@@ -135,6 +135,10 @@ pub(crate) struct PatchTool {
     reveal_in_side_bar: bool,
     /// The selection the flat list was scrolled to. See [`tool::list::take_reveal`].
     list_revealed: Option<Rc<str>>,
+    /// The mod code being typed to rename the work to, while that form is open.
+    rename_to: Option<String>,
+    /// A rename running: the work is on another thread. See [`tool::rename`].
+    renaming: Option<tool::rename::Renaming>,
 
     /// The text in the editor and what it belongs to (`(behavior, id)`).
     editor_text: String,
@@ -375,6 +379,7 @@ impl PatchTool {
         }
         self.read_view_settings(settings);
         self.changed_only = settings.changed_only;
+        self.poll_rename(ui.ctx(), notify, i18n);
         self.sync_workspace(notify, i18n);
         self.draw(ui, i18n, notify);
 
@@ -399,6 +404,14 @@ impl PatchTool {
     }
 
     fn draw(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        // The work is on another thread: only how far it is.
+        if let Some(renaming) = &self.renaming {
+            ui.label(format!("{}: {} -> {}", i18n.t(I18nKey::NemesisRenameCodeRunning), renaming.old, renaming.new));
+            let done = renaming.done.load(std::sync::atomic::Ordering::Relaxed);
+            let bar = egui::ProgressBar::new(renaming.progress()).text(format!("{done} / {}", renaming.total));
+            ui.add(bar.animate(true));
+            return;
+        }
         self.code_choice_window(ui.ctx(), i18n, notify);
         if self.is_user_patch {
             self.user_patch_bar(ui, i18n, notify);

@@ -1078,6 +1078,21 @@ pub enum I18nKey {
     /// Rename (the patches using it are updated too)
     NemesisRename,
 
+    /// Rename…
+    NemesisRenameCode,
+
+    /// Renamed the mod code
+    NemesisRenameCodeDone,
+
+    /// The mod code could not be renamed
+    NemesisRenameCodeFailed,
+
+    /// Gives this work another mod code (4-6 letters or digits): the ids of its new objects and clips change with it. What was exported under the old code goes at the next Export.
+    NemesisRenameCodeHover,
+
+    /// Renaming the mod code
+    NemesisRenameCodeRunning,
+
     /// Could not take the conflict's value
     NemesisResolveFailed,
 

@@ -2,4 +2,5 @@
 
 mod editing;
 pub(super) mod list;
+pub(super) mod rename;
 mod work;

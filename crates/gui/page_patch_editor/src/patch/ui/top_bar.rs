@@ -22,6 +22,7 @@ use gui_shared::{
 use crate::patch::{
     PatchTool,
     new_work::NewWork,
+    tool::rename::rename_problem,
     workspace::{ExportFormat, Workspace},
 };
 
@@ -163,10 +164,13 @@ impl PatchTool {
         self.ref_mods_row(ui, i18n);
 
         ui.horizontal_wrapped(|ui| {
-            // Fixed: it is in the ids of the new objects and the names of the folders.
+            // It is in the ids of the new objects and the names of the folders: renamed, not typed over.
             let hover = i18n.t(I18nKey::NemesisModCodeHover);
             ui.label(i18n.t(I18nKey::NemesisModCodeLabel)).on_hover_text(hover);
             ui.strong(self.mod_code.trim()).on_hover_text(hover);
+            if !self.is_user_patch {
+                self.rename_form(ui, i18n, notify);
+            }
 
             let info = &mut self.workspace.info;
             let mut changed = false;
@@ -184,6 +188,36 @@ impl PatchTool {
                 self.mark_dirty();
             }
         });
+    }
+
+    /// `[Rename…]`, then `[newc] [Rename] [Cancel] why not`. See [`crate::patch::tool::rename`].
+    fn rename_form(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        let Some(new) = &mut self.rename_to else {
+            if ui
+                .add(Button::new(i18n.t(I18nKey::NemesisRenameCode)).small())
+                .on_hover_text(i18n.t(I18nKey::NemesisRenameCodeHover))
+                .clicked()
+            {
+                self.rename_to = Some(String::new());
+            }
+            return;
+        };
+        ui.add(TextEdit::singleline(new).hint_text(i18n.t(I18nKey::NemesisModCodeHint)).desired_width(90.0));
+        let old = self.loaded_for.as_deref().unwrap_or_default();
+        let problem = rename_problem(old, new, |code| Workspace::exists(&self.cache_root, code));
+        let rename =
+            ui.add_enabled(problem.is_none(), Button::new(i18n.t(I18nKey::NemesisRenameCode)).small().primary());
+        let cancel = ui.add(Button::new(i18n.t(I18nKey::CancelButton)).small()).clicked();
+        if let Some(problem) = problem.filter(|_| !new.is_empty()) {
+            ui.colored_label(ui.visuals().warn_fg_color, i18n.t(problem));
+        }
+        if rename.on_hover_text(i18n.t(I18nKey::NemesisRenameCodeHover)).clicked() {
+            let new = std::mem::take(new);
+            self.rename_to = None;
+            self.start_rename(&new, notify, i18n);
+        } else if cancel {
+            self.rename_to = None;
+        }
     }
 
     /// `[Read from] D:/mods/Paraglider  [Reload]`, if the work was read from a mod.

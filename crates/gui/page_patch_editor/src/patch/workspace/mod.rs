@@ -23,6 +23,7 @@ mod import;
 mod locations;
 mod mod_info;
 pub(in crate::patch) mod pandora;
+pub(in crate::patch) mod rename;
 
 use std::{
     borrow::Cow,

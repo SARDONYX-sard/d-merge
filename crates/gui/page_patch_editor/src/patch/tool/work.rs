@@ -93,6 +93,9 @@ impl PatchTool {
 
     /// Loads the work of the code when it changes, and saves pending edits.
     pub(in crate::patch) fn sync_workspace(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        if self.renaming.is_some() {
+            return; // The work is not here: see `tool::rename`.
+        }
         let code = self.mod_code.trim();
         if is_existing_mod_code(code) && self.loaded_for.as_deref() != Some(code) {
             let code = code.to_owned();
@@ -131,6 +134,9 @@ impl PatchTool {
     }
 
     pub(in crate::patch) fn save_now(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        if self.renaming.is_some() {
+            return; // The empty work here would be saved over it: see `tool::rename`.
+        }
         self.sync_pandora_doc();
         let Some(code) = self.loaded_for.clone() else { return };
         if self.dirty_since.take().is_none() {
