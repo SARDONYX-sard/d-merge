@@ -61,8 +61,8 @@ impl PatchTool {
         self.reset_names();
         self.tabs.clear();
         self.selected = None;
-        self.editor_for = None;
-        self.preview = None;
+        self.pane.opened = None;
+        self.pane.preview = None;
         self.restore_session();
         self.mark_dirty();
         self.save_now(notify, i18n);

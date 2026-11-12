@@ -33,7 +33,7 @@ mod workspace;
 
 use std::{path::PathBuf, rc::Rc, time::Instant};
 
-use egui_code_editor::{CodeEditorState, Diagnostic, EditorCommand, InlineDiff};
+use egui_code_editor::EditorCommand;
 use egui_widgets::notify::Notification;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
@@ -42,7 +42,7 @@ use gui_shared::{
             patch::behavior::ParserMode,
             patch_editor::{PatchEditorSettings, RecentWork},
         },
-        ui::editor::{EditorMode, LspOptions},
+        ui::editor::LspOptions,
     },
 };
 
@@ -85,8 +85,8 @@ pub(crate) struct PatchTool {
     cache_root: PathBuf,
     /// This tool is the user patch's, in its window: see [`user_patch`].
     is_user_patch: bool,
-    /// What the mods have at the conflict being edited, shown beside the editor.
-    merge_values: Option<editor::resolve::MergeValues>,
+    /// The editor of the open object and what is beside it: preview, merge, problems. See [`tool::editing`].
+    pane: tool::editing::EditorPane,
     /// What `Edit...` proposed, until it is edited.
     draft: Option<user_patch::Draft>,
     /// Its bulk delete asks once more.
@@ -126,60 +126,18 @@ pub(crate) struct PatchTool {
     selected: Option<Rc<str>>,
     /// The objects of the explorer: the filters, the tree or the list, the keyboard in them. See [`tool::list`].
     explorer: tool::list::Explorer,
-    /// The editor had the keyboard last frame. See [`PatchTool::note_editor_focus`].
-    editor_had_focus: bool,
     /// The mod code being typed to rename the work to, while that form is open.
     rename_to: Option<String>,
     /// What runs on another thread: reading a mod, renaming its code. See [`tool::job`].
     job: Option<tool::job::Job>,
 
-    /// The text in the editor and what it belongs to (`(behavior, id)`).
-    editor_text: String,
-    editor_for: Option<(usize, String)>,
-    editor: CodeEditorState,
     /// The patch page's parser mode: what d-merge will accept, so what is checked here.
     parser_mode: ParserMode,
-    /// The trigger names of the template, read once (see [`anim::data::template_trigger_names`]).
-    template_triggers: Option<std::collections::BTreeSet<String>>,
-    /// Those and the work's, for completion in clip data files. Updated when one is opened.
-    trigger_names: Vec<String>,
     /// The "animation data" window.
     anim_data_dialog: Option<ui::anim_data::AnimDataDialog>,
     /// The objects open in tabs.
     tabs: editor::tabs::EditorTabs,
-    /// Preview of `editor_for`: (patch, parser result). Recomputed when the text changes.
-    preview: Option<(Option<String>, Result<(), String>)>,
-    /// Typed at this time: `preview` is out of date, and is computed again after [`REFRESH_DELAY`].
-    typed_at: Option<Instant>,
-    /// Unknown class / field names in the editor text (underlined).
-    field_problems: Vec<Diagnostic>,
-    /// The changes shown inside the editor, compared to the template.
-    inline_diff: InlineDiff,
-    /// Show `inline_diff`. From the settings.
-    show_inline_diff: bool,
-    /// Show preview diff. From the settings.
-    show_preview: bool,
-    /// The preview scrolls to and highlights the editor's cursor line. From the settings.
-    follow_preview: bool,
-    /// One label per changed block of the selected object (its `↶` revert buttons).
-    preview_view: Option<editor::preview::Preview>,
-    /// `Shift+F12`: who uses a symbol.
-    references: Option<editor::navigate::ReferenceList>,
-    history: editor::navigate::History,
-    /// The keyboard goes to the editor on the next frame, and the cursor to this place.
-    /// (An editor's id depends on its object, so this can only be done once the object is open.)
-    focus_editor: Option<FocusAt>,
 
-    /// Normal / Vim keys of the object editor.
-    editor_mode: EditorMode,
-    /// Language features (shared with hkanno's options), and their window is open.
-    lsp: LspOptions,
-    show_lsp_options: bool,
-    /// The editor's cursor line last frame (for the class around it).
-    cursor_line: usize,
-
-    /// `(behavior, values)`: enum / flag values per field, for the completion.
-    field_values: Option<(usize, std::rc::Rc<editor::language::FieldValues>)>,
     /// The "New" class list is open, and its filter.
     class_picker: bool,
     class_filter: String,
@@ -192,8 +150,6 @@ pub(crate) struct PatchTool {
     edits: u64,
     /// The Changes view: what changed since the last revision, and what is typed there. See [`changes`].
     scm: changes::Scm,
-    /// The lines accepted last in the merge panel: where the conflict is now. See [`editor::merge`].
-    merge_accepted: Vec<String>,
     /// The window making many objects from one. See [`repeat`].
     repeat: Option<ui::repeat::RepeatForm>,
     /// The window of a diff or a blame of the history. See [`ui::revision_view`].
@@ -218,8 +174,6 @@ pub(crate) struct PatchTool {
     pending_duplicate: Option<(Vec<String>, String)>,
     /// The "new clips" window.
     new_clips: Option<ui::anim_data::NewClipsForm>,
-    /// What each line of the open anim data file is. Recomputed with the preview.
-    anim_roles: Vec<anim::lines::LineRole>,
     /// The events / variables panel shows variables (else events).
     show_variables: bool,
     /// `(behavior, names)` of the events / variables panel and the completion.
@@ -290,37 +244,37 @@ impl PatchTool {
     pub(crate) fn set_parser_mode(&mut self, mode: ParserMode) {
         if self.parser_mode != mode {
             self.parser_mode = mode;
-            self.preview = None;
+            self.pane.preview = None;
         }
     }
 
     /// The editor's settings, shared with the hkanno editor.
     fn read_editor_options(&mut self, editor: &LspOptions) {
-        self.editor_mode = editor.editor_mode;
-        self.lsp.clone_from(editor);
+        self.pane.mode = editor.editor_mode;
+        self.pane.lsp.clone_from(editor);
     }
 
     /// Back to the settings: changed by the keymap box and the options window.
     fn write_editor_options(&mut self, editor: &mut LspOptions) {
         // Both hold the keymap: the box only changes `editor_mode`.
-        self.lsp.editor_mode = self.editor_mode;
-        if *editor != self.lsp {
-            editor.clone_from(&self.lsp);
+        self.pane.lsp.editor_mode = self.pane.mode;
+        if *editor != self.pane.lsp {
+            editor.clone_from(&self.pane.lsp);
         }
     }
 
     /// What is shown of the editor, kept in the settings.
     const fn read_view_settings(&mut self, settings: &PatchEditorSettings) {
-        self.show_inline_diff = settings.inline_diff;
-        self.follow_preview = settings.follow_preview;
-        self.show_preview = settings.show_preview;
+        self.pane.show_inline_diff = settings.inline_diff;
+        self.pane.follow_preview = settings.follow_preview;
+        self.pane.show_preview = settings.show_preview;
         self.explorer.tree_view = settings.tree_view;
     }
 
     const fn write_view_settings(&self, settings: &mut PatchEditorSettings) {
-        settings.inline_diff = self.show_inline_diff;
-        settings.show_preview = self.show_preview;
-        settings.follow_preview = self.follow_preview;
+        settings.inline_diff = self.pane.show_inline_diff;
+        settings.show_preview = self.pane.show_preview;
+        settings.follow_preview = self.pane.follow_preview;
         settings.tree_view = self.explorer.tree_view;
     }
 
@@ -534,8 +488,8 @@ mod tests {
                 let tree = &tool.explorer.trees[path];
                 let found = tree.rows().get(tree.cursor).map(|row| names.graph.id(row.node));
                 assert_eq!(found, Some(id.as_str()), "`{id}` is not selected in the tree");
-                assert_eq!(tool.editor_for.as_ref().map(|(_, open)| open.as_str()), Some(id.as_str()));
-                assert!(!tool.editor_text.is_empty(), "`{id}` opened empty");
+                assert_eq!(tool.pane.opened.as_ref().map(|(_, open)| open.as_str()), Some(id.as_str()));
+                assert!(!tool.pane.text.is_empty(), "`{id}` opened empty");
             }
         }
     }
@@ -740,34 +694,35 @@ mod work_tests {
     /// Vim `]c`: in the text while the inline diff shows, else in the preview.
     #[test]
     fn the_change_keys_go_to_what_shows_the_changes() {
-        let mut tool = PatchTool {
+        let pane = tool::editing::EditorPane {
             inline_diff: editor::inline_diff::changes("a\nb\nc\nd\n", "a\nx\nc\ny\n"),
             preview_view: Some(editor::preview::Preview::new(
                 "<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- CLOSE -->\n<!-- MOD_CODE ~m~ OPEN -->\nd\n<!-- CLOSE -->\n",
             )),
             show_inline_diff: true,
             show_preview: true,
-            ..PatchTool::default()
+            ..Default::default()
         };
-        let current = |tool: &PatchTool| tool.preview_view.as_ref().map(|view| view.current);
+        let mut tool = PatchTool { pane, ..PatchTool::default() };
+        let current = |tool: &PatchTool| tool.pane.preview_view.as_ref().map(|view| view.current);
 
         tool.step_change(true);
-        assert!(matches!(tool.focus_editor, Some(FocusAt::Line(1))));
-        tool.cursor_line = 1;
+        assert!(matches!(tool.pane.focus, Some(FocusAt::Line(1))));
+        tool.pane.cursor_line = 1;
         tool.step_change(true);
-        assert!(matches!(tool.focus_editor, Some(FocusAt::Line(3))));
-        tool.cursor_line = 3;
+        assert!(matches!(tool.pane.focus, Some(FocusAt::Line(3))));
+        tool.pane.cursor_line = 3;
         tool.step_change(false);
-        assert!(matches!(tool.focus_editor, Some(FocusAt::Line(1))));
+        assert!(matches!(tool.pane.focus, Some(FocusAt::Line(1))));
         assert_eq!(current(&tool), Some(0), "the preview stays");
 
-        tool.focus_editor = None;
-        tool.show_inline_diff = false;
+        tool.pane.focus = None;
+        tool.pane.show_inline_diff = false;
         tool.step_change(true);
         assert_eq!(current(&tool), Some(1));
-        assert!(tool.focus_editor.is_none(), "the cursor stays");
+        assert!(tool.pane.focus.is_none(), "the cursor stays");
 
-        tool.show_preview = false;
+        tool.pane.show_preview = false;
         tool.step_change(true);
         assert_eq!(current(&tool), Some(1), "neither shows");
     }
@@ -797,12 +752,12 @@ mod work_tests {
         tool.wait_job(&mut notify, &i18n);
         tool.sync_workspace(&mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        tool.editor_text = tool.workspace.behaviors[0].text("#0001").unwrap().to_owned();
+        tool.pane.text = tool.workspace.behaviors[0].text("#0001").unwrap().to_owned();
 
         let shown = |tool: &mut PatchTool| {
-            tool.preview = None;
+            tool.pane.preview = None;
             tool.refresh_preview("#0001");
-            let lines = tool.preview_view.as_ref().map(|view| view.lines().iter().map(|(_, line)| line.clone()));
+            let lines = tool.pane.preview_view.as_ref().map(|view| view.lines().iter().map(|(_, line)| line.clone()));
             lines.map_or_else(String::new, |lines| lines.collect::<Vec<_>>().join("\n"))
         };
         let as_pandora = shown(&mut tool);
@@ -823,16 +778,17 @@ mod work_tests {
     #[test]
     fn the_keymap_box_changes_the_keymap() {
         let mut tool = PatchTool::default();
-        let mut editor = LspOptions { editor_mode: EditorMode::Normal, ..LspOptions::default() };
+        let mut editor =
+            LspOptions { editor_mode: gui_shared::settings::ui::editor::EditorMode::Normal, ..LspOptions::default() };
         tool.read_editor_options(&editor);
-        tool.editor_mode = EditorMode::Vim;
+        tool.pane.mode = gui_shared::settings::ui::editor::EditorMode::Vim;
         tool.write_editor_options(&mut editor);
-        assert_eq!(editor.editor_mode, EditorMode::Vim);
+        assert_eq!(editor.editor_mode, gui_shared::settings::ui::editor::EditorMode::Vim);
 
         tool.read_editor_options(&editor);
-        tool.lsp.hover = !tool.lsp.hover;
+        tool.pane.lsp.hover = !tool.pane.lsp.hover;
         tool.write_editor_options(&mut editor);
-        assert_eq!(editor.hover, tool.lsp.hover);
-        assert_eq!(editor.editor_mode, EditorMode::Vim);
+        assert_eq!(editor.hover, tool.pane.lsp.hover);
+        assert_eq!(editor.editor_mode, gui_shared::settings::ui::editor::EditorMode::Vim);
     }
 }

@@ -56,7 +56,7 @@ impl PatchTool {
         let has_focus = ui.memory(|m| m.has_focus(editor_id));
         self.note_editor_focus(ui.ctx(), has_focus);
         // `Ctrl+W` closes the tab, as in VS Code. (Vim uses that key itself.)
-        if self.editor_mode == EditorMode::Normal
+        if self.pane.mode == EditorMode::Normal
             && ui.memory(|m| m.has_focus(editor_id))
             && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::W))
         {
@@ -81,20 +81,20 @@ impl PatchTool {
         let behavior = &self.workspace.behaviors[self.active];
         let is_new = behavior.added.contains_key(&*id) || behavior.is_ref(&id) || *id == *PANDORA_DOC;
         // What the mods have at the conflict being edited: the preview comes back when it is closed.
-        let is_merging = self.merge_values.as_ref().is_some_and(|values| *values.id == *id);
+        let is_merging = self.pane.merge_values.as_ref().is_some_and(|values| *values.id == *id);
         let preview_event = if is_merging {
             self.merge_panel(ui, i18n, &id);
             None
-        } else if is_new || !self.show_preview {
+        } else if is_new || !self.pane.show_preview {
             None
         } else {
             self.preview_panel(ui, i18n)
         };
         let result = self.editor_panel(ui, i18n, &id);
 
-        if let Some(view) = &mut self.preview_view {
-            if self.follow_preview {
-                view.follow_editor_line(self.cursor_line, &self.editor_text);
+        if let Some(view) = &mut self.pane.preview_view {
+            if self.pane.follow_preview {
+                view.follow_editor_line(self.pane.cursor_line, &self.pane.text);
             } else {
                 view.stop_following();
             }
@@ -102,18 +102,18 @@ impl PatchTool {
         if self.apply_editor_result(result, &id) {
             self.enter_tree(ui, editor_id);
         }
-        if let Some((document, line)) = references_window(ui.ctx(), &mut self.references) {
+        if let Some((document, line)) = references_window(ui.ctx(), &mut self.pane.references) {
             if *document != *id {
-                self.history.visit(&id);
+                self.pane.history.visit(&id);
                 self.selected = Some(document.into());
             }
-            self.focus_editor = Some(FocusAt::Line(line));
+            self.pane.focus = Some(FocusAt::Line(line));
         }
         match preview_event {
             Some(PreviewEvent::Revert(block)) => self.revert_block(&id, block),
             Some(PreviewEvent::JumpToEditor(row)) => {
-                let line = self.preview_view.as_ref().and_then(|view| view.editor_line_of(row, &self.editor_text));
-                self.focus_editor = line.map(FocusAt::Line);
+                let line = self.pane.preview_view.as_ref().and_then(|view| view.editor_line_of(row, &self.pane.text));
+                self.pane.focus = line.map(FocusAt::Line);
             }
             None => {}
         }
@@ -121,7 +121,7 @@ impl PatchTool {
 
     /// The mods' values side by side, as git's merge editor: see [`crate::patch::editor::merge`].
     fn merge_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, id: &str) {
-        let Some(values) = self.merge_values.take() else { return };
+        let Some(values) = self.pane.merge_values.take() else { return };
         let (mut picked, mut close) = (None, false);
         let panel_id = if self.is_user_patch { "user_patch_merge" } else { "nemesis_merge" };
         egui::Panel::right(panel_id).default_size(620.0).resizable(true).show(ui, |ui| {
@@ -145,47 +145,47 @@ impl PatchTool {
         });
         match picked {
             Some(MergePick::Insert(lines)) => {
-                let (text, last) = resolve::insert_lines(&self.editor_text, self.cursor_line, &lines);
+                let (text, last) = resolve::insert_lines(&self.pane.text, self.pane.cursor_line, &lines);
                 self.set_merged_text(id, text, last);
             }
             Some(MergePick::Accept(lines)) => {
-                let candidates = merge::candidates(&values, &self.merge_accepted);
-                if let Some(text) = merge::replace_block(&self.editor_text, &candidates, &lines) {
+                let candidates = merge::candidates(&values, &self.pane.merge_accepted);
+                if let Some(text) = merge::replace_block(&self.pane.text, &candidates, &lines) {
                     merge::remember(&mut self.workspace.resolutions, &values, lines.clone());
-                    self.merge_accepted = lines;
-                    let line = self.cursor_line;
+                    self.pane.merge_accepted = lines;
+                    let line = self.pane.cursor_line;
                     self.set_merged_text(id, text, line);
                 } else {
                     // Not found where it was: below the cursor, as `+` does.
-                    let (text, last) = resolve::insert_lines(&self.editor_text, self.cursor_line, &lines);
+                    let (text, last) = resolve::insert_lines(&self.pane.text, self.pane.cursor_line, &lines);
                     self.set_merged_text(id, text, last);
                 }
             }
             None => {}
         }
         if !close {
-            self.merge_values = Some(values);
+            self.pane.merge_values = Some(values);
         }
     }
 
     /// The object's text after a pick of the merge panel.
     fn set_merged_text(&mut self, id: &str, text: String, line: usize) {
-        self.editor_text = text;
-        self.workspace.behaviors[self.active].set_text(id, &self.editor_text);
-        self.preview = None;
+        self.pane.text = text;
+        self.workspace.behaviors[self.active].set_text(id, &self.pane.text);
+        self.pane.preview = None;
         self.object_changed(id);
-        self.focus_editor = Some(FocusAt::Line(line));
+        self.pane.focus = Some(FocusAt::Line(line));
     }
     /// `Patch preview ▲ ▼ 2/5 ✔ ... [follow]` and its lines.
     fn preview_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PreviewEvent> {
         let mut event = None;
         let panel_id = if self.is_user_patch { "user_patch_preview" } else { "nemesis_preview" };
-        let is_pandora = self.preview_view.as_ref().is_some_and(|view| view.is_pandora());
+        let is_pandora = self.pane.preview_view.as_ref().is_some_and(|view| view.is_pandora());
         egui::Panel::right(panel_id).default_size(520.0).resizable(true).show(ui, |ui| {
-            let Some((patch, check)) = &self.preview else { return };
+            let Some((patch, check)) = &self.pane.preview else { return };
             ui.horizontal(|ui| {
                 ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
-                if let Some(view) = &mut self.preview_view {
+                if let Some(view) = &mut self.pane.preview_view {
                     super::preview::nav_ui(view, ui, i18n.t(I18nKey::NemesisJumpDiffHover));
                 }
                 match check {
@@ -202,13 +202,13 @@ impl PatchTool {
                     }
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let follow = Button::selectable(self.follow_preview, "").icon(Icon::Crosshair).small();
+                    let follow = Button::selectable(self.pane.follow_preview, "").icon(Icon::Crosshair).small();
                     if ui.add(follow).on_hover_text(i18n.t(I18nKey::NemesisFollowCursor)).clicked() {
-                        self.follow_preview = !self.follow_preview;
+                        self.pane.follow_preview = !self.pane.follow_preview;
                     }
                 });
             });
-            if let Some(view) = &mut self.preview_view {
+            if let Some(view) = &mut self.pane.preview_view {
                 event = super::preview::lines_ui(view, ui, i18n.t(I18nKey::NemesisRevertHunkHover));
             }
         });
@@ -223,14 +223,17 @@ impl PatchTool {
         // The class (and fields) around the cursor line of last frame: field names / hover.
         let is_pandora_doc = id == PANDORA_DOC;
         let context = if is_pandora_doc {
-            pandora::fields_at(&self.workspace.behaviors[self.active], &self.editor_text, self.cursor_line)
+            pandora::fields_at(&self.workspace.behaviors[self.active], &self.pane.text, self.pane.cursor_line)
         } else {
-            nemesis_diff::schema::field_context(&self.editor_text, self.cursor_line)
+            nemesis_diff::schema::field_context(&self.pane.text, self.pane.cursor_line)
         };
-        let open_field =
-            if is_pandora_doc { None } else { nemesis_diff::schema::open_field(&self.editor_text, self.cursor_line) };
+        let open_field = if is_pandora_doc {
+            None
+        } else {
+            nemesis_diff::schema::open_field(&self.pane.text, self.pane.cursor_line)
+        };
         let language = NemesisXml {
-            code_action: self.lsp.code_action,
+            code_action: self.pane.lsp.code_action,
             events: &names.usable_events,
             variables: &names.usable_variables,
             variable_types: &names.variable_types,
@@ -245,9 +248,9 @@ impl PatchTool {
         };
         let anim_data = self.workspace.behaviors[self.active].is_anim_data();
         let anim_language = AnimDataLanguage {
-            roles: &self.anim_roles,
-            cursor_line: self.cursor_line,
-            trigger_names: &self.trigger_names,
+            roles: &self.pane.anim_roles,
+            cursor_line: self.pane.cursor_line,
+            trigger_names: &self.pane.trigger_names,
         };
         let pandora_language = PandoraXml { inner: &language };
         let shown_language: &dyn egui_code_editor::Language = if is_pandora_doc {
@@ -257,8 +260,8 @@ impl PatchTool {
         } else {
             &language
         };
-        let features = editor_features(&self.lsp, anim_data);
-        let keymap = match self.editor_mode {
+        let features = editor_features(&self.pane.lsp, anim_data);
+        let keymap = match self.pane.mode {
             EditorMode::Normal => Keymap::Normal,
             EditorMode::Vim => Keymap::Vim,
         };
@@ -285,19 +288,19 @@ impl PatchTool {
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if can_split {
-                        split_preview_button(ui, i18n, &mut self.show_preview);
+                        split_preview_button(ui, i18n, &mut self.pane.show_preview);
                     }
-                    let inline = Button::selectable(self.show_inline_diff, "").icon(Icon::Diff).small();
+                    let inline = Button::selectable(self.pane.show_inline_diff, "").icon(Icon::Diff).small();
                     if ui.add(inline).on_hover_text(i18n.t(I18nKey::NemesisInlineDiffHover)).clicked() {
-                        self.show_inline_diff = !self.show_inline_diff;
+                        self.pane.show_inline_diff = !self.pane.show_inline_diff;
                     }
-                    if self.show_inline_diff
-                        && let Some(line) = inline_diff_nav(ui, i18n, &self.inline_diff, self.cursor_line)
+                    if self.pane.show_inline_diff
+                        && let Some(line) = inline_diff_nav(ui, i18n, &self.pane.inline_diff, self.pane.cursor_line)
                     {
-                        self.focus_editor = Some(FocusAt::Line(line));
+                        self.pane.focus = Some(FocusAt::Line(line));
                     }
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        result.walk_history = history_buttons(ui, i18n, &self.history);
+                        result.walk_history = history_buttons(ui, i18n, &self.pane.history);
                         result.tab_event = tab_bar(ui, i18n, &self.tabs, self.active, id, &names.graph);
                     });
                 });
@@ -306,16 +309,16 @@ impl PatchTool {
             if read_only {
                 ui.weak(i18n.t(I18nKey::NemesisRefReadOnly));
             }
-            if self.show_lsp_options {
-                lsp_options_window(ui.ctx(), i18n, &mut self.lsp, &mut self.show_lsp_options);
+            if self.pane.show_lsp_options {
+                lsp_options_window(ui.ctx(), i18n, &mut self.pane.lsp, &mut self.pane.show_lsp_options);
             }
             // The editor's settings are in its status bar, as in VS Code.
             let status_id = if self.is_user_patch { "user_patch_status_bar" } else { "nemesis_status_bar" };
             egui::Panel::bottom(status_id).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     toggle_problems |= problem_counts(ui, i18n, counts);
-                    toolbar(ui, i18n, &mut self.editor_mode, &mut self.show_lsp_options);
-                    egui_code_editor::status_line(ui, &self.editor, keymap, &self.editor_text);
+                    toolbar(ui, i18n, &mut self.pane.mode, &mut self.pane.show_lsp_options);
+                    egui_code_editor::status_line(ui, &self.pane.state, keymap, &self.pane.text);
                 });
             });
             if self.problems.open
@@ -325,19 +328,19 @@ impl PatchTool {
             }
             // Per object: each tab keeps where it was scrolled to.
             egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false).show(ui, |ui| {
-                let output = CodeEditor::new(("nemesis_object", self.is_user_patch, id), &mut self.editor_text)
+                let output = CodeEditor::new(("nemesis_object", self.is_user_patch, id), &mut self.pane.text)
                     .language(shown_language)
                     .read_only(read_only)
-                    .diagnostics(&self.field_problems)
+                    .diagnostics(&self.pane.problems)
                     .features(features)
                     .keymap(keymap)
                     .labels(labels)
                     .host_commands(&HOST_COMMANDS)
                     .actions(&actions)
-                    .inline_diff(self.show_inline_diff.then_some(&self.inline_diff))
-                    .show(ui, &mut self.editor);
+                    .inline_diff(self.pane.show_inline_diff.then_some(&self.pane.inline_diff))
+                    .show(ui, &mut self.pane.state);
                 if let Some(cursor) = output.cursor {
-                    self.cursor_line = cursor.line;
+                    self.pane.cursor_line = cursor.line;
                 }
                 result.changed = output.changed;
                 result.inline_revert = output.inline_revert;
@@ -353,7 +356,7 @@ impl PatchTool {
                     Some(Navigation::Definition(location)) => {
                         result.definition = Some((location.document.into_owned(), location.line));
                     }
-                    Some(Navigation::References(references)) => self.references = Some(references.into()),
+                    Some(Navigation::References(references)) => self.pane.references = Some(references.into()),
                     None => {}
                 }
             });

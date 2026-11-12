@@ -305,8 +305,8 @@ impl PatchTool {
     /// The objects changed under the editor: what shows them is made again.
     fn work_restored(&mut self) {
         self.reset_names();
-        self.editor_for = None;
-        self.preview = None;
+        self.pane.opened = None;
+        self.pane.preview = None;
         self.mark_dirty();
     }
 

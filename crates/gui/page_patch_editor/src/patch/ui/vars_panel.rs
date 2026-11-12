@@ -101,7 +101,7 @@ impl PatchTool {
         let ids = Ids { string_data, graph_data, value_set };
         match self.apply(action, &ids, events, variables) {
             Ok(changed) => {
-                self.editor_for = None; // the open object may be one of them
+                self.pane.opened = None; // the open object may be one of them
                 for id in changed {
                     self.object_changed(&id);
                 }

@@ -201,8 +201,8 @@ impl PatchTool {
         resolve::apply(&mut tool.workspace, &root, request)?;
         tool.workspace.reload_refs(); // a behavior may have been opened
         tool.reset_names();
-        tool.editor_for = None;
-        tool.preview = None;
+        tool.pane.opened = None;
+        tool.pane.preview = None;
         let invalid = tool.write_user_patch()?;
         self.mod_written = true;
         if invalid.is_empty() { Ok(()) } else { Err(invalid.join("\n")) }
@@ -226,7 +226,7 @@ impl PatchTool {
 
     /// What `Edit...` proposed goes, unless it was edited. See [`Draft`].
     pub(super) fn undo_unedited_draft(&mut self) {
-        self.merge_values = None;
+        self.pane.merge_values = None;
         let Some(draft) = self.draft.take() else { return };
         if draft.is_edited(&self.workspace) {
             return;
@@ -234,8 +234,8 @@ impl PatchTool {
         let id = draft.id.clone();
         draft.undo(&mut self.workspace);
         self.reset_names();
-        self.editor_for = None;
-        self.preview = None;
+        self.pane.opened = None;
+        self.pane.preview = None;
         self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
         if self.workspace.behaviors.get(self.active).is_none_or(|behavior| behavior.text(&id).is_none()) {
             self.tabs.clear();
@@ -257,8 +257,8 @@ impl PatchTool {
         self.tabs.clear();
         self.active = 0;
         self.selected = None;
-        self.editor_for = None;
-        self.preview = None;
+        self.pane.opened = None;
+        self.pane.preview = None;
         match self.write_user_patch() {
             Ok(_) => self.mod_written = true,
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),

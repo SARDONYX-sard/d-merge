@@ -135,7 +135,7 @@ impl PatchTool {
         let response = response.on_hover_text(i18n.t(I18nKey::NemesisExportFormatHover));
         if response.changed() {
             self.workspace.export_format = ExportFormat::ALL[selected].0;
-            self.preview = None; // it says what the export would write
+            self.pane.preview = None; // it says what the export would write
             self.mark_dirty();
         }
     }
@@ -291,7 +291,7 @@ impl PatchTool {
             return;
         }
         self.reset_names();
-        self.editor_for = None;
+        self.pane.opened = None;
         self.mark_dirty();
     }
 }

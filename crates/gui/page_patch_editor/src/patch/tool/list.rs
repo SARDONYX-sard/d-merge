@@ -63,11 +63,11 @@ impl PatchTool {
     /// Notes whether the editor `has_focus` this frame. Getting it asks the side bar to show the
     /// object again (next frame: the side bar is drawn first).
     pub(in crate::patch) fn note_editor_focus(&mut self, ctx: &egui::Context, has_focus: bool) {
-        if has_focus && !self.editor_had_focus {
+        if has_focus && !self.pane.had_focus {
             self.explorer.reveal = true;
             ctx.request_repaint();
         }
-        self.editor_had_focus = has_focus;
+        self.pane.had_focus = has_focus;
     }
 
     /// The keyboard goes to the object tree (Vim `Space e`, or the palette).
@@ -84,7 +84,7 @@ impl PatchTool {
     /// The keyboard goes back to the editor.
     pub(in crate::patch) const fn leave_tree(&mut self) {
         self.explorer.tree_focus = false;
-        self.focus_editor = Some(FocusAt::Keep);
+        self.pane.focus = Some(FocusAt::Keep);
     }
 
     /// The flat list has the same keys as the tree, without the folding.
@@ -153,7 +153,7 @@ impl PatchTool {
                 self.selected = neighbor.map(Rc::from);
             }
         }
-        self.editor_for = None;
+        self.pane.opened = None;
         self.refresh_problems(id);
         self.object_changed(id);
     }

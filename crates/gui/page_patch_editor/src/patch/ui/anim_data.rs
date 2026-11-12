@@ -211,7 +211,7 @@ impl PatchTool {
         self.reset_names();
         self.active = self.workspace.behaviors.iter().position(|b| b.name == name).unwrap_or(self.active);
         self.selected = None;
-        self.editor_for = None;
+        self.pane.opened = None;
         self.mark_dirty();
     }
 }

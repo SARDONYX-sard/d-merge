@@ -130,7 +130,7 @@ impl PatchTool {
                 self.tabs.clear();
                 self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
                 self.selected = None;
-                self.editor_for = None;
+                self.pane.opened = None;
                 self.mark_dirty();
             }
             None => {}
