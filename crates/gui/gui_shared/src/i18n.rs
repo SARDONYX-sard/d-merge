@@ -1336,6 +1336,9 @@ pub enum I18nKey {
     /// Revert
     RevertButton,
 
+    /// Back to the editor
+    RevisionViewClose,
+
     /// Output format for hkx.
     /// - SkyrimLE/Enderal: win32
     /// - SkyrimSE/SkyrimVR/EnderalSE: amd64

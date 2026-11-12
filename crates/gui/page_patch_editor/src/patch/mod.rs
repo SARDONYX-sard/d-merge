@@ -152,7 +152,7 @@ pub(crate) struct PatchTool {
     scm: changes::Scm,
     /// The window making many objects from one. See [`repeat`].
     repeat: Option<ui::repeat::RepeatForm>,
-    /// The window of a diff or a blame of the history. See [`ui::revision_view`].
+    /// A diff or a blame of the history, in the editor's place. See [`ui::revision_view`].
     revision_view: Option<ui::revision_view::RevisionView>,
     /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
     problems: problems::Problems,
@@ -371,7 +371,6 @@ impl PatchTool {
         self.anim_data_window(ui.ctx(), i18n, notify);
         self.new_clips_window(ui.ctx(), i18n);
         self.duplicate_window(ui.ctx(), i18n);
-        self.revision_view_window(ui.ctx(), i18n);
         self.repeat_window(ui.ctx(), i18n);
         self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
 

@@ -49,6 +49,10 @@ impl PatchTool {
             egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisSelectObject)));
             return;
         };
+        // A diff or a blame of the history, as VS Code opens them in its editor.
+        if self.revision_view_ui(ui, i18n, &id) {
+            return;
+        }
         self.open_in_editor(&id);
         let editor_id = egui_code_editor::editor_id(("nemesis_object", self.is_user_patch, &id));
         self.apply_focus_request(ui.ctx(), editor_id);

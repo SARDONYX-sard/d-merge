@@ -385,6 +385,7 @@
   "repeat_title": "繰り返し作成…",
   "repeat_values": "値(1行目は列の名前。区切りはタブかカンマ)",
   "revert_button": "元に戻す",
+  "revision_view_close": "エディタに戻る",
   "runtime_target_hover": "hkxの出力形式\n- SkyrimLE/Enderal: win32\n- SkyrimSE/SkyrimVR/EnderalSE: amd64\n\n注意\n- VFSモードかつWindows環境でこれを変更した場合、自動でレジストリを探索しSkyrim Dataディレクトリの更新も試みます",
   "search_hits_label": "件ヒット",
   "search_label": "検索",

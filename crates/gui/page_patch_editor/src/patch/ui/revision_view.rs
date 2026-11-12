@@ -1,4 +1,4 @@
-//! The windows of the history: an object compared between two revisions (as git's `diff`), and its
+//! The views of the history, in the editor's place: an object compared between two revisions (as git's `diff`), and its
 //! lines with the revision that last changed each (as GitLens' blame). The history is
 //! [`crate::patch::workspace::history`]; the Changes view, [`super::side_bar`], opens these.
 //!
@@ -17,13 +17,23 @@ use crate::patch::{
     workspace::history::{ObjectKey, Origin},
 };
 
-/// What a window of the history shows.
+/// A diff or a blame of an object, shown in the editor's place as VS Code opens a diff in its editor:
+/// while that object is the one open. `✖`, or opening another, goes back to the editor.
 #[derive(Debug)]
-pub(in crate::patch) enum RevisionView {
-    /// `title`, and the lines of the diff: ` ` the same, `-` only in the older, `+` only in the newer.
-    Compare { title: String, lines: Vec<(char, String)> },
-    /// `title`, and each line with what last changed it.
-    Blame { title: String, lines: Vec<(String, String)> },
+pub(in crate::patch) struct RevisionView {
+    /// The object, e.g. `#0106`.
+    id: String,
+    /// e.g. `#0106: #2 -> working`
+    title: String,
+    body: Body,
+}
+
+#[derive(Debug)]
+enum Body {
+    /// The lines of the diff: ` ` the same, `-` only in the older, `+` only in the newer.
+    Compare(Vec<(char, String)>),
+    /// Each line with what last changed it.
+    Blame(Vec<(String, String)>),
 }
 
 /// The lines of `old` and `new` as a unified diff: each hunk's old lines, then its new lines.
@@ -66,7 +76,17 @@ impl PatchTool {
         let (old, new) = (self.object_text_at(behavior, id, Some(from)), self.object_text_at(behavior, id, to));
         let to_name = to.map_or_else(|| "working".to_owned(), |number| format!("#{number}"));
         let title = format!("{id}: #{from} -> {to_name}");
-        self.revision_view = Some(RevisionView::Compare { title, lines: unified(&old, &new) });
+        self.show_in_editor(behavior, id, title, Body::Compare(unified(&old, &new)));
+    }
+
+    /// Opens object `id` with `body` in the editor's place.
+    fn show_in_editor(&mut self, behavior: usize, id: &str, title: String, body: Body) {
+        if behavior != self.active {
+            self.active = behavior;
+            self.tabs.clear();
+        }
+        self.selected = Some(id.into());
+        self.revision_view = Some(RevisionView { id: id.to_owned(), title, body });
     }
 
     /// Opens the blame of object `id` of behavior `behavior`, as the work has it now.
@@ -86,30 +106,36 @@ impl PatchTool {
             }
         };
         let lines = now.lines().zip(origins).map(|(line, origin)| (label(origin), line.to_owned())).collect();
-        self.revision_view = Some(RevisionView::Blame { title: format!("Blame {id}"), lines });
+        self.show_in_editor(behavior, id, format!("Blame {id}"), Body::Blame(lines));
     }
 
-    /// Draws the window of [`RevisionView`], if one is open.
-    pub(in crate::patch) fn revision_view_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        let Some(view) = &self.revision_view else { return };
-        let title = match view {
-            RevisionView::Compare { title, .. } | RevisionView::Blame { title, .. } => title.clone(),
-        };
-        let mut open = true;
-        egui_widgets::window_near_pointer(ctx, title)
-            .open(&mut open)
-            .default_size([720.0, 420.0])
-            .resizable(true)
-            .show(ctx, |ui| {
-                let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 2.0;
-                egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| match view {
-                    RevisionView::Compare { lines, .. } => compare_lines(ui, lines, row_height, i18n),
-                    RevisionView::Blame { lines, .. } => blame_lines(ui, lines),
+    /// Draws the diff or the blame in the editor's place, if one is open for object `id`. Returns
+    /// whether it was drawn. Another object open closes it.
+    pub(in crate::patch) fn revision_view_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, id: &str) -> bool {
+        self.revision_view = self.revision_view.take().filter(|view| view.id == id);
+        let Some(view) = &self.revision_view else { return false };
+        let mut close = false;
+        egui::CentralPanel::default().show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.strong(&view.title);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    close = ui.small_button("✖").on_hover_text(i18n.t(I18nKey::RevisionViewClose)).clicked();
                 });
             });
-        if !open {
+            ui.separator();
+            let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 2.0;
+            egui::ScrollArea::both().id_salt(("nemesis_revision_view", id)).auto_shrink(false).show(
+                ui,
+                |ui| match &view.body {
+                    Body::Compare(lines) => compare_lines(ui, lines, row_height, i18n),
+                    Body::Blame(lines) => blame_lines(ui, lines),
+                },
+            );
+        });
+        if close {
             self.revision_view = None;
         }
+        true
     }
 }
 
