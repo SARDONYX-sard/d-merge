@@ -153,14 +153,15 @@ pub(super) fn apply_key(input: crate::patch::tree::TreeInput, rows: &[AnimRow<'_
     let toggle = |key: &str| AnimKeyEffect::Toggle(key.to_owned());
     match (input, row.open_key()) {
         (TreeInput::Leave, _) => AnimKeyEffect::Leave,
-        (TreeInput::Toggle, Some((key, _))) => toggle(key),
-        // `l`: a closed one opens; into an open one.
-        (TreeInput::Open, Some((key, false))) => toggle(key),
+        // `o`; `l` on a closed one opens it; `h` on an open one closes it.
+        (TreeInput::Toggle, Some((key, _)))
+        | (TreeInput::Open, Some((key, false)))
+        | (TreeInput::Close, Some((key, true))) => toggle(key),
+        // `l` on an open one: into it.
         (TreeInput::Open, Some((_, true))) => {
             AnimKeyEffect::Cursor(if cursor + 1 < rows.len() { cursor + 1 } else { cursor })
         }
-        // `h`: an open one closes; from a closed one or a file, up to the row it is in.
-        (TreeInput::Close, Some((key, true))) => toggle(key),
+        // `h` on a closed one or a file: up to the row it is in.
         (TreeInput::Close, _) => {
             let depth = row.depth();
             let parent = rows[..cursor].iter().rposition(|above| above.depth() < depth);
