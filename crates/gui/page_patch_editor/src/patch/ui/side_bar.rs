@@ -70,7 +70,7 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut egui_widgets::notify::Notification,
     ) {
-        self.side_bar_keys();
+        self.side_bar_keys(ui);
         self.file_keys(ui.ctx(), notify);
         let id = if self.is_user_patch { "user_patch" } else { "nemesis" };
         egui::Panel::left((id, "activity_bar"))
@@ -151,7 +151,9 @@ impl PatchTool {
 
     /// `Ctrl+Shift+E` / `F` / `G` (key bindings), as in VS Code. A key shows its view, and does not
     /// hide it.
-    fn side_bar_keys(&mut self) {
+    ///
+    /// As VS Code's, the view shown has the keyboard then (the search, its field).
+    fn side_bar_keys(&mut self, ui: &egui::Ui) {
         use keybinding::commands::{SIDE_BAR_CHANGES, SIDE_BAR_EXPLORER, SIDE_BAR_SEARCH};
         let keys = [
             (SIDE_BAR_EXPLORER, SideView::Explorer),
@@ -163,6 +165,14 @@ impl PatchTool {
                 self.side.view = view;
                 self.side.hidden = false;
                 self.focus_search |= view == SideView::Search;
+                if view != SideView::Search {
+                    self.explorer.tree_focus = true;
+                    ui.memory_mut(|m| {
+                        if let Some(focused) = m.focused() {
+                            m.surrender_focus(focused);
+                        }
+                    });
+                }
             }
         }
     }
@@ -209,6 +219,27 @@ impl PatchTool {
         self.commit_box(ui, i18n);
 
         let mut picked = None;
+        // The keys of the explorer go through the changes while the side bar has the keyboard: the
+        // object of the one the cursor gets to opens, as the tree's does.
+        let count = self.scm.pending.changes.len();
+        self.scm.cursor = self.scm.cursor.min(count.saturating_sub(1));
+        let mut moved = false;
+        if self.explorer.tree_focus {
+            for input in keybinding::host::take_mapped(&mut self.key_commands, super::tree::tree_input) {
+                if input == crate::patch::tree::TreeInput::Leave {
+                    self.leave_tree();
+                } else if let Some(at) = input.step(self.scm.cursor, count) {
+                    moved |= at != self.scm.cursor;
+                    self.scm.cursor = at;
+                }
+            }
+            if moved && let Some(change) = self.scm.pending.changes.get(self.scm.cursor) {
+                let behavior =
+                    self.workspace.behaviors.iter().position(|behavior| behavior.meshes_path == change.behavior);
+                picked = behavior.map(|at| ChangeAction::Open(at, change.id.clone()));
+            }
+        }
+        let cursor = self.explorer.tree_focus.then_some(self.scm.cursor);
         // Up and down only: the rows are cut with `…`, as VS Code's.
         egui::ScrollArea::vertical().id_salt("side_changes").auto_shrink(false).show(ui, |ui| {
             let title = format!("{} ({})", i18n.t(I18nKey::SideChanges), self.scm.pending.changes.len());
@@ -216,8 +247,9 @@ impl PatchTool {
                 if self.scm.pending.changes.is_empty() {
                     ui.weak(i18n.t(I18nKey::SideNoChanges));
                 }
-                for change in &self.scm.pending.changes {
-                    if let Some(action) = change_row(ui, i18n, &self.workspace, change, None) {
+                for (at, change) in self.scm.pending.changes.iter().enumerate() {
+                    let keyboard = (cursor == Some(at), moved);
+                    if let Some(action) = change_row(ui, i18n, (&self.workspace, change), None, keyboard) {
                         picked = Some(action);
                     }
                 }
@@ -240,7 +272,13 @@ impl PatchTool {
                             .id_salt(("side_revision", revision.number))
                             .show(ui, |ui| {
                                 for change in &revision.changes {
-                                    let row = change_row(ui, i18n, &self.workspace, change, Some(revision.number));
+                                    let row = change_row(
+                                        ui,
+                                        i18n,
+                                        (&self.workspace, change),
+                                        Some(revision.number),
+                                        (false, false),
+                                    );
                                     if let Some(action) = row {
                                         picked = Some(action);
                                     }
@@ -444,12 +482,14 @@ enum ChangeAction {
 /// `M  0_master  #0106  hkbModifierList  GetUpModList`. `revision`: `None` for a change since the last
 /// revision, which can be discarded; else the revision of the history it is of, which the object can
 /// be put back to. A removed one can not be opened.
+///
+/// `(under_cursor, moved)`: the keyboard is on it (a frame), and just went there (scrolled to).
 fn change_row(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
-    workspace: &crate::patch::workspace::Workspace,
-    change: &ObjectChange,
+    (workspace, change): (&crate::patch::workspace::Workspace, &ObjectChange),
     revision: Option<u32>,
+    (under_cursor, moved): (bool, bool),
 ) -> Option<ChangeAction> {
     let behavior = workspace.behaviors.iter().position(|behavior| behavior.meshes_path == change.behavior);
     let name = behavior.map_or_else(|| file_stem(&change.behavior), |at| workspace.behaviors[at].name.as_str());
@@ -467,6 +507,13 @@ fn change_row(
         let text = format!("{name}  {}  {class}  {label}", change.id);
         // Cut with `…` to the width left, the whole on hover when cut, as VS Code's.
         let response = super::object_list::fitted_button(ui, false, &text);
+        if under_cursor {
+            let stroke = ui.visuals().selection.stroke;
+            ui.painter().rect_stroke(response.rect, 2.0, stroke, egui::StrokeKind::Outside);
+            if moved {
+                response.scroll_to_me(None);
+            }
+        }
         // As VS Code's Source Control: a change opens its object; a file of a revision, what that
         // revision changed of it.
         match (response.clicked(), behavior, revision) {

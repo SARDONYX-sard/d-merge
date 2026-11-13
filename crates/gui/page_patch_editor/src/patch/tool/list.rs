@@ -147,9 +147,13 @@ impl PatchTool {
     /// The keyboard goes to the object tree or list, as it shows, its filter kept (Vim `Space e`, or
     /// the palette).
     pub(in crate::patch) fn enter_tree(&mut self, ui: &egui::Ui, editor: egui::Id) {
-        // The tree or the list, as it shows: the keys are the same in both.
+        // The view shown, as VS Code's "Focus Side Bar": the tree or the list, or the changes. The
+        // views without keys of their own (the search, the variables) give way to the explorer.
+        use crate::patch::ui::side_bar::SideView;
         self.explorer.tree_focus = true;
-        self.side.view = crate::patch::ui::side_bar::SideView::Explorer;
+        if !matches!(self.side.view, SideView::Explorer | SideView::Changes) || self.side.hidden {
+            self.side.view = SideView::Explorer;
+        }
         self.side.hidden = false;
         self.side.objects_closed = false;
         ui.memory_mut(|m| m.surrender_focus(editor));

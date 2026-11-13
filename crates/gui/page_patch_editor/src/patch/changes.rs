@@ -15,6 +15,8 @@ pub(super) struct Scm {
     pub(super) commit_message: String,
     /// The name of a new branch, while it is typed.
     pub(super) new_branch: Option<String>,
+    /// The change the keyboard is on (`j` / `k`), while the side bar has it.
+    pub(super) cursor: usize,
 }
 
 /// The changes since the last revision, and what they were found for.
