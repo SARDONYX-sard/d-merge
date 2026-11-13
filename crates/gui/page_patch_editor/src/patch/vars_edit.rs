@@ -52,17 +52,10 @@ impl PatchTool {
     ///
     /// Asked for every frame: an `Rc`, so the thousands of strings are not copied each time.
     pub(super) fn names(&mut self) -> Rc<Names> {
-        let active = self.active;
-        if self.names.as_ref().is_some_and(|(cached, _)| *cached != active) {
-            self.reset_names();
+        if !self.names.is_of(self.active) {
+            self.reset_names(); // another behavior: what was found of this one goes too
         }
-        let behavior = &self.workspace.behaviors[active];
-        let (_, names) = self.names.get_or_insert_with(|| (active, Rc::new(Names::new(behavior))));
-        if !self.changed_objects.is_empty() {
-            Rc::make_mut(names).apply_changes(behavior, &self.changed_objects);
-            self.changed_objects.clear();
-        }
-        Rc::clone(names)
+        self.names.get(self.active, &self.workspace.behaviors[self.active])
     }
 
     /// Returns the ids of the objects it edited.

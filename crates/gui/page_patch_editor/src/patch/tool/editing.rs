@@ -479,16 +479,13 @@ impl PatchTool {
 
     /// The text of object `id` changed, or it was added or deleted: `names` takes that one in.
     pub(in crate::patch) fn object_changed(&mut self, id: &str) {
-        if !self.changed_objects.iter().any(|changed| changed == id) {
-            self.changed_objects.push(id.to_owned());
-        }
+        self.names.changed(id);
         self.mark_dirty();
     }
 
     /// The behaviors themselves changed (loaded, closed): `names` starts over.
     pub(in crate::patch) fn reset_names(&mut self) {
-        self.names = None;
-        self.changed_objects.clear();
+        self.names.reset();
         self.edits += 1; // what was found of the work before is not of this one
         self.problems.stale = true;
     }

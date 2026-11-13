@@ -138,10 +138,8 @@ pub(crate) struct PatchTool {
     mod_export: user_patch::ModExport,
     /// The projects of the clip data template, read once. See [`anim::data::template_projects`].
     template_projects: Option<Vec<String>>,
-    /// `(behavior, names)` of the events / variables panel and the completion.
-    names: Option<(usize, Rc<editor::names::Names>)>,
-    /// Objects edited since `names` last looked. See [`Self::object_changed`].
-    changed_objects: Vec<String>,
+    /// The names of the events / variables panel and the completion. See [`Self::object_changed`].
+    names: editor::names::NamesCache,
     new_names: vars_edit::NewNames,
     vars_error: Option<String>,
 }

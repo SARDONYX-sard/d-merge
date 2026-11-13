@@ -5,6 +5,8 @@
 //! event and variable names, and `hkbBehaviorGraphData`, which holds the variable types, are only
 //! parsed again when they are the object that changed.
 
+use std::rc::Rc;
+
 use nemesis_diff::vars;
 
 use crate::patch::{
@@ -12,6 +14,55 @@ use crate::patch::{
     vars_edit::GRAPH_DATA,
     workspace::{Behavior, STRING_DATA},
 };
+
+/// The [`Names`] of the active behavior, kept up to date object by object.
+///
+/// ```text
+/// cache.changed("#0106")       an object was edited, added or deleted: only it is read again
+/// cache.get(0, &behavior)      the names of behavior 0: built, or the changes taken in
+/// cache.reset()                the behaviors themselves changed (loaded, closed): built again
+/// ```
+/// Asked for every frame: an `Rc`, so the thousands of strings are not copied each time.
+#[derive(Debug, Default)]
+pub(in crate::patch) struct NamesCache {
+    /// `(behavior, its names)`.
+    of: Option<(usize, Rc<Names>)>,
+    /// Objects changed since `of` last looked.
+    changed: Vec<String>,
+}
+
+impl NamesCache {
+    /// The names of behavior `index` (`behavior`), with the changes since the last call taken in.
+    pub(in crate::patch) fn get(&mut self, index: usize, behavior: &Behavior) -> Rc<Names> {
+        if !self.is_of(index) {
+            self.reset();
+        }
+        let (_, names) = self.of.get_or_insert_with(|| (index, Rc::new(Names::new(behavior))));
+        if !self.changed.is_empty() {
+            Rc::make_mut(names).apply_changes(behavior, &self.changed);
+            self.changed.clear();
+        }
+        Rc::clone(names)
+    }
+
+    /// Are these the names of behavior `index` (or none built yet)?
+    pub(in crate::patch) fn is_of(&self, index: usize) -> bool {
+        self.of.as_ref().is_none_or(|(of, _)| *of == index)
+    }
+
+    /// Object `id` was edited, added or deleted.
+    pub(in crate::patch) fn changed(&mut self, id: &str) {
+        if !self.changed.iter().any(|changed| changed == id) {
+            self.changed.push(id.to_owned());
+        }
+    }
+
+    /// Built again on the next [`Self::get`].
+    pub(in crate::patch) fn reset(&mut self) {
+        self.of = None;
+        self.changed.clear();
+    }
+}
 
 /// See the module docs.
 #[derive(Debug, Clone, Default)]
