@@ -185,7 +185,7 @@ impl PatchTool {
 
         let (mut toggled, mut menu_action) = (None, None);
         let row_height = row_height(ui);
-        let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
+        let mut scroll = egui::ScrollArea::both().auto_shrink(false);
         let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
         let at = selected
             .and_then(|node| rows.iter().position(|row| matches!(row, AnimRow::File { node: n, .. } if *n == node)));
@@ -304,7 +304,7 @@ impl PatchTool {
         let rows = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let mut menu_action = None;
         let row_height = row_height(ui);
-        let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
+        let mut scroll = egui::ScrollArea::both().auto_shrink(false);
         let forced = std::mem::take(&mut self.explorer.reveal);
         if take_reveal(self.selected.as_ref(), forced) {
             let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));

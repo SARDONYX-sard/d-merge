@@ -103,7 +103,7 @@ impl PatchTool {
         let code = if is_existing_mod_code(self.mod_code.trim()) { self.mod_code.trim() } else { "<code>" };
         let ext = self.workspace.export_format.is_ext();
         let mut event = None;
-        egui::ScrollArea::vertical().id_salt("nemesis_behaviors").max_height(LIST_HEIGHT).show(ui, |ui| {
+        egui::ScrollArea::both().id_salt("nemesis_behaviors").max_height(LIST_HEIGHT).show(ui, |ui| {
             for (i, behavior) in self.workspace.behaviors.iter().enumerate() {
                 let response = ui
                     .add(Button::selectable(i == self.active, row_label(behavior, ext)))

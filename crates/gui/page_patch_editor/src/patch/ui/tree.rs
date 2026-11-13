@@ -119,7 +119,7 @@ fn unlinked_section(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Rc<s
     }
     let title = format!("⚠ {} ({})", i18n.t(I18nKey::NemesisNotLinked), unlinked.len());
     ui.colored_label(ui.visuals().warn_fg_color, title).on_hover_text(i18n.t(I18nKey::NemesisNotLinkedHover));
-    egui::ScrollArea::vertical().id_salt("nemesis_unlinked").max_height(80.0).show(ui, |ui| {
+    egui::ScrollArea::both().id_salt("nemesis_unlinked").max_height(80.0).show(ui, |ui| {
         for &node in unlinked {
             let id = graph.id(node);
             let text = object_label(ui, graph, node, false);
