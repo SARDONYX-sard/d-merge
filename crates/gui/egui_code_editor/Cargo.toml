@@ -16,10 +16,11 @@ rust-version.workspace = true
 [dependencies]
 egui  = { workspace = true }
 imara-diff = { workspace = true } # `InlineDiff::between`: the line diff
-regex      = { workspace = true } # Vim `/`, the find bar
+regex      = { workspace = true } # Vim `/`, the find bar, the search view
 
 # workspace members
 egui_widgets = { workspace = true } # Markdown for hover / completion docs
+stdx         = { workspace = true } # the search view: text ignoring case
 
 [lints]
 workspace = true

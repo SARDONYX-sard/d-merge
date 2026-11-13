@@ -22,7 +22,6 @@ mod editor;
 mod new_work;
 mod problems;
 mod repeat;
-mod search;
 mod template_tree;
 mod tool;
 mod tree;
@@ -148,7 +147,7 @@ pub(crate) struct PatchTool {
     /// The "New" class list is open, and its filter.
     class_picker: bool,
     class_filter: String,
-    search: search::Search,
+    search: egui_code_editor::SearchView,
     /// The search field takes the keyboard next frame.
     focus_search: bool,
     /// The side bar: which view, and whether it shows. See [`ui::side_bar`].

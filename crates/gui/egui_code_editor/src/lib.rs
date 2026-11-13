@@ -48,6 +48,7 @@ pub mod problems;
 mod quick_fix;
 mod request;
 mod search;
+mod search_view;
 mod state;
 mod status;
 pub mod text_pos;
@@ -70,6 +71,7 @@ pub use self::{
     palette::{EditorAction, EditorLabels},
     problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
     request::EditorRequest,
+    search_view::{SearchHit, SearchLabels, SearchView},
     state::CodeEditorState,
     status::{StatusBar, StatusBarOutput, status_line},
 };

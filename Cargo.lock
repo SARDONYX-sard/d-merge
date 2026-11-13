@@ -1515,6 +1515,7 @@ dependencies = [
  "egui_widgets",
  "imara-diff",
  "regex",
+ "stdx",
 ]
 
 [[package]]
