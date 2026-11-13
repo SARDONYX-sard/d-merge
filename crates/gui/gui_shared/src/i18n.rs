@@ -807,6 +807,9 @@ pub enum I18nKey {
     /// Copy id
     NemesisCopyId,
 
+    /// Copy path
+    NemesisCopyPath,
+
     /// CRC32
     NemesisCrcTab,
 
@@ -1009,11 +1012,17 @@ pub enum I18nKey {
     /// New objects no object in the tree points to. Nemesis ignores them: add their #id to a pointer field somewhere.
     NemesisNotLinkedHover,
 
+    /// The patch file of the object in the mod, if this work patches it (where the export writes it); else the template it is read from.
+    NemesisObjectFileHover,
+
     /// Objects
     NemesisObjectsTab,
 
     /// Open work data
     NemesisOpenCacheDir,
+
+    /// Open folder
+    NemesisOpenFolder,
 
     /// Open a mod…
     NemesisOpenMod,

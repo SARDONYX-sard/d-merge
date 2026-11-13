@@ -7,7 +7,10 @@
 //! ```
 //! The title's actions are the explorer's: what is done to one object is in its right-click menu.
 //! A window has the class list: nothing moves in the side bar when it is opened.
-use egui_widgets::shadcn::{Button, Icon, TextEdit};
+use egui_widgets::{
+    notify::Notification,
+    shadcn::{Button, Icon, TextEdit},
+};
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
 use stdx::text::contains_ignore_case;
@@ -26,7 +29,7 @@ use crate::patch::{
 };
 
 impl PatchTool {
-    pub(in crate::patch) fn object_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
+    pub(in crate::patch) fn object_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let anim = self.workspace.behaviors[self.active].is_anim_data();
         let mut open = !self.side.objects_closed;
         super::behaviors::section_header(ui, &mut open, i18n.t(I18nKey::NemesisObjectsTab), |ui| {
@@ -59,11 +62,11 @@ impl PatchTool {
         let names = self.names();
         // A tree from the root container, unless filtering: a filter wants the flat list.
         if anim {
-            self.anim_tree_panel(ui, i18n, &names.graph);
+            self.anim_tree_panel(ui, i18n, &names.graph, notify);
         } else if self.explorer.tree_view && self.explorer.filter.is_empty() && !self.explorer.unlinked_only {
-            self.tree_panel(ui, i18n, &names.graph);
+            self.tree_panel(ui, i18n, &names.graph, notify);
         } else {
-            self.flat_list(ui, i18n, &names.graph);
+            self.flat_list(ui, i18n, &names.graph, notify);
         }
     }
 
@@ -139,7 +142,7 @@ impl PatchTool {
         }
     }
     /// The tree, and its keys while it has the keyboard.
-    fn tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph) {
+    fn tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph, notify: &mut Notification) {
         let path = &self.workspace.behaviors[self.active].meshes_path;
         if !self.explorer.trees.contains_key(path) {
             self.explorer.trees.insert(path.clone(), TreeState::default());
@@ -158,11 +161,11 @@ impl PatchTool {
         }
         let flags = (self.explorer.changed_only, self.explorer.tree_focus);
         let action = super::tree::tree_ui(ui, graph, &mut self.selected, tree, flags, i18n);
-        self.apply_row_action(ui, graph, action);
+        self.apply_row_action(ui, graph, action, notify);
     }
 
     /// The anim data files after the filter: the rows of [`anim_tree::rows`].
-    fn anim_tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph) {
+    fn anim_tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph, notify: &mut Notification) {
         self.refresh_list(graph);
         if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
@@ -237,7 +240,7 @@ impl PatchTool {
         if let Some(key) = toggled {
             anim_tree::toggle(&mut self.anim_tree.open, &key);
         }
-        self.apply_row_action(ui, graph, menu_action);
+        self.apply_row_action(ui, graph, menu_action, notify);
         self.duplicate_anim_files();
     }
 
@@ -295,7 +298,7 @@ impl PatchTool {
     }
 
     /// The flat list after the filter (only the rows on screen are laid out).
-    fn flat_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph) {
+    fn flat_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph, notify: &mut Notification) {
         self.refresh_list(graph);
         if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
@@ -335,10 +338,16 @@ impl PatchTool {
             }
         });
         self.explorer.list_scroll.note(&output);
-        self.apply_row_action(ui, graph, menu_action);
+        self.apply_row_action(ui, graph, menu_action, notify);
     }
 
-    fn apply_row_action(&mut self, ui: &egui::Ui, graph: &Graph, action: Option<(Node, RowAction)>) {
+    fn apply_row_action(
+        &mut self,
+        ui: &egui::Ui,
+        graph: &Graph,
+        action: Option<(Node, RowAction)>,
+        notify: &mut Notification,
+    ) {
         let Some((node, action)) = action else { return };
         let id = graph.id(node);
         match action {
@@ -351,6 +360,17 @@ impl PatchTool {
             RowAction::Repeat => self.open_repeat(id),
             RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
             RowAction::RevertOrDelete => self.revert_or_delete(id),
+            RowAction::CopyPath => {
+                let path = self.object_file(id);
+                ui.ctx().copy_text(path.display().to_string());
+            }
+            RowAction::OpenFolder => {
+                let path = self.object_file(id);
+                let folder = path.parent().unwrap_or(&path);
+                if let Err(err) = gui_shared::fs::open_existing_dir_or_ancestor(folder) {
+                    notify.error(err);
+                }
+            }
         }
     }
 
@@ -475,10 +495,14 @@ pub(super) enum RowAction {
     /// Many new objects from this one: see [`crate::patch::repeat`].
     Repeat,
     CopyId,
+    /// The path of the file the object is in: see [`PatchTool::object_file`].
+    CopyPath,
+    /// Its folder in the file manager.
+    OpenFolder,
     RevertOrDelete,
 }
 
-/// `Keep Open / New / Duplicate / Repeat / Copy id / Revert (or Delete for a new object)`, for the flat list and
+/// `Keep Open / New / Duplicate / Repeat / Copy id / Copy path / Open folder / Revert (or Delete for a new object)`, for the flat list and
 /// the tree alike.
 pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> Option<RowAction> {
     let keep_open = ui.button(i18n.t(I18nKey::NemesisKeepOpen)).clicked();
@@ -487,6 +511,9 @@ pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed:
     let duplicate = ui.button(i18n.t(I18nKey::NemesisDuplicate)).clicked();
     let repeat = ui.button(i18n.t(I18nKey::RepeatTitle)).on_hover_text(i18n.t(I18nKey::RepeatHover)).clicked();
     let copy = ui.button(i18n.t(I18nKey::NemesisCopyId)).clicked();
+    let hover = i18n.t(I18nKey::NemesisObjectFileHover);
+    let copy_path = ui.button(i18n.t(I18nKey::NemesisCopyPath)).on_hover_text(hover).clicked();
+    let open_folder = ui.button(i18n.t(I18nKey::NemesisOpenFolder)).on_hover_text(hover).clicked();
     let revert = changed && {
         ui.separator();
         let label = if is_new { I18nKey::NemesisDeleteObject } else { I18nKey::RevertButton };
@@ -498,6 +525,8 @@ pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed:
         (duplicate, RowAction::Duplicate),
         (repeat, RowAction::Repeat),
         (copy, RowAction::CopyId),
+        (copy_path, RowAction::CopyPath),
+        (open_folder, RowAction::OpenFolder),
         (revert, RowAction::RevertOrDelete),
     ]
     .into_iter()

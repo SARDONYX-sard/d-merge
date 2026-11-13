@@ -154,6 +154,31 @@ impl PatchTool {
         ui.memory_mut(|m| m.surrender_focus(editor));
     }
 
+    /// The file object `id` of the active behavior is in, to find it on disk: its patch file in the
+    /// mod if this work has one for it (as the export writes it, whether written yet or not), else
+    /// the template it is read from.
+    ///
+    /// e.g. `D:/mods/My/Nemesis_Engine/mod/mymod/0_master/#0106.txt`,
+    /// `D:/mods/My/Pandora_Engine/mod/mymod/patches/defaultmale~0_master.xml`,
+    /// `<templates>/meshes/actors/character/behaviors/0_master.xml`
+    pub(in crate::patch) fn object_file(&self, id: &str) -> std::path::PathBuf {
+        let behavior = &self.workspace.behaviors[self.active];
+        let patched = behavior.edits.contains_key(id) || behavior.added.contains_key(id);
+        let (output, code) = (self.output.trim(), self.mod_code.trim());
+        if !patched || output.is_empty() || code.is_empty() {
+            return behavior.template_path.clone();
+        }
+        let output = std::path::Path::new(output);
+        let format = self.workspace.export_format;
+        if format == crate::patch::workspace::ExportFormat::PandoraV5
+            && !behavior.is_anim_data()
+            && let Some(file) = behavior.pandora_patch_path(output, code)
+        {
+            return file;
+        }
+        output.join(behavior.patch_dir(code, format.is_ext())).join(behavior.patch_file(id))
+    }
+
     /// The keyboard goes back to the editor.
     pub(in crate::patch) const fn leave_tree(&mut self) {
         self.explorer.tree_focus = false;
@@ -246,6 +271,26 @@ impl PatchTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A patched object is in its patch file in the mod; one that isn't, in its template.
+    #[test]
+    fn the_file_of_an_object() {
+        use std::path::Path;
+
+        use crate::patch::workspace::{ADSF, Behavior};
+        let mut clips = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
+        clips.added.insert("Male~1/m$0.txt".to_owned(), String::new());
+        let mut tool =
+            PatchTool { mod_code: "mymod".to_owned(), output: "D:/mods/My".to_owned(), ..Default::default() };
+        tool.workspace.behaviors.push(clips);
+
+        let patch = Path::new("D:/mods/My").join("Nemesis_Engine/mod/mymod").join(ADSF).join("Male~1/m$0.txt");
+        assert_eq!(tool.object_file("Male~1/m$0.txt"), patch);
+        let template = tool.workspace.behaviors[0].template_path.clone();
+        assert_eq!(tool.object_file("Male~1/other.txt"), template, "not patched");
+        tool.output.clear();
+        assert_eq!(tool.object_file("Male~1/m$0.txt"), template, "no mod to be in");
+    }
 
     #[test]
     fn a_list_scrolls_only_when_the_editor_gets_the_keyboard() {

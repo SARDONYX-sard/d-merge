@@ -478,7 +478,7 @@ mod tests {
                 println!("{active} {id}");
                 tool.selected = Some(id.as_str().into());
                 egui::__run_test_ui(|ui| {
-                    tool.object_list(ui, &i18n);
+                    tool.object_list(ui, &i18n, &mut egui_widgets::notify::Notification::default());
                     tool.object_editor(ui, &i18n);
                 });
                 if tool.workspace.behaviors[active].is_anim_data() {

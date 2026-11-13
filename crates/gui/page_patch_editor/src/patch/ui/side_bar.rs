@@ -86,7 +86,7 @@ impl PatchTool {
                     view_title(ui, i18n.t(title));
                     self.behaviors_section(ui, i18n, notify);
                     if !self.workspace.behaviors.is_empty() {
-                        self.object_list(ui, i18n);
+                        self.object_list(ui, i18n, notify);
                     }
                 }
                 SideView::Search => {
