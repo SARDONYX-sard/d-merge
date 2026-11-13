@@ -55,7 +55,9 @@ pub(super) fn show(ui: &mut egui::Ui, i18n: &I18nMap, input: &ListInput<'_>) -> 
         }
 
         let (picked, toggled) = history(ui, i18n, input);
-        output.picked = picked.or(output.picked.take());
+        if picked.is_some() {
+            output.picked = picked;
+        }
         output.toggled = toggled;
     });
     output
