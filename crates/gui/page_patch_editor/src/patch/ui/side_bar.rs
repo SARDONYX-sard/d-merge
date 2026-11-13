@@ -58,11 +58,6 @@ const VIEWS: [(SideView, Icon, I18nKey, &str); 4] = [
     (SideView::Variables, Icon::Layers, I18nKey::NemesisVarsTab, ""),
 ];
 
-/// The width of the activity bar, and the size of its buttons.
-const ACTIVITY_SIZE: f32 = 40.0;
-/// The size of an icon in it.
-const ACTIVITY_ICON: f32 = 22.0;
-
 impl PatchTool {
     /// The activity bar and, unless hidden, the side bar with its view.
     pub(in crate::patch) fn side_bar(
@@ -76,7 +71,7 @@ impl PatchTool {
         let id = if self.is_user_patch { "user_patch" } else { "nemesis" };
         egui::Panel::left((id, "activity_bar"))
             .resizable(false)
-            .exact_size(ACTIVITY_SIZE)
+            .exact_size(egui_widgets::ActivityBar::SIZE)
             .show(ui, |ui| self.activity_bar(ui, i18n));
         if self.side.hidden {
             return;
@@ -85,21 +80,21 @@ impl PatchTool {
             let (_, _, title, _) = VIEWS.iter().find(|(view, ..)| *view == self.side.view).copied().unwrap_or(VIEWS[0]);
             match self.side.view {
                 SideView::Explorer => {
-                    view_title(ui, i18n.t(title));
+                    egui_widgets::side_bar_title(ui, i18n.t(title));
                     self.behaviors_section(ui, i18n, notify);
                     if !self.workspace.behaviors.is_empty() {
                         self.object_list(ui, i18n, notify);
                     }
                 }
                 SideView::Search => {
-                    view_title(ui, i18n.t(title));
+                    egui_widgets::side_bar_title(ui, i18n.t(title));
                     if !self.workspace.behaviors.is_empty() {
                         self.search_panel(ui, i18n);
                     }
                 }
                 SideView::Changes => self.changes_view(ui, i18n, notify),
                 SideView::Variables => {
-                    view_title(ui, i18n.t(title));
+                    egui_widgets::side_bar_title(ui, i18n.t(title));
                     // The events and variables are a behavior's: which one, here as well.
                     self.behavior_select(ui, i18n);
                     let has_vars =
@@ -178,43 +173,31 @@ impl PatchTool {
         }
     }
 
-    /// The icons of [`VIEWS`]: the one shown has a bar on its left, as in VS Code; Changes has the
-    /// count of changes on it.
+    /// The icons of [`VIEWS`] ([`egui_widgets::ActivityBar`]); Changes has the count of changes on it.
     fn activity_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         self.scm.pending.refresh(&self.workspace, self.edits);
         let changes = self.scm.pending.changes.len();
-        let mut clicked = None;
-        for (view, icon, name, key) in VIEWS {
-            let shown = view == self.side.view && !self.side.hidden;
-            // As wide as the panel lets it: `ACTIVITY_SIZE` is the panel's, its margins included.
-            let size = egui::vec2(ui.available_width(), ACTIVITY_SIZE);
-            let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
-            let visuals = ui.visuals();
-            let color =
-                if shown || response.hovered() { visuals.strong_text_color() } else { visuals.weak_text_color() };
-            let icon_rect = egui::Rect::from_center_size(rect.center(), egui::Vec2::splat(ACTIVITY_ICON));
-            egui_widgets::shadcn::icon::paint_icon(ui.painter(), icon_rect, icon, color);
-            if shown {
-                let bar = egui::Rect::from_min_size(rect.min, egui::vec2(2.0, rect.height()));
-                ui.painter().rect_filled(bar, 0.0, visuals.selection.stroke.color);
-            }
-            if view == SideView::Changes && changes > 0 {
-                badge(ui, rect, changes);
-            }
-            let hover = if key.is_empty() { i18n.t(name).to_owned() } else { format!("{} ({key})", i18n.t(name)) };
-            if response.on_hover_text(hover).clicked() {
-                clicked = Some(view);
-            }
-        }
-        if let Some(view) = clicked {
-            self.toggle_side_view(view);
+        let hovers =
+            VIEWS.map(
+                |(_, _, name, key)| {
+                    if key.is_empty() { i18n.t(name).to_owned() } else { format!("{} ({key})", i18n.t(name)) }
+                },
+            );
+        let items = VIEWS.iter().zip(&hovers).map(|(&(view, icon, ..), hover)| egui_widgets::ActivityItem {
+            icon,
+            hover,
+            shown: view == self.side.view && !self.side.hidden,
+            badge: if view == SideView::Changes { changes } else { 0 },
+        });
+        if let Some(at) = egui_widgets::ActivityBar::new().show(ui, items) {
+            self.toggle_side_view(VIEWS[at].0);
         }
     }
 
     /// `CHANGES`, the message and `Commit`, the changes since the last revision, and the history:
     /// like VS Code's Source Control. See [`crate::patch::workspace::history`].
     fn changes_view(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut egui_widgets::notify::Notification) {
-        view_title(ui, i18n.t(I18nKey::SideChanges));
+        egui_widgets::side_bar_title(ui, i18n.t(I18nKey::SideChanges));
         self.branch_row(ui, i18n, notify);
         self.scm.pending.refresh(&self.workspace, self.edits);
         self.commit_box(ui, i18n);
@@ -619,24 +602,6 @@ fn local_time(seconds: u64) -> String {
     chrono::DateTime::from_timestamp(seconds, 0)
         .map(|time| time.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
         .unwrap_or_default()
-}
-
-/// `EXPLORER`: the name of the view, as VS Code puts it at the top of the side bar.
-fn view_title(ui: &mut egui::Ui, title: &str) {
-    ui.label(egui::RichText::new(title.to_uppercase()).small().strong());
-    ui.add_space(2.0);
-}
-
-/// The count at the bottom right of an icon, as VS Code's badges. e.g. `3`, or `99+`.
-fn badge(ui: &egui::Ui, icon: egui::Rect, count: usize) {
-    let text = if count > 99 { "99+".to_owned() } else { count.to_string() };
-    let font = egui::FontId::proportional(9.0);
-    let painter = ui.painter();
-    let galley = painter.layout_no_wrap(text, font, egui::Color32::WHITE);
-    let size = egui::vec2(galley.size().x.max(galley.size().y) + 4.0, galley.size().y + 2.0);
-    let rect = egui::Rect::from_min_size(icon.right_bottom() - size - egui::vec2(4.0, 4.0), size);
-    painter.rect_filled(rect, size.y / 2.0, ui.visuals().selection.bg_fill);
-    painter.galley(rect.center() - galley.size() / 2.0, galley, egui::Color32::WHITE);
 }
 
 #[cfg(test)]

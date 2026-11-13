@@ -12,12 +12,14 @@ pub mod notify;
 pub mod preview_tabs;
 pub mod shadcn;
 
+mod activity_bar;
 mod cut_hover;
 mod editor_tab;
 mod path_row;
 mod window;
 
 pub use self::{
+    activity_bar::{ActivityBar, ActivityItem, side_bar_title},
     cut_hover::{CutHover, Fitted, fit, fit_text},
     editor_tab::{EditorTab, EditorTabOutput, TabAction, TabMenu},
     path_row::{PathActions, PathRow, PathRowOutput},
