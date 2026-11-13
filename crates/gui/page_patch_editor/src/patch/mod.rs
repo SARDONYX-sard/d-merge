@@ -114,8 +114,6 @@ pub(crate) struct PatchTool {
     tabs: editor::tabs::EditorTabs,
 
     search: egui_code_editor::SearchView,
-    /// The search field takes the keyboard next frame.
-    focus_search: bool,
     /// The side bar: which view, and whether it shows. See [`ui::side_bar`].
     side: ui::side_bar::SideBar,
     /// Edits made, counted: what is found anew after one, e.g. [`changes::Pending`].

@@ -44,6 +44,25 @@ pub(in crate::patch) struct SideBar {
     pub(in crate::patch) objects_closed: bool,
 }
 
+impl SideBar {
+    /// A click on `view`'s icon: shows it, or hides the side bar if it is the one shown. Returns
+    /// whether `view` is shown now.
+    pub(in crate::patch) fn toggle(&mut self, view: SideView) -> bool {
+        if self.view == view && !self.hidden {
+            self.hidden = true;
+            return false;
+        }
+        self.show(view);
+        true
+    }
+
+    /// Shows `view` (a key of it: it never hides).
+    pub(in crate::patch) const fn show(&mut self, view: SideView) {
+        self.view = view;
+        self.hidden = false;
+    }
+}
+
 /// The views in the activity bar, top to bottom: `(view, icon, name, key)`.
 /// The order is the user's (not VS Code's): from the bottom, events / variables, explorer, changes,
 /// search.
@@ -65,10 +84,17 @@ impl PatchTool {
         self.side_bar_keys(ui);
         self.file_keys(ui.ctx(), notify);
         let id = if self.is_user_patch { "user_patch" } else { "nemesis" };
-        egui::Panel::left((id, "activity_bar"))
+        let clicked = egui::Panel::left((id, "activity_bar"))
             .resizable(false)
             .exact_size(egui_widgets::ActivityBar::SIZE)
-            .show(ui, |ui| self.activity_bar(ui, i18n));
+            .show(ui, |ui| {
+                self.scm.pending.refresh(&self.workspace, self.edits);
+                activity_bar(ui, i18n, &self.side, self.scm.pending.changes.len())
+            })
+            .inner;
+        if let Some(view) = clicked {
+            self.toggle_side_view(view);
+        }
         if self.side.hidden {
             return;
         }
@@ -92,7 +118,11 @@ impl PatchTool {
                 SideView::Variables => {
                     egui_widgets::side_bar_title(ui, i18n.t(title));
                     // The events and variables are a behavior's: which one, here as well.
-                    self.behavior_select(ui, i18n);
+                    let behaviors = &self.workspace.behaviors;
+                    if let Some(at) = behavior_select(ui, i18n, behaviors, self.active) {
+                        self.active = at;
+                        self.selected = self.tabs.last_of(at).map(std::rc::Rc::from);
+                    }
                     let has_vars =
                         self.workspace.behaviors.get(self.active).is_some_and(|behavior| !behavior.is_anim_data());
                     if has_vars {
@@ -113,40 +143,11 @@ impl PatchTool {
         });
     }
 
-    /// `Template: [0_master ▼]`: the behavior the view is of (animation data has no events or
-    /// variables). Another one goes back to where it was left in it, as a click in BEHAVIORS does.
-    fn behavior_select(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let current = self.workspace.behaviors.get(self.active).map_or("", |behavior| behavior.name.as_str());
-        let mut picked = None;
-        ui.horizontal(|ui| {
-            ui.label(i18n.t(I18nKey::SideTemplate));
-            egui_widgets::shadcn::ComboBox::from_id_salt("side_vars_behavior").selected_text(current).show_ui(
-                ui,
-                |ui| {
-                    let behaviors = self.workspace.behaviors.iter().enumerate();
-                    for (at, behavior) in behaviors.filter(|(_, behavior)| !behavior.is_anim_data()) {
-                        if ui.selectable_label(at == self.active, &behavior.name).clicked() {
-                            picked = Some(at);
-                        }
-                    }
-                },
-            );
-        });
-        if let Some(at) = picked.filter(|at| *at != self.active) {
-            self.active = at;
-            self.selected = self.tabs.last_of(at).map(std::rc::Rc::from);
-        }
-    }
-
     /// Shows `view`, or hides the side bar if it is the one shown, as a click on its icon does.
     pub(in crate::patch) fn toggle_side_view(&mut self, view: SideView) {
-        if self.side.view == view && !self.side.hidden {
-            self.side.hidden = true;
-            return;
+        if self.side.toggle(view) && view == SideView::Search {
+            self.search.focus();
         }
-        self.side.view = view;
-        self.side.hidden = false;
-        self.focus_search |= view == SideView::Search;
     }
 
     /// `Ctrl+Shift+E` / `F` / `G` (key bindings), as in VS Code. A key shows its view, and does not
@@ -162,10 +163,10 @@ impl PatchTool {
         ];
         for (command, view) in keys {
             if self.key_command(command) {
-                self.side.view = view;
-                self.side.hidden = false;
-                self.focus_search |= view == SideView::Search;
-                if view != SideView::Search {
+                self.side.show(view);
+                if view == SideView::Search {
+                    self.search.focus();
+                } else {
                     self.explorer.tree_focus = true;
                     ui.memory_mut(|m| {
                         if let Some(focused) = m.focused() {
@@ -176,27 +177,48 @@ impl PatchTool {
             }
         }
     }
+}
 
-    /// The icons of [`VIEWS`] ([`egui_widgets::ActivityBar`]); Changes has the count of changes on it.
-    fn activity_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        self.scm.pending.refresh(&self.workspace, self.edits);
-        let changes = self.scm.pending.changes.len();
-        let hovers =
-            VIEWS.map(
-                |(_, _, name, key)| {
-                    if key.is_empty() { i18n.t(name).to_owned() } else { format!("{} ({key})", i18n.t(name)) }
-                },
-            );
-        let items = VIEWS.iter().zip(&hovers).map(|(&(view, icon, ..), hover)| egui_widgets::ActivityItem {
-            icon,
-            hover,
-            shown: view == self.side.view && !self.side.hidden,
-            badge: if view == SideView::Changes { changes } else { 0 },
+/// The icons of [`VIEWS`] ([`egui_widgets::ActivityBar`]); Changes has the count of `changes` on it.
+/// Returns the view clicked.
+fn activity_bar(ui: &mut egui::Ui, i18n: &I18nMap, side: &SideBar, changes: usize) -> Option<SideView> {
+    let hovers = VIEWS.map(
+        |(_, _, name, key)| {
+            if key.is_empty() { i18n.t(name).to_owned() } else { format!("{} ({key})", i18n.t(name)) }
+        },
+    );
+    let items = VIEWS.iter().zip(&hovers).map(|(&(view, icon, ..), hover)| egui_widgets::ActivityItem {
+        icon,
+        hover,
+        shown: view == side.view && !side.hidden,
+        badge: if view == SideView::Changes { changes } else { 0 },
+    });
+    egui_widgets::ActivityBar::new().show(ui, items).map(|at| VIEWS[at].0)
+}
+
+/// `Template: [0_master ▼]`: the behavior the EVENTS / VARIABLES view is of (animation data has
+/// none). Returns another one picked.
+fn behavior_select(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    behaviors: &[crate::patch::workspace::Behavior],
+    active: usize,
+) -> Option<usize> {
+    let current = behaviors.get(active).map_or("", |behavior| behavior.name.as_str());
+    let mut picked = None;
+    ui.horizontal(|ui| {
+        ui.label(i18n.t(I18nKey::SideTemplate));
+        let combo = egui_widgets::shadcn::ComboBox::from_id_salt("side_vars_behavior").selected_text(current);
+        combo.show_ui(ui, |ui| {
+            let shown = behaviors.iter().enumerate().filter(|(_, behavior)| !behavior.is_anim_data());
+            for (at, behavior) in shown {
+                if ui.selectable_label(at == active, &behavior.name).clicked() {
+                    picked = Some(at);
+                }
+            }
         });
-        if let Some(at) = egui_widgets::ActivityBar::new().show(ui, items) {
-            self.toggle_side_view(VIEWS[at].0);
-        }
-    }
+    });
+    picked.filter(|at| *at != active)
 }
 
 #[cfg(test)]
@@ -206,12 +228,12 @@ mod tests {
     /// As VS Code's icons: a click shows the view, a click on the one shown hides the side bar.
     #[test]
     fn a_view_icon_shows_or_hides() {
-        let mut tool = PatchTool::default();
-        tool.toggle_side_view(SideView::Search);
-        assert_eq!((tool.side.view, tool.side.hidden, tool.focus_search), (SideView::Search, false, true));
-        tool.toggle_side_view(SideView::Search);
-        assert!(tool.side.hidden);
-        tool.toggle_side_view(SideView::Changes);
-        assert_eq!((tool.side.view, tool.side.hidden), (SideView::Changes, false));
+        let mut side = SideBar::default();
+        assert!(side.toggle(SideView::Search));
+        assert_eq!((side.view, side.hidden), (SideView::Search, false));
+        assert!(!side.toggle(SideView::Search));
+        assert!(side.hidden);
+        assert!(side.toggle(SideView::Changes));
+        assert_eq!((side.view, side.hidden), (SideView::Changes, false));
     }
 }
