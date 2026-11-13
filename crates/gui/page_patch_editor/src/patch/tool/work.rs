@@ -378,6 +378,11 @@ impl PatchTool {
         // What was read is the work, rather than what may be in the cache.
         remember_recent(&mut self.recent, RecentWork { output: self.output.clone(), mod_code: code.clone() });
         self.loaded_for = Some(code);
+        // Read for the first time: what the mod has is the history's first revision, so the Changes
+        // view lists only what this work changes in it.
+        if kept.is_none() {
+            self.workspace.commit_init();
+        }
         // A reload: where it is exported to and the mods it refers to are not in the mod.
         if let Some(Kept { output, refs }) = kept {
             self.output = output;

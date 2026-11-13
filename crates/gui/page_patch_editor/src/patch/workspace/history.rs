@@ -31,6 +31,14 @@ use super::{Behavior, Workspace};
 /// The branch of a history kept before branches, and of a new one.
 pub(crate) const MAIN: &str = "main";
 
+/// The message of the first revision of a work read from an existing mod: what the mod had.
+pub(crate) const INIT_MESSAGE: &str = "feat: init commit";
+
+/// The time of a commit: seconds since the Unix epoch (`0` if the clock is before it).
+pub(crate) fn now() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |since| since.as_secs())
+}
+
 /// `(behavior's meshes_path, object id)`, e.g. `("meshes/actors/character/behaviors/0_master.bin", "#0106")`.
 pub(crate) type ObjectKey = (String, String);
 
@@ -365,6 +373,18 @@ impl Workspace {
         }
         missing
     }
+
+    /// The first revision of a work read from an existing mod ([`INIT_MESSAGE`]): all it has, so
+    /// what changes after is what this work did. `None`: it has a history already, or nothing in it.
+    pub(crate) fn commit_init(&mut self) -> Option<u32> {
+        if !self.history.revisions.is_empty() {
+            return None;
+        }
+        let mut history = std::mem::take(&mut self.history);
+        let number = history.commit(self, INIT_MESSAGE, now());
+        self.history = history;
+        number
+    }
 }
 
 #[cfg(test)]
@@ -384,6 +404,17 @@ mod tests {
 
     fn marks(changes: &[ObjectChange]) -> Vec<(&str, &str)> {
         changes.iter().map(|change| (change.id.as_str(), change.kind.mark())).collect()
+    }
+
+    /// A mod read the first time: all of it is the first revision; once only.
+    #[test]
+    fn a_read_mod_is_the_first_revision() {
+        let mut workspace = work(&[("a", "1"), ("b", "1")]);
+        assert_eq!(workspace.commit_init(), Some(1));
+        assert_eq!(workspace.history.revisions[0].message, INIT_MESSAGE);
+        assert!(workspace.history.pending(&workspace).is_empty());
+        assert_eq!(workspace.commit_init(), None, "it has a history");
+        assert_eq!(Workspace::default().commit_init(), None, "nothing to keep");
     }
 
     #[test]

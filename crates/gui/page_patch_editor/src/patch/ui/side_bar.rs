@@ -403,8 +403,7 @@ impl PatchTool {
             });
         });
         if commit {
-            let time =
-                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |since| since.as_secs());
+            let time = crate::patch::workspace::history::now();
             let message = std::mem::take(&mut self.scm.commit_message);
             let workspace = &mut self.workspace;
             let mut history = std::mem::take(&mut workspace.history);
