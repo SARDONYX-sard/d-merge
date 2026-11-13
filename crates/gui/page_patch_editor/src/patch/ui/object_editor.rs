@@ -358,11 +358,19 @@ impl PatchTool {
             // The editor's settings are in its status bar, as in VS Code.
             let status_id = if self.is_user_patch { "user_patch_status_bar" } else { "nemesis_status_bar" };
             egui::Panel::bottom(status_id).show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    toolbar(ui, i18n.t(I18nKey::LspOptionsTitle), &mut self.pane.mode, &mut self.pane.show_lsp_options);
-                    toggle_problems |=
-                        egui_code_editor::status_line(ui, &self.pane.state, keymap, &self.pane.text).clicked();
-                });
+                // `Vim ▾` and `⚙` at its right end, as VS Code's status bar items.
+                let mut chosen = keymap;
+                let status = egui_code_editor::StatusBar::new(&self.pane.state, keymap, &self.pane.text)
+                    .keymap_select(&mut chosen)
+                    .options(&mut self.pane.show_lsp_options, i18n.t(I18nKey::LspOptionsTitle))
+                    .show(ui);
+                toggle_problems |= status.problems.clicked();
+                if status.keymap_changed {
+                    self.pane.mode = match chosen {
+                        Keymap::Normal => EditorMode::Normal,
+                        Keymap::Vim => EditorMode::Vim,
+                    };
+                }
             });
             if self.problems.open
                 && let Some(problems) = &self.problems.list
@@ -674,23 +682,6 @@ const fn editor_features(lsp: &LspOptions, anim_data: bool) -> EditorFeatures {
         inlay_hints: lsp.inlay_hints,
         signature_help: lsp.signature_help,
     }
-}
-
-/// `[Vim ▼] ⚙`. `⚙` has the same language switches as the hkanno editor's.
-fn toolbar(ui: &mut egui::Ui, lsp_opt_hover: &str, mode: &mut EditorMode, show_options: &mut bool) {
-    ui.horizontal(|ui| {
-        let mut index = EditorMode::ALL.iter().position(|m| m == mode).unwrap_or(0);
-        if egui_widgets::shadcn::ComboBox::from_id_salt("nemesis_editor_mode")
-            .width(90.0)
-            .show_index(ui, &mut index, EditorMode::ALL.len(), |i| EditorMode::ALL[i].label())
-            .changed()
-        {
-            *mode = EditorMode::ALL[index];
-        }
-        if ui.add(Button::selectable(*show_options, "⚙").small()).on_hover_text(lsp_opt_hover).clicked() {
-            *show_options = !*show_options;
-        }
-    });
 }
 
 /// The language features that apply to the object editor (the hkanno options window's subset).

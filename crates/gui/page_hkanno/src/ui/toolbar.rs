@@ -6,10 +6,7 @@
 //! ```
 
 use egui_widgets::shadcn::{Button, Checkbox, ComboBox, TextEdit};
-use gui_shared::{
-    i18n::I18nKey,
-    settings::{pages::convert::OutputFormat, ui::editor::EditorMode},
-};
+use gui_shared::{i18n::I18nKey, settings::pages::convert::OutputFormat};
 
 use crate::{HkannoPage, HkannoPageCtx};
 
@@ -75,16 +72,7 @@ impl HkannoPage {
                 self.export_txt(ctx);
             }
 
-            if ui
-                .add(Button::selectable(self.show_lsp_options, "⚙"))
-                .on_hover_text(i18n.t(I18nKey::LspOptionsTitle))
-                .clicked()
-            {
-                self.show_lsp_options = !self.show_lsp_options;
-            }
-
-            ui.separator();
-            editor_mode_select(ui, ctx);
+            // The keymap and the language features are in the editor's status bar, as in VS Code.
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let show = &mut ctx.settings.show_preview;
@@ -168,21 +156,6 @@ impl HkannoPage {
         if modal.should_close() {
             self.show_revert = false;
         }
-    }
-}
-
-/// `Keymap: [Normal ▼]`: plain editing or Vim.
-fn editor_mode_select(ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
-    ui.label(ctx.i18n.t(I18nKey::LspEditorMode)).on_hover_text(ctx.i18n.t(I18nKey::LspEditorModeHover));
-
-    let mode = &mut ctx.lsp_settings.editor_mode;
-    let mut index = EditorMode::ALL.iter().position(|m| m == mode).unwrap_or(0);
-    if ComboBox::from_id_salt("hkanno_editor_mode")
-        .width(90.0)
-        .show_index(ui, &mut index, EditorMode::ALL.len(), |i| EditorMode::ALL[i].label())
-        .changed()
-    {
-        *mode = EditorMode::ALL[index];
     }
 }
 

@@ -67,5 +67,5 @@ pub use self::{
     problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
     request::EditorRequest,
     state::CodeEditorState,
-    status::status_line,
+    status::{StatusBar, StatusBarOutput, status_line},
 };

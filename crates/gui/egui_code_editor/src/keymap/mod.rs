@@ -28,6 +28,21 @@ pub enum Keymap {
     Vim,
 }
 
+impl Keymap {
+    /// Every keymap, as a status bar lists them.
+    pub const ALL: [Self; 2] = [Self::Normal, Self::Vim];
+
+    /// e.g. `Normal`, `Vim`
+    #[inline]
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Normal => "Normal",
+            Self::Vim => "Vim",
+        }
+    }
+}
+
 /// What a keymap did this frame.
 #[derive(Debug, Default)]
 pub(crate) struct KeymapOutput {
