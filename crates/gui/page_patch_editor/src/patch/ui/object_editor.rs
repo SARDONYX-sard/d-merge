@@ -10,7 +10,7 @@ use gui_shared::{
 };
 use keybinding::commands;
 
-use super::{preview::PreviewEvent, references::references_window};
+use super::preview::PreviewEvent;
 use crate::patch::{
     EditorResult, FocusAt, PatchTool, TabEvent,
     anim::lines::AnimDataLanguage,
@@ -126,7 +126,7 @@ impl PatchTool {
         if self.apply_editor_result(result, &id) {
             self.enter_tree(ui, editor_id);
         }
-        if let Some((document, line)) = references_window(ui.ctx(), &mut self.pane.references) {
+        if let Some((document, line)) = egui_code_editor::ReferenceList::window(ui.ctx(), &mut self.pane.references) {
             if *document != *id {
                 self.pane.history.visit(&*id);
                 self.selected = Some(document.into());

@@ -46,6 +46,7 @@ mod nav_history;
 mod palette;
 pub mod problems;
 mod quick_fix;
+mod references;
 mod request;
 mod search;
 mod search_view;
@@ -70,6 +71,7 @@ pub use self::{
     nav_history::NavHistory,
     palette::{EditorAction, EditorLabels},
     problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
+    references::ReferenceList,
     request::EditorRequest,
     search_view::{SearchHit, SearchLabels, SearchView},
     state::CodeEditorState,

@@ -5,7 +5,6 @@ pub(in crate::patch) mod diagnostics;
 pub(in crate::patch) mod language;
 pub(in crate::patch) mod merge;
 pub(in crate::patch) mod names;
-pub(in crate::patch) mod navigate;
 pub(in crate::patch) mod pandora;
 pub(in crate::patch) mod preview;
 pub(in crate::patch) mod resolve;

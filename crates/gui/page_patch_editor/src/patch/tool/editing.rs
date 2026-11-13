@@ -51,7 +51,7 @@ pub(in crate::patch) struct EditorPane {
     pub(in crate::patch) merge_values: Option<editor::resolve::MergeValues>,
     pub(in crate::patch) merge_accepted: Vec<String>,
     /// The window of the references of an object.
-    pub(in crate::patch) references: Option<editor::navigate::ReferenceList>,
+    pub(in crate::patch) references: Option<egui_code_editor::ReferenceList>,
     /// Back and forward, as `Alt+←` / `Alt+→`.
     pub(in crate::patch) history: egui_code_editor::NavHistory<String>,
     pub(in crate::patch) mode: EditorMode,
