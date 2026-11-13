@@ -5,14 +5,19 @@
 //!
 //! | The field                       | changed                         | operation               |
 //! | ------------------------------- | ------------------------------- | ----------------------- |
-//! | a value, `#0001 #0002`          | anyhow                          | `Replace` of the field  |
+//! | a value                         | anyhow                          | `Replace` of the field  |
+//! | a list of pointers, `#1 #2`     | more at the end                 | `Append` of the new ones |
+//! |                                 | else                            | `Replace` of the field  |
 //! | `<hkobject>`s, `<hkcstring>`s   | an element                      | what is inside of it    |
 //! |                                 | more at the end                 | `Append`                |
 //! |                                 | fewer at the end                | `Remove`, the last first |
 //!
-//! # Why a list of pointers is replaced whole
-//! An `Append` of text doesn't change `numelements`, and Pandora reads no pointers at all of a list
-//! that says `numelements="0"`. With `<hkobject>`s it counts them, so there it can be used.
+//! # Pointers pushed to a list
+//! As the Pandora mods do: `<Append path="#0340/states">#dmco$0</Append>`. Then other mods can push
+//! to the same list too: a `Replace` would drop what they pushed.
+//!
+//! Only to a list that has some already: Pandora reads no pointers at all of a list that says
+//! `numelements="0"`, and an `Append` of text doesn't change it. So an empty list is replaced whole.
 
 use std::fmt::Write as _;
 
@@ -48,6 +53,8 @@ pub struct Op<'a> {
     pub path: String,
     /// What it puts there. Nothing for a `Remove`.
     pub elements: Vec<Element<'a>>,
+    /// The words an `Append` adds to a list of values, e.g. `#dmco$0`. Then `elements` is empty.
+    pub words: Vec<&'a str>,
 }
 
 /// Why an edit can't be said in this format.
@@ -118,7 +125,7 @@ impl<'a> Ops<'a> {
     }
 
     fn replace(&mut self, path: String, element: &Element<'a>) {
-        self.replaces.push(Op { kind: OpKind::Replace, path, elements: vec![element.clone()] });
+        self.replaces.push(Op { kind: OpKind::Replace, path, elements: vec![element.clone()], words: Vec::new() });
     }
 
     /// What differs in each field `edited` has. See [`has_its_fields`].
@@ -144,7 +151,19 @@ impl<'a> Ops<'a> {
             }
             return;
         }
-        if old.words != new.words || old.attributes != new.attributes {
+        if old.words == new.words && old.attributes == new.attributes {
+            return;
+        }
+        // Pointers pushed to a list that has some: see the module docs.
+        let pushed = is_list(old)
+            && is_list(new)
+            && !old.words.is_empty()
+            && new.words.len() > old.words.len()
+            && new.words.starts_with(&old.words);
+        if pushed {
+            let words = new.words[old.words.len()..].to_vec();
+            self.appends.push(Op { kind: OpKind::Append, path, elements: Vec::new(), words });
+        } else {
             self.replace(path, new);
         }
     }
@@ -174,6 +193,7 @@ impl<'a> Ops<'a> {
                 kind: OpKind::Remove,
                 path: format!("{path}/Element{index}"),
                 elements: Vec::new(),
+                words: Vec::new(),
             });
         }
         if new.children.len() > common {
@@ -181,6 +201,7 @@ impl<'a> Ops<'a> {
                 kind: OpKind::Append,
                 path: path.to_owned(),
                 elements: new.children[common..].to_vec(),
+                words: Vec::new(),
             });
         }
     }
@@ -220,13 +241,30 @@ mod tests {
         assert_eq!(ops(r#"<hkparam name="a">1</hkparam>"#, r#"<hkparam name="a">2</hkparam>"#), ["Replace #0001/a"]);
     }
 
+    /// Pushed: an `Append` of the new pointers, as the Pandora mods do. Else replaced whole.
     #[test]
-    fn a_list_of_pointers_is_replaced_whole_for_its_count() {
-        let ops_of = ops(
-            r#"<hkparam name="states" numelements="1">#1</hkparam>"#,
-            r#"<hkparam name="states" numelements="2">#1 #2</hkparam>"#,
-        );
-        assert_eq!(ops_of, ["Replace #0001/states"]);
+    fn pointers_pushed_to_a_list_are_appended() {
+        let states = |pointers: &str| {
+            let count = pointers.split_whitespace().count();
+            object(&format!(r#"<hkparam name="states" numelements="{count}">{pointers}</hkparam>"#))
+        };
+        let (template, edited) = (states("#1"), states("#1 #m$0 #m$1"));
+        let pushed = object_ops(&template, &edited).unwrap();
+        assert_eq!(pushed.len(), 1);
+        assert_eq!((pushed[0].kind, pushed[0].path.as_str()), (OpKind::Append, "#0001/states"));
+        assert_eq!(pushed[0].words, ["#m$0", "#m$1"]);
+        assert!(pushed[0].elements.is_empty());
+
+        let kinds = |template: &str, edited: &str| ops(template, edited);
+        let list = |pointers: &str| {
+            let count = pointers.split_whitespace().count();
+            format!(r#"<hkparam name="states" numelements="{count}">{pointers}</hkparam>"#)
+        };
+        // Pandora reads nothing of a list that says `numelements="0"`.
+        assert_eq!(kinds(&list(""), &list("#m$0")), ["Replace #0001/states"], "an empty list");
+        assert_eq!(kinds(&list("#1 #2"), &list("#2 #1")), ["Replace #0001/states"], "reordered");
+        assert_eq!(kinds(&list("#1 #2"), &list("#1")), ["Replace #0001/states"], "fewer");
+        assert_eq!(kinds(&list("#1"), &list("#m$0 #1")), ["Replace #0001/states"], "not at the end");
     }
 
     #[test]
