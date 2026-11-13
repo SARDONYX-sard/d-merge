@@ -201,6 +201,7 @@ impl VimState {
         if !inserting {
             self.escape_seq.reset();
         }
+        copy_selection(ui, id, text);
         let keys = keys::take(ui, inserting, &mut self.escape_seq, &self.options);
         if keys.is_empty() {
             return KeymapOutput::default();
@@ -348,6 +349,22 @@ impl VimState {
         if self.mode == Mode::Insert && mode_before != Mode::Insert {
             self.repeat.insert_start = Some(exec.buf.text());
         }
+    }
+}
+
+/// `Ctrl+C` with a selection (Visual mode, or one made with the mouse) copies it, as VSCodeVim's
+/// `overrideCopy`; it still leaves the mode as `Esc` does (see [`keys::take`]). Without one it is only
+/// that `Esc`.
+fn copy_selection(ui: &egui::Ui, id: egui::Id, text: &str) {
+    if !ui.input(|i| i.events.iter().any(|event| matches!(event, egui::Event::Copy))) {
+        return;
+    }
+    let Some(range) = egui::TextEdit::load_state(ui.ctx(), id).and_then(|state| state.cursor.char_range()) else {
+        return;
+    };
+    let (a, b) = (range.primary.index.0, range.secondary.index.0);
+    if let Some(selected) = crate::edit_ops::selected_text(text, &(a.min(b)..a.max(b))) {
+        ui.ctx().copy_text(selected.to_owned());
     }
 }
 

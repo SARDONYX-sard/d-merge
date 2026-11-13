@@ -59,6 +59,18 @@ impl Frames {
     }
 
     fn frame(&mut self, events: Vec<egui::Event>) {
+        self.frame_output(events);
+    }
+
+    /// The text this frame put on the clipboard, if any.
+    fn copied(&mut self, events: Vec<egui::Event>) -> Option<String> {
+        self.frame_output(events).platform_output.commands.into_iter().find_map(|command| match command {
+            egui::OutputCommand::CopyText(text) => Some(text),
+            _ => None,
+        })
+    }
+
+    fn frame_output(&mut self, events: Vec<egui::Event>) -> egui::FullOutput {
         let raw = egui::RawInput { events, ..Default::default() };
         let (text, state, id, rect) = (&mut self.text, &mut self.state, &mut self.id, &mut self.rect);
         let (keymap, command, language) = (self.keymap, &mut self.command, self.language);
@@ -70,6 +82,7 @@ impl Frames {
             *rect = response.rect;
         });
         output.textures_delta.clear();
+        output
     }
 
     fn select(&self, from: usize, to: usize) {
@@ -345,4 +358,36 @@ fn selecting_with_the_mouse_asks_for_no_hover() {
 
     frames.move_to(dragged + egui::vec2(10.0, 0.0));
     assert!(frames.state.hover.resting.is_some(), "moved on");
+}
+
+#[test]
+fn copy_puts_the_selection_on_the_clipboard() {
+    for keymap in [Keymap::Normal, Keymap::Vim] {
+        let mut frames = Frames::new(
+            "abcdefghijkl
+second line",
+        );
+        frames.keymap = keymap;
+        frames.frame(Vec::new());
+        frames.select(0, 3);
+        frames.frame(Vec::new());
+        assert_eq!(frames.copied(vec![egui::Event::Copy]).as_deref(), Some("abc"), "{keymap:?}");
+    }
+}
+
+/// Vim's Visual mode: `Ctrl+C` copies what `v` selected, and leaves the mode.
+#[test]
+fn copy_in_vim_visual_mode() {
+    let mut frames = Frames::new(
+        "abcdefghijkl
+second line",
+    );
+    frames.keymap = Keymap::Vim;
+    frames.frame(Vec::new());
+    frames.select(0, 0);
+    for key in ["v", "l", "l"] {
+        frames.frame(vec![egui::Event::Text(key.to_owned())]);
+    }
+    assert_eq!(frames.copied(vec![egui::Event::Copy]).as_deref(), Some("abc"));
+    assert!(frames.selection().is_empty(), "back to Normal mode");
 }
