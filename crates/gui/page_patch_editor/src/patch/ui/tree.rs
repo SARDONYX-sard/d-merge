@@ -7,7 +7,7 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use super::object_list::{RowAction, row_menu};
 use crate::patch::{
     tool::list::{fixed_row, row_height},
-    tree::{Graph, MAX_STICKY, Node, Row, TreeState, has_guide},
+    tree::{Graph, MAX_STICKY, Node, Row, TreeState},
 };
 
 /// Pixels of indent per tree level.
@@ -62,7 +62,9 @@ pub(super) fn tree_ui(
     let output = scroll.show_rows(ui, row_height, state.rows().len(), |ui, range| {
         for (i, row) in state.rows()[range.clone()].iter().enumerate() {
             let is_selected = selected.as_deref() == Some(graph.id(row.node));
-            draw_connecting_lines(ui, *row, range.start + i, row_height, &guides);
+            let lines =
+                egui_tree::guides::GuideRow { depth: row.depth, last_child: row.last_child, guides: row.guides };
+            egui_tree::guides::paint(ui, lines, range.start + i, (row_height, INDENT), &guides);
             let row_event = row_ui(ui, graph, *row, row_height, (is_selected, focused), range.start + i, i18n);
             event = row_event.or(event);
         }
@@ -166,53 +168,6 @@ fn row_ui(
         });
     });
     event
-}
-
-/// The lines joining a row to its parent and to the rows below:
-/// ```text
-/// #0090
-/// ├ #0091
-/// │ └ #0094     `│` is level 0 going on past this row, `└` the row's own line at level 1
-/// └ #0095
-/// ```
-/// `guides`: what is on the way to the selected row is drawn in the selection's color, so its
-/// branch stands out in a big tree. See [`TreeState::active_guides`].
-fn draw_connecting_lines(
-    ui: &egui::Ui,
-    row: Row,
-    index: usize,
-    height: f32,
-    guides: &[Option<std::ops::RangeInclusive<usize>>],
-) {
-    let Some(own_level) = row.depth.checked_sub(1) else { return };
-    let normal = egui::Stroke::new(1.0, ui.visuals().weak_text_color().gamma_multiply(0.5));
-    let active = egui::Stroke::new(2.0, ui.visuals().selection.bg_fill);
-    let is_active =
-        |level: u16| guides.get(usize::from(level)).and_then(Option::as_ref).is_some_and(|r| r.contains(&index));
-
-    let (left, top) = (ui.cursor().left(), ui.cursor().top());
-    // Up to the next row, over the gap between the rows.
-    let bottom = top + height + ui.spacing().item_spacing.y;
-    let center = top + height / 2.0;
-    let x_of = |level: u16| f32::from(level).mul_add(INDENT, left + INDENT / 2.0);
-    let painter = ui.painter();
-
-    for level in 0..own_level {
-        if has_guide(row.guides, level) {
-            painter.vline(x_of(level), top..=bottom, if is_active(level) { active } else { normal });
-        }
-    }
-    let own_x = x_of(own_level);
-    painter.vline(own_x, top..=if row.last_child { center } else { bottom }, normal);
-    painter.hline(own_x..=own_x + INDENT / 2.0, center, normal);
-    if is_active(own_level) {
-        // The way ends at this row if it is the one on the way: only down to its own branch.
-        let on_the_way_here = guides[usize::from(own_level)].as_ref().is_some_and(|r| *r.end() == index);
-        painter.vline(own_x, top..=if on_the_way_here { center } else { bottom }, active);
-        if on_the_way_here {
-            painter.hline(own_x..=own_x + INDENT / 2.0, center, active);
-        }
-    }
 }
 
 /// How many crumbs of the way to the selected row are shown at most; the rest are on hover.

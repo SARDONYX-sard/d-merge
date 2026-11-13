@@ -462,16 +462,6 @@ struct RowLines {
     guides: u64,
 }
 
-/// The bit of tree level `depth` in [`Row::guides`]. Deeper than 64 levels has no lines.
-const fn guide_bit(depth: u16) -> u64 {
-    if depth < u64::BITS as u16 { 1 << depth } else { 0 }
-}
-
-/// Does the line of tree level `level` continue past the row with these `guides`?
-pub(super) const fn has_guide(guides: u64, level: u16) -> bool {
-    guides & guide_bit(level) != 0
-}
-
 pub(super) use egui_tree::TreeKey;
 
 /// How many ancestors are pinned over the tree at most. See [`TreeState::sticky_rows`].
@@ -616,7 +606,7 @@ impl TreeState {
         for (i, &child) in children.iter().enumerate() {
             let last_child = i + 1 == children.len();
             // This node's children hang from a line at this depth: more of them keep it going.
-            let guides = if last_child { guides } else { guides | guide_bit(depth) };
+            let guides = if last_child { guides } else { guides | egui_tree::guides::bit(depth) };
             if graph.entry(child).first_parent == Some(node) {
                 let lines = RowLines { parent_row: this_row, last_child, guides };
                 self.push_rows(graph, child, depth + 1, lines, changed_only, rows);
@@ -1014,10 +1004,10 @@ mod tests {
 
         assert_eq!(rows.iter().map(|row| row.last_child).collect::<Vec<_>>(), [true, false, true, true, false, true]);
         // `#c` under `#a`: the line of level 0 goes on to `#b`.
-        assert!(has_guide(rows[2].guides, 0));
+        assert!(egui_tree::guides::has(rows[2].guides, 0));
         // `#c` under `#b`: `#b` is the last child, so level 0 has ended; level 1 goes on to `#new0`.
-        assert!(!has_guide(rows[4].guides, 0));
-        assert!(has_guide(rows[4].guides, 1));
+        assert!(!egui_tree::guides::has(rows[4].guides, 0));
+        assert!(egui_tree::guides::has(rows[4].guides, 1));
     }
 
     /// A selection alone moves nothing: a tree being used must stay as it is.

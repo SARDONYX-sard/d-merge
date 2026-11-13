@@ -15,7 +15,9 @@
 //!   its key bindings to the keys and carries out the [`Nav`] (opens a node, selects a row).
 //! - [`list`]: rows of one height in a list that scrolls only up and down (`ScrollArea::show_rows`),
 //!   scrolled just enough to show a row, never widening its panel.
+//! - [`guides`]: the lines joining the rows, as VS Code's indent guides.
 
+pub mod guides;
 pub mod list;
 
 /// A key of a tree or a list, whatever key binding asked for it.
