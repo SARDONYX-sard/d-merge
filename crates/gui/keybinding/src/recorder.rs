@@ -43,6 +43,12 @@ pub struct RecorderTexts<'a> {
     pub edit_json: &'a str,
     /// The menus of the JSON's editor.
     pub labels: egui_code_editor::EditorLabels<'a>,
+    /// Closing the JSON with changes asks, as VS Code. e.g. `Do you want to save the changes ...?`
+    pub unsaved: &'a str,
+    /// Its buttons. e.g. `Save`, `Don't Save`, `Cancel`
+    pub save: &'a str,
+    pub dont_save: &'a str,
+    pub cancel: &'a str,
 }
 
 impl KeyRecorder {

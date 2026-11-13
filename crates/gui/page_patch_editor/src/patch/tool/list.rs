@@ -51,6 +51,10 @@ pub(in crate::patch) fn recorder_texts(i18n: &gui_shared::i18n::I18nMap) -> keyb
         also_bound: i18n.t(I18nKey::KeybindingAlsoBound),
         edit_json: i18n.t(I18nKey::KeybindingEditInJson),
         labels: egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)),
+        unsaved: i18n.t(I18nKey::KeybindingUnsaved),
+        save: i18n.t(I18nKey::KeybindingSave),
+        dont_save: i18n.t(I18nKey::KeybindingDontSave),
+        cancel: i18n.t(I18nKey::CancelButton),
     }
 }
 

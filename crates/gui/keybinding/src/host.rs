@@ -105,7 +105,7 @@ impl KeyUi {
             }
         }
         let keymap = if context.vim { egui_code_editor::Keymap::Vim } else { egui_code_editor::Keymap::Normal };
-        if let Some(saved) = self.json.show(ctx, bindings, keymap, texts.labels) {
+        if let Some(saved) = self.json.show(ctx, bindings, keymap, &texts) {
             out.saved = Some(saved);
         }
         // The palette is of the editor: its keys as the editor with the keyboard sees them.

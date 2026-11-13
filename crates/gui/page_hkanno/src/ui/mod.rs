@@ -41,6 +41,10 @@ impl HkannoPage {
             also_bound: ctx.i18n.t(I18nKey::KeybindingAlsoBound),
             edit_json: ctx.i18n.t(I18nKey::KeybindingEditInJson),
             labels: egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(ctx.i18n)),
+            unsaved: ctx.i18n.t(I18nKey::KeybindingUnsaved),
+            save: ctx.i18n.t(I18nKey::KeybindingSave),
+            dont_save: ctx.i18n.t(I18nKey::KeybindingDontSave),
+            cancel: ctx.i18n.t(I18nKey::CancelButton),
         };
         let frame = self.key_ui.frame(ui.ctx(), ctx.keys, &context, texts);
         self.key_commands = frame.commands;

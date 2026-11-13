@@ -553,6 +553,9 @@ pub enum I18nKey {
     /// Other commands with these keys:
     KeybindingAlsoBound,
 
+    /// Don't Save
+    KeybindingDontSave,
+
     /// Edit in keybindings.json
     KeybindingEditInJson,
 
@@ -562,8 +565,14 @@ pub enum I18nKey {
     /// Press the desired key combination and then press Enter. Esc cancels.
     KeybindingRecordHint,
 
+    /// Save
+    KeybindingSave,
+
     /// Key binding saved to keybindings.json
     KeybindingSaved,
+
+    /// Do you want to save the changes you made to keybindings.json? Your changes will be lost if you don't save them.
+    KeybindingUnsaved,
 
     /// License:
     LicenseLabel,
