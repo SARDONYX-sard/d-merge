@@ -7,7 +7,7 @@ mod toolbar;
 use egui_code_editor::{
     CodeEditor, CodeEditorOutput, EditorCommand, EditorFeatures, Keymap, ProblemGroup, ProblemsPanel, text_pos::LinePos,
 };
-use egui_widgets::shadcn::Button;
+use egui_widgets::{TabAction, shadcn::Button};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::ui::editor::EditorMode,
@@ -95,7 +95,8 @@ impl HkannoPage {
     /// `│ attack.hkx ✖ │ idle.hkx ● │ ...  [Open]`: VS Code's tabs ([`egui_widgets::EditorTab`]).
     /// `●`: unsaved edits; red / yellow: the file has errors / warnings.
     fn tab_bar(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
-        let mut close = None;
+        let menu = egui_widgets::TabMenu::from_texts(gui_shared::i18n::tab_menu_texts(ctx.i18n));
+        let mut picked = None;
         let mut open = None;
         ui.horizontal(|ui| {
             egui::ScrollArea::horizontal().id_salt("hkanno_tab_scroll").show(ui, |ui| {
@@ -109,18 +110,14 @@ impl HkannoPage {
                             .focused(focused)
                             .modified(tab.dirty)
                             .tone(tone)
+                            .hover(tab.settings.input_path.as_str())
                             .show(ui);
-                        let response = shown.response.on_hover_text(&tab.settings.input_path);
-                        if response.clicked() {
-                            self.active = i;
-                        }
-                        response.context_menu(|ui| {
-                            if tab_menu(ui, tab, ctx.i18n) {
-                                close = Some(i);
-                            }
-                        });
-                        if shown.close {
-                            close = Some(i);
+                        let more = |ui: &mut egui::Ui| {
+                            tab_menu(ui, tab, ctx.i18n);
+                            None
+                        };
+                        if let Some(action) = shown.action(&menu, |action| (i, action), more) {
+                            picked = Some(action);
                         }
                     }
                 });
@@ -141,8 +138,23 @@ impl HkannoPage {
         if let Some(files) = open {
             self.open(files.into_iter().map(|p| p.display().to_string()), ctx);
         }
-        if let Some(index) = close {
-            self.close(index);
+        let unsaved = match picked {
+            Some((at, TabAction::Show)) => {
+                self.active = at;
+                false
+            }
+            Some((at, TabAction::Close)) => {
+                self.close(at);
+                false
+            }
+            Some((at, TabAction::CloseOthers)) => self.close_where(|index| index != at),
+            Some((at, TabAction::CloseToTheRight)) => self.close_where(|index| index > at),
+            Some((_, TabAction::CloseAll)) => self.close_where(|_| true),
+            // No preview tabs here: every file opened stays.
+            Some((_, TabAction::KeepOpen)) | None => false,
+        };
+        if unsaved {
+            ctx.notify.error(ctx.i18n.t(I18nKey::HkannoTabUnsaved).to_owned());
         }
     }
 
@@ -420,7 +432,7 @@ impl HkannoPage {
 /// ───────────
 /// Close
 /// ```
-fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) -> bool {
+fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) {
     // The file selected in its folder, as VS Code's "Reveal in File Explorer"; the folder if the
     // file isn't there.
     let open_dir = |path: &str| {
@@ -443,8 +455,6 @@ fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) -> bool {
     if ui.button(i18n.t(I18nKey::HkannoTabCopyOutputPath)).clicked() {
         ui.ctx().copy_text(output.to_string());
     }
-    ui.separator();
-    ui.button(i18n.t(I18nKey::CloseButton)).clicked()
 }
 
 impl HkannoPage {

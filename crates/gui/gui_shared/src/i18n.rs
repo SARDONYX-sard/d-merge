@@ -1656,6 +1656,18 @@ pub const REVEAL_IN_FILE_MANAGER: I18nKey = if cfg!(windows) {
     I18nKey::OpenContainingFolder
 };
 
+/// The translated texts of a tab's right-click menu, in the order `egui_widgets::TabMenu::from_texts`
+/// takes them: Keep Open, Close, Close Others, Close to the Right, Close All.
+pub fn tab_menu_texts(i18n: &I18nMap) -> [&str; 5] {
+    [
+        i18n.t(I18nKey::NemesisKeepOpen),
+        i18n.t(I18nKey::CloseButton),
+        i18n.t(I18nKey::NemesisCloseOtherTabs),
+        i18n.t(I18nKey::NemesisCloseTabsRight),
+        i18n.t(I18nKey::NemesisCloseAllTabs),
+    ]
+}
+
 /// The translated texts of the code editor's menus (right click, `Ctrl+Shift+P`).
 ///
 /// In the order `egui_code_editor::EditorLabels::from_texts` takes them: this crate does not know

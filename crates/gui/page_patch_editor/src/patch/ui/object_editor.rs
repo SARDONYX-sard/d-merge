@@ -574,13 +574,7 @@ pub(in crate::patch) fn tab_bar(
     marks: TabMarks<'_>,
     views: &[super::revision_view::ViewTab<'_>],
 ) -> Option<TabEvent> {
-    let menu = egui_widgets::TabMenu {
-        keep_open: i18n.t(I18nKey::NemesisKeepOpen),
-        close: i18n.t(I18nKey::CloseButton),
-        close_others: i18n.t(I18nKey::NemesisCloseOtherTabs),
-        close_to_the_right: i18n.t(I18nKey::NemesisCloseTabsRight),
-        close_all: i18n.t(I18nKey::NemesisCloseAllTabs),
-    };
+    let menu = egui_widgets::TabMenu::from_texts(gui_shared::i18n::tab_menu_texts(i18n));
     let mut event = None;
     egui::ScrollArea::horizontal().id_salt("nemesis_editor_tabs").show(ui, |ui| {
         ui.horizontal(|ui| {

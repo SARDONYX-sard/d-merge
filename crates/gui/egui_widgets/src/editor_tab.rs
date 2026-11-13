@@ -72,6 +72,16 @@ pub struct TabMenu<'a> {
     pub close_all: &'a str,
 }
 
+impl<'a> TabMenu<'a> {
+    /// From `[keep_open, close, close_others, close_to_the_right, close_all]`, e.g. as the host's
+    /// translations give them.
+    #[inline]
+    #[must_use]
+    pub const fn from_texts([keep_open, close, close_others, close_to_the_right, close_all]: [&'a str; 5]) -> Self {
+        Self { keep_open, close, close_others, close_to_the_right, close_all }
+    }
+}
+
 impl EditorTabOutput {
     /// What the tab asked for this frame, as the host's event (`event`): a click shows it, a double
     /// click keeps it open, `✖` or a middle click closes it, and its right-click menu has `menu`

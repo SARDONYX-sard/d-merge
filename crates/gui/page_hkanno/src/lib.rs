@@ -134,6 +134,18 @@ impl HkannoPage {
         }
     }
 
+    /// Closes the tabs at the indices `close` says (a tab menu's Close Others / to the Right / All),
+    /// but not one with unsaved edits: there is no way to get them back. Returns whether one stayed
+    /// for that. See [`kept_tabs`].
+    fn close_where(&mut self, close: impl Fn(usize) -> bool) -> bool {
+        let dirty: Vec<bool> = self.tabs.iter().map(|tab| tab.dirty).collect();
+        let (keep, active) = kept_tabs(&dirty, self.active, &close);
+        let mut keep = keep.into_iter();
+        self.tabs.retain(|_| keep.next().unwrap_or(true));
+        self.active = active;
+        dirty.iter().enumerate().any(|(at, dirty)| *dirty && close(at))
+    }
+
     /// Saves the active tab and reports the result.
     pub(crate) fn save_active(&mut self, ctx: &mut HkannoPageCtx<'_>) {
         let Some(tab) = self.active_tab() else { return };
@@ -169,6 +181,17 @@ const fn neighbor_tab(active: usize, len: usize, forward: bool) -> Option<usize>
     Some(if forward { (active + 1) % len } else { (active + len - 1) % len })
 }
 
+/// Which tabs stay when those `close` says close, and the active one after: the one active if it
+/// stays, else the one now in its place. A tab with unsaved edits (`dirty`) stays.
+///
+/// e.g. `[a, b*, c]` (`b` unsaved, `c` active), close all -> `[b]`, active `0`
+fn kept_tabs(dirty: &[bool], active: usize, close: impl Fn(usize) -> bool) -> (Vec<bool>, usize) {
+    let keep: Vec<bool> = dirty.iter().enumerate().map(|(at, dirty)| *dirty || !close(at)).collect();
+    let before = keep[..active.min(keep.len())].iter().filter(|kept| **kept).count();
+    let left = keep.iter().filter(|kept| **kept).count();
+    (keep, before.min(left.saturating_sub(1)))
+}
+
 /// Dropped paths split into `(annotation texts, files to open)`.
 ///
 /// e.g., `[a.hkx, notes.TXT, b.xml]` -> `([notes.TXT], [a.hkx, b.xml])`
@@ -190,6 +213,16 @@ mod tests {
     }
 
     use super::*;
+
+    /// Close Others / to the Right / All keep the unsaved tabs and the active one where it is.
+    #[test]
+    fn tabs_closed_from_the_menu_keep_unsaved_ones() {
+        let dirty = [false, true, false];
+        assert_eq!(kept_tabs(&dirty, 2, |_| true), (vec![false, true, false], 0), "close all: `b` stays");
+        assert_eq!(kept_tabs(&dirty, 2, |at| at != 2), (vec![false, true, true], 1), "others of `c`");
+        assert_eq!(kept_tabs(&dirty, 0, |at| at > 0), (vec![true, true, false], 0), "right of `a`");
+        assert_eq!(kept_tabs(&[false], 0, |_| true), (vec![false], 0), "none left");
+    }
 
     #[test]
     fn dropped_texts_are_kept_apart() {
