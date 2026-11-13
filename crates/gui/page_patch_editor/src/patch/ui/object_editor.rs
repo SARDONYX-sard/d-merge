@@ -160,7 +160,7 @@ impl PatchTool {
             ui.add(egui::Label::new(egui::RichText::new(&values.path).monospace().weak()).truncate());
             ui.separator();
             egui::ScrollArea::both().id_salt(("nemesis_merge_values", id)).auto_shrink(false).show(ui, |ui| {
-                if let Some(pick) = merge_columns(ui, i18n, &values) {
+                if let Some(pick) = merge_values(ui, i18n, &values) {
                     picked = Some(pick);
                 }
             });
@@ -447,17 +447,25 @@ enum MergePick {
     Accept(Vec<String>),
 }
 
-/// The width of a column of the merge panel.
-const MERGE_COLUMN: f32 = 240.0;
-
-/// `Original | Flinching [Accept] | Impact [Accept]`: a column per mod, its lines that the original
-/// does not have tinted, each with `+` to put it below the cursor.
-fn merge_columns(ui: &mut egui::Ui, i18n: &I18nMap, values: &resolve::MergeValues) -> Option<MergePick> {
+/// The original, then each mod below it, as wide as the panel: their lines that the original does not
+/// have tinted, each with `+` to put it below the cursor.
+///
+/// ```text
+/// Original
+///   <hkparam name="value">1</hkparam>
+/// ───────────────────────────────
+/// Flinching [Accept]
+///   + <hkparam name="value">2</hkparam>    <- tinted: the mod changes it
+/// ───────────────────────────────
+/// Impact [Accept]
+///   + ...
+/// ```
+fn merge_values(ui: &mut egui::Ui, i18n: &I18nMap, values: &resolve::MergeValues) -> Option<MergePick> {
     let mut picked = None;
     let is_original = |line: &String| values.original.iter().any(|original| original.trim() == line.trim());
-    ui.horizontal_top(|ui| {
+    // One above the other, each as wide as the panel: side by side they were cut off.
+    ui.vertical(|ui| {
         ui.vertical(|ui| {
-            ui.set_width(MERGE_COLUMN);
             ui.weak(i18n.t(I18nKey::NemesisMergeOriginal));
             for line in &values.original {
                 ui.add(egui::Label::new(egui_code_editor::line_job(ui, line.trim_start(), &Xml)));
@@ -466,7 +474,6 @@ fn merge_columns(ui: &mut egui::Ui, i18n: &I18nMap, values: &resolve::MergeValue
         for side in &values.sides {
             ui.separator();
             ui.vertical(|ui| {
-                ui.set_width(MERGE_COLUMN);
                 ui.horizontal(|ui| {
                     ui.strong(&side.name);
                     let accept = Button::new(i18n.t(I18nKey::MergeAccept)).small();
