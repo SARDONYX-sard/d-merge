@@ -27,6 +27,7 @@ use crate::patch::{
     EditorResult, FocusAt, PatchTool,
     anim::lines::AnimDataLanguage,
     editor::{language::NemesisXml, names::Names, pandora::PandoraXml},
+    tool::editing::EditorPane,
     workspace::PANDORA_DOC,
 };
 
@@ -88,7 +89,16 @@ impl PatchTool {
 
             toggle_problems = self.pane.status_bar(ui, i18n, keymap, self.is_user_patch);
             problems = self.problems.panel_ui(ui, i18n, &self.workspace.behaviors, &problem_keys);
-            self.code_editor(ui, i18n, id, (&names, keymap), &requests, &mut result);
+            let input = EditorInput {
+                behavior: (self.active, &self.workspace.behaviors[self.active]),
+                id,
+                names: &names,
+                keymap,
+                key_ui: &self.key_ui,
+                requests: &requests,
+                user_patch: self.is_user_patch,
+            };
+            self.pane.code_editor(ui, i18n, input, &mut result);
         });
 
         if format_and_save {
@@ -125,90 +135,6 @@ impl PatchTool {
             requests.push(EditorRequest::Format);
         }
         requests
-    }
-
-    /// The editor itself, and what it asked for into `result`.
-    fn code_editor(
-        &mut self,
-        ui: &mut egui::Ui,
-        i18n: &I18nMap,
-        id: &str,
-        (names, keymap): (&Rc<Names>, Keymap),
-        requests: &[EditorRequest],
-        result: &mut EditorResult,
-    ) {
-        let values = self.pane.field_values(self.active, &self.workspace.behaviors[self.active]);
-        let behavior = &self.workspace.behaviors[self.active];
-        let is_pandora_doc = id == PANDORA_DOC;
-
-        // The class (and fields) around the cursor line of last frame: field names, hover.
-        let context = if is_pandora_doc {
-            crate::patch::editor::pandora::fields_at(behavior, &self.pane.text, self.pane.cursor_line)
-        } else {
-            nemesis_diff::schema::field_context(&self.pane.text, self.pane.cursor_line)
-        };
-        let open_field = if is_pandora_doc {
-            None
-        } else {
-            nemesis_diff::schema::open_field(&self.pane.text, self.pane.cursor_line)
-        };
-
-        let language = NemesisXml {
-            code_action: self.pane.lsp.code_action,
-            events: &names.usable_events,
-            variables: &names.usable_variables,
-            variable_types: &names.variable_types,
-            values: &values,
-            graph: &names.graph,
-            fields: context.as_ref().map(|(class, fields)| (*class, fields.as_slice())),
-            pointer_field: open_field.filter(|field| nemesis_diff::schema::holds_pointers(field)),
-            kept_array_hover: i18n.t(I18nKey::NemesisKeptArrayHover),
-            in_string_array: open_field.is_some_and(nemesis_diff::schema::holds_strings),
-            behavior,
-        };
-        let anim_language = AnimDataLanguage {
-            roles: &self.pane.anim_roles,
-            cursor_line: self.pane.cursor_line,
-            trigger_names: &self.pane.trigger_names,
-        };
-        let pandora_language = PandoraXml { inner: &language };
-        let shown_language: &dyn Language = if is_pandora_doc {
-            &pandora_language
-        } else if behavior.is_anim_data() {
-            &anim_language
-        } else {
-            &language
-        };
-
-        let actions = palette_actions(&self.key_ui, i18n);
-        let labels = EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n));
-        let read_only = behavior.is_ref(id);
-        let features = editor_features(&self.pane.lsp, behavior.is_anim_data());
-
-        // Per object: each tab keeps where it was scrolled to.
-        let scroll = egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false);
-        scroll.show(ui, |ui| {
-            let output = CodeEditor::new(("nemesis_object", self.is_user_patch, id), &mut self.pane.text)
-                .language(shown_language)
-                .read_only(read_only)
-                .diagnostics(&self.pane.problems)
-                .features(features)
-                .keymap(keymap)
-                .labels(labels)
-                .host_commands(&HOST_COMMANDS)
-                .requests(requests)
-                .request_keys(self.key_ui.request_keys())
-                .actions(&actions)
-                .inline_diff(self.pane.show_inline_diff.then_some(&self.pane.inline_diff))
-                .show(ui, &mut self.pane.state);
-
-            if let Some(cursor) = output.cursor {
-                self.pane.cursor_line = cursor.line;
-            }
-            if let Some(references) = read_output(output, result) {
-                self.pane.references = Some(references);
-            }
-        });
     }
 
     /// What a click in the Problems panel or on the status bar's counts asked for.
@@ -282,5 +208,95 @@ fn read_output(output: CodeEditorOutput<'_>, result: &mut EditorResult) -> Optio
         }
         Some(Navigation::References(references)) => Some(references.into()),
         None => None,
+    }
+}
+
+/// What the code editor is drawn with.
+struct EditorInput<'a> {
+    /// The active behavior, and its index in the work.
+    behavior: (usize, &'a crate::patch::workspace::Behavior),
+    id: &'a str,
+    names: &'a Rc<Names>,
+    keymap: Keymap,
+    /// The keys of the palette's actions, and the `⚙` to change them.
+    key_ui: &'a keybinding::KeyUi,
+    /// The editor's own commands asked for by the key bindings this frame.
+    requests: &'a [EditorRequest],
+    /// The user patch's window: its editor has ids of its own.
+    user_patch: bool,
+}
+
+impl EditorPane {
+    /// The editor itself, of object `id`, and what it asked for into `result`.
+    fn code_editor(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, input: EditorInput<'_>, result: &mut EditorResult) {
+        let EditorInput { behavior: (index, behavior), id, names, keymap, key_ui, requests, user_patch } = input;
+        let values = self.field_values(index, behavior);
+        let is_pandora_doc = id == PANDORA_DOC;
+
+        // The class (and fields) around the cursor line of last frame: field names, hover.
+        let context = if is_pandora_doc {
+            crate::patch::editor::pandora::fields_at(behavior, &self.text, self.cursor_line)
+        } else {
+            nemesis_diff::schema::field_context(&self.text, self.cursor_line)
+        };
+        let open_field =
+            if is_pandora_doc { None } else { nemesis_diff::schema::open_field(&self.text, self.cursor_line) };
+
+        let language = NemesisXml {
+            code_action: self.lsp.code_action,
+            events: &names.usable_events,
+            variables: &names.usable_variables,
+            variable_types: &names.variable_types,
+            values: &values,
+            graph: &names.graph,
+            fields: context.as_ref().map(|(class, fields)| (*class, fields.as_slice())),
+            pointer_field: open_field.filter(|field| nemesis_diff::schema::holds_pointers(field)),
+            kept_array_hover: i18n.t(I18nKey::NemesisKeptArrayHover),
+            in_string_array: open_field.is_some_and(nemesis_diff::schema::holds_strings),
+            behavior,
+        };
+        let anim_language = AnimDataLanguage {
+            roles: &self.anim_roles,
+            cursor_line: self.cursor_line,
+            trigger_names: &self.trigger_names,
+        };
+        let pandora_language = PandoraXml { inner: &language };
+        let shown_language: &dyn Language = if is_pandora_doc {
+            &pandora_language
+        } else if behavior.is_anim_data() {
+            &anim_language
+        } else {
+            &language
+        };
+
+        let actions = palette_actions(key_ui, i18n);
+        let labels = EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n));
+        let read_only = behavior.is_ref(id);
+        let features = editor_features(&self.lsp, behavior.is_anim_data());
+
+        // Per object: each tab keeps where it was scrolled to.
+        let scroll = egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false);
+        scroll.show(ui, |ui| {
+            let output = CodeEditor::new(("nemesis_object", user_patch, id), &mut self.text)
+                .language(shown_language)
+                .read_only(read_only)
+                .diagnostics(&self.problems)
+                .features(features)
+                .keymap(keymap)
+                .labels(labels)
+                .host_commands(&HOST_COMMANDS)
+                .requests(requests)
+                .request_keys(key_ui.request_keys())
+                .actions(&actions)
+                .inline_diff(self.show_inline_diff.then_some(&self.inline_diff))
+                .show(ui, &mut self.state);
+
+            if let Some(cursor) = output.cursor {
+                self.cursor_line = cursor.line;
+            }
+            if let Some(references) = read_output(output, result) {
+                self.references = Some(references);
+            }
+        });
     }
 }
