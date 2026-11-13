@@ -1127,6 +1127,7 @@ dependencies = [
  "font-kit",
  "gui_shared",
  "image",
+ "keybinding",
  "mimalloc",
  "page_convert",
  "page_hkanno",
@@ -2973,6 +2974,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "keybinding"
+version = "0.0.0"
+dependencies = [
+ "egui",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "khronos-egl"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4014,6 +4024,7 @@ dependencies = [
  "fast_hash",
  "gui_shared",
  "hkanno_lsp",
+ "keybinding",
  "parking_lot 0.13.0",
  "serde_hkx_for_gui",
  "tracing",
@@ -4054,6 +4065,7 @@ dependencies = [
  "fast_hash",
  "gui_shared",
  "hkx_io",
+ "keybinding",
  "nemesis_diff",
  "pandora_patch",
  "phf 0.14.0",

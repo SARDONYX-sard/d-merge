@@ -159,6 +159,15 @@ impl KeymapState {
         }
     }
 
+    /// Vim's mode as key bindings name it (`vim.mode`), e.g. `normal`. `None` with the Normal keymap.
+    #[inline]
+    pub const fn vim_mode(&self, keymap: Keymap) -> Option<&'static str> {
+        match keymap {
+            Keymap::Normal => None,
+            Keymap::Vim => Some(self.vim.mode_name()),
+        }
+    }
+
     /// Is the user typing text right now? Completion / signature help only make sense then.
     ///
     /// e.g., `false` in Vim's Normal mode, where letters are commands.

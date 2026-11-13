@@ -9,6 +9,7 @@ use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::ui::editor::{EditorMode, LspOptions},
 };
+use keybinding::commands;
 
 use super::{preview::PreviewEvent, references::references_window};
 use crate::patch::{
@@ -59,28 +60,39 @@ impl PatchTool {
         // Like VS Code: getting into the editor shows its object in the side bar.
         let has_focus = ui.memory(|m| m.has_focus(editor_id));
         self.note_editor_focus(ui.ctx(), has_focus);
-        if egui_code_editor::ProblemsCursor::toggle_key(ui.ctx()) {
+        if self.key_command(commands::PROBLEMS_TOGGLE) {
             self.toggle_problems_focus(ui, editor_id);
         } else if has_focus {
             self.problems.cursor.focused = false; // e.g. a click in the editor
         }
-        // `Ctrl+W` closes the tab, as in VS Code. (Vim uses that key itself.)
-        if self.pane.mode == EditorMode::Normal
-            && ui.memory(|m| m.has_focus(editor_id))
-            && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::W))
-        {
+        // `Ctrl+W` with the Normal keymap, as in VS Code. (Vim uses that key itself.)
+        if self.key_command(commands::TABS_CLOSE) {
             self.apply_tab_event(Some(TabEvent::Close(id.to_string())), &id);
             return;
         }
         self.expire_preview(ui.ctx());
         self.refresh_preview(&id);
-        if let Some(older) = history_keys(ui) {
+        let older = if self.key_command(commands::HISTORY_BACK) {
+            Some(true)
+        } else if self.key_command(commands::HISTORY_FORWARD) {
+            Some(false)
+        } else {
+            history_buttons_of_mouse(ui)
+        };
+        if let Some(older) = older {
             self.walk_history(older, &id);
             ui.ctx().request_repaint();
             return;
         }
-        // `Ctrl+PageDown` / `Ctrl+PageUp`, as in VS Code, in every keymap.
-        if let Some(forward) = egui_code_editor::tab_switch_keys(ui) {
+        // `Ctrl+PageDown` / `Ctrl+PageUp` (`Alt+L` / `Alt+H`), as in VS Code, in every keymap.
+        let step = if self.key_command(commands::TABS_NEXT) {
+            Some(true)
+        } else if self.key_command(commands::TABS_PREVIOUS) {
+            Some(false)
+        } else {
+            None
+        };
+        if let Some(forward) = step {
             self.step_tab(&id, forward);
             ui.ctx().request_repaint();
             return;
@@ -482,13 +494,11 @@ fn split_preview_button(ui: &mut egui::Ui, i18n: &I18nMap, show_preview: &mut bo
 
 /// `Alt+←` or the mouse's back button: `Some(true)`. `Alt+→` or its forward button: `Some(false)`.
 /// As in VS Code, in every keymap: going to a definition is only useful if you can come back.
-fn history_keys(ui: &egui::Ui) -> Option<bool> {
-    use egui::{Key, Modifiers, PointerButton};
-    ui.input_mut(|input| {
-        let back =
-            input.consume_key(Modifiers::ALT, Key::ArrowLeft) || input.pointer.button_pressed(PointerButton::Extra1);
-        let forward =
-            input.consume_key(Modifiers::ALT, Key::ArrowRight) || input.pointer.button_pressed(PointerButton::Extra2);
+fn history_buttons_of_mouse(ui: &egui::Ui) -> Option<bool> {
+    use egui::PointerButton;
+    ui.input(|input| {
+        let back = input.pointer.button_pressed(PointerButton::Extra1);
+        let forward = input.pointer.button_pressed(PointerButton::Extra2);
         if back {
             Some(true)
         } else if forward {

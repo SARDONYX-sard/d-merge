@@ -10,7 +10,7 @@
 //!     ⚠ `#0002` does not exist.     Ln 9, Col 5
 //! ```
 //!
-//! The keyboard, as in a Vim file tree: `Ctrl+Shift+L` ([`ProblemsCursor::toggle_key`]) shows the
+//! The keyboard, as in a Vim file tree: `Ctrl+Shift+L` (the host's key binding `problems.toggle`) shows the
 //! panel with it, or hides the panel that has it; there `j` / `k` / `↓` / `↑` / `g` / `G` move the cursor,
 //! `Enter` goes to the problem and `Esc` back to the editor.
 
@@ -56,12 +56,6 @@ pub struct ProblemsCursor {
 }
 
 impl ProblemsCursor {
-    /// `Ctrl+Shift+L` was pressed: the host moves the keyboard to the panel or back to the editor.
-    #[inline]
-    pub fn toggle_key(ctx: &egui::Context) -> bool {
-        ctx.input_mut(|input| input.consume_key(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, egui::Key::L))
-    }
-
     /// Applies `key` in a panel of `len` problems. Returns the row to go to (`Go`): the keyboard then
     /// leaves the panel, as it does on `Leave`.
     ///

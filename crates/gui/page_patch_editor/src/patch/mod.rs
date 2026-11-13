@@ -85,6 +85,8 @@ pub(crate) struct PatchTool {
     cache_root: PathBuf,
     /// This tool is the user patch's, in its window: see [`user_patch`].
     is_user_patch: bool,
+    /// The commands this frame's keys asked for: see [`Self::key_command`].
+    key_commands: Vec<&'static str>,
     /// The editor of the open object and what is beside it: preview, merge, problems. See [`tool::editing`].
     pane: tool::editing::EditorPane,
     /// What `Edit...` proposed, until it is edited.
@@ -286,8 +288,8 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut Notification,
         paths: PatchPaths<'_>,
-        settings: &mut PatchEditorSettings,
-        editor: &mut LspOptions,
+        (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
+        keys: &mut keybinding::Keybindings,
     ) {
         self.read_editor_options(editor);
         if self.template_dir != paths.template_dir {
@@ -324,6 +326,9 @@ impl PatchTool {
         }
         self.sync_workspace(notify, i18n);
         self.diagnose_work();
+        // The user patch window, above the page, has the keys while it is open.
+        let keys = (!self.user_patch.open).then_some(keys);
+        self.take_key_commands(ui.ctx(), keys);
         self.draw(ui, i18n, notify);
 
         self.write_editor_options(editor);

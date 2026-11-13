@@ -46,7 +46,7 @@ the keyboard works it too:
 | `Enter`                      | Go to the problem (the editor gets the keys)  |
 | `Esc`                        | Back to the editor                            |
 
-`Ctrl+Shift+L` is read by the host (`ProblemsCursor::toggle_key`), which owns the focus.
+`Ctrl+Shift+L` is the host's key binding (`problems.toggle` of the `keybinding` crate): the host owns the focus.
 
 ## Command palette and host API
 

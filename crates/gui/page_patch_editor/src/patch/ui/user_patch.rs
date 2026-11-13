@@ -30,8 +30,8 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut Notification,
         paths: PatchPaths<'_>,
-        settings: &mut PatchEditorSettings,
-        editor: &mut LspOptions,
+        (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
+        keys: &mut keybinding::Keybindings,
     ) {
         if !self.user_patch.open {
             return;
@@ -46,7 +46,7 @@ impl PatchTool {
             // Its editor uses `Esc` (Vim, hovers, quick fixes): the window closes with its `x`.
             .close_on_escape(false)
             .show(ctx, &mut open, |ui| match &mut tool {
-                Some(tool) => tool.user_patch_ui(ui, i18n, notify, settings, editor),
+                Some(tool) => tool.user_patch_ui(ui, i18n, notify, (settings, editor), keys),
                 None => {
                     ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNeedPatchOutput));
                 }
@@ -63,13 +63,14 @@ impl PatchTool {
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         notify: &mut Notification,
-        settings: &mut PatchEditorSettings,
-        editor: &mut LspOptions,
+        (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
+        keys: &mut keybinding::Keybindings,
     ) {
         self.read_editor_options(editor);
         self.read_view_settings(settings);
         self.sync_workspace(notify, i18n);
         self.take_in_resolution(notify, i18n);
+        self.take_key_commands(ui.ctx(), Some(keys));
         self.draw(ui, i18n, notify);
         self.write_editor_options(editor);
         self.write_view_settings(settings);

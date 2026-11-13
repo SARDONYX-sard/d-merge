@@ -51,7 +51,7 @@ mod ui;
 
 pub(crate) use self::cursor::scroll_request_id;
 pub use self::{
-    command::{EditorCommand, EditorFeatures, tab_switch_keys},
+    command::{EditorCommand, EditorFeatures},
     cursor::{editor_id, set_cursor},
     editor::{CodeEditor, CodeEditorOutput, Navigation},
     inline_diff::{CharChange, DiffHunk, InlineDiff},

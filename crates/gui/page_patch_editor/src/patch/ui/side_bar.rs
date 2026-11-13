@@ -70,7 +70,7 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut egui_widgets::notify::Notification,
     ) {
-        self.side_bar_keys(ui);
+        self.side_bar_keys();
         let id = if self.is_user_patch { "user_patch" } else { "nemesis" };
         egui::Panel::left((id, "activity_bar"))
             .resizable(false)
@@ -145,12 +145,17 @@ impl PatchTool {
         self.focus_search |= view == SideView::Search;
     }
 
-    /// `Ctrl+Shift+E` / `F` / `G`, as in VS Code. A key shows its view, and does not hide it.
-    fn side_bar_keys(&mut self, ui: &egui::Ui) {
-        use egui::{Key, Modifiers};
-        let keys = [(Key::E, SideView::Explorer), (Key::F, SideView::Search), (Key::G, SideView::Changes)];
-        for (key, view) in keys {
-            if ui.input_mut(|input| input.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, key)) {
+    /// `Ctrl+Shift+E` / `F` / `G` (key bindings), as in VS Code. A key shows its view, and does not
+    /// hide it.
+    fn side_bar_keys(&mut self) {
+        use keybinding::commands::{SIDE_BAR_CHANGES, SIDE_BAR_EXPLORER, SIDE_BAR_SEARCH};
+        let keys = [
+            (SIDE_BAR_EXPLORER, SideView::Explorer),
+            (SIDE_BAR_SEARCH, SideView::Search),
+            (SIDE_BAR_CHANGES, SideView::Changes),
+        ];
+        for (command, view) in keys {
+            if self.key_command(command) {
                 self.side.view = view;
                 self.side.hidden = false;
                 self.focus_search |= view == SideView::Search;

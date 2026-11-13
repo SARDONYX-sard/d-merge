@@ -32,6 +32,8 @@ pub struct PatchEditorPageCtx<'a> {
     pub editor: &'a mut ui::editor::LspOptions,
     /// Frame (background) of the page's panels, from the app theme.
     pub panel_frame: egui::Frame,
+    /// The key bindings: their commands are taken out of the frame's keys by the page.
+    pub keys: &'a mut keybinding::Keybindings,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -85,10 +87,10 @@ impl PatchEditorPage {
         i18n: &I18nMap,
         notify: &mut Notification,
         paths: PatchPaths<'_>,
-        settings: &mut pages::patch_editor::PatchEditorSettings,
-        editor: &mut ui::editor::LspOptions,
+        prefs: (&mut pages::patch_editor::PatchEditorSettings, &mut ui::editor::LspOptions),
+        keys: &mut keybinding::Keybindings,
     ) {
-        self.patch.user_patch_window(ctx, i18n, notify, paths, settings, editor);
+        self.patch.user_patch_window(ctx, i18n, notify, paths, prefs, keys);
     }
 
     /// `Edit...` in a conflict: the value goes into the user patch, and its window shows it.
@@ -105,7 +107,7 @@ impl PatchEditorPage {
 
     /// Draws the page.
     pub fn ui(&mut self, ui: &mut egui::Ui, ctx: PatchEditorPageCtx<'_>) {
-        let PatchEditorPageCtx { i18n, notify, paths, settings, editor, panel_frame } = ctx;
+        let PatchEditorPageCtx { i18n, notify, paths, settings, editor, panel_frame, keys } = ctx;
         self.patch.set_parser_mode(paths.parser_mode);
         egui::CentralPanel::default().frame(panel_frame).show(ui, |ui| {
             // Always-visible scroll bars (like the hkanno page): you see where you are in a long object.
@@ -119,7 +121,7 @@ impl PatchEditorPage {
             });
             ui.separator();
             match self.tool {
-                Tool::Patch => self.patch.ui(ui, i18n, notify, paths, settings, editor),
+                Tool::Patch => self.patch.ui(ui, i18n, notify, paths, (settings, editor), keys),
                 Tool::Crc => self.crc.ui(ui, i18n),
             }
         });

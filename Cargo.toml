@@ -105,6 +105,7 @@ egui_code_editor  = { path = "./crates/gui/egui_code_editor" }
 egui_widgets      = { path = "./crates/gui/egui_widgets" }
 gh_issue_link     = { path = "./crates/gui/gh_issue_link" }
 gui_shared        = { path = "./crates/gui/gui_shared" }
+keybinding        = { path = "./crates/gui/keybinding" }
 hkanno_lsp        = { path = "./crates/gui/hkanno_lsp" }
 mod_info          = { path = "./crates/gui/mod_info" }
 node_expr         = { path = "./crates/gui/node_expr" }

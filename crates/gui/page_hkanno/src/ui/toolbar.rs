@@ -118,9 +118,9 @@ impl HkannoPage {
         }
     }
 
-    /// `Ctrl+S` saves (works in every keymap; Vim also has `:w`).
-    pub(crate) fn handle_shortcuts(&mut self, egui_ctx: &egui::Context, ctx: &mut HkannoPageCtx<'_>) {
-        if egui_ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::S)) {
+    /// `Ctrl+S` (key bindings) saves, in every keymap; Vim also has `:w`.
+    pub(crate) fn handle_shortcuts(&mut self, ctx: &mut HkannoPageCtx<'_>) {
+        if self.key_command(keybinding::commands::EDITOR_SAVE) {
             self.save_active(ctx);
         }
     }

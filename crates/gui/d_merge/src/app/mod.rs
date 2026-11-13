@@ -85,7 +85,14 @@ pub(crate) struct App {
 
     /// A page asked for another page to be shown. The router does that, after it drew this frame.
     pub pending_page: Option<gui_shared::settings::ui::Page>,
+
+    // ── Key bindings ──────────────────────────────────────────────────────────
+    /// The defaults and `keybindings.json`, read again when it changes.
+    pub keys: keybinding::Keybindings,
 }
+
+/// The user's key bindings, next to the settings. See [`keybinding::file`].
+const KEYBINDINGS_PATH: &str = "./.d_merge/keybindings.json";
 
 impl App {
     /// Constructs `App` from persisted settings.
@@ -128,6 +135,7 @@ impl App {
             hkanno,
             patch_editor: PatchEditorPage::default(),
             pending_page: None,
+            keys: keybinding::Keybindings::load(std::path::Path::new(KEYBINDINGS_PATH)),
         }
     }
 
@@ -160,6 +168,15 @@ impl App {
         self.patch.poll(ctx, patch_ctx);
         self.convert.poll(&mut self.notify, &self.i18n);
         self.update_window_info(ctx);
+        // `keybindings.json` changed: what of it can't be taken is told once.
+        self.keys.reload_if_changed(ctx.input(|i| i.time));
+        let warnings = self.keys.take_warnings();
+        if !warnings.is_empty() {
+            self.notify.warn(warnings.join(
+                "
+",
+            ));
+        }
 
         // ── One-shot setup (first frame only) ─────────────────────────────────
         self.start_log_watcher();

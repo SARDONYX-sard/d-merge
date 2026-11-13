@@ -52,13 +52,10 @@ impl PatchTool {
         if ui.memory(|m| m.focused().is_some()) {
             self.explorer.tree_focus = false;
         }
-        // `t` / `c` / `u`: what it shows, switched from the keyboard as the `[≡]` / `⋯` menu does.
-        if self.explorer.tree_focus {
-            let keys = super::tree::read_view_keys(ui);
-            self.explorer.tree_view ^= keys.tree && !anim;
-            self.explorer.changed_only ^= keys.changed;
-            self.explorer.unlinked_only ^= keys.unlinked && !anim;
-        }
+        // `t` / `c` / `u` (key bindings): what it shows, as the `[≡]` / `⋯` menu does.
+        self.explorer.tree_view ^= self.key_command(keybinding::commands::EXPLORER_TOGGLE_VIEW) && !anim;
+        self.explorer.changed_only ^= self.key_command(keybinding::commands::EXPLORER_TOGGLE_CHANGED_ONLY);
+        self.explorer.unlinked_only ^= self.key_command(keybinding::commands::EXPLORER_TOGGLE_UNLINKED_ONLY) && !anim;
         let names = self.names();
         // A tree from the root container, unless filtering: a filter wants the flat list.
         if anim {

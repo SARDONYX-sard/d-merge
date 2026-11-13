@@ -151,6 +151,26 @@ impl VimState {
         self.mode
     }
 
+    /// The mode as the host's key bindings name it (`vim.mode` of their `when`). A command being
+    /// typed (`2d`, `:w`) is `pending` / `command`: a binding of `normal` must not cut it.
+    ///
+    /// e.g. `normal`, `insert`, `visual`, `visualLine`, `visualBlock`, `pending`, `command`
+    pub(crate) const fn mode_name(&self) -> &'static str {
+        if self.prompt.is_some() {
+            return "command";
+        }
+        if !self.pending.is_empty() {
+            return "pending";
+        }
+        match self.mode {
+            Mode::Normal => "normal",
+            Mode::Insert => "insert",
+            Mode::Visual => "visual",
+            Mode::VisualLine => "visualLine",
+            Mode::VisualBlock => "visualBlock",
+        }
+    }
+
     /// Status line: the mode badge and the details next to it.
     /// e.g., (`Insert`, ``), (`Command`, `:w`), (`Normal`, `recording @a  2d`)
     /// The key the pending keys wait on, if it has a list of what can follow.

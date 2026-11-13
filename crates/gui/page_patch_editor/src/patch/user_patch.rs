@@ -477,7 +477,15 @@ mod tests {
         for _ in 0..3 {
             let mut drawn = ctx.run_ui(egui::RawInput::default(), |ui| {
                 let ctx = ui.ctx().clone();
-                main.user_patch_window(&ctx, &i18n, &mut notify, paths(&output), &mut settings, &mut editor);
+                let mut keys = keybinding::Keybindings::default();
+                main.user_patch_window(
+                    &ctx,
+                    &i18n,
+                    &mut notify,
+                    paths(&output),
+                    (&mut settings, &mut editor),
+                    &mut keys,
+                );
             });
             drawn.textures_delta.clear();
         }

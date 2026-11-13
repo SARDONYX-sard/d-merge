@@ -1,0 +1,22 @@
+[package]
+name        = "keybinding"
+version     = "0.0.0"
+description = "VS Code-like key bindings for egui: commands, keys, `when` conditions and a user file"
+
+authors.workspace      = true
+categories             = ["gui"]
+edition.workspace      = true
+keywords               = ["egui", "keybindings"]
+license                = "MIT"
+readme                 = "../../../README.md"
+repository.workspace   = true
+rust-version.workspace = true
+
+# NOTE: It knows no page: the commands are names, carried out by whoever reads them.
+[dependencies]
+egui       = { workspace = true } # `Key` / `Modifiers`, and the input events
+serde      = { workspace = true }
+serde_json = { workspace = true } # the user file (after its comments are taken out) and its schema
+
+[lints]
+workspace = true

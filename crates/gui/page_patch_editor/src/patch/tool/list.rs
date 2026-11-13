@@ -135,6 +135,49 @@ impl PatchTool {
         ui.memory_mut(|m| m.surrender_focus(editor));
     }
 
+    /// Takes the commands of this frame's keys (see [`keybinding`]): carried out by those who ask for
+    /// them with [`Self::key_command`] while it is drawn. `keys`: `None` when another has the keyboard
+    /// (the main work's tool while the user patch window is open).
+    pub(in crate::patch) fn take_key_commands(
+        &mut self,
+        ctx: &egui::Context,
+        keys: Option<&mut keybinding::Keybindings>,
+    ) {
+        self.key_commands.clear();
+        let Some(keys) = keys else { return };
+        let context = self.key_context(ctx);
+        self.key_commands = keys.dispatch(ctx, &context);
+    }
+
+    /// Was `command` asked for by this frame's keys? It is done then: asked again, `false`.
+    ///
+    /// e.g. `self.key_command(keybinding::commands::TABS_CLOSE)`
+    pub(in crate::patch) fn key_command(&mut self, command: &str) -> bool {
+        let Some(at) = self.key_commands.iter().position(|asked| *asked == command) else { return false };
+        self.key_commands.swap_remove(at);
+        true
+    }
+
+    /// Who has the keyboard: what a binding's `when` sees.
+    pub(in crate::patch) fn key_context(&self, ctx: &egui::Context) -> keybinding::KeyContext {
+        use gui_shared::settings::ui::editor::EditorMode;
+        let vim = self.pane.mode == EditorMode::Vim;
+        let keymap = if vim { egui_code_editor::Keymap::Vim } else { egui_code_editor::Keymap::Normal };
+        let editor_focus = self.pane.had_focus;
+        keybinding::KeyContext {
+            page: "patchEditor",
+            editor_focus,
+            vim,
+            vim_mode: self.pane.state.keymap.vim_mode(keymap),
+            explorer_focus: self.explorer.tree_focus,
+            explorer_view: Some(if self.explorer.tree_view { "tree" } else { "list" }),
+            problems_focus: self.problems.cursor.focused,
+            problems_visible: self.problems.open,
+            input_focus: !editor_focus && ctx.egui_wants_keyboard_input(),
+            user_patch: self.is_user_patch,
+        }
+    }
+
     /// `Ctrl+Shift+L`, as VS Code's `Ctrl+Shift+M`: the Problems panel shows and gets the keyboard;
     /// if it has it, it hides and the editor gets it back. See [`egui_code_editor::problems`].
     pub(in crate::patch) fn toggle_problems_focus(&mut self, ui: &egui::Ui, editor: egui::Id) {

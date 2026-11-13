@@ -13,30 +13,6 @@ use crate::patch::{
 /// Pixels of indent per tree level.
 const INDENT: f32 = 12.0;
 
-/// What the explorer shows, switched by a key while it has the keyboard, as Vim file trees do.
-///
-/// | key | switches            |
-/// | --- | ------------------- |
-/// | `t` | tree / flat list    |
-/// | `c` | changed only        |
-/// | `u` | unlinked only       |
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub(in crate::patch) struct ViewKeys {
-    pub(in crate::patch) tree: bool,
-    pub(in crate::patch) changed: bool,
-    pub(in crate::patch) unlinked: bool,
-}
-
-/// This frame's [`ViewKeys`]: read before [`read_keys`], whichever of the tree and the list shows.
-pub(in crate::patch) fn read_view_keys(ui: &egui::Ui) -> ViewKeys {
-    use egui::{Key, Modifiers};
-    ui.input_mut(|input| ViewKeys {
-        tree: input.consume_key(Modifiers::NONE, Key::T),
-        changed: input.consume_key(Modifiers::NONE, Key::C),
-        unlinked: input.consume_key(Modifiers::NONE, Key::U),
-    })
-}
-
 /// This frame's keys as [`TreeInput`]s (several for a held key on a slow frame).
 ///
 /// `leader`: `Space` was pressed; the next key decides. Frames also come without keys (e.g., the

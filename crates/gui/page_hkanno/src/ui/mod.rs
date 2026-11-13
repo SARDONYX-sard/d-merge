@@ -13,6 +13,7 @@ use gui_shared::{
     settings::ui::editor::EditorMode,
 };
 use hkanno_lsp::features::code_action::code_action;
+use keybinding::commands;
 
 use crate::{
     HkannoPage, HkannoPageCtx,
@@ -29,7 +30,9 @@ impl HkannoPage {
     /// Draws the page.
     pub fn ui(&mut self, ui: &mut egui::Ui, mut ctx: HkannoPageCtx<'_>) {
         self.handle_drop(ui.ctx(), &mut ctx);
-        self.handle_shortcuts(ui.ctx(), &mut ctx);
+        let context = self.key_context(ui.ctx(), &ctx);
+        self.key_commands = ctx.keys.dispatch(ui.ctx(), &context);
+        self.handle_shortcuts(&mut ctx);
 
         // egui's default scroll bars are thin until hovered, which hides where in the file
         // you are. Always-visible solid bars, like a code editor (only on this page).
@@ -121,8 +124,10 @@ impl HkannoPage {
     /// The text editor of the active tab (+ the keymap status line, e.g., `-- INSERT --`).
     fn editor(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
         ui.label(egui::RichText::new(ctx.i18n.t(I18nKey::HkannoAnnotationLabel)).weak());
-        if let Some(forward) = egui_code_editor::tab_switch_keys(ui) {
-            self.step_tab(ui, forward);
+        if self.key_command(commands::TABS_NEXT) {
+            self.step_tab(ui, true);
+        } else if self.key_command(commands::TABS_PREVIOUS) {
+            self.step_tab(ui, false);
         }
 
         let i18n = ctx.i18n;
@@ -266,7 +271,9 @@ impl HkannoPage {
         let cursor = &mut self.problems_cursor;
         // `Ctrl+Shift+L`, as VS Code's `Ctrl+Shift+M`: the panel shows and gets the keyboard; if it
         // has it, it hides and the editor gets it back.
-        if egui_code_editor::ProblemsCursor::toggle_key(ui.ctx()) {
+        let toggle = self.key_commands.iter().position(|asked| *asked == commands::PROBLEMS_TOGGLE);
+        if let Some(at) = toggle {
+            self.key_commands.swap_remove(at);
             if cursor.focused {
                 (cursor.focused, self.problems_hidden) = (false, true);
                 ui.memory_mut(|m| m.request_focus(id));
@@ -365,6 +372,32 @@ fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) -> bool {
     }
     ui.separator();
     ui.button(i18n.t(I18nKey::CloseButton)).clicked()
+}
+
+impl HkannoPage {
+    /// Was `command` asked for by this frame's keys? It is done then: asked again, `false`.
+    fn key_command(&mut self, command: &str) -> bool {
+        let Some(at) = self.key_commands.iter().position(|asked| *asked == command) else { return false };
+        self.key_commands.swap_remove(at);
+        true
+    }
+
+    /// Who has the keyboard: what a binding's `when` sees.
+    fn key_context(&self, egui_ctx: &egui::Context, ctx: &HkannoPageCtx<'_>) -> keybinding::KeyContext {
+        let keymap = to_keymap(ctx.lsp_settings.editor_mode);
+        let tab = self.tabs.get(self.active);
+        let editor_focus = tab.is_some_and(|tab| egui_ctx.memory(|m| m.has_focus(tab.editor_id())));
+        keybinding::KeyContext {
+            page: "hkanno",
+            editor_focus,
+            vim: keymap == Keymap::Vim,
+            vim_mode: tab.and_then(|tab| tab.editor.keymap.vim_mode(keymap)),
+            problems_focus: self.problems_cursor.focused,
+            problems_visible: !self.problems_hidden,
+            input_focus: !editor_focus && egui_ctx.egui_wants_keyboard_input(),
+            ..Default::default()
+        }
+    }
 }
 
 /// Settings enum -> editor enum.
