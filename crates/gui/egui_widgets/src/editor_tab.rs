@@ -235,6 +235,8 @@ impl EditorTab {
         let lock = if self.read_only { Self::CLOSE_SIZE + 2.0 } else { 0.0 };
         let width = self.padding + galley.size().x + 6.0 + lock + Self::CLOSE_SIZE + self.padding;
         let (rect, response) = ui.allocate_exact_size(egui::vec2(width, self.height), egui::Sense::click());
+        // A hand over it, as over a link: it is clicked, not typed in.
+        let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
         let response = match self.hover {
             Some(hover) => response.on_hover_text(hover),
             None => response,
@@ -245,6 +247,7 @@ impl EditorTab {
             egui::Vec2::splat(Self::CLOSE_SIZE),
         );
         let close_response = ui.interact(close_rect, response.id.with("close"), egui::Sense::click());
+        let close_response = close_response.on_hover_cursor(egui::CursorIcon::PointingHand);
         let close = close_response.clicked() || response.middle_clicked();
         if !ui.is_rect_visible(rect) {
             return EditorTabOutput { response, close, elided, preview };
