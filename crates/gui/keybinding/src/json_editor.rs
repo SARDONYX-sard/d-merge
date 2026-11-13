@@ -130,6 +130,10 @@ impl JsonEditor {
         let mut save =
             ctx.memory(|m| m.has_focus(id)) && ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::S));
         let title = if self.dirty { "keybindings.json ●" } else { "keybindings.json" };
+        // As a tab of the editor: Vim's `<Space>c` / `:q`, `Ctrl+W` with the Normal keymap.
+        let mut close = keymap == Keymap::Normal
+            && ctx.memory(|m| m.has_focus(id))
+            && ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::W));
         let mut open = true;
         let size = ctx.content_rect().size() * egui::vec2(0.7, 0.75);
         egui::Window::new(title)
@@ -148,6 +152,7 @@ impl JsonEditor {
                     .auto_shrink(false)
                     .show(ui, |ui| {
                         CodeEditor::new(EDITOR_SALT, &mut self.text)
+                            .host_commands(&[EditorCommand::CloseTab])
                             .language(&language)
                             .diagnostics(&self.problems)
                             .keymap(keymap)
@@ -161,8 +166,9 @@ impl JsonEditor {
                     self.problems = diagnose(&self.text);
                 }
                 save |= command == Some(EditorCommand::Save);
+                close |= command == Some(EditorCommand::CloseTab);
             });
-        let closed = !open;
+        let closed = !open || close;
         self.asking |= closed && self.dirty;
         let answer = if self.asking { ask(ctx, texts) } else { None };
         save |= self.on_close(closed, answer);
