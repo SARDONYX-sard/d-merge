@@ -262,7 +262,17 @@ impl PatchTool {
     pub(in crate::patch) fn apply_tab_event(&mut self, event: Option<TabEvent>, current: &str) {
         let active = self.active;
         match event {
-            Some(TabEvent::Show(id)) => self.selected = Some(id.into()),
+            Some(TabEvent::Show(id)) => {
+                self.views.shown = None;
+                self.selected = Some(id.into());
+            }
+            Some(TabEvent::ShowView(at)) => {
+                if let Some(view) = self.views.list.get(at) {
+                    self.selected = Some(view.id.as_str().into());
+                    self.views.shown = Some(at);
+                }
+            }
+            Some(TabEvent::CloseView(at)) => self.views.close(at),
             Some(TabEvent::KeepOpen(id)) => self.tabs.pin(active, &id),
             Some(TabEvent::CloseToTheRight(id)) => {
                 self.tabs.close_to_the_right(active, &id);

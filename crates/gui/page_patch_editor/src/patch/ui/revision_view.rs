@@ -26,15 +26,46 @@ use crate::patch::{
     workspace::history::{ObjectKey, Origin},
 };
 
-/// A diff or a blame of an object, shown in the editor's place as VS Code opens a diff in its editor:
-/// while that object is the one open. `✖`, or opening another, goes back to the editor.
+/// A diff or a blame of an object, in a tab of the editor as VS Code opens a diff:
+/// `GetUpModList (#2) ↔ GetUpModList (working) 🔒 ✖`. Read only.
 #[derive(Debug)]
 pub(in crate::patch) struct RevisionView {
+    /// Its behavior: its tab is with that behavior's.
+    pub(in crate::patch) behavior: usize,
     /// The object, e.g. `#0106`.
-    id: String,
-    /// e.g. `#0106: #2 -> working`
-    title: String,
+    pub(in crate::patch) id: String,
+    /// What its tab says. e.g. `GetUpModList (#2) ↔ GetUpModList (working)`
+    pub(in crate::patch) title: String,
     body: Body,
+}
+
+/// The views open, as tabs after the objects'.
+#[derive(Debug, Default)]
+pub(in crate::patch) struct Views {
+    pub(in crate::patch) list: Vec<RevisionView>,
+    /// The one shown in the editor's place. `None`: the object of the tab selected.
+    pub(in crate::patch) shown: Option<usize>,
+}
+
+impl Views {
+    /// `(title, shown)` of the tabs of `behavior`, in order, with their indices in [`Self::list`].
+    pub(in crate::patch) fn tabs_of(&self, behavior: usize) -> Vec<(usize, &str, bool)> {
+        let of = self.list.iter().enumerate().filter(|(_, view)| view.behavior == behavior);
+        of.map(|(at, view)| (at, view.title.as_str(), self.shown == Some(at))).collect()
+    }
+
+    /// Closes view `at`; the one shown stays the one shown.
+    pub(in crate::patch) fn close(&mut self, at: usize) {
+        if at >= self.list.len() {
+            return;
+        }
+        self.list.remove(at);
+        self.shown = match self.shown {
+            Some(shown) if shown == at => None,
+            Some(shown) if shown > at => Some(shown - 1),
+            shown => shown,
+        };
+    }
 }
 
 #[derive(Debug)]
@@ -75,20 +106,37 @@ impl PatchTool {
     pub(in crate::patch) fn open_compare(&mut self, behavior: usize, id: &str, from: u32, to: Option<u32>) {
         let (old, new) = (self.object_text_at(behavior, id, Some(from)), self.object_text_at(behavior, id, to));
         let to_name = to.map_or_else(|| "working".to_owned(), |number| format!("#{number}"));
-        let title = format!("{id}: #{from} -> {to_name}");
+        let name = self.object_name(behavior, id);
+        let title = format!("{name} (#{from}) ↔ {name} ({to_name})");
         let diff = inline_diff::changes(&old, &new);
         let compare = Compare { text: new, diff, state: CodeEditorState::default(), cursor_line: 0, to_first: true };
         self.show_in_editor(behavior, id, title, Body::Compare(Box::new(compare)));
     }
 
-    /// Opens object `id` with `body` in the editor's place.
+    /// The object's name as its tab says it. e.g. `GetUpModList`; its id if it has none.
+    fn object_name(&mut self, behavior: usize, id: &str) -> String {
+        if behavior != self.active {
+            return id.to_owned();
+        }
+        let names = self.names();
+        let name = names.graph.node_of(id).map_or("", |node| names.graph.short_name(node));
+        if name.is_empty() { id.to_owned() } else { name.to_owned() }
+    }
+
+    /// Opens a tab of object `id` with `body`, or shows the one open with that title.
     fn show_in_editor(&mut self, behavior: usize, id: &str, title: String, body: Body) {
         if behavior != self.active {
             self.active = behavior;
             self.tabs.clear();
         }
         self.selected = Some(id.into());
-        self.revision_view = Some(RevisionView { id: id.to_owned(), title, body });
+        let views = &mut self.views;
+        let open = views.list.iter().position(|view| view.behavior == behavior && view.title == title);
+        let at = open.unwrap_or_else(|| {
+            views.list.push(RevisionView { behavior, id: id.to_owned(), title, body });
+            views.list.len() - 1
+        });
+        views.shown = Some(at);
     }
 
     /// Opens the blame of object `id` of behavior `behavior`, as the work has it now.
@@ -108,39 +156,66 @@ impl PatchTool {
             }
         };
         let lines = now.lines().zip(origins).map(|(line, origin)| (label(origin), line.to_owned())).collect();
-        self.show_in_editor(behavior, id, format!("Blame {id}"), Body::Blame(lines));
+        let title = format!("Blame {}", self.object_name(behavior, id));
+        self.show_in_editor(behavior, id, title, Body::Blame(lines));
     }
 
-    /// Draws the diff or the blame in the editor's place, if one is open for object `id`. Returns
-    /// whether it was drawn. Another object open closes it.
-    pub(in crate::patch) fn revision_view_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, id: &str) -> bool {
-        self.revision_view = self.revision_view.take().filter(|view| view.id == id);
+    /// Draws the view shown, with the tabs, in the editor's place. Returns whether one is shown.
+    pub(in crate::patch) fn views_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> bool {
+        // Another object selected (the tree, the list): its editor, the view's tab stays.
+        let selected = self.selected.as_deref();
+        let shown = self.views.shown.filter(|&at| {
+            self.views.list.get(at).is_some_and(|v| v.behavior == self.active && selected == Some(v.id.as_str()))
+        });
+        self.views.shown = shown;
+        let Some(at) = shown else { return false };
         let keymap = if self.pane.mode == EditorMode::Vim { Keymap::Vim } else { Keymap::Normal };
-        let Some(view) = &mut self.revision_view else { return false };
+        let names = self.names();
+        let mut tab_event = None;
         let mut close = false;
         egui::CentralPanel::default().show(ui, |ui| {
             let mut go_to = None;
+            let view_tabs = self.views.tabs_of(self.active);
             ui.horizontal(|ui| {
-                ui.strong(&view.title);
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    close = ui.small_button("✖").on_hover_text(i18n.t(I18nKey::RevisionViewClose)).clicked();
-                    if let Body::Compare(compare) = &view.body {
+                    if let Body::Compare(compare) = &self.views.list[at].body {
                         go_to = super::object_editor::inline_diff_nav(ui, i18n, &compare.diff, compare.cursor_line);
                     }
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        let marks = super::object_editor::TabMarks { focused: true, problems: None };
+                        let current = (self.active, "");
+                        tab_event = super::object_editor::tab_bar(
+                            ui,
+                            i18n,
+                            &self.tabs,
+                            current,
+                            &names.graph,
+                            marks,
+                            &view_tabs,
+                        );
+                    });
                 });
             });
-            ui.separator();
+            let view = &mut self.views.list[at];
+            let id = view.id.clone();
             match &mut view.body {
-                Body::Compare(compare) => close |= compare_ui(ui, i18n, id, compare, (keymap, go_to)),
+                Body::Compare(compare) => close |= compare_ui(ui, i18n, &id, compare, (keymap, go_to)),
                 Body::Blame(lines) => {
-                    egui::ScrollArea::both().id_salt(("nemesis_revision_view", id)).auto_shrink(false).show(ui, |ui| {
-                        blame_lines(ui, lines);
-                    });
+                    egui::ScrollArea::both().id_salt(("nemesis_revision_view", &id)).auto_shrink(false).show(
+                        ui,
+                        |ui| {
+                            blame_lines(ui, lines);
+                        },
+                    );
                 }
             }
         });
         if close {
-            self.revision_view = None;
+            self.views.close(at);
+        }
+        if tab_event.is_some() {
+            let current = self.selected.as_deref().unwrap_or_default().to_owned();
+            self.apply_tab_event(tab_event, &current);
         }
         true
     }
@@ -216,6 +291,23 @@ fn blame_lines(ui: &mut egui::Ui, lines: &[(String, String)]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Closing a tab keeps the one shown, wherever it moved.
+    #[test]
+    fn a_view_closed_keeps_the_one_shown() {
+        let view = |title: &str| RevisionView {
+            behavior: 0,
+            id: "#1".to_owned(),
+            title: title.to_owned(),
+            body: Body::Blame(Vec::new()),
+        };
+        let mut views = Views { list: vec![view("a"), view("b"), view("c")], shown: Some(2) };
+        views.close(0);
+        assert_eq!((views.list.len(), views.shown), (2, Some(1)));
+        views.close(1);
+        assert_eq!(views.shown, None, "the one shown closed");
+        assert_eq!(views.tabs_of(0), [(0, "b", false)]);
+    }
 
     /// The diff is the newer text with the older lines in it, as the editor's inline diff has them.
     #[test]

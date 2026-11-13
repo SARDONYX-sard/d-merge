@@ -259,7 +259,7 @@ impl PatchTool {
         });
         match picked {
             Some(ChangeAction::Open(behavior, id)) => {
-                self.revision_view = None; // the object itself, not a diff of it
+                self.views.shown = None; // the object itself, not a diff of it
                 if behavior != self.active {
                     self.active = behavior;
                     self.tabs.clear();

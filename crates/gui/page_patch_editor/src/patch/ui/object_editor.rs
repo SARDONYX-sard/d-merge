@@ -52,7 +52,7 @@ impl PatchTool {
             return;
         };
         // A diff or a blame of the history, as VS Code opens them in its editor.
-        if self.revision_view_ui(ui, i18n, &id) {
+        if self.views_ui(ui, i18n) {
             return;
         }
         self.open_in_editor(&id);
@@ -368,7 +368,9 @@ impl PatchTool {
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         result.walk_history = history_buttons(ui, i18n, &self.pane.history);
                         let marks = TabMarks { focused: editor_focused, problems: self.problems.list.as_deref() };
-                        result.tab_event = tab_bar(ui, i18n, &self.tabs, (self.active, id), &names.graph, marks);
+                        let views = self.views.tabs_of(self.active);
+                        result.tab_event =
+                            tab_bar(ui, i18n, &self.tabs, (self.active, id), &names.graph, marks, &views);
                     });
                 });
             });
@@ -603,11 +605,11 @@ fn history_buttons(
 }
 
 /// What the tabs show of the editor and the work, besides the tabs themselves.
-struct TabMarks<'a> {
+pub(in crate::patch) struct TabMarks<'a> {
     /// The editor has the keyboard: the shown tab's line is the accent color.
-    focused: bool,
+    pub(in crate::patch) focused: bool,
     /// The work's problems: a tab of an object with some is red (errors) or yellow (warnings only).
-    problems: Option<&'a [crate::patch::problems::ObjectProblems]>,
+    pub(in crate::patch) problems: Option<&'a [crate::patch::problems::ObjectProblems]>,
 }
 
 impl TabMarks<'_> {
@@ -630,13 +632,17 @@ impl TabMarks<'_> {
 /// Only the name, to keep the tabs short: the hover has the whole label, and the tree follows the tab.
 /// A click shows a tab, a double click pins it, a middle click or `✖` closes it. `●`: the object is
 /// changed; italic: the preview tab; red / yellow: it has problems.
-fn tab_bar(
+///
+/// `views`: the diffs / blames open (see [`super::revision_view::Views`]), as tabs after the objects':
+/// `(index, title, shown)`. With one shown, no object's tab is (`current` is `""`).
+pub(in crate::patch) fn tab_bar(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
     tabs: &EditorTabs,
     (behavior, current): (usize, &str),
     graph: &Graph,
     marks: TabMarks<'_>,
+    views: &[(usize, &str, bool)],
 ) -> Option<TabEvent> {
     let mut event = None;
     egui::ScrollArea::horizontal().id_salt("nemesis_editor_tabs").show(ui, |ui| {
@@ -665,6 +671,19 @@ fn tab_bar(
                     event = Some(TabEvent::Close(tab.id.clone()));
                 }
                 response.context_menu(|ui| event = tab_menu(ui, i18n, &tab.id, tab.pinned).or_else(|| event.take()));
+            }
+            // The diffs and blames, read only: `GetUpModList (#2) ↔ GetUpModList (working) 🔒 ✖`.
+            for &(at, title, shown) in views {
+                let tab = egui_widgets::EditorTab::new(egui::RichText::new(title), shown)
+                    .focused(marks.focused)
+                    .read_only(true)
+                    .show(ui);
+                if tab.response.clicked() {
+                    event = Some(TabEvent::ShowView(at));
+                }
+                if tab.close {
+                    event = Some(TabEvent::CloseView(at));
+                }
             }
         });
     });

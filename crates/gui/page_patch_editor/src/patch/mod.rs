@@ -159,8 +159,8 @@ pub(crate) struct PatchTool {
     scm: changes::Scm,
     /// The window making many objects from one. See [`repeat`].
     repeat: Option<ui::repeat::RepeatForm>,
-    /// A diff or a blame of the history, in the editor's place. See [`ui::revision_view`].
-    revision_view: Option<ui::revision_view::RevisionView>,
+    /// The diffs and blames of the history open as tabs. See [`ui::revision_view`].
+    views: ui::revision_view::Views,
     /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
     problems: problems::Problems,
     /// The tree of the animation data files. See [`ui::anim_tree`].
@@ -232,6 +232,9 @@ enum TabEvent {
     CloseOthers(String),
     CloseToTheRight(String),
     CloseAll,
+    /// A tab of [`ui::revision_view::Views`]: shown, or closed.
+    ShowView(usize),
+    CloseView(usize),
     /// The object's file: its path to the clipboard, or shown in the file manager.
     File(tool::list::FileAction, String),
 }

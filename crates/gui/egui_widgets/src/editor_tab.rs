@@ -25,6 +25,7 @@ pub struct EditorTab {
     modified: bool,
     preview: bool,
     tone: Option<egui::Color32>,
+    read_only: bool,
     height: f32,
     padding: f32,
 }
@@ -58,6 +59,7 @@ impl EditorTab {
             modified: false,
             preview: false,
             tone: None,
+            read_only: false,
             height: Self::HEIGHT,
             padding: Self::PADDING,
         }
@@ -91,6 +93,13 @@ impl EditorTab {
         self
     }
 
+    /// What it shows can't be edited (a diff): a lock before `✖`, as VS Code's.
+    #[inline]
+    pub const fn read_only(mut self, read_only: bool) -> Self {
+        self.read_only = read_only;
+        self
+    }
+
     /// Its height (default 26).
     #[inline]
     pub const fn height(mut self, height: f32) -> Self {
@@ -117,7 +126,8 @@ impl EditorTab {
             text => text,
         };
         let galley = text.into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::TextStyle::Body);
-        let width = self.padding + galley.size().x + 6.0 + Self::CLOSE_SIZE + self.padding;
+        let lock = if self.read_only { Self::CLOSE_SIZE + 2.0 } else { 0.0 };
+        let width = self.padding + galley.size().x + 6.0 + lock + Self::CLOSE_SIZE + self.padding;
         let (rect, response) = ui.allocate_exact_size(egui::vec2(width, self.height), egui::Sense::click());
         let close_rect = egui::Rect::from_center_size(
             egui::pos2(rect.right() - self.padding - Self::CLOSE_SIZE / 2.0, rect.center().y),
@@ -144,6 +154,11 @@ impl EditorTab {
         let border = visuals.widgets.noninteractive.bg_stroke;
         painter.vline(rect.right() - border.width / 2.0, rect.y_range(), border);
 
+        if self.read_only {
+            let center = egui::pos2(close_rect.left() - 2.0 - Self::CLOSE_SIZE / 2.0, rect.center().y);
+            let lock_rect = egui::Rect::from_center_size(center, egui::Vec2::splat(Self::CLOSE_SIZE * 0.75));
+            crate::shadcn::icon::paint_icon(painter, lock_rect, crate::shadcn::Icon::Lock, visuals.weak_text_color());
+        }
         let text_pos = egui::pos2(rect.left() + self.padding, rect.center().y - galley.size().y / 2.0);
         painter.galley(text_pos, galley, color);
 
