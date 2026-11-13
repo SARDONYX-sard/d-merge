@@ -42,45 +42,55 @@ impl PatchTool {
             panel.show(ui, |ui| panel_ui(ui, i18n, id, &values)).inner
         };
 
-        match picked {
-            Some(MergePick::Insert(lines)) => self.insert_lines(id, &lines),
-            Some(MergePick::Accept(lines)) => self.accept_lines(id, &values, lines),
-            None => {}
+        if let Some(pick) = picked {
+            let merged =
+                merged_text(&self.pane.text, self.pane.cursor_line, (&values, &self.pane.merge_accepted), pick);
+            if let Some(accepted) = merged.accepted {
+                merge::remember(&mut self.workspace.resolutions, &values, accepted.clone());
+                self.pane.merge_accepted = accepted;
+            }
+            self.pane.text = merged.text;
+            self.workspace.behaviors[self.active].set_text(id, &self.pane.text);
+            self.pane.preview = None;
+            self.object_changed(id);
+            self.pane.focus = Some(FocusAt::Line(merged.line));
         }
 
         if !close {
             self.pane.merge_values = Some(values);
         }
     }
+}
 
-    /// `+`: the lines below the cursor.
-    fn insert_lines(&mut self, id: &str, lines: &[String]) {
-        let (text, last) = resolve::insert_lines(&self.pane.text, self.pane.cursor_line, lines);
-        self.set_merged_text(id, text, last);
-    }
+/// The object's text after a pick, and where the cursor goes.
+struct Merged {
+    text: String,
+    line: usize,
+    /// `Accept` put these lines in place of the conflict's: remembered for the next same conflict.
+    accepted: Option<Vec<String>>,
+}
 
-    /// `Accept`: the lines in place of the conflict's, remembered for the next same conflict. Not
-    /// found where it was: below the cursor, as `+` does.
-    fn accept_lines(&mut self, id: &str, values: &resolve::MergeValues, lines: Vec<String>) {
-        let candidates = merge::candidates(values, &self.pane.merge_accepted);
-        let Some(text) = merge::replace_block(&self.pane.text, &candidates, &lines) else {
-            self.insert_lines(id, &lines);
-            return;
-        };
-
-        merge::remember(&mut self.workspace.resolutions, values, lines.clone());
-        self.pane.merge_accepted = lines;
-        let line = self.pane.cursor_line;
-        self.set_merged_text(id, text, line);
-    }
-
-    /// The object's text after a pick: in the work, and the cursor on `line`.
-    fn set_merged_text(&mut self, id: &str, text: String, line: usize) {
-        self.pane.text = text;
-        self.workspace.behaviors[self.active].set_text(id, &self.pane.text);
-        self.pane.preview = None;
-        self.object_changed(id);
-        self.pane.focus = Some(FocusAt::Line(line));
+/// The text after `pick`: `+` puts lines below the cursor; `Accept` puts them in place of the
+/// conflict's (`accepted`: the lines taken last), or below the cursor if they are not found.
+fn merged_text(
+    text: &str,
+    cursor_line: usize,
+    (values, accepted): (&resolve::MergeValues, &[String]),
+    pick: MergePick,
+) -> Merged {
+    let below = |lines: &[String]| {
+        let (text, line) = resolve::insert_lines(text, cursor_line, lines);
+        Merged { text, line, accepted: None }
+    };
+    match pick {
+        MergePick::Insert(lines) => below(&lines),
+        MergePick::Accept(lines) => {
+            let candidates = merge::candidates(values, accepted);
+            match merge::replace_block(text, &candidates, &lines) {
+                Some(text) => Merged { text, line: cursor_line, accepted: Some(lines) },
+                None => below(&lines),
+            }
+        }
     }
 }
 
