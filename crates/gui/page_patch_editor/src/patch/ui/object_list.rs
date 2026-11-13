@@ -362,9 +362,8 @@ impl PatchTool {
                 ui.ctx().copy_text(path.display().to_string());
             }
             RowAction::OpenFolder => {
-                let path = self.object_file(id);
-                let folder = path.parent().unwrap_or(&path);
-                if let Err(err) = gui_shared::fs::open_existing_dir_or_ancestor(folder) {
+                // The file selected in its folder; what exists of the folder if it isn't written yet.
+                if let Err(err) = gui_shared::fs::reveal_file(&self.object_file(id)) {
                     notify.error(err);
                 }
             }

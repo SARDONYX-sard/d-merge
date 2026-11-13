@@ -1,4 +1,4 @@
-//! File-system helpers for locating and opening directories.
+//! File-system helpers for locating and opening directories, and showing a file in them.
 //!
 //! Both functions walk up the path hierarchy until they find an existing
 //! directory, which lets the app open a folder picker or an Explorer/Finder
@@ -66,6 +66,58 @@ where
 #[inline]
 pub fn open_dir_of(path: &str) -> Result<(), String> {
     open_existing_dir_or_ancestor(path)
+}
+
+/// Shows `file` selected in the file manager, as VS Code's "Reveal in File Explorer". A file that
+/// doesn't exist (e.g. a patch not written yet) opens what exists of its folder instead.
+///
+/// The `open` crate only opens a path with its default program: selecting needs the file manager
+/// itself.
+///
+/// | OS      | how                                                                          |
+/// | ------- | ---------------------------------------------------------------------------- |
+/// | Windows | `explorer /select,"D:\mods\My\#0106.txt"`                                 |
+/// | macOS   | `open -R <file>`                                                             |
+/// | Linux   | D-Bus `org.freedesktop.FileManager1.ShowItems`; else the folder is opened   |
+///
+/// # Errors
+/// Neither the file manager nor the folder could be opened.
+pub fn reveal_file(file: &Path) -> Result<(), String> {
+    if !file.is_file() {
+        return open_existing_dir_or_ancestor(file.parent().unwrap_or(file));
+    }
+    // Not `canonicalize`: on Windows it gives `\\?\D:\...`, which Explorer doesn't take.
+    let file = std::path::absolute(file).map_err(|e| format!("{}: {e}", file.display()))?;
+    match reveal_selected(&file) {
+        Ok(()) => Ok(()),
+        Err(_) => open_existing_dir_or_ancestor(file.parent().unwrap_or(&file)),
+    }
+}
+
+#[cfg(windows)]
+fn reveal_selected(file: &Path) -> std::io::Result<()> {
+    use std::os::windows::process::CommandExt as _;
+    // Explorer reads `/select,` and the quoted path itself: Rust's quoting of a whole argument
+    // (`"/select,D:\a b"`) is not what it takes. It wants `\`, not `/`.
+    let path = file.to_string_lossy().replace('/', "\\");
+    std::process::Command::new("explorer").raw_arg(format!("/select,\"{path}\"")).spawn().map(drop)
+}
+
+#[cfg(target_os = "macos")]
+fn reveal_selected(file: &Path) -> std::io::Result<()> {
+    std::process::Command::new("open").arg("-R").arg(file).spawn().map(drop)
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn reveal_selected(file: &Path) -> std::io::Result<()> {
+    let uri = format!("array:string:file://{}", file.display());
+    let status = std::process::Command::new("dbus-send")
+        .args(["--session", "--print-reply", "--dest=org.freedesktop.FileManager1", "--type=method_call"])
+        .args(["/org/freedesktop/FileManager1", "org.freedesktop.FileManager1.ShowItems"])
+        .arg(uri)
+        .arg("string:")
+        .status()?;
+    if status.success() { Ok(()) } else { Err(std::io::Error::other("no file manager took it")) }
 }
 
 /// The folder dialog, starting from `current` or else what exists of it. `None`: cancelled.
