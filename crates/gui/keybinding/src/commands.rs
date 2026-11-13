@@ -30,6 +30,7 @@ pub const EXPLORER_TOGGLE_UNLINKED_ONLY: &str = "explorer.toggleUnlinkedOnly";
 pub const EDITOR_SAVE: &str = "editor.save";
 pub const FILE_COPY_PATH: &str = "file.copyPath";
 pub const FILE_REVEAL: &str = "file.reveal";
+pub const KEYBINDINGS_OPEN_JSON: &str = "keybindings.openJson";
 
 /// The editor of the Normal keymap has the keyboard. (Vim has `Ctrl+W` / `Ctrl+S` of its own.)
 const NORMAL_EDITOR: Option<&str> = Some("editorFocus && !vim");
@@ -71,6 +72,11 @@ pub const COMMANDS: &[Command] = &[
         id: FILE_COPY_PATH,
         description: "Copy the path of the selected object's file (VS Code's Copy Path)",
         defaults: &[("shift+alt+c", Some("!inputFocus"))],
+    },
+    Command {
+        id: KEYBINDINGS_OPEN_JSON,
+        description: "Open keybindings.json in the editor (VS Code's Preferences: Open Keyboard Shortcuts (JSON))",
+        defaults: &[],
     },
     Command {
         id: FILE_REVEAL,

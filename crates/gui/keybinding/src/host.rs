@@ -9,13 +9,20 @@
 
 use crate::{
     KeyContext, Keybindings,
-    commands::{EDITOR_SAVE, FILE_REVEAL, HISTORY_BACK, HISTORY_FORWARD, TABS_CLOSE, TABS_NEXT, TABS_PREVIOUS},
+    commands::{
+        EDITOR_SAVE, FILE_REVEAL, HISTORY_BACK, HISTORY_FORWARD, KEYBINDINGS_OPEN_JSON, TABS_CLOSE, TABS_NEXT,
+        TABS_PREVIOUS,
+    },
+    json_editor::JsonEditor,
     recorder::{KeyRecorder, Recorded, RecorderTexts},
 };
 
+/// The palette action of VS Code's "Preferences: Open Keyboard Shortcuts (JSON)".
+pub const OPEN_JSON_ACTION: &str = "open_keybindings_json";
+
 /// The editor's palette actions that are commands here: `(action id, command)`. The action ids are
 /// those of `egui_code_editor::EditorCommand` and the hosts' own (`go_back`).
-pub const EDITOR_ACTIONS: [(&str, &str); 7] = [
+pub const EDITOR_ACTIONS: [(&str, &str); 8] = [
     ("next_tab", TABS_NEXT),
     ("previous_tab", TABS_PREVIOUS),
     ("close_tab", TABS_CLOSE),
@@ -23,6 +30,7 @@ pub const EDITOR_ACTIONS: [(&str, &str); 7] = [
     ("save", EDITOR_SAVE),
     ("go_back", HISTORY_BACK),
     ("go_forward", HISTORY_FORWARD),
+    (OPEN_JSON_ACTION, KEYBINDINGS_OPEN_JSON),
 ];
 
 /// The command of a palette action, if it is one. e.g. `close_tab` -> `tabs.close`
@@ -40,6 +48,14 @@ pub struct FrameKeys {
     pub saved: Option<Result<(), String>>,
 }
 
+/// Where the JSON opens.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum JsonAt {
+    Top,
+    /// At the entry of this command.
+    Command(&'static str),
+}
+
 /// Keep one per page.
 #[derive(Debug, Default)]
 pub struct KeyUi {
@@ -50,6 +66,9 @@ pub struct KeyUi {
     cached_for: Option<(u64, KeyContext)>,
     /// The context the recorder was opened in: the binding it replaces is the one working there.
     record_context: KeyContext,
+    json: JsonEditor,
+    /// The JSON is to be opened next frame.
+    json_asked: Option<JsonAt>,
 }
 
 impl KeyUi {
@@ -63,13 +82,31 @@ impl KeyUi {
         texts: RecorderTexts<'_>,
     ) -> FrameKeys {
         let mut out = FrameKeys::default();
+        if let Some(at) = self.json_asked.take()
+            && let Some(path) = bindings.path()
+        {
+            let command = match at {
+                JsonAt::Top => None,
+                JsonAt::Command(command) => Some(command),
+            };
+            self.json.open(path, command);
+        }
         if self.recorder.is_open() {
             if let Some(Recorded::Keys(command, keys)) = self.recorder.take_keys(ctx) {
                 out.saved = Some(bindings.bind(command, &keys, &self.record_context));
             }
-            self.recorder.show(ctx, bindings, texts);
-        } else {
+            self.json_asked = self.recorder.show(ctx, bindings, texts).map(JsonAt::Command);
+        } else if !self.json.has_keyboard(ctx) {
+            // Typed in the JSON's editor, the keys are its own.
             out.commands = bindings.dispatch(ctx, context);
+            if let Some(at) = out.commands.iter().position(|command| *command == KEYBINDINGS_OPEN_JSON) {
+                out.commands.swap_remove(at);
+                self.json_asked = Some(JsonAt::Top);
+            }
+        }
+        let keymap = if context.vim { egui_code_editor::Keymap::Vim } else { egui_code_editor::Keymap::Normal };
+        if let Some(saved) = self.json.show(ctx, bindings, keymap, texts.labels) {
+            out.saved = Some(saved);
         }
         // The palette is of the editor: its keys as the editor with the keyboard sees them.
         let editor = KeyContext { editor_focus: true, input_focus: false, explorer_focus: false, ..*context };
@@ -88,6 +125,17 @@ impl KeyUi {
     #[must_use]
     pub fn palette_keys(&self, action: &str) -> Option<&str> {
         self.palette.iter().find(|(id, _)| *id == action).map(|(_, keys)| keys.as_str())
+    }
+
+    /// A palette action that is the key bindings' own: `true` if it was, and is done.
+    ///
+    /// e.g. `open_keybindings_json` opens the JSON.
+    pub fn run_action(&mut self, action: &str) -> bool {
+        let own = action == OPEN_JSON_ACTION;
+        if own {
+            self.json_asked = Some(JsonAt::Top);
+        }
+        own
     }
 
     /// The `⚙` of palette action `action`: the recorder opens for its command.

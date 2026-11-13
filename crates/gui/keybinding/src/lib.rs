@@ -15,6 +15,8 @@
 pub mod commands;
 pub mod file;
 pub mod host;
+pub mod json;
+pub mod json_editor;
 mod jsonc;
 pub mod key;
 pub mod recorder;
@@ -152,10 +154,8 @@ impl Keybindings {
             }
         }
         let mut warnings = Vec::new();
-        for (at, entry) in entries.iter().enumerate() {
-            if let Err(why) = apply_entry(&mut bindings, entry) {
-                warnings.push(format!("keybindings.json: entry {} (`{}`): {why}", at + 1, entry.key));
-            }
+        for (at, why) in apply_entries(&mut bindings, entries) {
+            warnings.push(format!("keybindings.json: entry {} (`{}`): {why}", at + 1, entries[at].key));
         }
         static GENERATIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let generation = GENERATIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
@@ -250,6 +250,15 @@ impl Keybindings {
         self.generation
     }
 
+    /// Reads the user file again now, e.g. after it was saved in the app.
+    pub fn reload_now(&mut self) {
+        let Some(file) = &self.file else { return };
+        let path = file.path.clone();
+        let mut read = Self::read(&path);
+        read.file = Some(UserFile { modified: modified(&path), path, checked_at: 0.0 });
+        *self = read;
+    }
+
     /// The path of the user file, if loaded from one. e.g. `./.d_merge/keybindings.json`
     #[must_use]
     pub fn path(&self) -> Option<&Path> {
@@ -317,6 +326,26 @@ impl Keybindings {
     }
 }
 
+/// What of `entries` can't be taken, after the defaults: `(index, why)`. e.g. `(2, TAKES_NOTHING)`
+#[must_use]
+pub fn entry_problems(entries: &[file::Entry]) -> Vec<(usize, String)> {
+    let mut bindings = Keybindings::default().bindings;
+    apply_entries(&mut bindings, entries)
+}
+
+/// Why a `-command` entry is told: there is no such binding before it.
+pub const TAKES_NOTHING: &str = "it takes away no binding";
+
+fn apply_entries(bindings: &mut Vec<Binding>, entries: &[file::Entry]) -> Vec<(usize, String)> {
+    let mut problems = Vec::new();
+    for (at, entry) in entries.iter().enumerate() {
+        if let Err(why) = apply_entry(bindings, entry) {
+            problems.push((at, why));
+        }
+    }
+    problems
+}
+
 /// Puts `entry` into `bindings`: after them, or (`-command`) taking those it names away.
 fn apply_entry(bindings: &mut Vec<Binding>, entry: &file::Entry) -> Result<(), String> {
     let (removes, id) = entry.command.strip_prefix('-').map_or((false, entry.command.as_str()), |id| (true, id));
@@ -331,7 +360,7 @@ fn apply_entry(bindings: &mut Vec<Binding>, entry: &file::Entry) -> Result<(), S
                 && entry.when.as_ref().is_none_or(|when| Some(when) == b.when_text.as_ref());
             !named
         });
-        return if bindings.len() < before { Ok(()) } else { Err("it takes away no binding".to_owned()) };
+        return if bindings.len() < before { Ok(()) } else { Err(TAKES_NOTHING.to_owned()) };
     }
     let keys = parse_keys(&entry.key)?;
     let when = entry.when.as_deref().map(When::parse).transpose().map_err(|err| format!("when: {err}"))?;

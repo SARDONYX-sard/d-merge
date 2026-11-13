@@ -55,6 +55,20 @@ pub fn parse(text: &str) -> Result<Vec<Entry>, String> {
     }
 }
 
+/// Like [`parse`], with where the text stops being right: `(message, line, column)`, both 1-based.
+///
+/// # Errors
+/// See [`parse`].
+pub fn parse_at(text: &str) -> Result<Vec<Entry>, (String, usize, usize)> {
+    if text.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    match serde_json::from_str::<FileForm>(&jsonc::strip(text)) {
+        Ok(FileForm::Object { bindings } | FileForm::Array(bindings)) => Ok(bindings),
+        Err(err) => Err((err.to_string(), err.line(), err.column())),
+    }
+}
+
 /// The file name of the schema, next to the user file.
 pub const SCHEMA_FILE: &str = "keybindings.schema.json";
 

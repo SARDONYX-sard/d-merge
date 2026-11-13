@@ -553,6 +553,12 @@ pub enum I18nKey {
     /// Other commands with these keys:
     KeybindingAlsoBound,
 
+    /// Edit in keybindings.json
+    KeybindingEditInJson,
+
+    /// Preferences: Open Keyboard Shortcuts (JSON)
+    KeybindingOpenJson,
+
     /// Press the desired key combination and then press Enter. Esc cancels.
     KeybindingRecordHint,
 

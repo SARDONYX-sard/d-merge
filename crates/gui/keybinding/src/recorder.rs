@@ -32,13 +32,17 @@ pub enum Recorded {
     Cancelled,
 }
 
-/// The window's texts, translated by the host.
+/// The texts of the recorder and of the JSON editor, translated by the host.
 #[derive(Debug, Clone, Copy)]
 pub struct RecorderTexts<'a> {
     /// e.g. `Press the desired key combination and then press Enter. Esc cancels.`
     pub hint: &'a str,
     /// e.g. `Other commands with these keys:`
     pub also_bound: &'a str,
+    /// The recorder's way to the JSON. e.g. `Edit in keybindings.json`
+    pub edit_json: &'a str,
+    /// The menus of the JSON's editor.
+    pub labels: egui_code_editor::EditorLabels<'a>,
 }
 
 impl KeyRecorder {
@@ -94,9 +98,16 @@ impl KeyRecorder {
         None
     }
 
-    /// Draws the window, in the middle of the screen.
-    pub fn show(&self, ctx: &egui::Context, bindings: &Keybindings, texts: RecorderTexts<'_>) {
-        let Some(command) = self.command else { return };
+    /// Draws the window, in the middle of the screen. Returns the command whose entry is to be edited
+    /// in `keybindings.json` instead: the recorder is closed then.
+    pub fn show(
+        &mut self,
+        ctx: &egui::Context,
+        bindings: &Keybindings,
+        texts: RecorderTexts<'_>,
+    ) -> Option<&'static str> {
+        let command = self.command?;
+        let mut to_json = false;
         egui::Window::new(command.description)
             .id(egui::Id::NULL.with("keybinding_recorder"))
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
@@ -109,6 +120,8 @@ impl KeyRecorder {
                     ui.heading(egui::RichText::new(keys).monospace());
                 });
                 ui.weak(texts.hint);
+                // The mouse only: a key would be recorded.
+                to_json = ui.link(texts.edit_json).clicked();
                 let others: Vec<_> = bindings.bound_to(&self.keys).filter(|(other, _)| *other != command.id).collect();
                 if others.is_empty() || self.keys.is_empty() {
                     return;
@@ -120,6 +133,11 @@ impl KeyRecorder {
                 }
             });
         ctx.request_repaint_after(std::time::Duration::from_millis(250));
+        if !to_json {
+            return None;
+        }
+        self.command = None;
+        Some(command.id)
     }
 }
 

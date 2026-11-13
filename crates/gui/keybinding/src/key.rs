@@ -183,6 +183,47 @@ const KEY_NAMES: [(Key, &str); 40] = [
     (Key::F12, "f12"),
 ];
 
+/// The modifiers as the file writes them, for completion.
+pub const MODIFIERS: [&str; 3] = ["ctrl", "shift", "alt"];
+
+/// The names of the keys a binding can have, as the file writes them, for completion. e.g. `a`,
+/// `pagedown`, `f12`, `.`
+pub fn key_names() -> impl Iterator<Item = &'static str> {
+    const MORE: [&str; 30] = [
+        "0",
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "f9",
+        "f10",
+        "f11",
+        "insert",
+        "delete",
+        "plus",
+        "f13",
+        "f14",
+        "f15",
+        "f16",
+        "f17",
+        "f18",
+        "f19",
+        "f20",
+        "quote",
+        "colon",
+        "pipe",
+        "questionmark",
+        "exclamationmark",
+        "copy",
+    ];
+    KEY_NAMES.iter().map(|(_, name)| *name).chain(ALIASES.iter().map(|(name, _)| *name)).chain(MORE)
+}
+
 /// `ctrl+k ctrl+s`: the keys as the file writes them, normalized.
 pub fn keys_text(keys: &[Chord]) -> String {
     let parts: Vec<String> = keys.iter().map(ToString::to_string).collect();
@@ -212,6 +253,13 @@ mod tests {
         assert!(parse_keys("ctrl+").is_err());
         assert!(parse_keys("hyper+a").unwrap_err().contains("hyper"));
         assert!(parse_keys("ctrl+nokey").unwrap_err().contains("nokey"));
+    }
+
+    #[test]
+    fn every_key_name_offered_is_read() {
+        for name in key_names() {
+            assert!(parse_keys(name).is_ok(), "{name}");
+        }
     }
 
     #[test]

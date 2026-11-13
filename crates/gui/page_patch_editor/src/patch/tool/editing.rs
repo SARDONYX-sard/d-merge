@@ -328,8 +328,11 @@ impl PatchTool {
             Some(EditorCommand::ToggleExplorer | EditorCommand::GoToDefinition | EditorCommand::FindReferences)
             | None => {}
         }
-        if let Some(command) = result.configure {
-            self.key_ui.configure_command(command);
+        match result.configure {
+            // The palette's "Open Keyboard Shortcuts (JSON)" comes the same way.
+            Some(action) if self.key_ui.run_action(action) => {}
+            Some(command) => self.key_ui.configure_command(command),
+            None => {}
         }
         if let Some(older) = result.walk_history {
             self.walk_history(older, id);

@@ -39,6 +39,8 @@ impl HkannoPage {
         let texts = keybinding::RecorderTexts {
             hint: ctx.i18n.t(I18nKey::KeybindingRecordHint),
             also_bound: ctx.i18n.t(I18nKey::KeybindingAlsoBound),
+            edit_json: ctx.i18n.t(I18nKey::KeybindingEditInJson),
+            labels: egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(ctx.i18n)),
         };
         let frame = self.key_ui.frame(ui.ctx(), ctx.keys, &context, texts);
         self.key_commands = frame.commands;
@@ -162,6 +164,10 @@ impl HkannoPage {
             keyed(EditorCommand::CloseTab.action(i18n.t(I18nKey::EditorCloseTab))),
             EditorCommand::TogglePreview.action(i18n.t(I18nKey::EditorTogglePreview)),
             keyed(EditorCommand::RevealFile.action(i18n.t(gui_shared::i18n::REVEAL_IN_FILE_MANAGER))),
+            keyed(egui_code_editor::EditorAction::new(
+                keybinding::host::OPEN_JSON_ACTION,
+                i18n.t(I18nKey::KeybindingOpenJson),
+            )),
         ];
         let lsp = &ctx.lsp_settings;
         let language = HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
@@ -193,7 +199,7 @@ impl HkannoPage {
         }
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
 
-        let CodeEditorOutput { changed, cursor, command, configure, .. } = egui::ScrollArea::both()
+        let CodeEditorOutput { changed, cursor, command, configure, action, .. } = egui::ScrollArea::both()
             .id_salt("hkanno_editor_scroll")
             .auto_shrink(false)
             .show(ui, |ui| {
@@ -209,8 +215,13 @@ impl HkannoPage {
             })
             .inner;
 
+        // Both borrow the palette's keys: what they ask for is taken before it is done.
+        let open_json = action.is_some_and(|action| action == keybinding::host::OPEN_JSON_ACTION);
         if let Some(command) = configure.and_then(keybinding::host::command_of_action) {
             self.key_ui.configure_command(command);
+        }
+        if open_json {
+            self.key_ui.run_action(keybinding::host::OPEN_JSON_ACTION);
         }
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
         if changed {

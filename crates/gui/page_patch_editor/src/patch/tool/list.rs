@@ -49,6 +49,8 @@ pub(in crate::patch) fn recorder_texts(i18n: &gui_shared::i18n::I18nMap) -> keyb
     keybinding::RecorderTexts {
         hint: i18n.t(I18nKey::KeybindingRecordHint),
         also_bound: i18n.t(I18nKey::KeybindingAlsoBound),
+        edit_json: i18n.t(I18nKey::KeybindingEditInJson),
+        labels: egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)),
     }
 }
 

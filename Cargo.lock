@@ -2978,6 +2978,7 @@ name = "keybinding"
 version = "0.0.0"
 dependencies = [
  "egui",
+ "egui_code_editor",
  "serde",
  "serde_json",
 ]

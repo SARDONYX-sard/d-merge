@@ -18,5 +18,8 @@ egui       = { workspace = true } # `Key` / `Modifiers`, and the input events
 serde      = { workspace = true }
 serde_json = { workspace = true } # the user file (after its comments are taken out) and its schema
 
+# workspace members
+egui_code_editor = { workspace = true } # its editor of keybindings.json: the JSON language and the window
+
 [lints]
 workspace = true

@@ -300,6 +300,7 @@ impl PatchTool {
             EditorCommand::TogglePreview.action(i18n.t(I18nKey::EditorTogglePreview)),
             EditorCommand::ToggleInlineDiff.action(i18n.t(I18nKey::NemesisToggleInlineDiff)),
             keyed(EditorCommand::RevealFile.action(i18n.t(super::object_list::REVEAL_LABEL))),
+            keyed(EditorAction::new(keybinding::host::OPEN_JSON_ACTION, i18n.t(I18nKey::KeybindingOpenJson))),
         ];
 
         let mut result = EditorResult::default();
@@ -384,6 +385,9 @@ impl PatchTool {
                 result.inline_revert = output.inline_revert;
                 result.command = output.command;
                 result.configure = output.configure.and_then(keybinding::host::command_of_action);
+                if output.action.is_some_and(|action| action == keybinding::host::OPEN_JSON_ACTION) {
+                    result.configure = Some(keybinding::host::OPEN_JSON_ACTION);
+                }
                 result.focus_tree = output.action == Some(ACTION_FOCUS_TREE);
                 match output.action {
                     Some(ACTION_BACK) => result.walk_history = Some(true),
