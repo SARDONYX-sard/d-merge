@@ -401,7 +401,10 @@ impl PatchTool {
                 self.panels.focus_quick_pick = true;
             }
             RowAction::Duplicate => self.new_object(Some(id)),
-            RowAction::Repeat => self.open_repeat(id),
+            RowAction::Repeat => {
+                let behavior = &self.workspace.behaviors[self.active];
+                self.panels.repeat = super::repeat::RepeatForm::of(self.active, behavior, id);
+            }
             RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
             RowAction::RevertOrDelete => self.revert_or_delete(id),
             RowAction::CopyPath => self.copy_object_path(ui.ctx(), id),

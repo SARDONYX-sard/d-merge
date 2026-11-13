@@ -316,6 +316,26 @@ impl PatchTool {
         }
     }
 
+    /// The repeat window, if open, and what it asked for.
+    fn repeat(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
+        use ui::repeat::RepeatAsk;
+        let code = self.place.mod_code.trim().to_owned();
+        let Some(form) = &mut self.panels.repeat else { return };
+        match form.window(ctx, i18n, nemesis_diff::is_existing_mod_code(&code)) {
+            Some(RepeatAsk::Close) => self.panels.repeat = None,
+            Some(RepeatAsk::Create) => {
+                let Some(form) = self.panels.repeat.take() else { return };
+                let Some(behavior) = self.workspace.behaviors.get_mut(form.behavior()) else { return };
+                let first = form.create(behavior, &code);
+                self.active = form.behavior();
+                self.reset_names();
+                self.mark_dirty();
+                self.selected = first.map(Into::into);
+            }
+            None => {}
+        }
+    }
+
     fn draw(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         // The work is on another thread: only how far it is.
         if let Some(job) = &self.job {
@@ -343,7 +363,7 @@ impl PatchTool {
         self.anim_data_window(ui.ctx(), i18n, notify);
         self.new_clips_window(ui.ctx(), i18n);
         self.duplicate_window(ui.ctx(), i18n);
-        self.repeat_window(ui.ctx(), i18n);
+        self.repeat(ui.ctx(), i18n);
         self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
 
         // Like VS Code: the activity bar, the side bar, and the editor with what belongs to it.

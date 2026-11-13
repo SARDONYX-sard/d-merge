@@ -33,7 +33,7 @@ pub(in crate::patch) struct Panels {
     pub(in crate::patch) class_picker: bool,
     pub(in crate::patch) class_filter: String,
     /// The window making many objects from one. See [`ui::repeat`].
-    pub(super) repeat: Option<ui::repeat::RepeatForm>,
+    pub(in crate::patch) repeat: Option<ui::repeat::RepeatForm>,
     /// The "animation data" window.
     pub(super) anim_data_dialog: Option<ui::anim_data::AnimDataDialog>,
     /// The "duplicate to" window.
