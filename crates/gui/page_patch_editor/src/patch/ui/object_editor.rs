@@ -70,7 +70,7 @@ impl PatchTool {
         }
         // `Ctrl+W` with the Normal keymap, as in VS Code. (Vim uses that key itself.)
         if self.key_command(commands::TABS_CLOSE) {
-            self.apply_tab_event(Some(TabEvent::Close(id.to_string())), &id);
+            self.apply_tab_event(Some(TabEvent::Object(egui_widgets::TabAction::Close, id.to_string())), &id);
             return;
         }
         self.expire_preview(ui.ctx());
@@ -621,102 +621,51 @@ pub(in crate::patch) fn tab_bar(
     marks: TabMarks<'_>,
     views: &[super::revision_view::ViewTab<'_>],
 ) -> Option<TabEvent> {
+    let menu = egui_widgets::TabMenu {
+        keep_open: i18n.t(I18nKey::NemesisKeepOpen),
+        close: i18n.t(I18nKey::CloseButton),
+        close_others: i18n.t(I18nKey::NemesisCloseOtherTabs),
+        close_to_the_right: i18n.t(I18nKey::NemesisCloseTabsRight),
+        close_all: i18n.t(I18nKey::NemesisCloseAllTabs),
+    };
     let mut event = None;
     egui::ScrollArea::horizontal().id_salt("nemesis_editor_tabs").show(ui, |ui| {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0; // the tabs touch, with a line between them
             for tab in tabs.of(behavior) {
-                let node = graph.node_of(&tab.id);
+                let id = tab.id.as_str();
+                let node = graph.node_of(id);
                 let changed = node.is_some_and(|node| graph.is_changed(node));
-                let name = tab_name(node.map_or("", |node| graph.short_name(node)), &tab.id);
-                let tone = marks.severity(behavior, &tab.id).map(|severity| severity.color(ui.visuals()));
-                let hover = node.map_or(tab.id.as_str(), |node| graph.label(node));
-                let shown = egui_widgets::EditorTab::new(egui::RichText::new(name), tab.id == current)
+                let name = tab_name(node.map_or("", |node| graph.short_name(node)), id);
+                let tone = marks.severity(behavior, id).map(|severity| severity.color(ui.visuals()));
+                let shown = egui_widgets::EditorTab::new(egui::RichText::new(name), id == current)
                     .focused(marks.focused)
                     .modified(changed)
                     .preview(!tab.pinned)
                     .tone(tone)
+                    .hover(node.map_or(id, |node| graph.label(node)))
                     .show(ui);
-                let response = shown.response.on_hover_text(hover);
-                if response.clicked() {
-                    event = Some(TabEvent::Show(tab.id.clone()));
+                let to_event = |action| TabEvent::Object(action, id.to_owned());
+                if let Some(picked) = shown.action(&menu, to_event, |ui| object_items(ui, i18n, id)) {
+                    event = Some(picked);
                 }
-                if response.double_clicked() {
-                    event = Some(TabEvent::KeepOpen(tab.id.clone()));
-                }
-                if shown.close {
-                    event = Some(TabEvent::Close(tab.id.clone()));
-                }
-                response.context_menu(|ui| event = tab_menu(ui, i18n, &tab.id, tab.pinned).or_else(|| event.take()));
             }
             // The diffs and blames, read only: `GetUpModList (#2) ↔ GetUpModList (working) 🔒 ✖`.
             for view in views {
-                let tab = egui_widgets::EditorTab::new(egui::RichText::new(view.title), view.shown)
+                let shown = egui_widgets::EditorTab::new(egui::RichText::new(view.title), view.shown)
                     .focused(marks.focused)
                     .read_only(true)
                     .preview(!view.pinned)
+                    .hover(view.title)
                     .show(ui);
-                let at = view.at;
-                // Cut with `…` (the `✖` stays in reach): the whole title on hover.
-                let tab = egui_widgets::EditorTabOutput {
-                    response: if tab.elided { tab.response.on_hover_text(view.title) } else { tab.response },
-                    ..tab
-                };
-                if tab.response.clicked() {
-                    event = Some(TabEvent::ShowView(at));
+                let to_event = |action| TabEvent::View(action, view.at);
+                if let Some(picked) = shown.action(&menu, to_event, |ui| object_items(ui, i18n, view.id)) {
+                    event = Some(picked);
                 }
-                if tab.response.double_clicked() {
-                    event = Some(TabEvent::KeepView(at));
-                }
-                if tab.close {
-                    event = Some(TabEvent::CloseView(at));
-                }
-                tab.response.context_menu(|ui| event = view_menu(ui, i18n, *view, view.id).or_else(|| event.take()));
             }
         });
     });
     event
-}
-
-/// A tab's right-click menu, like VS Code's.
-fn tab_menu(ui: &mut egui::Ui, i18n: &I18nMap, id: &str, pinned: bool) -> Option<TabEvent> {
-    let items = [
-        (I18nKey::NemesisKeepOpen, !pinned, TabEvent::KeepOpen(id.to_owned())),
-        (I18nKey::CloseButton, true, TabEvent::Close(id.to_owned())),
-        (I18nKey::NemesisCloseOtherTabs, true, TabEvent::CloseOthers(id.to_owned())),
-        (I18nKey::NemesisCloseTabsRight, true, TabEvent::CloseToTheRight(id.to_owned())),
-        (I18nKey::NemesisCloseAllTabs, true, TabEvent::CloseAll),
-    ];
-    let mut picked = None;
-    for (label, enabled, event) in items {
-        if ui.add_enabled(enabled, egui::Button::new(i18n.t(label))).clicked() {
-            picked = Some(event);
-            ui.close();
-        }
-    }
-    ui.separator();
-    object_items(ui, i18n, id).or(picked)
-}
-
-/// A diff's / blame's tab's right-click menu: as an object's tab's, for the views, then its object's.
-fn view_menu(ui: &mut egui::Ui, i18n: &I18nMap, view: super::revision_view::ViewTab<'_>, id: &str) -> Option<TabEvent> {
-    let at = view.at;
-    let items = [
-        (I18nKey::NemesisKeepOpen, !view.pinned, TabEvent::KeepView(at)),
-        (I18nKey::CloseButton, true, TabEvent::CloseView(at)),
-        (I18nKey::NemesisCloseOtherTabs, true, TabEvent::CloseOthersOfView(at)),
-        (I18nKey::NemesisCloseTabsRight, true, TabEvent::CloseViewsRight(at)),
-        (I18nKey::NemesisCloseAllTabs, true, TabEvent::CloseAll),
-    ];
-    let mut picked = None;
-    for (label, enabled, event) in items {
-        if ui.add_enabled(enabled, egui::Button::new(i18n.t(label))).clicked() {
-            picked = Some(event);
-            ui.close();
-        }
-    }
-    ui.separator();
-    object_items(ui, i18n, id).or(picked)
 }
 
 /// `Copy id / Copy Path / Reveal in File Explorer` of object `id`, the end of a tab's menu.

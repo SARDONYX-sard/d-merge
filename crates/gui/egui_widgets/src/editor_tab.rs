@@ -26,6 +26,7 @@ pub struct EditorTab {
     preview: bool,
     tone: Option<egui::Color32>,
     read_only: bool,
+    hover: Option<egui::WidgetText>,
     height: f32,
     padding: f32,
     max_text_width: f32,
@@ -40,6 +41,78 @@ pub struct EditorTabOutput {
     pub close: bool,
     /// Its text was cut with `…` to [`EditorTab::max_text_width`]: the host may show the whole on hover.
     pub elided: bool,
+    /// It was drawn as the preview tab: its menu has `Keep Open`.
+    pub preview: bool,
+}
+
+/// What a tab asks of the host, as VS Code's: see [`EditorTabOutput::action`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TabAction {
+    /// A click: show it.
+    Show,
+    /// A double click, or the menu: it is no longer the preview tab.
+    KeepOpen,
+    /// `✖`, a middle click, or the menu.
+    Close,
+    CloseOthers,
+    CloseToTheRight,
+    CloseAll,
+}
+
+/// The words of a tab's right-click menu, in the host's language.
+///
+/// e.g. `{ keep_open: "Keep Open", close: "Close", close_others: "Close Others", close_to_the_right:
+/// "Close to the Right", close_all: "Close All" }`
+#[derive(Debug, Clone, Copy)]
+pub struct TabMenu<'a> {
+    pub keep_open: &'a str,
+    pub close: &'a str,
+    pub close_others: &'a str,
+    pub close_to_the_right: &'a str,
+    pub close_all: &'a str,
+}
+
+impl EditorTabOutput {
+    /// What the tab asked for this frame, as the host's event (`event`): a click shows it, a double
+    /// click keeps it open, `✖` or a middle click closes it, and its right-click menu has `menu`
+    /// (`Keep Open` only on the preview tab), then the host's own items (`more`, e.g. `Copy Path`).
+    pub fn action<E>(
+        &self,
+        menu: &TabMenu<'_>,
+        event: impl Fn(TabAction) -> E,
+        more: impl FnOnce(&mut egui::Ui) -> Option<E>,
+    ) -> Option<E> {
+        let mut picked = if self.close {
+            Some(TabAction::Close)
+        } else if self.response.double_clicked() {
+            Some(TabAction::KeepOpen)
+        } else if self.response.clicked() {
+            Some(TabAction::Show)
+        } else {
+            None
+        }
+        .map(&event);
+        self.response.context_menu(|ui| {
+            let items = [
+                (menu.keep_open, self.preview, TabAction::KeepOpen),
+                (menu.close, true, TabAction::Close),
+                (menu.close_others, true, TabAction::CloseOthers),
+                (menu.close_to_the_right, true, TabAction::CloseToTheRight),
+                (menu.close_all, true, TabAction::CloseAll),
+            ];
+            for (label, enabled, action) in items {
+                if ui.add_enabled(enabled, egui::Button::new(label)).clicked() {
+                    picked = Some(event(action));
+                    ui.close();
+                }
+            }
+            ui.separator();
+            if let Some(own) = more(ui) {
+                picked = Some(own);
+            }
+        });
+        picked
+    }
 }
 
 impl EditorTab {
@@ -65,6 +138,7 @@ impl EditorTab {
             preview: false,
             tone: None,
             read_only: false,
+            hover: None,
             height: Self::HEIGHT,
             padding: Self::PADDING,
             max_text_width: Self::MAX_TEXT_WIDTH,
@@ -106,6 +180,13 @@ impl EditorTab {
         self
     }
 
+    /// What its hover shows, e.g. the whole name or path.
+    #[inline]
+    pub fn hover(mut self, text: impl Into<egui::WidgetText>) -> Self {
+        self.hover = Some(text.into());
+        self
+    }
+
     /// The widest its text gets, cut with `…` past it, so that `✖` stays in reach (default 240).
     #[inline]
     pub const fn max_text_width(mut self, width: f32) -> Self {
@@ -144,6 +225,11 @@ impl EditorTab {
         let lock = if self.read_only { Self::CLOSE_SIZE + 2.0 } else { 0.0 };
         let width = self.padding + galley.size().x + 6.0 + lock + Self::CLOSE_SIZE + self.padding;
         let (rect, response) = ui.allocate_exact_size(egui::vec2(width, self.height), egui::Sense::click());
+        let response = match self.hover {
+            Some(hover) => response.on_hover_text(hover),
+            None => response,
+        };
+        let preview = self.preview;
         let close_rect = egui::Rect::from_center_size(
             egui::pos2(rect.right() - self.padding - Self::CLOSE_SIZE / 2.0, rect.center().y),
             egui::Vec2::splat(Self::CLOSE_SIZE),
@@ -151,7 +237,7 @@ impl EditorTab {
         let close_response = ui.interact(close_rect, response.id.with("close"), egui::Sense::click());
         let close = close_response.clicked() || response.middle_clicked();
         if !ui.is_rect_visible(rect) {
-            return EditorTabOutput { response, close, elided };
+            return EditorTabOutput { response, close, elided, preview };
         }
 
         let visuals = ui.visuals();
@@ -192,6 +278,6 @@ impl EditorTab {
             let font = egui::FontId::proportional(Self::CLOSE_SIZE * 0.75);
             painter.text(close_rect.center(), egui::Align2::CENTER_CENTER, mark, font, color);
         }
-        EditorTabOutput { response, close, elided }
+        EditorTabOutput { response, close, elided, preview }
     }
 }

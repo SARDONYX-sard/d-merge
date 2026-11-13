@@ -165,7 +165,6 @@ impl HkannoPage {
         let format_and_save = self.key_command(commands::EDITOR_FORMAT_AND_SAVE);
 
         let i18n = ctx.i18n;
-        // With their keys as the key bindings have them, and a `⚙` to change them, as VS Code's.
         // With their keys as the key bindings have them and a `⚙` to change them, and found by their
         // English names and command ids too, as VS Code's.
         let key_ui = &self.key_ui;

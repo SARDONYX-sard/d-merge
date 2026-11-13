@@ -3,6 +3,7 @@
 use std::{borrow::Cow, path::Path, rc::Rc, time::Instant};
 
 use egui_code_editor::{CodeEditorState, Diagnostic, EditorCommand, InlineDiff};
+use egui_widgets::TabAction;
 use gui_shared::settings::ui::editor::{EditorMode, LspOptions};
 
 use crate::patch::{
@@ -284,57 +285,74 @@ impl PatchTool {
 
     /// Does what the tab bar asked for. `current`: the object shown now.
     pub(in crate::patch) fn apply_tab_event(&mut self, event: Option<TabEvent>, current: &str) {
-        let active = self.active;
         match event {
-            Some(TabEvent::Show(id)) => {
+            Some(TabEvent::Object(action, id)) => self.object_tab_action(action, id, current),
+            Some(TabEvent::View(action, at)) => self.view_tab_action(action, at),
+            Some(TabEvent::File(action, id)) => self.file_asked = Some((action, id)),
+            None => {}
+        }
+    }
+
+    /// What an object's tab asked for. `current`: the object shown now.
+    fn object_tab_action(&mut self, action: TabAction, id: String, current: &str) {
+        let active = self.active;
+        match action {
+            TabAction::Show => {
                 self.views.list.active = None;
                 self.selected = Some(id.into());
             }
-            Some(TabEvent::ShowView(at)) => {
-                if let Some(view) = self.views.list.get(at) {
-                    self.selected = Some(view.id.as_str().into());
-                    self.views.show(at);
-                }
-            }
-            Some(TabEvent::CloseView(at)) => _ = self.views.list.close(at),
-            Some(TabEvent::CloseOthersOfView(at)) => {
-                self.tabs.close_all(active);
-                self.views.close_others(at);
-                if let Some(view) = self.views.list.active.and_then(|shown| self.views.list.get(shown)) {
-                    self.selected = Some(view.id.as_str().into());
-                }
-            }
-            Some(TabEvent::CloseViewsRight(at)) => self.views.list.close_to_the_right(at),
-            Some(TabEvent::KeepView(at)) => {
-                self.views.list.pin(at);
-            }
-            Some(TabEvent::KeepOpen(id)) => self.tabs.pin(active, &id),
-            Some(TabEvent::CloseToTheRight(id)) => {
-                self.tabs.close_to_the_right(active, &id);
-                if !self.tabs.of(active).any(|tab| tab.id == current) {
-                    self.selected = Some(id.into());
-                }
-            }
-            Some(TabEvent::CloseAll) => {
-                self.tabs.close_all(active);
-                self.views.list.close_all(active);
-                self.selected = None;
-                self.pane.opened = None;
-            }
-            Some(TabEvent::Close(id)) => {
+            TabAction::KeepOpen => self.tabs.pin(active, &id),
+            TabAction::Close => {
                 let neighbor = self.tabs.close(active, &id);
                 if id == current {
                     self.selected = neighbor.map(Rc::from);
                     self.pane.opened = None; // its editor state went with the tab
                 }
             }
-            Some(TabEvent::CloseOthers(id)) => {
+            TabAction::CloseOthers => {
                 self.tabs.close_others(active, &id);
                 self.selected = Some(id.into());
             }
-            Some(TabEvent::File(action, id)) => self.file_asked = Some((action, id)),
-            None => {}
+            TabAction::CloseToTheRight => {
+                self.tabs.close_to_the_right(active, &id);
+                if !self.tabs.of(active).any(|tab| tab.id == current) {
+                    self.selected = Some(id.into());
+                }
+            }
+            TabAction::CloseAll => self.close_all_tabs(),
         }
+    }
+
+    /// What a diff's / blame's tab asked for: as an object's, by its index in the views.
+    fn view_tab_action(&mut self, action: TabAction, at: usize) {
+        match action {
+            TabAction::Show => {
+                if let Some(view) = self.views.list.get(at) {
+                    self.selected = Some(view.id.as_str().into());
+                    self.views.show(at);
+                }
+            }
+            TabAction::KeepOpen => self.views.list.pin(at),
+            TabAction::Close => _ = self.views.list.close(at),
+            // Every other tab of the behavior, objects' and views'.
+            TabAction::CloseOthers => {
+                self.tabs.close_all(self.active);
+                self.views.close_others(at);
+                if let Some(view) = self.views.list.active.and_then(|shown| self.views.list.get(shown)) {
+                    self.selected = Some(view.id.as_str().into());
+                }
+            }
+            TabAction::CloseToTheRight => self.views.list.close_to_the_right(at),
+            TabAction::CloseAll => self.close_all_tabs(),
+        }
+    }
+
+    /// Closes every tab of the behavior, objects' and views'.
+    fn close_all_tabs(&mut self) {
+        self.tabs.close_all(self.active);
+        self.views.list.close_all(self.active);
+        self.selected = None;
+        self.pane.opened = None;
     }
 
     /// Does what the editor asked for. Returns whether the keyboard goes to the object tree.
@@ -361,7 +379,7 @@ impl PatchTool {
             Some(EditorCommand::NextTab) => self.step_tab(id, true),
             Some(EditorCommand::PreviousTab) => self.step_tab(id, false),
             Some(EditorCommand::CloseTab) => {
-                self.apply_tab_event(Some(TabEvent::Close(id.to_owned())), id);
+                self.apply_tab_event(Some(TabEvent::Object(TabAction::Close, id.to_owned())), id);
                 self.pane.focus = Some(FocusAt::Keep);
             }
             Some(EditorCommand::TogglePreview) => self.pane.show_preview = !self.pane.show_preview,

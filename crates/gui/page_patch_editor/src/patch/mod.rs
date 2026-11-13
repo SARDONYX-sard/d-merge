@@ -226,21 +226,10 @@ struct EditorResult {
 /// What a click on the tab bar asked for.
 #[derive(Debug)]
 enum TabEvent {
-    Show(String),
-    KeepOpen(String),
-    Close(String),
-    CloseOthers(String),
-    CloseToTheRight(String),
-    CloseAll,
-    /// A tab of [`ui::revision_view::Views`]: shown, or closed.
-    ShowView(usize),
-    CloseView(usize),
-    /// A double click on a view's tab: it is kept.
-    KeepView(usize),
-    /// A view's menu: every other tab of the behavior closes, objects' and views'.
-    CloseOthersOfView(usize),
-    /// A view's menu: the views to its right close.
-    CloseViewsRight(usize),
+    /// An object's tab, by its id.
+    Object(egui_widgets::TabAction, String),
+    /// A diff's / blame's tab, by its index in [`ui::revision_view::Views`].
+    View(egui_widgets::TabAction, usize),
     /// The object's file: its path to the clipboard, or shown in the file manager.
     File(tool::list::FileAction, String),
 }
