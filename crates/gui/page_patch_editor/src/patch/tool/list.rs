@@ -86,18 +86,19 @@ pub(in crate::patch) fn row_height(ui: &egui::Ui) -> f32 {
     ui.spacing().interact_size.y.max(ui.text_style_height(&egui::TextStyle::Monospace) + 4.0)
 }
 
-/// Draws a row of `height` exactly, whatever is in it: the rows of a `show_rows` list must all be
-/// of the height it was given. What is wider than the view still widens the list.
+/// Draws a row of `height` and the view's width exactly, whatever is in it: the rows of a `show_rows`
+/// list must all be of the height it was given, and a list must not widen its side bar.
 pub(in crate::patch) fn fixed_row<R>(ui: &mut egui::Ui, height: f32, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
     let top_left = ui.cursor().min;
     let max_rect = egui::Rect::from_min_size(top_left, egui::vec2(ui.available_width().max(1.0), height));
     let layout = egui::Layout::left_to_right(egui::Align::Center);
     let mut row = ui.new_child(egui::UiBuilder::new().max_rect(max_rect).layout(layout));
     let clip = ui.clip_rect();
-    row.set_clip_rect(egui::Rect::from_x_y_ranges(clip.x_range(), max_rect.y_range().intersection(clip.y_range())));
+    // As wide as the view, whatever is in it: what goes past is cut (the rows are fitted with `…`).
+    // Taking a wider row's width made the side bar wider, which made the rows wider, and so on.
+    row.set_clip_rect(max_rect.intersect(clip));
     let inner = add(&mut row);
-    let width = row.min_rect().width().max(max_rect.width());
-    ui.allocate_rect(egui::Rect::from_min_size(top_left, egui::vec2(width, height)), egui::Sense::hover());
+    ui.allocate_rect(max_rect, egui::Sense::hover());
     inner
 }
 
