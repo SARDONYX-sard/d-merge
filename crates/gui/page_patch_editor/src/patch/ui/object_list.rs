@@ -130,10 +130,10 @@ impl PatchTool {
         {
             if adsf {
                 let projects = self.anim_projects();
-                self.new_clips = Some(NewClipsForm::new(self.selected.as_deref(), projects));
+                self.panels.new_clips = Some(NewClipsForm::new(self.selected.as_deref(), projects));
             } else {
-                self.class_picker = true;
-                self.focus_quick_pick = true;
+                self.panels.class_picker = true;
+                self.panels.focus_quick_pick = true;
             }
         }
     }
@@ -288,14 +288,16 @@ impl PatchTool {
     /// What a row's menu asked for: at once, or after asking where. `current`: the project they are in.
     fn ask_duplicate(&mut self, pick: DuplicatePick, files: Vec<String>, projects: &[String], current: &str) {
         match pick {
-            DuplicatePick::To(to) => self.pending_duplicate = Some((files, to)),
-            DuplicatePick::Choose => self.duplicate_form = Some(DuplicateForm::new(files, projects.to_vec(), current)),
+            DuplicatePick::To(to) => self.panels.pending_duplicate = Some((files, to)),
+            DuplicatePick::Choose => {
+                self.panels.duplicate_form = Some(DuplicateForm::new(files, projects.to_vec(), current));
+            }
         }
     }
 
     /// The files go to the other project, which opens to show them.
     fn duplicate_anim_files(&mut self) {
-        let Some((files, to)) = self.pending_duplicate.take() else { return };
+        let Some((files, to)) = self.panels.pending_duplicate.take() else { return };
         let made = data::duplicate_to(&mut self.workspace.behaviors[self.active], &files, &to);
         for id in &made {
             self.object_changed(id);
@@ -395,8 +397,8 @@ impl PatchTool {
         match action {
             RowAction::KeepOpen => self.keep_open(id),
             RowAction::NewObject => {
-                self.class_picker = true;
-                self.focus_quick_pick = true;
+                self.panels.class_picker = true;
+                self.panels.focus_quick_pick = true;
             }
             RowAction::Duplicate => self.new_object(Some(id)),
             RowAction::Repeat => self.open_repeat(id),
@@ -409,29 +411,29 @@ impl PatchTool {
 
     /// The window of [`Self::class_picker_ui`].
     pub(in crate::patch) fn class_picker_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        if !self.class_picker {
+        if !self.panels.class_picker {
             return;
         }
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisNewObject))
             .open(&mut open)
             .show(ctx, |ui| self.class_picker_ui(ui, i18n));
-        self.class_picker &= open; // a picked class has turned it off already
+        self.panels.class_picker &= open; // a picked class has turned it off already
     }
 
     /// `[class filter]` + the class table's classes (the template's own first); a click adds a
     /// new object of that class with every field at its default.
     fn class_picker_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         let field = ui.add(
-            TextEdit::singleline(&mut self.class_filter)
+            TextEdit::singleline(&mut self.panels.class_filter)
                 .hint_text(i18n.t(I18nKey::NemesisClassFilterHint))
                 .desired_width(ui.available_width()),
         );
-        if std::mem::take(&mut self.focus_quick_pick) {
+        if std::mem::take(&mut self.panels.focus_quick_pick) {
             field.request_focus();
         }
         let behavior = &self.workspace.behaviors[self.active];
-        let filter = self.class_filter.as_str();
+        let filter = self.panels.class_filter.as_str();
         let used = |class: &str| behavior.object_of_class(class).is_some();
         let mut classes: Vec<&str> =
             nemesis_diff::schema::class_names().into_iter().filter(|c| contains_ignore_case(c, filter)).collect();
@@ -458,7 +460,7 @@ impl PatchTool {
             if let Some(id) = self.workspace.behaviors[self.active].add_class(&code, &class) {
                 self.object_changed(&id);
                 self.selected = Some(id.into());
-                self.class_picker = false;
+                self.panels.class_picker = false;
             }
         }
     }

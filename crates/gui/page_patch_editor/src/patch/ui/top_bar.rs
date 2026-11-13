@@ -47,7 +47,7 @@ impl PatchTool {
     pub(in crate::patch) fn project_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         ui.horizontal(|ui| {
             self.file_menu(ui, i18n, notify);
-            let chevron = if self.project_open { Icon::ChevronDown } else { Icon::ChevronRight };
+            let chevron = if self.panels.project_open { Icon::ChevronDown } else { Icon::ChevronRight };
             let mut toggle = ui.add(Button::new("").icon(chevron).small()).clicked();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.export_button(ui, i18n, notify);
@@ -57,10 +57,10 @@ impl PatchTool {
                 });
             });
             if toggle {
-                self.project_open = !self.project_open;
+                self.panels.project_open = !self.panels.project_open;
             }
         });
-        if self.project_open {
+        if self.panels.project_open {
             self.project_form(ui, i18n, notify);
         }
     }
@@ -100,7 +100,7 @@ impl PatchTool {
                 // Usually next to the one that was open.
                 let output = self.place.output.clone();
                 self.close_work(notify, i18n);
-                self.new_work = Some(NewWork { code: String::new(), output, ..NewWork::default() });
+                self.panels.new_work = Some(NewWork { code: String::new(), output, ..NewWork::default() });
             }
             Some(FileAction::Open) => self.pick_mod(notify, i18n),
             Some(FileAction::Recent(work)) => self.open_recent(&work, notify, i18n),
@@ -192,13 +192,13 @@ impl PatchTool {
 
     /// `[Rename…]`, then `[newc] [Rename] [Cancel] why not`. See [`crate::patch::tool::rename`].
     fn rename_form(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let Some(new) = &mut self.rename_to else {
+        let Some(new) = &mut self.panels.rename_to else {
             if ui
                 .add(Button::new(i18n.t(I18nKey::NemesisRenameCode)).small())
                 .on_hover_text(i18n.t(I18nKey::NemesisRenameCodeHover))
                 .clicked()
             {
-                self.rename_to = Some(String::new());
+                self.panels.rename_to = Some(String::new());
             }
             return;
         };
@@ -213,10 +213,10 @@ impl PatchTool {
         }
         if rename.on_hover_text(i18n.t(I18nKey::NemesisRenameCodeHover)).clicked() {
             let new = std::mem::take(new);
-            self.rename_to = None;
+            self.panels.rename_to = None;
             self.start_rename(&new, notify, i18n);
         } else if cancel {
-            self.rename_to = None;
+            self.panels.rename_to = None;
         }
     }
 

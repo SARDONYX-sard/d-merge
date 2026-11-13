@@ -43,14 +43,14 @@ impl PatchTool {
                 [(false, I18nKey::NemesisEvents, events.len()), (true, I18nKey::NemesisVariables, variables.len())]
             {
                 let label = format!("{} ({count})", i18n.t(key));
-                if ui.add(Button::selectable(self.show_variables == variables_tab, label)).clicked() {
-                    self.show_variables = variables_tab;
+                if ui.add(Button::selectable(self.panels.show_variables == variables_tab, label)).clicked() {
+                    self.panels.show_variables = variables_tab;
                 }
             }
         });
 
         let mut action = None;
-        if self.show_variables {
+        if self.panels.show_variables {
             ui.horizontal(|ui| {
                 let new = &mut self.new_names;
                 let name = TextEdit::singleline(&mut new.variable)

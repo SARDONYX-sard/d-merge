@@ -50,7 +50,7 @@ impl PatchTool {
         ui.horizontal(|ui| {
             let new = Button::new(i18n.t(I18nKey::NemesisNewWork)).icon(Icon::Plus).primary();
             if ui.add(new).on_hover_text(i18n.t(I18nKey::NemesisNewWorkHover)).clicked() {
-                self.new_work.get_or_insert_default();
+                self.panels.new_work.get_or_insert_default();
             }
             let open = Button::new(i18n.t(I18nKey::NemesisOpenMod)).icon(Icon::FolderSearch);
             if ui.add(open).on_hover_text(i18n.t(I18nKey::NemesisOpenModHover)).clicked() {
@@ -62,7 +62,7 @@ impl PatchTool {
 
     /// The mod code and the output of a new work.
     fn new_work_form(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let Some(form) = &mut self.new_work else { return };
+        let Some(form) = &mut self.panels.new_work else { return };
         ui.add_space(8.0);
         ui.horizontal(|ui| {
             let hover = i18n.t(I18nKey::NemesisModCodeHover);
@@ -95,7 +95,7 @@ impl PatchTool {
             self.create_work(code, output, scope);
             ui.ctx().request_repaint();
         } else if cancel {
-            self.new_work = None;
+            self.panels.new_work = None;
         }
     }
 }

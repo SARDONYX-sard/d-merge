@@ -46,22 +46,22 @@ impl PatchTool {
     /// See the module docs.
     pub(in crate::patch) fn behaviors_section(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let mut add = None;
-        let mut open = self.behaviors_open;
+        let mut open = self.panels.behaviors_open;
         let scope = self.workspace.scope;
         egui_widgets::section_header(ui, &mut open, i18n.t(I18nKey::NemesisBehaviorsSection), |ui| {
             add = add_menu(ui, scope, i18n);
         });
-        self.behaviors_open = open;
+        self.panels.behaviors_open = open;
         match add {
             Some(AddEvent::Template) => {
-                self.picker.open = true;
-                self.focus_quick_pick = true;
+                self.panels.picker.open = true;
+                self.panels.focus_quick_pick = true;
             }
             Some(AddEvent::File) => self.add_custom_template(notify, i18n),
             Some(AddEvent::AnimData) => self.open_anim_data_for_mod(),
             None => {}
         }
-        if self.behaviors_open {
+        if self.panels.behaviors_open {
             let event = self.behavior_rows(ui, i18n);
             self.apply_row_event(event);
         }
@@ -134,48 +134,52 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut Notification,
     ) {
-        if !self.picker.open {
+        if !self.panels.picker.open {
             return;
         }
         let scope = self.workspace.scope;
-        let fresh =
-            self.picker.catalog_for.as_ref().is_some_and(|(dir, of)| *dir == self.place.template_dir && *of == scope);
+        let fresh = self
+            .panels
+            .picker
+            .catalog_for
+            .as_ref()
+            .is_some_and(|(dir, of)| *dir == self.place.template_dir && *of == scope);
         if !fresh {
-            self.picker.catalog = crate::patch::workspace::catalog(Path::new(&self.place.template_dir), scope);
-            self.picker.catalog_for = Some((self.place.template_dir.clone(), scope));
+            self.panels.picker.catalog = crate::patch::workspace::catalog(Path::new(&self.place.template_dir), scope);
+            self.panels.picker.catalog_for = Some((self.place.template_dir.clone(), scope));
         }
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let mut picked = None;
         egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisAddBehavior)).open(&mut open).show(ctx, |ui| {
             picked = self.template_picker_ui(ui, i18n);
         });
-        self.picker.open = open && picked.is_none();
+        self.panels.picker.open = open && picked.is_none();
         if let Some(path) = picked {
             self.add_behavior(&path, notify, i18n);
         }
     }
 
     fn template_picker_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PathBuf> {
-        let field = TextEdit::singleline(&mut self.picker.filter)
+        let field = TextEdit::singleline(&mut self.panels.picker.filter)
             .hint_text(i18n.t(I18nKey::NemesisFilterHint))
             .desired_width(ui.available_width());
         let field = ui.add(field);
-        if std::mem::take(&mut self.focus_quick_pick) {
+        if std::mem::take(&mut self.panels.focus_quick_pick) {
             field.request_focus();
         }
-        ui.weak(format!("{} ({})", self.place.template_dir, self.picker.catalog.len()));
+        ui.weak(format!("{} ({})", self.place.template_dir, self.panels.picker.catalog.len()));
         if self.workspace.scope == TemplateScope::Nemesis {
             ui.weak(i18n.t(I18nKey::NemesisScopeNemesisOnly));
         }
-        if self.picker.catalog.is_empty() {
+        if self.panels.picker.catalog.is_empty() {
             ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNoTemplates));
             return None;
         }
         // No filter: as a directory tree. A filter wants all the matches at once.
-        let clicked = if self.picker.filter.is_empty() {
-            super::template_picker::tree_ui(ui, &self.picker.catalog, &mut self.picker.toggled, i18n)
+        let clicked = if self.panels.picker.filter.is_empty() {
+            super::template_picker::tree_ui(ui, &self.panels.picker.catalog, &mut self.panels.picker.toggled, i18n)
         } else {
-            super::template_picker::filtered_ui(ui, &self.picker.catalog, &self.picker.filter, i18n)
+            super::template_picker::filtered_ui(ui, &self.panels.picker.catalog, &self.panels.picker.filter, i18n)
         };
         clicked.map(Path::to_path_buf)
     }

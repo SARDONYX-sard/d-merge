@@ -264,18 +264,18 @@ impl PatchTool {
         self.active = 0;
         self.selected = None;
         self.pane.opened = None;
-        self.project_open = false;
+        self.panels.project_open = false;
     }
 
     /// `New` of the start screen: the work's first save makes it exist.
     pub(in crate::patch) fn create_work(&mut self, code: String, output: String, scope: workspace::TemplateScope) {
-        self.new_work = None;
+        self.panels.new_work = None;
         self.workspace.scope = scope;
         self.workspace.export_format = scope.default_format();
         self.place.mod_code = code;
         self.place.output = output;
         self.place.mod_dir.clear();
-        self.project_open = true; // Its name and author are still to be set.
+        self.panels.project_open = true; // Its name and author are still to be set.
         self.autosave.changed();
     }
 
@@ -295,7 +295,7 @@ impl PatchTool {
                 && !mod_code.code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE)
         });
         if codes.len() > 1 {
-            self.code_choice = Some(ModCodeChoice { root: selected.to_path_buf(), codes });
+            self.panels.code_choice = Some(ModCodeChoice { root: selected.to_path_buf(), codes });
             return;
         }
         let only = codes.first().and_then(|mod_code| workspace::patch_dir_of_code(selected, &mod_code.code));
@@ -304,7 +304,7 @@ impl PatchTool {
 
     /// The answer to the question of [`Self::open_mod`].
     pub(in crate::patch) fn open_chosen_code(&mut self, code: &str, notify: &mut Notification, i18n: &I18nMap) {
-        let Some(choice) = self.code_choice.take() else { return };
+        let Some(choice) = self.panels.code_choice.take() else { return };
         match workspace::patch_dir_of_code(&choice.root, code) {
             Some(dir) => self.open_patch_dir(&dir, notify, i18n),
             None => notify.error(format!("{}: {}", i18n.t(I18nKey::NemesisNotAMod), choice.root.display())),
@@ -373,7 +373,7 @@ impl PatchTool {
         self.place.mod_code.clone_from(&code);
         self.place.output.clone_from(&source);
         self.place.mod_dir = source;
-        self.new_work = None;
+        self.panels.new_work = None;
         // What was read is the work, rather than what may be in the cache.
         remember_recent(&mut self.recent, RecentWork { output: self.place.output.clone(), mod_code: code.clone() });
         self.place.loaded_for = Some(code);

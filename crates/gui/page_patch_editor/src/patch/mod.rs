@@ -74,6 +74,8 @@ pub struct PatchPaths<'a> {
 
 #[derive(Debug, Default)]
 pub(crate) struct PatchTool {
+    /// Which windows, forms and sections are open. See [`ui::panels`].
+    panels: ui::panels::Panels,
     /// Which work is open, and where its files are.
     place: tool::place::WorkPlace,
     /// This tool is the user patch's, in its window: see [`user_patch`].
@@ -89,24 +91,10 @@ pub(crate) struct PatchTool {
     pane: tool::editing::EditorPane,
     /// What `Edit...` proposed, until it is edited.
     draft: Option<user_patch::Draft>,
-    /// Its bulk delete asks once more.
-    confirm_clear: bool,
     /// See [`Self::take_mod_written`].
     mod_written: bool,
     /// What was edited of the active behavior since [`Self::sync_pandora_doc`].
     pandora_edited: Vec<String>,
-    /// A mod with several codes was opened: which of them? See [`ui::code_choice`].
-    code_choice: Option<ui::code_choice::ModCodeChoice>,
-    /// See [`new_work`]. `Some`: its form is shown on the start screen.
-    new_work: Option<new_work::NewWork>,
-    /// The window of the templates to add. See [`ui::template_picker`].
-    picker: ui::template_picker::TemplatePicker,
-    /// The next quick pick window drawn takes the keyboard.
-    focus_quick_pick: bool,
-    /// The details of the bar above are shown. See [`ui::top_bar`].
-    project_open: bool,
-    /// The side bar's behavior list is shown (else only its header).
-    behaviors_open: bool,
     /// `output` / `code` were taken from the settings.
     restored: bool,
     workspace: Workspace,
@@ -117,21 +105,14 @@ pub(crate) struct PatchTool {
     selected: Option<Rc<str>>,
     /// The objects of the explorer: the filters, the tree or the list, the keyboard in them. See [`tool::list`].
     explorer: tool::list::Explorer,
-    /// The mod code being typed to rename the work to, while that form is open.
-    rename_to: Option<String>,
     /// What runs on another thread: reading a mod, renaming its code. See [`tool::job`].
     job: Option<tool::job::Job>,
 
     /// The patch page's parser mode: what d-merge will accept, so what is checked here.
     parser_mode: ParserMode,
-    /// The "animation data" window.
-    anim_data_dialog: Option<ui::anim_data::AnimDataDialog>,
     /// The objects open in tabs.
     tabs: editor::tabs::EditorTabs,
 
-    /// The "New" class list is open, and its filter.
-    class_picker: bool,
-    class_filter: String,
     search: egui_code_editor::SearchView,
     /// The search field takes the keyboard next frame.
     focus_search: bool,
@@ -141,8 +122,6 @@ pub(crate) struct PatchTool {
     edits: u64,
     /// The Changes view: what changed since the last revision, and what is typed there. See [`changes`].
     scm: changes::Scm,
-    /// The window making many objects from one. See [`repeat`].
-    repeat: Option<ui::repeat::RepeatForm>,
     /// The diffs and blames of the history open as tabs. See [`ui::revision_view`].
     views: ui::revision_view::Views,
     /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
@@ -159,14 +138,6 @@ pub(crate) struct PatchTool {
     mod_export: user_patch::ModExport,
     /// The projects of the clip data template, read once. See [`anim::data::template_projects`].
     template_projects: Option<Vec<String>>,
-    /// The "duplicate to" window.
-    duplicate_form: Option<ui::anim_data::DuplicateForm>,
-    /// What a row's menu asked to duplicate: `(files, to the project)`.
-    pending_duplicate: Option<(Vec<String>, String)>,
-    /// The "new clips" window.
-    new_clips: Option<ui::anim_data::NewClipsForm>,
-    /// The events / variables panel shows variables (else events).
-    show_variables: bool,
     /// `(behavior, names)` of the events / variables panel and the completion.
     names: Option<(usize, Rc<editor::names::Names>)>,
     /// Objects edited since `names` last looked. See [`Self::object_changed`].
@@ -303,8 +274,8 @@ impl PatchTool {
                 self.close_work(notify, i18n);
             }
             // What is set once stays out of the way, unless it still has to be set.
-            self.project_open = false;
-            self.behaviors_open = true;
+            self.panels.project_open = false;
+            self.panels.behaviors_open = true;
             self.explorer.trees = settings
                 .tree_open
                 .iter()
@@ -590,6 +561,7 @@ mod work_tests {
         tool.wait_job(&mut notify, &i18n);
         let opened_at_once = tool.place.loaded_for.clone();
         let choice = tool
+            .panels
             .code_choice
             .as_ref()
             .map(|choice| choice.codes.iter().map(|code| code.code.clone()).collect::<Vec<_>>());
@@ -597,7 +569,7 @@ mod work_tests {
         tool.open_chosen_code("ecnpc", &mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
         let opened = tool.place.loaded_for.clone();
-        let asked_again = tool.code_choice.is_some();
+        let asked_again = tool.panels.code_choice.is_some();
         std::fs::remove_dir_all(&dir).unwrap();
 
         assert_eq!(opened_at_once, None);
@@ -618,12 +590,12 @@ mod work_tests {
         tool.open_mod(&one, &mut notify, &i18n);
 
         tool.wait_job(&mut notify, &i18n);
-        let of_one = (tool.place.loaded_for.clone(), tool.code_choice.is_some());
+        let of_one = (tool.place.loaded_for.clone(), tool.panels.code_choice.is_some());
 
         // The code of 7 letters, as Nemesis' own mod has it.
         tool.open_mod(&several.join("Nemesis_Engine/mod/nemesis"), &mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        let of_patch_dir = (tool.place.loaded_for.clone(), tool.code_choice.is_some());
+        let of_patch_dir = (tool.place.loaded_for.clone(), tool.panels.code_choice.is_some());
         std::fs::remove_dir_all(&dir).unwrap();
 
         assert_eq!(of_one, (Some("para".to_owned()), false));

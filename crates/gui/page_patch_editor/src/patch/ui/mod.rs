@@ -8,6 +8,7 @@ mod changes_view;
 pub(super) mod code_choice;
 mod object_editor;
 mod object_list;
+pub(super) mod panels;
 pub(super) mod preview;
 pub(super) mod problems;
 pub(super) mod repeat;

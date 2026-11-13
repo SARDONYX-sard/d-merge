@@ -109,7 +109,7 @@ impl PatchTool {
         let project = data::default_project(&folders, hkx.first().map(String::as_str));
         let projects =
             sets.into_iter().map(|(folder, files)| SetProject { folder, files: Checklist::new(files) }).collect();
-        self.anim_data_dialog = Some(AnimDataDialog {
+        self.panels.anim_data_dialog = Some(AnimDataDialog {
             root: root.to_path_buf(),
             rows,
             hkx: Checklist::new(hkx),
@@ -126,7 +126,7 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut Notification,
     ) {
-        let Some(dialog) = &mut self.anim_data_dialog else { return };
+        let Some(dialog) = &mut self.panels.anim_data_dialog else { return };
         let mut open = true;
         let mut generate = false;
         egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisAnimData))
@@ -140,12 +140,12 @@ impl PatchTool {
             open = false;
         }
         if !open {
-            self.anim_data_dialog = None;
+            self.panels.anim_data_dialog = None;
         }
     }
 
     fn generate_anim_data(&mut self, i18n: &I18nMap, notify: &mut Notification) {
-        let Some(dialog) = self.anim_data_dialog.take() else { return };
+        let Some(dialog) = self.panels.anim_data_dialog.take() else { return };
         let code = self.place.mod_code.trim().to_owned();
         let chosen: Vec<(&ClipSource, HkxInfo)> =
             dialog.rows.iter().filter(|row| row.checked).filter_map(chosen_clip).collect();
@@ -400,7 +400,7 @@ impl DuplicateForm {
 impl PatchTool {
     /// The window of [`DuplicateForm`]: what it asks for goes on as a row's menu's does.
     pub(in crate::patch) fn duplicate_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        let Some(form) = &mut self.duplicate_form else { return };
+        let Some(form) = &mut self.panels.duplicate_form else { return };
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let mut go = false;
         egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisDuplicateTo))
@@ -420,14 +420,14 @@ impl PatchTool {
                         .clicked();
                 });
             });
-        if go && let Some(form) = self.duplicate_form.take() {
+        if go && let Some(form) = self.panels.duplicate_form.take() {
             if let Some(to) = form.projects.into_iter().nth(form.picked) {
-                self.pending_duplicate = Some((form.files, to));
+                self.panels.pending_duplicate = Some((form.files, to));
             }
             return;
         }
         if !open {
-            self.duplicate_form = None;
+            self.panels.duplicate_form = None;
         }
     }
 
@@ -442,7 +442,7 @@ impl PatchTool {
     }
 
     pub(in crate::patch) fn new_clips_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        let Some(form) = &mut self.new_clips else { return };
+        let Some(form) = &mut self.panels.new_clips else { return };
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let mut create = false;
         egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisNewClips))
@@ -471,12 +471,12 @@ impl PatchTool {
             open = false;
         }
         if !open {
-            self.new_clips = None;
+            self.panels.new_clips = None;
         }
     }
 
     fn create_new_clips(&mut self) {
-        let Some(form) = self.new_clips.take() else { return };
+        let Some(form) = self.panels.new_clips.take() else { return };
         let code = self.place.mod_code.trim().to_owned();
         let adsf = &mut self.workspace.behaviors[self.active];
         let added = data::add_numbered_clips(adsf, &code, form.folder.trim(), form.name.trim(), form.count);

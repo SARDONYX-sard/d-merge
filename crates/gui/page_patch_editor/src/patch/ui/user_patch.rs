@@ -156,9 +156,9 @@ impl PatchTool {
     fn clear_button(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let button = Button::new(i18n.t(I18nKey::UserPatchClear)).icon(Icon::Trash).destructive();
         if ui.add(button).on_hover_text(i18n.t(I18nKey::UserPatchClearHover)).clicked() {
-            self.confirm_clear = true;
+            self.panels.confirm_clear = true;
         }
-        if !self.confirm_clear {
+        if !self.panels.confirm_clear {
             return;
         }
         let dialog = AlertDialog::new(
@@ -168,7 +168,7 @@ impl PatchTool {
         );
         let choice = dialog.description(i18n.t(I18nKey::UserPatchClearHover)).action_icon(Icon::Trash).destructive();
         let choice = choice.show(ui.ctx());
-        self.confirm_clear = choice.is_none();
+        self.panels.confirm_clear = choice.is_none();
         if choice == Some(AlertDialogChoice::Action) {
             self.clear_user_patch(notify, i18n);
         }

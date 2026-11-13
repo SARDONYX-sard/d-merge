@@ -37,7 +37,7 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut Notification,
     ) {
-        let Some(choice) = &self.code_choice else { return };
+        let Some(choice) = &self.panels.code_choice else { return };
 
         let mut open = true;
         let mut picked = None;
@@ -56,7 +56,7 @@ impl PatchTool {
         if let Some(code) = picked {
             self.open_chosen_code(&code, notify, i18n);
         } else if !open {
-            self.code_choice = None;
+            self.panels.code_choice = None;
         }
     }
 }

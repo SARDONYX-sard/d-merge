@@ -42,12 +42,12 @@ impl PatchTool {
         };
         let form =
             RepeatForm { behavior: self.active, from: id.to_owned(), template: text.to_owned(), values: String::new() };
-        self.repeat = Some(form);
+        self.panels.repeat = Some(form);
     }
 
     /// Draws the window if it is open, and makes the objects when asked.
     pub(in crate::patch) fn repeat_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        let Some(form) = &mut self.repeat else { return };
+        let Some(form) = &mut self.panels.repeat else { return };
         let mut open = true;
         let mut create = false;
         let rows = values(&form.values).rows.len();
@@ -79,13 +79,13 @@ impl PatchTool {
         if create {
             self.create_repeated();
         } else if !open {
-            self.repeat = None;
+            self.panels.repeat = None;
         }
     }
 
     /// Makes one new object per row of the values, and shows the first.
     fn create_repeated(&mut self) {
-        let Some(form) = self.repeat.take() else { return };
+        let Some(form) = self.panels.repeat.take() else { return };
         let code = self.place.mod_code.trim().to_owned();
         let read = values(&form.values);
         let Some(behavior) = self.workspace.behaviors.get_mut(form.behavior) else { return };
