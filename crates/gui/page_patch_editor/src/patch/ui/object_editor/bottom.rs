@@ -15,7 +15,7 @@ use gui_shared::{
     settings::ui::editor::{EditorMode, LspOptions},
 };
 
-use crate::patch::PatchTool;
+use crate::patch::{problems::Problems, tool::editing::EditorPane, workspace::Behavior};
 
 /// What the Problems panel asked for.
 #[derive(Debug, Default)]
@@ -26,41 +26,50 @@ pub(super) struct ProblemsOutput {
     pub(super) left: bool,
 }
 
-impl PatchTool {
-    /// The status bar. Returns whether its problem counts were clicked (to show / hide the panel).
-    pub(super) fn status_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, keymap: Keymap) -> bool {
-        if self.pane.show_lsp_options {
-            lsp_options_window(ui.ctx(), i18n, &mut self.pane.lsp, &mut self.pane.show_lsp_options);
+impl EditorPane {
+    /// The status bar. `user_patch`: the user patch's window. Returns whether its problem counts
+    /// were clicked (to show / hide the panel).
+    pub(super) fn status_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, keymap: Keymap, user_patch: bool) -> bool {
+        if self.show_lsp_options {
+            lsp_options_window(ui.ctx(), i18n, &mut self.lsp, &mut self.show_lsp_options);
         }
 
-        let status_id = if self.is_user_patch { "user_patch_status_bar" } else { "nemesis_status_bar" };
+        let status_id = if user_patch { "user_patch_status_bar" } else { "nemesis_status_bar" };
         egui::Panel::bottom(status_id)
             .show(ui, |ui| {
                 // `Vim ▾` and `⚙` at its right end, as VS Code's status bar items.
                 let mut chosen = keymap;
-                let status = egui_code_editor::StatusBar::new(&self.pane.state, keymap, &self.pane.text)
+                let status = egui_code_editor::StatusBar::new(&self.state, keymap, &self.text)
                     .keymap_select(&mut chosen)
-                    .options(&mut self.pane.show_lsp_options, i18n.t(I18nKey::LspOptionsTitle))
+                    .options(&mut self.show_lsp_options, i18n.t(I18nKey::LspOptionsTitle))
                     .show(ui);
                 if status.keymap_changed {
-                    self.pane.mode = EditorMode::from_vim(chosen.is_vim());
+                    self.mode = EditorMode::from_vim(chosen.is_vim());
                 }
                 status.problems.clicked()
             })
             .inner
     }
+}
 
-    /// The Problems panel, if open. `keys`: this frame's keys of it (`j` / `k` / `Enter` / `Esc`).
-    pub(super) fn problems_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, keys: &[ProblemsKey]) -> ProblemsOutput {
-        let Some(problems) = self.problems.list.as_ref().filter(|_| self.problems.open) else {
+impl Problems {
+    /// The Problems panel, if open, of the objects of `behaviors`. `keys`: this frame's keys of it
+    /// (`j` / `k` / `Enter` / `Esc`).
+    pub(super) fn panel_ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        behaviors: &[Behavior],
+        keys: &[ProblemsKey],
+    ) -> ProblemsOutput {
+        let Some(problems) = self.list.as_ref().filter(|_| self.open) else {
             return ProblemsOutput::default();
         };
 
-        let (behaviors, cursor) = (&self.workspace.behaviors, &mut self.problems.cursor);
-        let was_focused = cursor.focused;
-        let go_to = super::super::problems::problems_panel(ui, i18n, problems, behaviors, cursor, keys);
+        let was_focused = self.cursor.focused;
+        let go_to = super::super::problems::problems_panel(ui, i18n, problems, behaviors, &mut self.cursor, keys);
         // `Esc`: back to the editor, where it was. (`Enter` goes to the problem's line.)
-        let left = was_focused && !cursor.focused && go_to.is_none();
+        let left = was_focused && !self.cursor.focused && go_to.is_none();
 
         ProblemsOutput { go_to, left }
     }

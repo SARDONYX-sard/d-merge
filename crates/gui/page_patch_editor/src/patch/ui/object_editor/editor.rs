@@ -74,8 +74,8 @@ impl PatchTool {
                 ui.weak(i18n.t(I18nKey::NemesisRefReadOnly));
             }
 
-            toggle_problems = self.status_bar(ui, i18n, keymap);
-            problems = self.problems_ui(ui, i18n, &problem_keys);
+            toggle_problems = self.pane.status_bar(ui, i18n, keymap, self.is_user_patch);
+            problems = self.problems.panel_ui(ui, i18n, &self.workspace.behaviors, &problem_keys);
             self.code_editor(ui, i18n, id, (&names, keymap), &requests, &mut result);
         });
 

@@ -10,18 +10,24 @@
 use egui_widgets::shadcn::{Button, Icon};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use crate::patch::{PatchTool, ui::preview::PreviewEvent};
+use crate::patch::{tool::editing::EditorPane, ui::preview::PreviewEvent};
 
-impl PatchTool {
+impl EditorPane {
     /// Draws the panel. Returns what its lines asked for (revert a block, go to a line).
-    pub(super) fn preview_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PreviewEvent> {
-        let panel_id = if self.is_user_patch { "user_patch_preview" } else { "nemesis_preview" };
+    /// `user_patch`: the user patch's window (its panels have ids of their own).
+    pub(super) fn preview_panel(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        user_patch: bool,
+    ) -> Option<PreviewEvent> {
+        let panel_id = if user_patch { "user_patch_preview" } else { "nemesis_preview" };
         let panel = egui::Panel::right(panel_id).default_size(520.0).resizable(true);
 
         panel
             .show(ui, |ui| {
                 self.preview_header(ui, i18n)?;
-                let view = self.pane.preview_view.as_mut()?;
+                let view = self.preview_view.as_mut()?;
                 super::super::preview::lines_ui(view, ui, i18n.t(I18nKey::NemesisRevertHunkHover))
             })
             .inner
@@ -29,12 +35,12 @@ impl PatchTool {
 
     /// `Patch preview ▲ ▼ 2/5 ✔ ... ⌖`. `None`: there is no preview yet.
     fn preview_header(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<()> {
-        let (patch, check) = self.pane.preview.as_ref()?;
-        let is_pandora = self.pane.preview_view.as_ref().is_some_and(|view| view.is_pandora());
+        let (patch, check) = self.preview.as_ref()?;
+        let is_pandora = self.preview_view.as_ref().is_some_and(|view| view.is_pandora());
 
         ui.horizontal(|ui| {
             ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
-            if let Some(view) = &mut self.pane.preview_view {
+            if let Some(view) = &mut self.preview_view {
                 super::super::preview::nav_ui(view, ui, i18n.t(I18nKey::NemesisJumpDiffHover));
             }
 
@@ -53,9 +59,9 @@ impl PatchTool {
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let follow = Button::selectable(self.pane.follow_preview, "").icon(Icon::Crosshair).small();
+                let follow = Button::selectable(self.follow_preview, "").icon(Icon::Crosshair).small();
                 if ui.add(follow).on_hover_text(i18n.t(I18nKey::NemesisFollowCursor)).clicked() {
-                    self.pane.follow_preview = !self.pane.follow_preview;
+                    self.follow_preview = !self.follow_preview;
                 }
             });
         });

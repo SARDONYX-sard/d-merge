@@ -122,7 +122,7 @@ impl PatchTool {
         if is_new || !self.pane.show_preview {
             return None;
         }
-        self.preview_panel(ui, i18n)
+        self.pane.preview_panel(ui, i18n, self.is_user_patch)
     }
 
     /// Does what the editor and the side panel asked for, once both are drawn.
