@@ -4,11 +4,9 @@
 //! Adding edits the string data, graph data (and value set) objects at once; see
 //! [`nemesis_diff::vars`]. Template entries cannot be removed (other mods index them).
 
-use std::rc::Rc;
-
 use nemesis_diff::vars::{self, VariableType};
 
-use super::{PatchTool, editor::names::Names};
+use super::workspace::Behavior;
 
 pub(super) const GRAPH_DATA: &str = "hkbBehaviorGraphData";
 pub(super) const VALUE_SET: &str = "hkbVariableValueSet";
@@ -47,96 +45,82 @@ pub(super) struct Renaming {
     pub(super) focus: bool,
 }
 
-impl PatchTool {
-    /// The active behavior's names, with the changes since the last call taken in.
-    ///
-    /// Asked for every frame: an `Rc`, so the thousands of strings are not copied each time.
-    pub(super) fn names(&mut self) -> Rc<Names> {
-        if !self.names.is_of(self.active) {
-            self.reset_names(); // another behavior: what was found of this one goes too
+/// Does `action` to `behavior`, with what `new` holds (the "add" rows, the rename field). Returns
+/// the ids of the objects it edited.
+pub(super) fn apply(
+    behavior: &mut Behavior,
+    new: &mut NewNames,
+    action: Action,
+    ids: &Ids,
+    (events, variables): (&[String], &[String]),
+) -> Result<Vec<String>, String> {
+    let text = |id: &str| behavior.text(id).unwrap_or_default().to_string();
+    let mut edits: Vec<(String, String)> = Vec::new();
+    match action {
+        Action::AddEvent => {
+            let name = valid_name(&new.event, events)?;
+            let (s, g) = vars::add_event(&text(&ids.string_data), &text(&ids.graph_data), name)
+                .ok_or("eventNames / eventInfos not found")?;
+            edits = vec![(ids.string_data.clone(), s), (ids.graph_data.clone(), g)];
+            new.event.clear();
         }
-        self.names.get(self.active, &self.workspace.behaviors[self.active])
+        Action::AddVariable => {
+            let name = valid_name(&new.variable, variables)?;
+            let value = new.kind.word_value(&new.value).ok_or_else(|| format!("Invalid value: `{}`", new.value))?;
+            let value_set = ids.value_set.as_deref().ok_or("No hkbVariableValueSet")?;
+            let (s, g, v) = vars::add_variable(
+                &text(&ids.string_data),
+                &text(&ids.graph_data),
+                &text(value_set),
+                name,
+                new.kind,
+                value,
+            )
+            .ok_or("variableNames / variableInfos / wordVariableValues not found")?;
+            edits = vec![(ids.string_data.clone(), s), (ids.graph_data.clone(), g), (value_set.to_string(), v)];
+            new.variable.clear();
+            new.value.clear();
+        }
+        Action::Rename { is_variable, index } => {
+            let text = new.renaming.take().map(|renaming| renaming.text).unwrap_or_default();
+            let (param, prefix, existing) = if is_variable {
+                ("variableNames", vars::VARIABLE_ID_PREFIX, variables)
+            } else {
+                ("eventNames", vars::EVENT_ID_PREFIX, events)
+            };
+            let old = existing.get(index).ok_or(param)?;
+            let new_name = valid_rename(&text, existing, index)?;
+            if new_name == old {
+                return Ok(Vec::new());
+            }
+            let renamed = vars::rename(&behavior_text(behavior, &ids.string_data), param, index, new_name);
+            edits.push((ids.string_data.clone(), renamed.ok_or(param)?));
+            // Patches name it: those texts change too, or they would point to nothing.
+            edits.extend(behavior.texts().filter_map(|object| {
+                let edited = vars::rename_uses(object.text, prefix, old, new_name)?;
+                Some((object.id.to_owned(), edited))
+            }));
+        }
+        Action::RemoveEvent(i) => {
+            for (id, param) in [(&ids.string_data, "eventNames"), (&ids.graph_data, "eventInfos")] {
+                edits.push((id.clone(), vars::remove(&text(id), param, i).ok_or(param)?));
+            }
+        }
+        Action::RemoveVariable(i) => {
+            let mut targets = vec![(&ids.string_data, "variableNames"), (&ids.graph_data, "variableInfos")];
+            if let Some(value_set) = &ids.value_set {
+                targets.push((value_set, "wordVariableValues"));
+            }
+            for (id, param) in targets {
+                edits.push((id.clone(), vars::remove(&text(id), param, i).ok_or(param)?));
+            }
+        }
     }
-
-    /// Returns the ids of the objects it edited.
-    pub(super) fn apply(
-        &mut self,
-        action: Action,
-        ids: &Ids,
-        events: &[String],
-        variables: &[String],
-    ) -> Result<Vec<String>, String> {
-        let behavior = &mut self.workspace.behaviors[self.active];
-        let text = |id: &str| behavior.text(id).unwrap_or_default().to_string();
-        let new = &mut self.new_names;
-        let mut edits: Vec<(String, String)> = Vec::new();
-        match action {
-            Action::AddEvent => {
-                let name = valid_name(&new.event, events)?;
-                let (s, g) = vars::add_event(&text(&ids.string_data), &text(&ids.graph_data), name)
-                    .ok_or("eventNames / eventInfos not found")?;
-                edits = vec![(ids.string_data.clone(), s), (ids.graph_data.clone(), g)];
-                new.event.clear();
-            }
-            Action::AddVariable => {
-                let name = valid_name(&new.variable, variables)?;
-                let value = new.kind.word_value(&new.value).ok_or_else(|| format!("Invalid value: `{}`", new.value))?;
-                let value_set = ids.value_set.as_deref().ok_or("No hkbVariableValueSet")?;
-                let (s, g, v) = vars::add_variable(
-                    &text(&ids.string_data),
-                    &text(&ids.graph_data),
-                    &text(value_set),
-                    name,
-                    new.kind,
-                    value,
-                )
-                .ok_or("variableNames / variableInfos / wordVariableValues not found")?;
-                edits = vec![(ids.string_data.clone(), s), (ids.graph_data.clone(), g), (value_set.to_string(), v)];
-                new.variable.clear();
-                new.value.clear();
-            }
-            Action::Rename { is_variable, index } => {
-                let text = new.renaming.take().map(|renaming| renaming.text).unwrap_or_default();
-                let (param, prefix, existing) = if is_variable {
-                    ("variableNames", vars::VARIABLE_ID_PREFIX, variables)
-                } else {
-                    ("eventNames", vars::EVENT_ID_PREFIX, events)
-                };
-                let old = existing.get(index).ok_or(param)?;
-                let new_name = valid_rename(&text, existing, index)?;
-                if new_name == old {
-                    return Ok(Vec::new());
-                }
-                let renamed = vars::rename(&behavior_text(behavior, &ids.string_data), param, index, new_name);
-                edits.push((ids.string_data.clone(), renamed.ok_or(param)?));
-                // Patches name it: those texts change too, or they would point to nothing.
-                edits.extend(behavior.texts().filter_map(|object| {
-                    let edited = vars::rename_uses(object.text, prefix, old, new_name)?;
-                    Some((object.id.to_owned(), edited))
-                }));
-            }
-            Action::RemoveEvent(i) => {
-                for (id, param) in [(&ids.string_data, "eventNames"), (&ids.graph_data, "eventInfos")] {
-                    edits.push((id.clone(), vars::remove(&text(id), param, i).ok_or(param)?));
-                }
-            }
-            Action::RemoveVariable(i) => {
-                let mut targets = vec![(&ids.string_data, "variableNames"), (&ids.graph_data, "variableInfos")];
-                if let Some(value_set) = &ids.value_set {
-                    targets.push((value_set, "wordVariableValues"));
-                }
-                for (id, param) in targets {
-                    edits.push((id.clone(), vars::remove(&text(id), param, i).ok_or(param)?));
-                }
-            }
-        }
-        let changed = edits.iter().map(|(id, _)| id.clone()).collect();
-        for (id, edited) in edits {
-            behavior.set_text(&id, &edited);
-        }
-        self.vars_error = None;
-        Ok(changed)
+    let changed = edits.iter().map(|(id, _)| id.clone()).collect();
+    for (id, edited) in edits {
+        behavior.set_text(&id, &edited);
     }
+    Ok(changed)
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -159,7 +143,7 @@ pub(super) struct Ids {
 }
 
 /// The text of object `id`.
-fn behavior_text(behavior: &super::Behavior, id: &str) -> String {
+fn behavior_text(behavior: &Behavior, id: &str) -> String {
     behavior.text(id).unwrap_or_default().to_owned()
 }
 

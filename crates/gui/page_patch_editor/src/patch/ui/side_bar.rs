@@ -96,7 +96,15 @@ impl PatchTool {
                     let has_vars =
                         self.workspace.behaviors.get(self.active).is_some_and(|behavior| !behavior.is_anim_data());
                     if has_vars {
-                        self.vars_panel(ui, i18n);
+                        let names = self.names();
+                        let behavior = &mut self.workspace.behaviors[self.active];
+                        let changed = self.vars.show(ui, i18n, behavior, &names, &self.explorer.filter);
+                        if !changed.is_empty() {
+                            self.pane.opened = None; // the open object may be one of them
+                        }
+                        for id in changed {
+                            self.object_changed(&id);
+                        }
                     } else {
                         ui.weak(i18n.t(I18nKey::SideNoVariables));
                     }

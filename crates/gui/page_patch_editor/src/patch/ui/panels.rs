@@ -3,7 +3,7 @@
 //!
 //! ```text
 //! top bar      project_open (details), rename_to (the rename form)
-//! side bar     behaviors_open (BEHAVIORS), show_variables (VARIABLES, else EVENTS)
+//! side bar     behaviors_open (BEHAVIORS)
 //! start screen new_work, code_choice (a mod with several codes)
 //! windows      picker (templates), class_picker + class_filter (New object), repeat,
 //!              anim_data_dialog, duplicate_form + pending_duplicate, new_clips
@@ -21,8 +21,6 @@ pub(in crate::patch) struct Panels {
     pub(in crate::patch) rename_to: Option<String>,
     /// The side bar's behavior list is shown (else only its header).
     pub(in crate::patch) behaviors_open: bool,
-    /// The events / variables panel shows variables (else events).
-    pub(in crate::patch) show_variables: bool,
     /// See [`new_work`]. `Some`: its form is shown on the start screen.
     pub(in crate::patch) new_work: Option<new_work::NewWork>,
     /// A mod with several codes was opened: which of them? See [`ui::code_choice`].

@@ -483,6 +483,16 @@ impl PatchTool {
         self.mark_dirty();
     }
 
+    /// The active behavior's names, with the changes since the last call taken in.
+    ///
+    /// Asked for every frame: an `Rc`, so the thousands of strings are not copied each time.
+    pub(in crate::patch) fn names(&mut self) -> Rc<editor::names::Names> {
+        if !self.names.is_of(self.active) {
+            self.reset_names(); // another behavior: what was found of this one goes too
+        }
+        self.names.get(self.active, &self.workspace.behaviors[self.active])
+    }
+
     /// The behaviors themselves changed (loaded, closed): `names` starts over.
     pub(in crate::patch) fn reset_names(&mut self) {
         self.names.reset();

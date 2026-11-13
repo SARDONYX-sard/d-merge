@@ -21,4 +21,4 @@ pub(super) mod template_picker;
 mod top_bar;
 mod tree;
 mod user_patch;
-mod vars_panel;
+pub(super) mod vars_panel;

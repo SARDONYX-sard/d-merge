@@ -44,7 +44,7 @@ use gui_shared::{
     },
 };
 
-use self::workspace::{Behavior, Workspace};
+use self::workspace::Workspace;
 
 /// How many works the list of recent ones keeps.
 const MAX_RECENT: usize = 12;
@@ -140,8 +140,8 @@ pub(crate) struct PatchTool {
     template_projects: Option<Vec<String>>,
     /// The names of the events / variables panel and the completion. See [`Self::object_changed`].
     names: editor::names::NamesCache,
-    new_names: vars_edit::NewNames,
-    vars_error: Option<String>,
+    /// The EVENTS / VARIABLES panel. See [`ui::vars_panel`].
+    vars: ui::vars_panel::VarsPanel,
 }
 
 /// Where the cursor goes when the editor gets the keyboard back.
@@ -387,7 +387,7 @@ mod tests {
         use std::time::Instant;
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../../resource/assets/templates/meshes/actors/character/behaviors/0_master.bin");
-        let mut behavior = Behavior::open(&path).unwrap();
+        let mut behavior = workspace::Behavior::open(&path).unwrap();
         let largest = behavior.objects.iter().max_by_key(|o| o.text.len()).unwrap();
         let (id, text) = (largest.id.clone(), largest.text.clone());
         println!("{id} {} {} lines; {} objects", largest.class, text.lines().count(), behavior.objects.len());

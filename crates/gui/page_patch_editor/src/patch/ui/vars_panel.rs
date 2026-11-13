@@ -15,25 +15,40 @@ use nemesis_diff::vars::VariableType;
 use stdx::text::contains_ignore_case;
 
 use crate::patch::{
-    PatchTool,
-    vars_edit::{Action, GRAPH_DATA, Ids, Renaming, VALUE_SET},
-    workspace::STRING_DATA,
+    editor::names::Names,
+    vars_edit::{self, Action, GRAPH_DATA, Ids, NewNames, Renaming, VALUE_SET},
+    workspace::{Behavior, STRING_DATA},
 };
 
-impl PatchTool {
-    pub(super) fn vars_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let behavior = &self.workspace.behaviors[self.active];
+/// See the module docs. Its own state only: what is typed, the last error, which list is shown.
+#[derive(Debug, Default)]
+pub(in crate::patch) struct VarsPanel {
+    new: NewNames,
+    error: Option<String>,
+    /// Variables are listed (else events).
+    show_variables: bool,
+}
+
+impl VarsPanel {
+    /// Draws the panel of `behavior` (its `names`), the lists filtered by `filter`. Returns the ids of
+    /// the objects an add / rename / remove edited (none: nothing was done).
+    pub(in crate::patch) fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        behavior: &mut Behavior,
+        names: &Names,
+        filter: &str,
+    ) -> Vec<String> {
         let ids = [STRING_DATA, GRAPH_DATA, VALUE_SET].map(|class| behavior.object_of_class(class).map(str::to_string));
         let [Some(string_data), Some(graph_data), value_set] = ids else {
             ui.weak(i18n.t(I18nKey::NemesisNoVars));
-            return;
+            return Vec::new();
         };
 
-        if let Some(error) = &self.vars_error {
+        if let Some(error) = &self.error {
             ui.colored_label(ui.visuals().error_fg_color, error);
         }
-        let names = self.names();
-        let filter = self.explorer.filter.as_str();
         let (events, template_events) = (&names.events, names.template_events);
         let (variables, template_variables) = (&names.variables, names.template_variables);
 
@@ -43,17 +58,17 @@ impl PatchTool {
                 [(false, I18nKey::NemesisEvents, events.len()), (true, I18nKey::NemesisVariables, variables.len())]
             {
                 let label = format!("{} ({count})", i18n.t(key));
-                if ui.add(Button::selectable(self.panels.show_variables == variables_tab, label)).clicked() {
-                    self.panels.show_variables = variables_tab;
+                if ui.add(Button::selectable(self.show_variables == variables_tab, label)).clicked() {
+                    self.show_variables = variables_tab;
                 }
             }
         });
 
         let mut action = None;
-        if self.panels.show_variables {
+        if self.show_variables {
             // Wrapped, not wider than the side bar.
             ui.horizontal_wrapped(|ui| {
-                let new = &mut self.new_names;
+                let new = &mut self.new;
                 let name = TextEdit::singleline(&mut new.variable)
                     .hint_text(i18n.t(I18nKey::NemesisNewVariableHint))
                     .desired_width(110.0);
@@ -82,10 +97,10 @@ impl PatchTool {
                 template_count: template_variables,
                 is_variable: true,
             };
-            action = name_rows(ui, i18n, list, filter, &mut self.new_names.renaming).or(action);
+            action = name_rows(ui, i18n, list, filter, &mut self.new.renaming).or(action);
         } else {
             ui.horizontal_wrapped(|ui| {
-                let name = TextEdit::singleline(&mut self.new_names.event)
+                let name = TextEdit::singleline(&mut self.new.event)
                     .hint_text(i18n.t(I18nKey::NemesisNewEventHint))
                     .desired_width(140.0);
                 ui.add(name).on_hover_text(i18n.t(I18nKey::NemesisNewEventHover));
@@ -95,19 +110,20 @@ impl PatchTool {
             });
             ui.separator();
             let list = NameList { names: events, types: None, template_count: template_events, is_variable: false };
-            action = name_rows(ui, i18n, list, filter, &mut self.new_names.renaming).or(action);
+            action = name_rows(ui, i18n, list, filter, &mut self.new.renaming).or(action);
         }
 
-        let Some(action) = action else { return };
+        let Some(action) = action else { return Vec::new() };
         let ids = Ids { string_data, graph_data, value_set };
-        match self.apply(action, &ids, events, variables) {
+        match vars_edit::apply(behavior, &mut self.new, action, &ids, (events, variables)) {
             Ok(changed) => {
-                self.pane.opened = None; // the open object may be one of them
-                for id in changed {
-                    self.object_changed(&id);
-                }
+                self.error = None;
+                changed
             }
-            Err(message) => self.vars_error = Some(message),
+            Err(message) => {
+                self.error = Some(message);
+                Vec::new()
+            }
         }
     }
 }
