@@ -72,7 +72,26 @@ pub(super) struct AnimDataDialog {
     add_names: bool,
 }
 
+/// What a form's window asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::patch) enum FormAsk {
+    /// Its button: generate / create / duplicate.
+    Done,
+    /// `✖` or `Esc`.
+    Close,
+}
+
 impl AnimDataDialog {
+    /// Draws the window. Returns what was asked.
+    fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
+        let mut open = true;
+        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisAnimData)).open(&mut open);
+        let generate =
+            window.default_width(720.0).show(ctx, |ui| dialog_ui(ui, i18n, self)).and_then(|shown| shown.inner);
+
+        if generate == Some(true) { Some(FormAsk::Done) } else { (!open).then_some(FormAsk::Close) }
+    }
+
     fn checked_clips(&self) -> usize {
         self.rows.iter().filter(|row| row.checked).count()
     }
@@ -127,20 +146,10 @@ impl PatchTool {
         notify: &mut Notification,
     ) {
         let Some(dialog) = &mut self.panels.anim_data_dialog else { return };
-        let mut open = true;
-        let mut generate = false;
-        egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisAnimData))
-            .open(&mut open)
-            .default_width(720.0)
-            .show(ctx, |ui| {
-                generate = dialog_ui(ui, i18n, dialog);
-            });
-        if generate {
-            self.generate_anim_data(i18n, notify);
-            open = false;
-        }
-        if !open {
-            self.panels.anim_data_dialog = None;
+        match dialog.window(ctx, i18n) {
+            Some(FormAsk::Done) => self.generate_anim_data(i18n, notify),
+            Some(FormAsk::Close) => self.panels.anim_data_dialog = None,
+            None => {}
         }
     }
 
@@ -336,6 +345,39 @@ pub(super) struct NewClipsForm {
 }
 
 impl NewClipsForm {
+    /// Draws the window: actor, name, count, `Create`. Returns what was asked.
+    fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
+        let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
+        let mut create = false;
+        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisNewClips)).open(&mut open);
+        window.collapsible(false).show(ctx, |ui| {
+            self.fields(ui, i18n);
+            create = ui.add_enabled(self.is_valid(), Button::new(i18n.t(I18nKey::NemesisCreate)).primary()).clicked();
+        });
+
+        if create { Some(FormAsk::Done) } else { (!open).then_some(FormAsk::Close) }
+    }
+
+    /// `Actor [..]  Name [..]  Count [..]`, each with its hover.
+    fn fields(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
+        egui::Grid::new("nemesis_new_clips").num_columns(2).show(ui, |ui| {
+            let hover = i18n.t(I18nKey::NemesisClipActorHover);
+            ui.label(i18n.t(I18nKey::NemesisClipActor)).on_hover_text(hover);
+            actor_field(ui, i18n, &mut self.folder, &self.projects, hover);
+            ui.end_row();
+
+            let hover = i18n.t(I18nKey::NemesisClipNameHover);
+            ui.label(i18n.t(I18nKey::ColumnName)).on_hover_text(hover);
+            ui.add(TextEdit::singleline(&mut self.name).desired_width(220.0)).on_hover_text(hover);
+            ui.end_row();
+
+            let hover = i18n.t(I18nKey::NemesisClipCountHover);
+            ui.label(i18n.t(I18nKey::NemesisClipCount)).on_hover_text(hover);
+            ui.add(egui::DragValue::new(&mut self.count).range(1..=999)).on_hover_text(hover);
+            ui.end_row();
+        });
+    }
+
     /// `selected`: the open file, whose actor is the likely one.
     pub(super) fn new(selected: Option<&str>, projects: Vec<String>) -> Self {
         let folder = selected.and_then(|id| id.split_once('/')).map_or("DefaultMale~1", |(folder, _)| folder);
@@ -389,6 +431,30 @@ pub(super) struct DuplicateForm {
 }
 
 impl DuplicateForm {
+    /// Draws the window: how many files, and the project to pick. Returns what was asked.
+    fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
+        let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
+        let mut go = false;
+        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisDuplicateTo)).open(&mut open);
+        window.collapsible(false).resizable(false).show(ctx, |ui| {
+            ui.label(format!("{}: {}", i18n.t(I18nKey::NemesisDuplicateFiles), self.files.len()))
+                .on_hover_text(self.files.join("\n"));
+            ui.horizontal(|ui| {
+                let projects = &self.projects;
+                ComboBox::from_id_salt("nemesis_duplicate_to").search_hint(i18n.t(I18nKey::SearchLabel)).show_index(
+                    ui,
+                    &mut self.picked,
+                    projects.len(),
+                    |i| projects[i].as_str(),
+                );
+                let button = Button::new(i18n.t(I18nKey::NemesisDuplicate)).primary();
+                go = ui.add_enabled(!projects.is_empty(), button).clicked();
+            });
+        });
+
+        if go { Some(FormAsk::Done) } else { (!open).then_some(FormAsk::Close) }
+    }
+
     /// `current`: the project the files are in.
     pub(in crate::patch) fn new(files: Vec<String>, mut projects: Vec<String>, current: &str) -> Self {
         projects.retain(|project| project != current);
@@ -401,33 +467,15 @@ impl PatchTool {
     /// The window of [`DuplicateForm`]: what it asks for goes on as a row's menu's does.
     pub(in crate::patch) fn duplicate_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
         let Some(form) = &mut self.panels.duplicate_form else { return };
-        let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
-        let mut go = false;
-        egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisDuplicateTo))
-            .open(&mut open)
-            .collapsible(false)
-            .resizable(false)
-            .show(ctx, |ui| {
-                ui.label(format!("{}: {}", i18n.t(I18nKey::NemesisDuplicateFiles), form.files.len()))
-                    .on_hover_text(form.files.join("\n"));
-                ui.horizontal(|ui| {
-                    let projects = &form.projects;
-                    ComboBox::from_id_salt("nemesis_duplicate_to")
-                        .search_hint(i18n.t(I18nKey::SearchLabel))
-                        .show_index(ui, &mut form.picked, projects.len(), |i| projects[i].as_str());
-                    go = ui
-                        .add_enabled(!projects.is_empty(), Button::new(i18n.t(I18nKey::NemesisDuplicate)).primary())
-                        .clicked();
-                });
-            });
-        if go && let Some(form) = self.panels.duplicate_form.take() {
-            if let Some(to) = form.projects.into_iter().nth(form.picked) {
-                self.panels.pending_duplicate = Some((form.files, to));
+        match form.window(ctx, i18n) {
+            Some(FormAsk::Done) => {
+                let Some(form) = self.panels.duplicate_form.take() else { return };
+                if let Some(to) = form.projects.into_iter().nth(form.picked) {
+                    self.panels.pending_duplicate = Some((form.files, to));
+                }
             }
-            return;
-        }
-        if !open {
-            self.panels.duplicate_form = None;
+            Some(FormAsk::Close) => self.panels.duplicate_form = None,
+            None => {}
         }
     }
 
@@ -441,37 +489,13 @@ impl PatchTool {
         data::project_folders(&self.workspace.behaviors[self.active], template)
     }
 
+    /// The window of [`NewClipsForm`]; `Create` adds the clips.
     pub(in crate::patch) fn new_clips_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
         let Some(form) = &mut self.panels.new_clips else { return };
-        let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
-        let mut create = false;
-        egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisNewClips))
-            .open(&mut open)
-            .collapsible(false)
-            .show(ctx, |ui| {
-                egui::Grid::new("nemesis_new_clips").num_columns(2).show(ui, |ui| {
-                    let hover = i18n.t(I18nKey::NemesisClipActorHover);
-                    ui.label(i18n.t(I18nKey::NemesisClipActor)).on_hover_text(hover);
-                    actor_field(ui, i18n, &mut form.folder, &form.projects, hover);
-                    ui.end_row();
-                    let hover = i18n.t(I18nKey::NemesisClipNameHover);
-                    ui.label(i18n.t(I18nKey::ColumnName)).on_hover_text(hover);
-                    ui.add(TextEdit::singleline(&mut form.name).desired_width(220.0)).on_hover_text(hover);
-                    ui.end_row();
-                    let hover = i18n.t(I18nKey::NemesisClipCountHover);
-                    ui.label(i18n.t(I18nKey::NemesisClipCount)).on_hover_text(hover);
-                    ui.add(egui::DragValue::new(&mut form.count).range(1..=999)).on_hover_text(hover);
-                    ui.end_row();
-                });
-                create =
-                    ui.add_enabled(form.is_valid(), Button::new(i18n.t(I18nKey::NemesisCreate)).primary()).clicked();
-            });
-        if create {
-            self.create_new_clips();
-            open = false;
-        }
-        if !open {
-            self.panels.new_clips = None;
+        match form.window(ctx, i18n) {
+            Some(FormAsk::Done) => self.create_new_clips(),
+            Some(FormAsk::Close) => self.panels.new_clips = None,
+            None => {}
         }
     }
 
