@@ -77,7 +77,7 @@ impl HkannoPage {
 
             if ui
                 .add(Button::selectable(self.show_lsp_options, "⚙"))
-                .on_hover_text(i18n.t(I18nKey::HkannoLspOptionsTitle))
+                .on_hover_text(i18n.t(I18nKey::LspOptionsTitle))
                 .clicked()
             {
                 self.show_lsp_options = !self.show_lsp_options;
@@ -188,7 +188,7 @@ fn editor_mode_select(ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
 
 /// Window with one checkbox per language feature.
 fn lsp_options_window(egui_ctx: &egui::Context, ctx: &mut HkannoPageCtx<'_>, open: &mut bool) {
-    egui_widgets::window_near_pointer(egui_ctx, ctx.i18n.t(I18nKey::HkannoLspOptionsTitle))
+    egui_widgets::window_near_pointer(egui_ctx, ctx.i18n.t(I18nKey::LspOptionsTitle))
         .open(open)
         .resizable(false)
         .collapsible(false)

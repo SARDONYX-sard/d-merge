@@ -480,9 +480,6 @@ pub enum I18nKey {
     /// Imported
     HkannoImported,
 
-    /// Language features
-    HkannoLspOptionsTitle,
-
     /// Open
     HkannoOpenButton,
 
@@ -651,6 +648,9 @@ pub enum I18nKey {
 
     /// Show parameter names (time, x, y, ...) at the end of each line.
     LspInlayHintsHover,
+
+    /// Language features
+    LspOptionsTitle,
 
     /// Semantic highlighting
     LspSemanticTokens,

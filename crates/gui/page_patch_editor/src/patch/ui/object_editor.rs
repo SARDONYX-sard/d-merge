@@ -359,9 +359,9 @@ impl PatchTool {
             let status_id = if self.is_user_patch { "user_patch_status_bar" } else { "nemesis_status_bar" };
             egui::Panel::bottom(status_id).show(ui, |ui| {
                 ui.horizontal(|ui| {
+                    toolbar(ui, i18n.t(I18nKey::LspOptionsTitle), &mut self.pane.mode, &mut self.pane.show_lsp_options);
                     toggle_problems |=
                         egui_code_editor::status_line(ui, &self.pane.state, keymap, &self.pane.text).clicked();
-                    toolbar(ui, i18n, &mut self.pane.mode, &mut self.pane.show_lsp_options);
                 });
             });
             if self.problems.open
@@ -677,21 +677,17 @@ const fn editor_features(lsp: &LspOptions, anim_data: bool) -> EditorFeatures {
 }
 
 /// `[Vim ▼] ⚙`. `⚙` has the same language switches as the hkanno editor's.
-fn toolbar(ui: &mut egui::Ui, i18n: &I18nMap, mode: &mut EditorMode, show_options: &mut bool) {
+fn toolbar(ui: &mut egui::Ui, lsp_opt_hover: &str, mode: &mut EditorMode, show_options: &mut bool) {
     ui.horizontal(|ui| {
         let mut index = EditorMode::ALL.iter().position(|m| m == mode).unwrap_or(0);
-        if egui::ComboBox::from_id_salt("nemesis_editor_mode")
-            .width(80.0)
+        if egui_widgets::shadcn::ComboBox::from_id_salt("nemesis_editor_mode")
+            .width(90.0)
             .show_index(ui, &mut index, EditorMode::ALL.len(), |i| EditorMode::ALL[i].label())
             .changed()
         {
             *mode = EditorMode::ALL[index];
         }
-        if ui
-            .add(Button::selectable(*show_options, "⚙").small())
-            .on_hover_text(i18n.t(I18nKey::HkannoLspOptionsTitle))
-            .clicked()
-        {
+        if ui.add(Button::selectable(*show_options, "⚙").small()).on_hover_text(lsp_opt_hover).clicked() {
             *show_options = !*show_options;
         }
     });
@@ -699,7 +695,7 @@ fn toolbar(ui: &mut egui::Ui, i18n: &I18nMap, mode: &mut EditorMode, show_option
 
 /// The language features that apply to the object editor (the hkanno options window's subset).
 fn lsp_options_window(ctx: &egui::Context, i18n: &I18nMap, lsp: &mut LspOptions, open: &mut bool) {
-    egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::HkannoLspOptionsTitle))
+    egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::LspOptionsTitle))
         .open(open)
         .resizable(false)
         .collapsible(false)

@@ -13,7 +13,7 @@ use egui::Vec2;
 use egui_widgets::{
     Modal,
     notify::Notification,
-    shadcn::{AlertDialog, AlertDialogChoice, Button, Icon},
+    shadcn::{AlertDialog, AlertDialogChoice, Button, ComboBox, Icon},
 };
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
@@ -117,7 +117,7 @@ impl PatchTool {
             }
             ui.horizontal(|ui| {
                 ui.label(i18n.t(I18nKey::OutputFormatLabel));
-                let combo = egui::ComboBox::from_id_salt("user_patch_mod_format");
+                let combo = ComboBox::from_id_salt("user_patch_mod_format");
                 combo.selected_text(label(self.mod_export.format)).show_ui(ui, |ui| {
                     for &(format, text) in &ExportFormat::ALL {
                         ui.selectable_value(&mut self.mod_export.format, format, text);

@@ -19,7 +19,7 @@
 //! | 📂   | Explorer           | `Ctrl+Shift+E` | Explorer         |
 //! | ▤    | Events / Variables |                | Outline          |
 
-use egui_widgets::shadcn::{Button, Icon};
+use egui_widgets::shadcn::{Button, ComboBox, Icon};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
@@ -120,14 +120,17 @@ impl PatchTool {
         let mut picked = None;
         ui.horizontal(|ui| {
             ui.label(i18n.t(I18nKey::SideTemplate));
-            egui::ComboBox::from_id_salt("side_vars_behavior").selected_text(current).show_ui(ui, |ui| {
-                let behaviors = self.workspace.behaviors.iter().enumerate();
-                for (at, behavior) in behaviors.filter(|(_, behavior)| !behavior.is_anim_data()) {
-                    if ui.selectable_label(at == self.active, &behavior.name).clicked() {
-                        picked = Some(at);
+            egui_widgets::shadcn::ComboBox::from_id_salt("side_vars_behavior").selected_text(current).show_ui(
+                ui,
+                |ui| {
+                    let behaviors = self.workspace.behaviors.iter().enumerate();
+                    for (at, behavior) in behaviors.filter(|(_, behavior)| !behavior.is_anim_data()) {
+                        if ui.selectable_label(at == self.active, &behavior.name).clicked() {
+                            picked = Some(at);
+                        }
                     }
-                }
-            });
+                },
+            );
         });
         if let Some(at) = picked.filter(|at| *at != self.active) {
             self.active = at;
@@ -289,7 +292,7 @@ impl PatchTool {
         let mut switch = None;
         ui.horizontal(|ui| {
             ui.label("⎇").on_hover_text(i18n.t(I18nKey::SideBranchHover));
-            egui::ComboBox::from_id_salt("side_branch").selected_text(&current).show_ui(ui, |ui| {
+            ComboBox::from_id_salt("side_branch").selected_text(&current).show_ui(ui, |ui| {
                 for name in &names {
                     if ui.selectable_label(*name == current, name).clicked() && *name != current {
                         switch = Some(name.clone());
