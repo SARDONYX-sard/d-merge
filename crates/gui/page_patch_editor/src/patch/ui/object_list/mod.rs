@@ -7,6 +7,7 @@
 //! ```
 //! The title's actions are the explorer's: what is done to one object is in its right-click menu.
 //! A window has the class list: nothing moves in the side bar when it is opened.
+mod anim_list;
 mod title;
 
 use egui_widgets::{
@@ -18,7 +19,7 @@ use nemesis_diff::is_existing_mod_code;
 
 use super::{
     anim_data::{DuplicateForm, NewClipsForm},
-    anim_tree::{self, AnimFile, AnimRow, FileKind},
+    anim_tree::{self, AnimFile, AnimRow},
 };
 use crate::patch::{
     PatchTool,
@@ -139,127 +140,112 @@ impl PatchTool {
     fn anim_tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph, notify: &mut Notification) {
         self.refresh_list(graph);
         let is_adsf = self.workspace.behaviors[self.active].adsf;
+
         // Only when the editor gets the keyboard: else what is open, and where it is scrolled, is the user's.
         let forced = std::mem::take(&mut self.explorer.reveal);
         let reveal = take_reveal(self.selected.as_ref(), forced);
         if reveal && let Some(id) = &self.selected {
             anim_tree::reveal(&mut self.anim_tree.open, is_adsf, id);
         }
-        let nodes = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
-        let files: Vec<AnimFile<'_>> =
-            nodes.iter().map(|&node| AnimFile { node, id: graph.id(node), changed: graph.is_changed(node) }).collect();
+
+        let files: Vec<AnimFile<'_>> = {
+            let nodes = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
+            nodes.iter().map(|&node| AnimFile { node, id: graph.id(node), changed: graph.is_changed(node) }).collect()
+        };
         if std::mem::take(&mut self.anim_tree.expand_all) {
             anim_tree::expand_all(&mut self.anim_tree.open, &files);
         }
         let filtering = !self.explorer.filter.is_empty();
-        let mut rows = anim_tree::rows(&files, &self.anim_tree.open, is_adsf, filtering);
+        let rebuild = |state: &anim_tree::AnimTreeState| anim_tree::rows(&files, &state.open, is_adsf, filtering);
+        let mut rows = rebuild(&self.anim_tree);
 
-        // The keys on the rows shown, as in the object tree; a file the cursor gets to opens.
-        let mut cursor_moved = false;
-        if self.explorer.tree_focus {
-            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            let inputs = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key);
-            for input in inputs {
-                let nav: Vec<_> = rows.iter().map(AnimRow::nav).collect();
-                match egui_tree::navigate(input, &nav, self.anim_tree.cursor) {
-                    egui_tree::Nav::Cursor(at) => {
-                        self.anim_tree.cursor = at;
-                        cursor_moved = true;
-                    }
-                    egui_tree::Nav::SetOpen(at, _) => {
-                        anim_tree::toggle(&mut self.anim_tree.open, rows[at].open_key());
-                        rows = anim_tree::rows(&files, &self.anim_tree.open, is_adsf, filtering);
-                    }
-                    egui_tree::Nav::Leave => self.leave_tree(),
-                    egui_tree::Nav::None => {}
-                }
-            }
-            if cursor_moved && let Some(AnimRow::File { node, .. }) = rows.get(self.anim_tree.cursor) {
-                self.selected = Some(graph.id(*node).into());
-            }
-        } else if let Some(at) = self
-            .selected
-            .as_deref()
-            .and_then(|id| graph.node_of(id))
-            .and_then(|node| rows.iter().position(|row| matches!(row, AnimRow::File { node: n, .. } if *n == node)))
-        {
-            // The keyboard starts where the selection is.
-            self.anim_tree.cursor = at;
-        }
-        self.anim_tree.cursor = self.anim_tree.cursor.min(rows.len().saturating_sub(1));
-        let focused_row = self.explorer.tree_focus.then_some(self.anim_tree.cursor);
+        let moved = self.anim_keys(ui, i18n, graph, &mut rows, &rebuild);
+        let cursor = self.explorer.tree_focus.then_some(self.anim_tree.cursor);
 
-        let (mut toggled, mut menu_action) = (None, None);
-        let row_height = row_height(ui);
-        // Up and down only, as VS Code's: the rows are cut with `…`. (Sideways, its width changed with the
-        // rows drawn, and the scroll bars came and went.)
-        let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
-        let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
-        let at = selected
-            .and_then(|node| rows.iter().position(|row| matches!(row, AnimRow::File { node: n, .. } if *n == node)));
-        let sizes = (row_height, ui.spacing().item_spacing.y);
-        let to = if cursor_moved { focused_row } else { at.filter(|_| reveal) };
-        if let Some(offset) = to.and_then(|at| offset_to_show(at, sizes, rows.len(), self.explorer.list_scroll, 0)) {
-            scroll = scroll.vertical_scroll_offset(offset);
+        let projects = self.anim_projects();
+        let (event, scroll) = {
+            let selected_row =
+                self.selected.as_deref().and_then(|id| graph.node_of(id)).and_then(|node| file_row(&rows, node));
+            let input = anim_list::ListInput {
+                graph,
+                selected: self.selected.as_deref(),
+                cursor,
+                scroll_to: if moved { cursor } else { selected_row.filter(|_| reveal) },
+                scroll: self.explorer.list_scroll,
+                projects: &projects,
+            };
+            anim_list::show(ui, i18n, &rows, &input)
+        };
+        self.explorer.list_scroll = scroll;
+
+        if let Some(event) = event {
+            self.apply_anim_event(ui, graph, event, &projects, notify);
         }
-        let output = scroll.show_rows(ui, row_height, rows.len(), |ui, range| {
-            let first = range.start;
-            for (offset, row) in rows[range].iter().enumerate() {
-                // The keyboard's row has a frame, as in the object tree.
-                if focused_row == Some(first + offset) {
-                    let rect = egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), row_height));
-                    egui_tree::list::cursor_frame(ui, rect);
-                }
-                fixed_row(ui, row_height, |ui| match row {
-                    AnimRow::Folder { name, files, changed, open } => {
-                        let response = anim_group_row(ui, name, (*files, *changed, *open), 0);
-                        if response.clicked() {
-                            toggled = Some((*name).to_owned());
-                        }
-                        response.context_menu(|ui| {
-                            if ui.button(i18n.t(I18nKey::NemesisExpandAllBelow)).clicked() {
-                                anim_tree::expand(&mut self.anim_tree.open, name);
-                                ui.close();
-                            }
-                            if ui.button(i18n.t(I18nKey::NemesisCollapseAllBelow)).clicked() {
-                                anim_tree::collapse(&mut self.anim_tree.open, name);
-                                ui.close();
-                            }
-                            ui.separator();
-                            let projects = self.anim_projects();
-                            if let Some(pick) = duplicate_items(ui, i18n, &projects, name) {
-                                let files = data::changed_files(&self.workspace.behaviors[self.active], name);
-                                self.ask_duplicate(pick, files, &projects, name);
-                            }
-                        });
-                    }
-                    AnimRow::Group { kind, key, files, changed, open } => {
-                        let label = i18n.t(anim_kind_label(*kind));
-                        let response = anim_group_row(ui, label, (*files, *changed, *open), 1);
-                        if response.clicked() {
-                            toggled = Some(key.clone());
-                        }
-                    }
-                    AnimRow::File { node, name } => {
-                        menu_action = self.anim_file_row(ui, i18n, graph, *node, name).or(menu_action);
-                    }
-                });
-            }
-        });
-        self.explorer.list_scroll.note(&output);
-        if let Some(key) = toggled {
-            anim_tree::toggle(&mut self.anim_tree.open, &key);
-        }
-        self.apply_row_action(ui, graph, menu_action, notify);
         self.duplicate_anim_files();
     }
 
-    /// What a row's menu asked for: at once, or after asking where. `current`: the project they are in.
-    fn ask_duplicate(&mut self, pick: DuplicatePick, files: Vec<String>, projects: &[String], current: &str) {
-        match pick {
-            DuplicatePick::To(to) => self.panels.pending_duplicate = Some((files, to)),
-            DuplicatePick::Choose => {
-                self.panels.duplicate_form = Some(DuplicateForm::new(files, projects.to_vec(), current));
+    /// The keys, while the list has the keyboard: a file the cursor gets to is selected. Else the
+    /// cursor follows the selection. Returns whether the keys moved it.
+    fn anim_keys<'a>(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        graph: &Graph,
+        rows: &mut Vec<AnimRow<'a>>,
+        rebuild: &impl Fn(&anim_tree::AnimTreeState) -> Vec<AnimRow<'a>>,
+    ) -> bool {
+        let mut moved = false;
+        if self.explorer.tree_focus {
+            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
+            let keys = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key);
+            let done = anim_list::keys(&mut self.anim_tree, &keys, rows, rebuild);
+            if done.leave {
+                self.leave_tree();
+            }
+            moved = done.moved;
+            if moved && let Some(AnimRow::File { node, .. }) = rows.get(self.anim_tree.cursor) {
+                self.selected = Some(graph.id(*node).into());
+            }
+        } else if let Some(at) =
+            self.selected.as_deref().and_then(|id| graph.node_of(id)).and_then(|node| file_row(rows, node))
+        {
+            self.anim_tree.cursor = at; // the keyboard starts where the selection is
+        }
+
+        self.anim_tree.cursor = self.anim_tree.cursor.min(rows.len().saturating_sub(1));
+        moved
+    }
+
+    /// What a row of the list asked for.
+    fn apply_anim_event(
+        &mut self,
+        ui: &egui::Ui,
+        graph: &Graph,
+        event: anim_list::AnimEvent,
+        projects: &[String],
+        notify: &mut Notification,
+    ) {
+        use anim_list::{AnimEvent, DuplicatePick, Files};
+        match event {
+            AnimEvent::Toggle(key) => anim_tree::toggle(&mut self.anim_tree.open, &key),
+            AnimEvent::ExpandBelow(folder) => anim_tree::expand(&mut self.anim_tree.open, &folder),
+            AnimEvent::CollapseBelow(folder) => anim_tree::collapse(&mut self.anim_tree.open, &folder),
+
+            AnimEvent::Select(node) => self.selected = Some(graph.id(node).into()),
+            AnimEvent::Menu(node, action) => self.apply_row_action(ui, graph, Some((node, action)), notify),
+
+            AnimEvent::Duplicate { pick, files, from } => {
+                let behavior = &self.workspace.behaviors[self.active];
+                let files = match files {
+                    Files::ChangedOf(folder) => data::changed_files(behavior, &folder),
+                    Files::WithMotion(id) => data::with_motion(behavior, &id),
+                };
+                match pick {
+                    DuplicatePick::To(to) => self.panels.pending_duplicate = Some((files, to)),
+                    DuplicatePick::Choose => {
+                        self.panels.duplicate_form = Some(DuplicateForm::new(files, projects.to_vec(), &from));
+                    }
+                }
             }
         }
     }
@@ -272,40 +258,6 @@ impl PatchTool {
             self.object_changed(id);
         }
         self.anim_tree.open.insert(to);
-    }
-
-    /// `    ● Idle~mymod$0.txt`
-    fn anim_file_row(
-        &mut self,
-        ui: &mut egui::Ui,
-        i18n: &I18nMap,
-        graph: &Graph,
-        node: Node,
-        name: &str,
-    ) -> Option<(Node, RowAction)> {
-        let mut action = None;
-        let is_selected = self.selected.as_deref() == Some(graph.id(node));
-        let marker = if graph.is_changed(node) { "● " } else { "" };
-        let response = egui_widgets::fitted_button(ui, is_selected, &format!("    {marker}{name}"));
-        if response.clicked() {
-            self.selected = Some(graph.id(node).into());
-        }
-        if response.double_clicked() {
-            action = Some((node, RowAction::KeepOpen));
-        }
-        response.context_menu(|ui| {
-            if let Some(picked) = row_menu(ui, i18n, graph.is_new(node), graph.is_changed(node)) {
-                action = Some((node, picked));
-            }
-            let id = graph.id(node);
-            let folder = id.split_once('/').map_or(id, |(folder, _)| folder);
-            let projects = self.anim_projects();
-            if let Some(pick) = duplicate_items(ui, i18n, &projects, folder) {
-                let files = data::with_motion(&self.workspace.behaviors[self.active], id);
-                self.ask_duplicate(pick, files, &projects, folder);
-            }
-        });
-        action
     }
 
     /// The flat list after the filter (only the rows on screen are laid out).
@@ -381,55 +333,9 @@ impl PatchTool {
     }
 }
 
-/// What a row's menu asked to do with its files.
-#[derive(Debug)]
-enum DuplicatePick {
-    To(String),
-    /// Ask which project, see [`DuplicateForm`].
-    Choose,
-}
-
-/// `Duplicate to DefaultFemale~1`, the project that usually has the same patches, if there is one, and
-/// `Duplicate to...`, which asks. `current`: the project it is in.
-fn duplicate_items(ui: &mut egui::Ui, i18n: &I18nMap, projects: &[String], current: &str) -> Option<DuplicatePick> {
-    let mut picked = None;
-    let hover = i18n.t(I18nKey::NemesisDuplicateToHover);
-    let partner = data::partner_of(current);
-    if partner != current && projects.contains(&partner) {
-        let label = format!("{} {partner}", i18n.t(I18nKey::NemesisDuplicateTo));
-        if ui.button(label).on_hover_text(hover).clicked() {
-            picked = Some(DuplicatePick::To(partner));
-            ui.close();
-        }
-    }
-    if ui.button(i18n.t(I18nKey::NemesisDuplicateToOther)).on_hover_text(hover).clicked() {
-        picked = Some(DuplicatePick::Choose);
-        ui.close();
-    }
-    picked
-}
-
-/// A folder or a group of the anim data list: `▼ Clips (3) ●`. `(files, changed, open)`.
-fn anim_group_row(
-    ui: &mut egui::Ui,
-    label: &str,
-    (files, changed, open): (usize, bool, bool),
-    depth: usize,
-) -> egui::Response {
-    let glyph = if open { "▼" } else { "▶" };
-    let marker = if changed { " ●" } else { "" };
-    let indent = "  ".repeat(depth);
-    egui_widgets::fitted_button(ui, false, &format!("{indent}{glyph} {label} ({files}){marker}"))
-}
-
-const fn anim_kind_label(kind: FileKind) -> I18nKey {
-    match kind {
-        FileKind::Header => I18nKey::NemesisAnimKindHeader,
-        FileKind::Clip => I18nKey::NemesisAnimKindClip,
-        FileKind::Motion => I18nKey::NemesisAnimKindMotion,
-        FileKind::Set => I18nKey::NemesisAnimKindSet,
-        FileKind::NewSet => I18nKey::NemesisAnimKindNewSet,
-    }
+/// The row of file `node`, if it is shown.
+fn file_row(rows: &[AnimRow<'_>], node: Node) -> Option<usize> {
+    rows.iter().position(|row| matches!(row, AnimRow::File { node: n, .. } if *n == node))
 }
 
 /// What a row's right-click menu asked for, in the flat list and the tree.
