@@ -19,7 +19,10 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
     PatchTool,
-    workspace::history::{ObjectKey, Origin},
+    workspace::{
+        Workspace,
+        history::{ObjectKey, Origin},
+    },
 };
 
 /// A diff or a blame of an object, in a tab of the editor as VS Code opens a diff:
@@ -80,28 +83,114 @@ impl Views {
     }
 }
 
-impl PatchTool {
-    /// The text of object `id` of behavior `behavior` at revision `number` (`None`: in the work now).
-    /// An object no revision changed is the template's.
-    pub(in crate::patch) fn object_text_at(&self, behavior: usize, id: &str, number: Option<u32>) -> String {
-        let Some(of) = self.workspace.behaviors.get(behavior) else { return String::new() };
-        let template = || of.template_object(id).map(|object| object.text.clone()).unwrap_or_default();
-        match number {
-            None => of.text(id).map_or_else(template, str::to_owned),
-            Some(number) => {
-                let key: ObjectKey = (of.meshes_path.clone(), id.to_owned());
-                self.workspace.history.state_at(number).get(&key).map_or_else(template, |text| (*text).to_owned())
-            }
+/// The text of object `id` of behavior `behavior` at revision `number` (`None`: in the work now).
+/// An object no revision changed is the template's.
+pub(in crate::patch) fn object_text_at(
+    workspace: &Workspace,
+    behavior: usize,
+    id: &str,
+    number: Option<u32>,
+) -> String {
+    let Some(of) = workspace.behaviors.get(behavior) else { return String::new() };
+    let template = || of.template_object(id).map(|object| object.text.clone()).unwrap_or_default();
+    match number {
+        None => of.text(id).map_or_else(template, str::to_owned),
+        Some(number) => {
+            let key: ObjectKey = (of.meshes_path.clone(), id.to_owned());
+            workspace.history.state_at(number).get(&key).map_or_else(template, |text| (*text).to_owned())
         }
     }
+}
 
+/// Object `id` of behavior `behavior` as the work has it now, and the revision that last changed
+/// each of its lines, as GitLens says it: `3 days ago  #2 fix the speed`.
+fn blame_of(workspace: &Workspace, behavior: usize, id: &str) -> Option<(String, Vec<String>)> {
+    let of = workspace.behaviors.get(behavior)?;
+    let key: ObjectKey = (of.meshes_path.clone(), id.to_owned());
+    let now = of.text(id).unwrap_or_default();
+    let template = of.template_object(id).map(|object| object.text.as_str());
+
+    let history = &workspace.history;
+    let at = crate::patch::workspace::history::now();
+    let label = |origin: Origin| match origin {
+        Origin::Template => "template".to_owned(),
+        Origin::Working => "working (not committed)".to_owned(),
+        Origin::Revision(number) => history.revision(number).map_or_else(
+            || format!("#{number}"),
+            |revision| format!("{}  #{number} {}", stdx::time::ago(at, revision.time), revision.message),
+        ),
+    };
+    let notes = history.blame(&key, template, now).into_iter().map(label).collect();
+    Some((now.to_owned(), notes))
+}
+
+/// What the view shown asked for.
+#[derive(Debug, Default)]
+struct ShownOutput {
+    tab_event: Option<crate::patch::TabEvent>,
+    /// Its editor's command (Vim's `Space c`, `gt`, ...).
+    command: Option<EditorCommand>,
+    /// Its editor has the keyboard.
+    has_focus: bool,
+}
+
+impl Views {
+    /// Draws view `at` in the editor's place, the tab bar above it (the object tabs of `active`,
+    /// `tabs`, with their names from `graph`).
+    fn show_at(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        at: usize,
+        (tabs, graph, active): (&crate::patch::editor::tabs::EditorTabs, &crate::patch::tree::Graph, usize),
+        keymap: Keymap,
+    ) -> ShownOutput {
+        let mut output = ShownOutput::default();
+        egui::CentralPanel::default().show(ui, |ui| {
+            let mut go_to = None;
+            let view_tabs = self.tabs_of(active);
+            ui.horizontal(|ui| {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    go_to = self.list[at].body.nav(ui, i18n.t(I18nKey::NemesisJumpDiffHover));
+                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                        let marks = super::tab_bar::TabMarks { focused: true, problems: None };
+                        output.tab_event =
+                            super::tab_bar::tab_bar(ui, i18n, tabs, (active, ""), graph, marks, &view_tabs);
+                    });
+                });
+            });
+
+            let view = &mut *self.list[at];
+            if let Some(line) = go_to {
+                view.body.go_to(line);
+            }
+            if view.body.is_unchanged() {
+                ui.weak(i18n.t(I18nKey::NemesisNoChange));
+            }
+            let shown = view.body.show(ui, ("nemesis_revision_view", view.id.as_str()), &Xml, keymap);
+            output.command = shown.command;
+            output.has_focus = shown.has_focus;
+        });
+        output
+    }
+}
+
+impl PatchTool {
     /// Opens the diff of object `id` from revision `from` to `to` (`None`: the work now).
     pub(in crate::patch) fn open_compare(&mut self, behavior: usize, id: &str, from: u32, to: Option<u32>) {
-        let (old, new) = (self.object_text_at(behavior, id, Some(from)), self.object_text_at(behavior, id, to));
+        let old = object_text_at(&self.workspace, behavior, id, Some(from));
+        let new = object_text_at(&self.workspace, behavior, id, to);
         let to_name = to.map_or_else(|| "working".to_owned(), |number| format!("#{number}"));
         let name = self.object_name(behavior, id);
         let title = format!("{name} (#{from}) ↔ {name} ({to_name})");
         self.show_in_editor(behavior, id, title, Box::new(DiffView::diff(&old, new)));
+    }
+
+    /// Opens the blame of object `id` of behavior `behavior`, as the work has it now.
+    pub(in crate::patch) fn open_blame(&mut self, behavior: usize, id: &str) {
+        let Some((text, notes)) = blame_of(&self.workspace, behavior, id) else { return };
+        let title = format!("Blame {}", self.object_name(behavior, id));
+        self.show_in_editor(behavior, id, title, Box::new(DiffView::blame(text, notes)));
     }
 
     /// The object's name as its tab says it. e.g. `GetUpModList`; its id if it has none.
@@ -128,82 +217,36 @@ impl PatchTool {
         self.views.show(at);
     }
 
-    /// Opens the blame of object `id` of behavior `behavior`, as the work has it now.
-    pub(in crate::patch) fn open_blame(&mut self, behavior: usize, id: &str) {
-        let Some(of) = self.workspace.behaviors.get(behavior) else { return };
-        let key: ObjectKey = (of.meshes_path.clone(), id.to_owned());
-        let now = of.text(id).unwrap_or_default();
-        let template = of.template_object(id).map(|object| object.text.as_str());
-        let history = &self.workspace.history;
-        let origins = history.blame(&key, template, now);
-        let at = crate::patch::workspace::history::now();
-        let label = |origin: Origin| match origin {
-            Origin::Template => "template".to_owned(),
-            Origin::Working => "working (not committed)".to_owned(),
-            Origin::Revision(number) => history.revision(number).map_or_else(
-                || format!("#{number}"),
-                |revision| format!("{}  #{number} {}", stdx::time::ago(at, revision.time), revision.message),
-            ),
-        };
-        let notes = origins.into_iter().map(label).collect();
-        let text = now.to_owned();
-        let title = format!("Blame {}", self.object_name(behavior, id));
-        self.show_in_editor(behavior, id, title, Box::new(DiffView::blame(text, notes)));
-    }
-
     /// Draws the view shown, with the tabs, in the editor's place. Returns whether one is shown.
     pub(super) fn views_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> bool {
         // Another object selected (the tree, the list): its editor, the view's tab stays.
         let selected = self.selected.as_deref();
         let shown = self.views.list.active.filter(|&at| {
-            self.views.list.get(at).is_some_and(|v| v.group == self.active && selected == Some(v.id.as_str()))
+            self.views.list.get(at).is_some_and(|view| view.group == self.active && selected == Some(view.id.as_str()))
         });
         self.views.list.active = shown;
         let Some(at) = shown else { return false };
+
         let keymap = Keymap::from_vim(self.pane.mode.is_vim());
         let names = self.names();
-        let mut tab_event = None;
-        let mut command = None;
-        egui::CentralPanel::default().show(ui, |ui| {
-            let mut go_to = None;
-            let view_tabs = self.views.tabs_of(self.active);
-            ui.horizontal(|ui| {
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    go_to = self.views.list[at].body.nav(ui, i18n.t(I18nKey::NemesisJumpDiffHover));
-                    ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        let marks = super::tab_bar::TabMarks { focused: true, problems: None };
-                        let current = (self.active, "");
-                        tab_event =
-                            super::tab_bar::tab_bar(ui, i18n, &self.tabs, current, &names.graph, marks, &view_tabs);
-                    });
-                });
-            });
-            let view = &mut *self.views.list[at];
-            if let Some(line) = go_to {
-                view.body.go_to(line);
-            }
-            if view.body.is_unchanged() {
-                ui.weak(i18n.t(I18nKey::NemesisNoChange));
-            }
-            let output = view.body.show(ui, ("nemesis_revision_view", view.id.as_str()), &Xml, keymap);
-            command = output.command;
-            // What the key bindings see (`editorFocus`): this editor, as the object's is seen.
-            self.pane.had_focus = output.has_focus;
-        });
+        let output = self.views.show_at(ui, i18n, at, (&self.tabs, &names.graph, self.active), keymap);
+        // What the key bindings see (`editorFocus`): this editor, as the object's is seen.
+        self.pane.had_focus = output.has_focus;
+
         // The keys of the tabs as on an object's: the tab bar's bindings, Vim's `gt` / `Space c`.
+        let command = output.command;
         let close = self.key_command(keybinding::commands::TABS_CLOSE) || command == Some(EditorCommand::CloseTab);
         let next = self.key_command(keybinding::commands::TABS_NEXT) || command == Some(EditorCommand::NextTab);
         let previous =
             self.key_command(keybinding::commands::TABS_PREVIOUS) || command == Some(EditorCommand::PreviousTab);
+        let current = self.selected.as_deref().unwrap_or_default().to_owned();
         if close {
             self.views.list.close(at);
         } else if next || previous {
-            let current = self.selected.as_deref().unwrap_or_default().to_owned();
             self.step_tab(&current, next);
         }
-        if tab_event.is_some() {
-            let current = self.selected.as_deref().unwrap_or_default().to_owned();
-            self.apply_tab_event(tab_event, &current);
+        if output.tab_event.is_some() {
+            self.apply_tab_event(output.tab_event, &current);
         }
         true
     }
