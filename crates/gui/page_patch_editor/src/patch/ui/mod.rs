@@ -4,6 +4,7 @@
 pub(super) mod anim_data;
 pub(super) mod anim_tree;
 mod behaviors;
+mod changes_view;
 pub(super) mod code_choice;
 mod object_editor;
 mod object_list;
@@ -14,6 +15,7 @@ pub(super) mod revision_view;
 mod search;
 pub(super) mod side_bar;
 mod start_screen;
+mod tab_bar;
 pub(super) mod template_picker;
 mod top_bar;
 pub(super) mod tree;

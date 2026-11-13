@@ -171,17 +171,10 @@ impl PatchTool {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     go_to = self.views.list[at].body.nav(ui, i18n.t(I18nKey::NemesisJumpDiffHover));
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        let marks = super::object_editor::TabMarks { focused: true, problems: None };
+                        let marks = super::tab_bar::TabMarks { focused: true, problems: None };
                         let current = (self.active, "");
-                        tab_event = super::object_editor::tab_bar(
-                            ui,
-                            i18n,
-                            &self.tabs,
-                            current,
-                            &names.graph,
-                            marks,
-                            &view_tabs,
-                        );
+                        tab_event =
+                            super::tab_bar::tab_bar(ui, i18n, &self.tabs, current, &names.graph, marks, &view_tabs);
                     });
                 });
             });
