@@ -57,7 +57,7 @@ impl PatchTool {
         let requests = self.editor_requests(format_and_save);
 
         // The status bar counts the whole work's problems, of which the open object's are a part.
-        self.pane.state.set_status_problems(self.problem_counts());
+        self.pane.state.set_status_problems(self.problems.counts());
         let names = self.names();
         let keymap = Keymap::from_vim(self.pane.mode.is_vim());
         let editor_id = egui_code_editor::editor_id(("nemesis_object", self.is_user_patch, id));

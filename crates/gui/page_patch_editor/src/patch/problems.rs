@@ -97,44 +97,61 @@ fn sort(groups: &mut [ObjectProblems]) {
     groups.sort_by(|a, b| (a.behavior, &a.id).cmp(&(b.behavior, &b.id)));
 }
 
-impl PatchTool {
-    /// What checks the objects of behavior `index`.
-    fn checker(&self, index: usize) -> Checker<'_> {
-        let behavior = &self.workspace.behaviors[index];
-        Checker { index, behavior, code: self.place.mod_code.trim(), mode: self.parser_mode }
-    }
-
-    /// Checks the whole work again if it changed as a whole (read, loaded, restored). Call each frame.
-    pub(super) fn diagnose_work(&mut self) {
-        if !self.problems.stale || self.job.is_some() || !self.place.is_open() {
+impl Problems {
+    /// Checks the whole work again if it changed as a whole (read, loaded, restored). `(code, mode)`:
+    /// the mod code, and the parser's mode.
+    pub(super) fn check_work(&mut self, behaviors: &[Behavior], (code, mode): (&str, ParserMode)) {
+        if !self.stale {
             return;
         }
+        let checker = |index| Checker { index, behavior: &behaviors[index], code, mode };
         let mut found: Vec<ObjectProblems> =
-            (0..self.workspace.behaviors.len()).flat_map(|index| behavior_problems(self.checker(index))).collect();
+            (0..behaviors.len()).flat_map(|index| behavior_problems(checker(index))).collect();
         sort(&mut found);
-        self.problems.list = Some(found);
-        self.problems.stale = false;
+        self.list = Some(found);
+        self.stale = false;
     }
 
-    /// The errors and warnings of the work, once it was checked: the status bar's counts.
-    pub(super) fn problem_counts(&self) -> Option<(usize, usize)> {
-        let groups = self.problems.list.as_deref()?;
-        Some(egui_code_editor::problems::counts(groups.iter().flat_map(|group| &group.problems)))
-    }
-
-    /// The object `id` of the active behavior changed: only its problems are found again. After
-    /// typing pauses.
-    pub(super) fn refresh_problems(&mut self, id: &str) {
-        let index = self.active;
-        let Some(behavior) = self.workspace.behaviors.get(index) else { return };
+    /// The object `id` of behavior `index` changed: only its problems are found again. After typing
+    /// pauses.
+    pub(super) fn refresh_object(
+        &mut self,
+        (index, behavior): (usize, &Behavior),
+        id: &str,
+        (code, mode): (&str, ParserMode),
+    ) {
+        let checker = Checker { index, behavior, code, mode };
         let object = behavior.object_text(id).filter(|object| is_checked(behavior, object));
-        let found = object.and_then(|object| object_problems(self.checker(index), &object));
-        let Some(groups) = &mut self.problems.list else { return };
+        let found = object.and_then(|object| object_problems(checker, &object));
+
+        let Some(groups) = &mut self.list else { return };
         groups.retain(|group| group.behavior != index || group.id != id);
         if let Some(found) = found {
             groups.push(found);
             sort(groups);
         }
+    }
+
+    /// The errors and warnings of the work, once it was checked: the status bar's counts.
+    pub(super) fn counts(&self) -> Option<(usize, usize)> {
+        let groups = self.list.as_deref()?;
+        Some(egui_code_editor::problems::counts(groups.iter().flat_map(|group| &group.problems)))
+    }
+}
+
+impl PatchTool {
+    /// Checks the work again if it is due, unless a job has it or none is open. Call each frame.
+    pub(super) fn diagnose_work(&mut self) {
+        if self.job.is_none() && self.place.is_open() {
+            self.problems.check_work(&self.workspace.behaviors, (self.place.mod_code.trim(), self.parser_mode));
+        }
+    }
+
+    /// The object `id` of the active behavior changed: see [`Problems::refresh_object`].
+    pub(super) fn refresh_problems(&mut self, id: &str) {
+        let Some(behavior) = self.workspace.behaviors.get(self.active) else { return };
+        let settings = (self.place.mod_code.trim(), self.parser_mode);
+        self.problems.refresh_object((self.active, behavior), id, settings);
     }
 }
 
@@ -168,20 +185,20 @@ mod tests {
     #[test]
     fn the_work_is_checked_when_read_and_then_per_edit() {
         let mut tool = tool(ParserMode::Strict);
-        assert_eq!(tool.problem_counts(), None, "not checked yet");
+        assert_eq!(tool.problems.counts(), None, "not checked yet");
         tool.reset_names(); // as a read or a load does
         tool.diagnose_work();
-        assert_eq!(tool.problem_counts(), Some((3, 0)));
+        assert_eq!(tool.problems.counts(), Some((3, 0)));
         let ids: Vec<&str> = tool.problems.list.iter().flatten().map(|group| group.id.as_str()).collect();
         assert_eq!(ids, ["Female~1/Bad~m$0.txt", "Male~1/Bad~m$0.txt", "Male~1/m$2.txt"]);
 
         let motion = "Male~1/m$2.txt";
         tool.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\n1\n0\n0\n".to_owned());
         tool.refresh_problems(motion);
-        assert_eq!(tool.problem_counts(), Some((2, 0)));
+        assert_eq!(tool.problems.counts(), Some((2, 0)));
         tool.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\nwrong\n0\n0\n".to_owned());
         tool.refresh_problems(motion);
-        assert_eq!(tool.problem_counts(), Some((3, 0)), "a new mistake comes in");
+        assert_eq!(tool.problems.counts(), Some((3, 0)), "a new mistake comes in");
     }
 
     /// The count is the parser's to check, in the mode of the patch page.
@@ -195,7 +212,7 @@ mod tests {
                 .insert("Male~1/Count~m$0.txt".to_owned(), "Count\nm$0\n1\n0\n0\n7\n".to_owned());
             tool.reset_names();
             tool.diagnose_work();
-            tool.problem_counts()
+            tool.problems.counts()
         };
         assert_eq!(count(ParserMode::Strict), Some((1, 0)));
         assert_eq!(count(ParserMode::Lenient), Some((0, 0)));
