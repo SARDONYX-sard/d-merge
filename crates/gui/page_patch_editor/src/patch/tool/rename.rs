@@ -7,8 +7,6 @@
 //! ```
 //! Until it is back the work is not here: see [`crate::patch::tool::job`] for why nothing saves.
 
-use std::time::Instant;
-
 use egui_widgets::notify::Notification;
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_valid_mod_code;
@@ -77,7 +75,7 @@ impl PatchTool {
         for work in self.recent.iter_mut().filter(|work| work.mod_code.eq_ignore_ascii_case(old)) {
             new.clone_into(&mut work.mod_code);
         }
-        self.dirty_since.get_or_insert_with(Instant::now);
+        self.autosave.changed();
         notify.success(format!("{}: {old} -> {new}", i18n.t(I18nKey::NemesisRenameCodeDone)));
     }
 }

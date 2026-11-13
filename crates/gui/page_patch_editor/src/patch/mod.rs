@@ -29,7 +29,7 @@ mod user_patch;
 mod vars_edit;
 mod workspace;
 
-use std::{path::PathBuf, rc::Rc, time::Instant};
+use std::{path::PathBuf, rc::Rc};
 
 use egui_code_editor::EditorCommand;
 use egui_widgets::notify::Notification;
@@ -59,9 +59,6 @@ fn remember_recent(recent: &mut Vec<RecentWork>, work: RecentWork) {
 /// How long typing must pause before the patch, its check, the underlines and the diff are computed
 /// again. Together they take over 100 ms on a big object in a debug build: too slow for each key.
 const REFRESH_DELAY: std::time::Duration = std::time::Duration::from_millis(150);
-
-/// How long after an edit the workspace is written to its cache.
-const SAVE_DELAY: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// What the tool needs of the patch page's settings.
 #[derive(Debug, Clone, Copy)]
@@ -124,8 +121,8 @@ pub(crate) struct PatchTool {
     workspace: Workspace,
     /// The code of the work the workspace belongs to (`None` = no work is open).
     loaded_for: Option<String>,
-    /// Unsaved edits since this time.
-    dirty_since: Option<Instant>,
+    /// When the work is saved next.
+    autosave: tool::autosave::Autosave,
 
     active: usize,
     selected: Option<Rc<str>>,
@@ -167,8 +164,6 @@ pub(crate) struct PatchTool {
     pending_resolution: Option<gui_shared::patch::ResolveRequest>,
     /// The works opened lately, the last one first. From the settings.
     recent: Vec<RecentWork>,
-    /// The behavior and the object the work last saved had open.
-    session_seen: (usize, Option<Rc<str>>),
     /// The window of the user patch, and what it asks for.
     user_patch: user_patch::UserPatchView,
     /// The user patch written as a mod of its own. See [`user_patch::ModExport`].

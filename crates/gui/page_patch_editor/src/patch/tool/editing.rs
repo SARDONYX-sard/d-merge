@@ -7,8 +7,7 @@ use egui_widgets::TabAction;
 use gui_shared::settings::ui::editor::{EditorMode, LspOptions};
 
 use crate::patch::{
-    EditorResult, FocusAt, PatchTool, REFRESH_DELAY, SAVE_DELAY, TabEvent, anim, editor, workspace,
-    workspace::PANDORA_DOC,
+    EditorResult, FocusAt, PatchTool, REFRESH_DELAY, TabEvent, anim, editor, workspace, workspace::PANDORA_DOC,
 };
 
 /// The editor of the open object, and what is shown beside it.
@@ -373,7 +372,7 @@ impl PatchTool {
         }
         match result.command {
             // Vim `:w`: save the work now.
-            Some(EditorCommand::Save) => self.dirty_since = Instant::now().checked_sub(SAVE_DELAY),
+            Some(EditorCommand::Save) => self.autosave.save_soon(),
             Some(EditorCommand::JumpBack) => self.walk_history(true, id),
             Some(EditorCommand::JumpForward) => self.walk_history(false, id),
             Some(EditorCommand::NextTab) => self.step_tab(id, true),

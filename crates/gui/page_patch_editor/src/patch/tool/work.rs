@@ -3,7 +3,6 @@
 use std::{
     path::{Path, PathBuf},
     rc::Rc,
-    time::Instant,
 };
 
 use egui_widgets::notify::Notification;
@@ -15,7 +14,7 @@ use nemesis_diff::is_existing_mod_code;
 
 use super::job::{Done, Job, Kept};
 use crate::patch::{
-    FocusAt, PatchTool, SAVE_DELAY, editor, remember_recent,
+    FocusAt, PatchTool, editor, remember_recent,
     ui::code_choice::ModCodeChoice,
     user_patch, workspace,
     workspace::{Behavior, Session, SessionTab, Workspace},
@@ -44,7 +43,7 @@ impl PatchTool {
         let Some(request) = self.pending_resolution.take() else { return };
         self.undo_unedited_draft();
         let before = user_patch::Draft::before(&self.workspace);
-        let dirty_since = self.dirty_since;
+        let since = self.autosave.since();
         if self.workspace.info.name.is_empty() {
             i18n.t(I18nKey::UserPatchTitle).clone_into(&mut self.workspace.info.name);
         }
@@ -74,8 +73,8 @@ impl PatchTool {
         self.reuse_resolution(behavior, &id, notify, i18n);
         self.selected = Some(id.into());
         // What is shown is no change of the work yet.
-        self.dirty_since = dirty_since;
-        self.session_seen = (self.active, self.selected.clone());
+        self.autosave.restore(since);
+        self.autosave.seen_at(self.active, self.selected.as_ref());
         // Picking another value of the object shown has no other sign of having gone anywhere.
         self.pane.focus = line.map(FocusAt::Line);
     }
@@ -127,14 +126,10 @@ impl PatchTool {
         }
 
         // What is open is part of the work: back to it when it is opened again.
-        if self.session_seen.0 != self.active || self.session_seen.1 != self.selected {
-            self.session_seen = (self.active, self.selected.clone());
-            if self.loaded_for.is_some() && !self.workspace.behaviors.is_empty() {
-                self.dirty_since.get_or_insert_with(Instant::now);
-            }
-        }
+        let has_work = self.loaded_for.is_some() && !self.workspace.behaviors.is_empty();
+        self.autosave.look_at(self.active, self.selected.as_ref(), has_work);
 
-        if self.dirty_since.is_some_and(|since| since.elapsed() >= SAVE_DELAY) {
+        if self.autosave.is_due() {
             self.save_now(notify, i18n);
         }
     }
@@ -171,7 +166,7 @@ impl PatchTool {
         }
         self.sync_pandora_doc();
         let Some(code) = self.loaded_for.clone() else { return };
-        if self.dirty_since.take().is_none() {
+        if !self.autosave.take() {
             return;
         }
         self.workspace.session = self.current_session();
@@ -237,7 +232,7 @@ impl PatchTool {
         if !session.output.is_empty() && !self.is_user_patch {
             self.output = session.output;
         }
-        self.session_seen = (self.active, self.selected.clone());
+        self.autosave.seen_at(self.active, self.selected.as_ref());
     }
 
     /// Opens a work of the list of recent ones. If its cache is gone, the mod it was exported to is
@@ -278,7 +273,7 @@ impl PatchTool {
         self.output = output;
         self.mod_dir.clear();
         self.project_open = true; // Its name and author are still to be set.
-        self.dirty_since.get_or_insert_with(Instant::now);
+        self.autosave.changed();
     }
 
     /// The folder dialog for [`Self::open_mod`].
@@ -416,7 +411,7 @@ impl PatchTool {
     }
     /// Something to save.
     pub(in crate::patch) fn mark_dirty(&mut self) {
-        self.dirty_since.get_or_insert_with(Instant::now);
+        self.autosave.changed();
         self.edits += 1;
     }
 
@@ -484,7 +479,7 @@ impl PatchTool {
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
         }
         // What it wrote is what the next export replaces.
-        self.dirty_since.get_or_insert_with(Instant::now);
+        self.autosave.changed();
         self.save_now(notify, i18n);
     }
 }

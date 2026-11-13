@@ -193,7 +193,7 @@ impl PatchTool {
         self.workspace.save(&self.cache_root, USER_PATCH_CODE)?;
         let invalid = self.workspace.export(Path::new(&self.output), USER_PATCH_CODE, self.parser_mode)?.1;
         self.workspace.save(&self.cache_root, USER_PATCH_CODE)?;
-        self.dirty_since = None;
+        self.autosave.take();
         Ok(invalid)
     }
 
@@ -261,10 +261,10 @@ impl PatchTool {
             self.tabs.clear();
             self.selected = None;
         }
-        self.session_seen = (self.active, self.selected.clone());
+        self.autosave.seen_at(self.active, self.selected.as_ref());
         // Something saved meanwhile (another object) had it in: the disk goes back too.
         if self.mod_written {
-            self.dirty_since.get_or_insert_with(std::time::Instant::now);
+            self.autosave.changed();
         }
     }
 
@@ -404,7 +404,7 @@ mod tests {
         let (mut main, mut notify, i18n) = proposed(&dir);
         let tool = main.user_patch.tool.as_mut().unwrap();
         assert_eq!(tool.workspace.behaviors[0].text("D~1/Idle~m$0.txt"), Some("theirs\n"), "it shows the value");
-        assert!(tool.dirty_since.is_none(), "nothing to save yet");
+        assert!(!tool.autosave.is_dirty(), "nothing to save yet");
 
         main.close_user_patch(&mut notify, &i18n);
         let tool = main.user_patch.tool.as_ref().unwrap();
