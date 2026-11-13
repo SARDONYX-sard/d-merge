@@ -44,12 +44,15 @@ pub fn row_height(ui: &egui::Ui) -> f32 {
 /// centered. What goes past the width is cut: a row a pixel wider would widen the panel, then the
 /// rows, and so on.
 pub fn fixed_row<R>(ui: &mut egui::Ui, height: f32, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
-    let top_left = ui.cursor().min;
-    let rect = egui::Rect::from_min_size(top_left, egui::vec2(ui.available_width().max(1.0), height));
-    let layout = egui::Layout::left_to_right(egui::Align::Center);
-    let mut row = ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(layout));
-    row.set_clip_rect(rect.intersect(ui.clip_rect()));
-    let inner = add(&mut row);
+    let rect = egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width().max(1.0), height));
+
+    let inner = {
+        let layout = egui::Layout::left_to_right(egui::Align::Center);
+        let mut row = ui.new_child(egui::UiBuilder::new().max_rect(rect).layout(layout));
+        row.set_clip_rect(rect.intersect(ui.clip_rect()));
+        add(&mut row)
+    };
+
     ui.allocate_rect(rect, egui::Sense::hover());
     inner
 }
@@ -81,17 +84,23 @@ pub fn offset_to_show(
     #[expect(clippy::cast_precision_loss, reason = "far fewer rows than f32 can count")]
     let (row, rows, covered) = (row as f32, rows as f32, covered as f32);
     let step = row_height + spacing;
-    let (top, pinned) = (row * step, covered * step);
-    let wanted = if top - pinned < scroll.offset {
-        top - pinned
-    } else if top + row_height > scroll.offset + scroll.view {
-        top + row_height - scroll.view
-    } else {
-        return None;
+
+    // Up to its top below what is pinned, or down to its bottom.
+    let wanted = {
+        let (top, pinned) = (row * step, covered * step);
+        if top - pinned < scroll.offset {
+            top - pinned
+        } else if top + row_height > scroll.offset + scroll.view {
+            top + row_height - scroll.view
+        } else {
+            return None;
+        }
     };
-    // As `show_rows` makes the content: no spacing after the last row.
+
+    // Never past the ends. As `show_rows` makes the content: no spacing after the last row.
     let max = rows.mul_add(step, -spacing).max(0.0) - scroll.view;
     let wanted = wanted.min(max).max(0.0);
+
     ((wanted - scroll.offset).abs() >= 0.5).then_some(wanted)
 }
 

@@ -43,27 +43,31 @@ pub(in crate::patch) fn tab_bar(
 ) -> Option<TabEvent> {
     let menu = egui_widgets::TabMenu::from_texts(gui_shared::i18n::tab_menu_texts(i18n));
     let mut event = None;
+
     egui::ScrollArea::horizontal().id_salt("nemesis_editor_tabs").show(ui, |ui| {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0; // the tabs touch, with a line between them
             for tab in tabs.of(behavior) {
                 let id = tab.id.as_str();
-                let node = graph.node_of(id);
-                let changed = node.is_some_and(|node| graph.is_changed(node));
-                let name = tab_name(node.map_or("", |node| graph.short_name(node)), id);
-                let tone = marks.severity(behavior, id).map(|severity| severity.color(ui.visuals()));
-                let shown = egui_widgets::EditorTab::new(egui::RichText::new(name), id == current)
-                    .focused(marks.focused)
-                    .modified(changed)
-                    .preview(!tab.pinned)
-                    .tone(tone)
-                    .hover(node.map_or(id, |node| graph.label(node)))
-                    .show(ui);
+                let shown = {
+                    let node = graph.node_of(id);
+                    let name = tab_name(node.map_or("", |node| graph.short_name(node)), id);
+                    let tone = marks.severity(behavior, id).map(|severity| severity.color(ui.visuals()));
+                    egui_widgets::EditorTab::new(egui::RichText::new(name), id == current)
+                        .focused(marks.focused)
+                        .modified(node.is_some_and(|node| graph.is_changed(node)))
+                        .preview(!tab.pinned)
+                        .tone(tone)
+                        .hover(node.map_or(id, |node| graph.label(node)))
+                        .show(ui)
+                };
+
                 let to_event = |action| TabEvent::Object(action, id.to_owned());
                 if let Some(picked) = shown.action(&menu, to_event, |ui| object_items(ui, i18n, id)) {
                     event = Some(picked);
                 }
             }
+
             // The diffs and blames, read only: `GetUpModList (#2) ↔ GetUpModList (working) 🔒 ✖`.
             for view in views {
                 let shown = egui_widgets::EditorTab::new(egui::RichText::new(view.title), view.shown)
@@ -72,6 +76,7 @@ pub(in crate::patch) fn tab_bar(
                     .preview(!view.pinned)
                     .hover(view.title)
                     .show(ui);
+
                 let to_event = |action| TabEvent::View(action, view.at);
                 if let Some(picked) = shown.action(&menu, to_event, |ui| object_items(ui, i18n, view.id)) {
                     event = Some(picked);

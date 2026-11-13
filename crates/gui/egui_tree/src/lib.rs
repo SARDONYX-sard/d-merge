@@ -87,6 +87,7 @@ pub fn navigate(key: TreeKey, rows: &[NavRow], cursor: usize) -> Nav {
     if let Some(next) = key.step(cursor, rows.len()) {
         return Nav::Cursor(next);
     }
+
     let Some(row) = rows.get(cursor) else { return Nav::None };
     match (key, row.open) {
         (TreeKey::Leave, _) => Nav::Leave,

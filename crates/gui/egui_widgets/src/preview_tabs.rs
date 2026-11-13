@@ -104,11 +104,13 @@ impl<T> PreviewTabs<T> {
         if let Some(at) = self.find(group, is_same) {
             return at;
         }
+
         let tab = Tab { group, pinned: false, item };
         if let Some(preview) = self.tabs.iter().position(|tab| tab.group == group && !tab.pinned) {
             self.tabs[preview] = tab;
             return preview;
         }
+
         let at = after.map_or(self.tabs.len(), |at| (at + 1).min(self.tabs.len()));
         self.tabs.insert(at, tab);
         if let Some(active) = &mut self.active
@@ -116,6 +118,7 @@ impl<T> PreviewTabs<T> {
         {
             *active += 1;
         }
+
         at
     }
 
@@ -133,12 +136,14 @@ impl<T> PreviewTabs<T> {
         if at >= self.tabs.len() {
             return None;
         }
+
         let group = self.tabs.remove(at).group;
         self.active = match self.active {
             Some(active) if active == at => None,
             Some(active) if active > at => Some(active - 1),
             active => active,
         };
+
         let next = (at..self.tabs.len()).find(|&i| self.tabs[i].group == group);
         next.or_else(|| (0..at).rev().find(|&i| self.tabs[i].group == group))
     }

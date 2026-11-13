@@ -115,41 +115,51 @@ impl DiffView {
         keymap: Keymap,
     ) -> DiffViewOutput {
         let editor_id = crate::editor_id(id_salt);
+
         egui::Panel::bottom(("diff_view_status", id_salt)).show(ui, |ui| {
             crate::status_line(ui, &self.state, keymap, &self.text);
         });
+
         let focus = std::mem::take(&mut self.focus);
         if focus {
             ui.memory_mut(|m| m.request_focus(editor_id));
         }
-        let output =
-            egui::ScrollArea::both().id_salt(("diff_view_scroll", id_salt)).auto_shrink(false).show(ui, |ui| {
-                CodeEditor::new(id_salt, &mut self.text)
-                    .language(language)
-                    .read_only(true)
-                    .keymap(keymap)
-                    .inline_diff(Some(&self.diff))
-                    .line_annotations(&self.notes)
-                    .host_commands(&COMMANDS)
-                    .show(ui, &mut self.state)
-            });
-        let output = output.inner;
+        let output = {
+            let scroll = egui::ScrollArea::both().id_salt(("diff_view_scroll", id_salt)).auto_shrink(false);
+            scroll
+                .show(ui, |ui| {
+                    CodeEditor::new(id_salt, &mut self.text)
+                        .language(language)
+                        .read_only(true)
+                        .keymap(keymap)
+                        .inline_diff(Some(&self.diff))
+                        .line_annotations(&self.notes)
+                        .host_commands(&COMMANDS)
+                        .show(ui, &mut self.state)
+                })
+                .inner
+        };
         // Asked again of the editor drawn: a focus asked for by id before it was may be lost.
         if focus {
             output.response.request_focus();
         }
+
         if let Some(cursor) = output.cursor {
             self.cursor_line = cursor.line;
         }
         let command = output.command;
+
+        // `]c` / `[c`, or a line asked for (the first change, `▲ ▼`).
         let step = match command {
             Some(EditorCommand::NextChange) => self.diff.step(self.cursor_line, true),
             Some(EditorCommand::PreviousChange) => self.diff.step(self.cursor_line, false),
             _ => None,
         };
         if let Some(line) = step.or_else(|| self.go_to.take()) {
-            crate::set_cursor(ui.ctx(), editor_id, LinePos { line, column: 0 }.to_char_index(&self.text));
+            let at = LinePos { line, column: 0 }.to_char_index(&self.text);
+            crate::set_cursor(ui.ctx(), editor_id, at);
         }
+
         DiffViewOutput { command, has_focus: ui.memory(|m| m.has_focus(editor_id)) }
     }
 }
@@ -160,6 +170,7 @@ impl InlineDiff {
     pub fn nav(&self, ui: &mut egui::Ui, cursor_line: usize, hover: &str) -> Option<usize> {
         let (at, count) = self.position(cursor_line)?;
         ui.label(format!("{}/{count}", at + 1));
+
         let mut line = None;
         for (forward, glyph) in [(true, "▼"), (false, "▲")] {
             if ui.small_button(glyph).on_hover_text(hover).clicked() {

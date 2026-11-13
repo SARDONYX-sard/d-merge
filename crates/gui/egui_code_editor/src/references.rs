@@ -50,6 +50,7 @@ impl ReferenceList {
     /// `(document, line)` clicked.
     pub fn window<'a>(ctx: &egui::Context, list: &'a mut Option<Self>) -> Option<(&'a str, usize)> {
         let references = list.as_ref()?;
+
         let (mut open, mut picked) = (true, None);
         let window = egui_widgets::window_near_pointer(ctx, &*references.title).open(&mut open);
         window.default_height(300.0).show(ctx, |ui| {
@@ -63,6 +64,7 @@ impl ReferenceList {
                 }
             });
         });
+
         if !open {
             *list = None;
             return None;

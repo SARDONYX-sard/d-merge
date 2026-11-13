@@ -17,16 +17,19 @@ impl CompletionPopup {
         let screen = ctx.content_rect();
         let (below, above) = (screen.bottom() - anchor.bottom(), anchor.top() - screen.top());
         let is_below = below >= 160.0 || below >= above;
-        let (pos, pivot, room) = if is_below {
-            (anchor.left_bottom(), egui::Align2::LEFT_TOP, below)
-        } else {
-            (anchor.left_top(), egui::Align2::LEFT_BOTTOM, above)
-        };
-        let doc = list.items.get(self.selected).map(|item| item.documentation.as_ref()).filter(|d| !d.is_empty());
-        let list_height = (room - 32.0).clamp(60.0, 400.0);
-        let follow = self.scrolled_to != Some(self.selected);
 
-        let area = egui::Area::new(id.with("completion")).order(egui::Order::Foreground).fixed_pos(pos).pivot(pivot);
+        // The list.
+        let follow = self.scrolled_to != Some(self.selected);
+        let (area, list_height) = {
+            let (pos, pivot, room) = if is_below {
+                (anchor.left_bottom(), egui::Align2::LEFT_TOP, below)
+            } else {
+                (anchor.left_top(), egui::Align2::LEFT_BOTTOM, above)
+            };
+            let list_height = (room - 32.0).clamp(60.0, 400.0);
+            let area = egui::Area::new(id.with("completion")).order(egui::Order::Foreground).fixed_pos(pos);
+            (area.pivot(pivot), list_height)
+        };
         let shown = area.show(ctx, |ui| {
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.set_max_width(480.0);
@@ -55,6 +58,7 @@ impl CompletionPopup {
 
         // The documentation: right of the list, or left of it if the window has no room there; level
         // with the list's side next to the cursor.
+        let doc = list.items.get(self.selected).map(|item| item.documentation.as_ref()).filter(|d| !d.is_empty());
         if let Some(doc) = doc {
             let list_rect = shown.response.rect;
             let right = screen.right() - list_rect.right() >= DOC_WIDTH;
@@ -78,8 +82,8 @@ impl CompletionPopup {
                     });
                 });
         }
-        self.scrolled_to = Some(self.selected);
 
+        self.scrolled_to = Some(self.selected);
         clicked
     }
 }

@@ -91,15 +91,18 @@ impl SearchView {
     /// Searches `documents` (`(id, text)`) again if the query or `version` (e.g. the project and its
     /// edit count) changed since the last time.
     pub fn refresh<'a>(&mut self, version: impl Hash, documents: impl Iterator<Item = (&'a str, &'a str)>) {
-        let mut hasher = std::hash::DefaultHasher::new();
-        version.hash(&mut hasher);
-        let version = hasher.finish();
+        let version = {
+            let mut hasher = std::hash::DefaultHasher::new();
+            version.hash(&mut hasher);
+            hasher.finish()
+        };
         let unchanged = self.searched.as_ref().is_some_and(|(query, regex, searched)| {
             *query == self.query && *regex == self.regex && *searched == version
         });
         if unchanged {
             return;
         }
+
         let query = self.query.trim();
         self.hits = if self.regex {
             // `(?i)`: as the text search, case does not matter.
@@ -156,6 +159,7 @@ impl SearchView {
         if self.query.trim().is_empty() {
             return None;
         }
+
         // `3 results in 2 files`, as VS Code's line above the results.
         let more = if self.hits.len() >= Self::MAX_HITS { "+" } else { "" };
         ui.weak(format!(
@@ -166,14 +170,12 @@ impl SearchView {
             labels.documents
         ));
 
-        let rows = self.rows();
-        let (mut open, mut fold) = (None, None);
-        let height = ui.text_style_height(&egui::TextStyle::Monospace) + 6.0;
-        egui::ScrollArea::both().id_salt("code_editor_search_view").auto_shrink(false).show_rows(
-            ui,
-            height,
-            rows.len(),
-            |ui, range| {
+        let (open, fold) = {
+            let rows = self.rows();
+            let height = ui.text_style_height(&egui::TextStyle::Monospace) + 6.0;
+            let (mut open, mut fold) = (None, None);
+            let scroll = egui::ScrollArea::both().id_salt("code_editor_search_view").auto_shrink(false);
+            scroll.show_rows(ui, height, rows.len(), |ui, range| {
                 for row in &rows[range] {
                     match *row {
                         Row::Document { first, count } => {
@@ -190,12 +192,15 @@ impl SearchView {
                         }
                     }
                 }
-            },
-        );
+            });
+            (open, fold)
+        };
+
         if let Some(first) = fold {
             let document = self.hits[first].document.clone();
             self.toggle(&document);
         }
+
         open.map(|at| (self.hits[at].document.clone(), self.hits[at].line))
     }
 
@@ -230,6 +235,7 @@ fn find<'a>(
     if query.is_empty() {
         return Vec::new();
     }
+
     let mut hits = Vec::new();
     for (document, text) in documents {
         for (line, text) in text.lines().enumerate() {
@@ -259,18 +265,25 @@ fn document_row(
     ui.painter().rect_filled(rect, 0.0, band);
     ui.painter().hline(rect.x_range(), rect.top(), visuals.widgets.noninteractive.bg_stroke);
 
-    let font = egui::TextStyle::Monospace.resolve(ui.style());
-    let mut job = LayoutJob::default();
-    let arrow = if folded { "▶ " } else { "▼ " };
-    job.append(arrow, 0.0, egui::TextFormat::simple(font, visuals.weak_text_color()));
-    label(&mut job, document, visuals);
-    let galley = ui.painter().layout_job(job);
-    let text_at = egui::pos2(rect.left() + 4.0, rect.center().y - galley.size().y / 2.0);
-    ui.painter().galley(text_at, galley, visuals.text_color());
+    // `▼ ` and the host's label.
+    {
+        let font = egui::TextStyle::Monospace.resolve(ui.style());
+        let mut job = LayoutJob::default();
+        let arrow = if folded { "▶ " } else { "▼ " };
+        job.append(arrow, 0.0, egui::TextFormat::simple(font, visuals.weak_text_color()));
+        label(&mut job, document, visuals);
+        let galley = ui.painter().layout_job(job);
+        let text_at = egui::pos2(rect.left() + 4.0, rect.center().y - galley.size().y / 2.0);
+        ui.painter().galley(text_at, galley, visuals.text_color());
+    }
+
     // The count at the right, as VS Code's badge.
-    let at = egui::pos2(rect.right() - 6.0, rect.center().y);
-    let font = egui::FontId::proportional(11.0);
-    ui.painter().text(at, egui::Align2::RIGHT_CENTER, count.to_string(), font, visuals.weak_text_color());
+    {
+        let at = egui::pos2(rect.right() - 6.0, rect.center().y);
+        let font = egui::FontId::proportional(11.0);
+        ui.painter().text(at, egui::Align2::RIGHT_CENTER, count.to_string(), font, visuals.weak_text_color());
+    }
+
     response.clicked()
 }
 
@@ -281,30 +294,35 @@ fn hit_row(ui: &mut egui::Ui, hit: &SearchHit, height: f32, language: &dyn Langu
     if response.hovered() {
         ui.painter().rect_filled(rect, 0.0, ui.visuals().widgets.hovered.weak_bg_fill);
     }
-    let job = colored_line(ui, &hit.text, &hit.matches, language);
-    let galley = ui.painter().layout_job(job);
+
+    let galley = ui.painter().layout_job(colored_line(ui, &hit.text, &hit.matches, language));
     let text_at = egui::pos2(rect.left() + HIT_INDENT, rect.center().y - galley.size().y / 2.0);
     ui.painter().with_clip_rect(rect).galley(text_at, galley, ui.visuals().text_color());
+
     response.on_hover_text(format!("{}:{}", hit.document, hit.line + 1)).clicked()
 }
 
 /// `text` as `language` colors it, with the byte ranges `matches` on VS Code's tint of a match.
 fn colored_line(ui: &egui::Ui, text: &str, matches: &[Range<usize>], language: &dyn Language) -> LayoutJob {
+    // What a char looks like: the highlight's color (its ranges are of chars), on the tint if a match
+    // (their ranges are of bytes) has it.
     let visuals = ui.visuals();
-    let font = egui::TextStyle::Monospace.resolve(ui.style());
-    // The highlight's ranges are of chars; the matches', of bytes.
-    let colors = language.highlight(text, visuals);
-    let color_at = |char_at: usize| {
-        colors
-            .iter()
-            .find(|(range, _)| range.contains(&char_at))
-            .map_or_else(|| visuals.text_color(), |(_, color)| *color)
+    let format_at = {
+        let font = egui::TextStyle::Monospace.resolve(ui.style());
+        let colors = language.highlight(text, visuals);
+        let tint = visuals.selection.bg_fill.gamma_multiply(0.7);
+        move |char_at: usize, byte_at: usize| {
+            let color = colors
+                .iter()
+                .find(|(range, _)| range.contains(&char_at))
+                .map_or_else(|| visuals.text_color(), |(_, color)| *color);
+            let matched = matches.iter().any(|range| range.contains(&byte_at));
+            let background = if matched { tint } else { Color32::TRANSPARENT };
+            egui::TextFormat { background, ..egui::TextFormat::simple(font.clone(), color) }
+        }
     };
-    let tint = visuals.selection.bg_fill.gamma_multiply(0.7);
-    let format_at = |char_at: usize, byte_at: usize| {
-        let background = if matches.iter().any(|range| range.contains(&byte_at)) { tint } else { Color32::TRANSPARENT };
-        egui::TextFormat { background, ..egui::TextFormat::simple(font.clone(), color_at(char_at)) }
-    };
+
+    // Runs of chars that look the same, one section each.
     let mut job = LayoutJob::default();
     let mut run: Option<(usize, egui::TextFormat)> = None; // (start byte, format) of the run being added
     for (char_at, (byte_at, _)) in text.char_indices().enumerate() {
@@ -322,6 +340,7 @@ fn colored_line(ui: &egui::Ui, text: &str, matches: &[Range<usize>], language: &
     if let Some((start, current)) = run {
         job.append(&text[start..], 0.0, current);
     }
+
     job
 }
 

@@ -102,6 +102,7 @@ impl EditorTabOutput {
             None
         }
         .map(&event);
+
         self.response.context_menu(|ui| {
             let items = [
                 (menu.keep_open, self.preview, TabAction::KeepOpen),
@@ -117,10 +118,12 @@ impl EditorTabOutput {
                 }
             }
             ui.separator();
+
             if let Some(own) = more(ui) {
                 picked = Some(own);
             }
         });
+
         picked
     }
 }

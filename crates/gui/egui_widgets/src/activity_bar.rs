@@ -78,10 +78,13 @@ impl ActivityBar {
             let (rect, response) =
                 ui.allocate_exact_size(egui::vec2(ui.available_width(), self.size), egui::Sense::click());
             let visuals = ui.visuals();
-            let lit = item.shown || response.hovered();
-            let color = if lit { visuals.strong_text_color() } else { visuals.weak_text_color() };
-            let icon = egui::Rect::from_center_size(rect.center(), egui::Vec2::splat(self.icon_size));
-            paint_icon(ui.painter(), icon, item.icon, color);
+
+            {
+                let lit = item.shown || response.hovered();
+                let color = if lit { visuals.strong_text_color() } else { visuals.weak_text_color() };
+                let icon = egui::Rect::from_center_size(rect.center(), egui::Vec2::splat(self.icon_size));
+                paint_icon(ui.painter(), icon, item.icon, color);
+            }
             if item.shown {
                 let bar = egui::Rect::from_min_size(rect.min, egui::vec2(2.0, rect.height()));
                 ui.painter().rect_filled(bar, 0.0, visuals.selection.stroke.color);
@@ -89,19 +92,24 @@ impl ActivityBar {
             if item.badge > 0 {
                 badge(ui, rect, item.badge);
             }
+
             if response.on_hover_text(item.hover).clicked() {
                 clicked = Some(at);
             }
         }
+
         clicked
     }
 }
 
 /// The count at the bottom right of `rect`, as VS Code's badges. e.g. `3`, or `99+`.
 fn badge(ui: &egui::Ui, rect: egui::Rect, count: usize) {
-    let text = if count > 99 { "99+".to_owned() } else { count.to_string() };
     let painter = ui.painter();
-    let galley = painter.layout_no_wrap(text, egui::FontId::proportional(9.0), egui::Color32::WHITE);
+    let galley = {
+        let text = if count > 99 { "99+".to_owned() } else { count.to_string() };
+        painter.layout_no_wrap(text, egui::FontId::proportional(9.0), egui::Color32::WHITE)
+    };
+
     let size = egui::vec2(galley.size().x.max(galley.size().y) + 4.0, galley.size().y + 2.0);
     let badge = egui::Rect::from_min_size(rect.right_bottom() - size - egui::vec2(4.0, 4.0), size);
     painter.rect_filled(badge, size.y / 2.0, ui.visuals().selection.bg_fill);

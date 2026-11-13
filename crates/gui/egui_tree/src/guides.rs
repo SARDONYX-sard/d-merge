@@ -61,12 +61,16 @@ pub fn paint(
     let x_of = |level: u16| f32::from(level).mul_add(indent, left + indent / 2.0);
     let painter = ui.painter();
 
+    // `│` of the ancestors' levels that go on past this row.
     for level in (0..own_level).filter(|&level| has(row.guides, level)) {
         painter.vline(x_of(level), top..=bottom, if is_lit(level) { lit } else { normal });
     }
+
+    // `├` / `└`: its own.
     let own_x = x_of(own_level);
     painter.vline(own_x, top..=if row.last_child { center } else { bottom }, normal);
     painter.hline(own_x..=own_x + indent / 2.0, center, normal);
+
     if is_lit(own_level) {
         // The way ends at this row if it is the one on the way: only down to its own branch.
         let ends_here = way(own_level).is_some_and(|rows| *rows.end() == index);

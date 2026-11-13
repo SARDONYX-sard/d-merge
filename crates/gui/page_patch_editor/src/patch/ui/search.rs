@@ -17,9 +17,11 @@ impl PatchTool {
         if std::mem::take(&mut self.focus_search) {
             self.search.focus();
         }
+
         let generation = self.names().graph.generation();
         let behavior = &self.workspace.behaviors[self.active];
         self.search.refresh((self.active, generation), behavior.texts().map(|object| (object.id, object.text)));
+
         let labels = SearchLabels {
             hint: i18n.t(I18nKey::NemesisSearchHint),
             regex_hover: i18n.t(I18nKey::SearchRegexHover),
@@ -27,23 +29,25 @@ impl PatchTool {
             documents: i18n.t(I18nKey::SearchObjects),
         };
         // `#0106  hkbModifierList  GetUpModList`
-        let font = egui::TextStyle::Monospace.resolve(ui.style());
-        let label = |job: &mut LayoutJob, id: &str, visuals: &egui::Visuals| {
-            let object = behavior.object_text(id);
-            let (class, name) = object.map_or(("", ""), |object| (object.class, object.name));
-            let parts = [
-                (id, visuals.strong_text_color()),
-                ("  ", visuals.text_color()),
-                (class, egui_widgets::markdown::class_color(visuals)),
-                ("  ", visuals.text_color()),
-                (name, visuals.weak_text_color()),
-            ];
-            for (text, color) in parts {
-                job.append(text, 0.0, egui::TextFormat::simple(font.clone(), color));
+        let label = {
+            let font = egui::TextStyle::Monospace.resolve(ui.style());
+            move |job: &mut LayoutJob, id: &str, visuals: &egui::Visuals| {
+                let object = behavior.object_text(id);
+                let (class, name) = object.map_or(("", ""), |object| (object.class, object.name));
+                let parts = [
+                    (id, visuals.strong_text_color()),
+                    ("  ", visuals.text_color()),
+                    (class, egui_widgets::markdown::class_color(visuals)),
+                    ("  ", visuals.text_color()),
+                    (name, visuals.weak_text_color()),
+                ];
+                for (text, color) in parts {
+                    job.append(text, 0.0, egui::TextFormat::simple(font.clone(), color));
+                }
             }
         };
-        let open = self.search.show(ui, &labels, &Xml, label);
-        if let Some((object, line)) = open {
+
+        if let Some((object, line)) = self.search.show(ui, &labels, &Xml, label) {
             let current = self.selected.clone().unwrap_or_default();
             self.open_location(&current, &object, line);
         }

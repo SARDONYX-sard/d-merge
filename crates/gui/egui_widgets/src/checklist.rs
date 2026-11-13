@@ -143,10 +143,12 @@ impl Checklist {
                     self.set_visible(false);
                 }
             });
+
             let filter = egui::TextEdit::singleline(&mut self.query).hint_text(labels.filter);
             if ui.add(filter.desired_width(f32::INFINITY)).changed() {
                 self.refilter();
             }
+
             let scroll = egui::ScrollArea::both().max_height(max_height).auto_shrink([false, false]);
             scroll.show_rows(ui, self.row_height, self.visible.len(), |ui, range| {
                 for at in range {
@@ -160,12 +162,14 @@ impl Checklist {
     fn row(&mut self, ui: &mut egui::Ui, index: usize) {
         ui.horizontal(|ui| {
             ui.set_height(self.row_height);
+
             let mut on = self.is_checked(index);
             let box_clicked = ui.add(egui::Checkbox::without_text(&mut on)).changed();
             let label = egui::Label::new(self.item(index)).truncate().sense(egui::Sense::click());
             if ui.add(label).clicked() {
                 on = !on;
             }
+
             if box_clicked || on != self.is_checked(index) {
                 self.set(index, on);
             }
