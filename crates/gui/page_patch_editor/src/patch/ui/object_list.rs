@@ -320,7 +320,10 @@ impl PatchTool {
                 let id = graph.id(node);
                 let text = super::tree::object_label(ui, graph, node, false);
                 let selected = self.selected.as_deref() == Some(id);
-                let response = fixed_row(ui, row_height, |ui| ui.add(egui::Button::selectable(selected, text)));
+                let response = fixed_row(ui, row_height, |ui| {
+                    let response = ui.add(egui::Button::selectable(selected, text));
+                    super::tree::hover_if_cut(ui, response, graph, node)
+                });
                 if response.clicked() {
                     self.selected = Some(id.into());
                 }

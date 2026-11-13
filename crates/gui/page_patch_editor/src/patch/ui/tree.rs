@@ -123,7 +123,8 @@ fn unlinked_section(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Rc<s
         for &node in unlinked {
             let id = graph.id(node);
             let text = object_label(ui, graph, node, false);
-            if ui.add(egui::Button::selectable(selected.as_deref() == Some(id), text)).clicked() {
+            let response = ui.add(egui::Button::selectable(selected.as_deref() == Some(id), text));
+            if hover_if_cut(ui, response, graph, node).clicked() {
                 *selected = Some(id.into());
             }
         }
@@ -156,6 +157,7 @@ fn row_ui(
         }
 
         let response = ui.add(egui::Button::selectable(is_selected, object_label(ui, graph, row.node, row.dimmed)));
+        let response = hover_if_cut(ui, response, graph, row.node);
         if response.clicked() {
             event = Some(RowEvent::Select(index));
         }
@@ -312,6 +314,45 @@ fn sticky_rows_ui(
         });
     }
     event
+}
+
+/// `response` of a row of `node`, with its whole label on hover if the row is cut off at the side
+/// bar's edge: on lines of its own, the pointers wrapped, as wide as a hover.
+///
+/// ```text
+/// #0106
+/// hkbStateMachine
+/// GetUpStateMachine
+/// ← #0105 #0109 #0110 #0111 #0112
+///   #0113 ...
+/// ```
+pub(in crate::patch) fn hover_if_cut(
+    ui: &egui::Ui,
+    response: egui::Response,
+    graph: &Graph,
+    node: Node,
+) -> egui::Response {
+    if response.rect.right() <= ui.clip_rect().right() + 0.5 {
+        return response;
+    }
+    response.on_hover_ui(|ui| {
+        ui.set_max_width(420.0);
+        let (head, class, name, links) = graph.label_parts(node);
+        let visuals = ui.visuals().clone();
+        let parts = [
+            (head, visuals.text_color()),
+            (class, egui_widgets::markdown::class_color(&visuals)),
+            (name, egui_widgets::markdown::name_color(&visuals)),
+            (links, visuals.weak_text_color()),
+        ];
+        for (text, color) in parts {
+            let text = text.trim();
+            if !text.is_empty() {
+                let label = egui::RichText::new(text).monospace().color(color);
+                ui.add(egui::Label::new(label).wrap());
+            }
+        }
+    })
 }
 
 /// A row's text: the class and the name each have their color, to find them in a long list.
