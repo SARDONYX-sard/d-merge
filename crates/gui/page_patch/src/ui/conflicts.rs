@@ -256,7 +256,20 @@ fn resolve_sides(found: &crate::conflicts::Conflicts, point: &Point) -> Vec<Reso
         .collect()
 }
 
-/// Each mod's value, the one the merge keeps first.
+/// Takes the value of the mod at `mod_dir` for `point` into the user patch. `sides`: `Some` to resolve
+/// it by hand, with each mod's value beside it (see [`resolve_sides`]); `None` to use it as it is.
+fn resolve_request(point: &Point, mod_dir: &str, sides: Option<Vec<ResolveSide>>) -> ResolveRequest {
+    ResolveRequest {
+        target: point.target.to_string(),
+        path: point.path.to_string(),
+        mod_dir: mod_dir.to_owned(),
+        edit: sides.is_some(),
+        sides: sides.unwrap_or_default(),
+        keep_all_events: false,
+    }
+}
+
+/// `[Resolve by hand…]`, then each mod's value, the one the merge keeps first.
 fn point_ui(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
@@ -268,7 +281,29 @@ fn point_ui(
     let mut values: Vec<_> = point.values.iter().map(|value| (&found.mods[value.owner as usize], value)).collect();
     values.sort_by_key(|(owner, _)| Some(owner.id.as_str()) != winner);
 
+    // One way to resolve by hand, from the value kept now: not one per mod.
     let mut request = None;
+    let start = values.iter().find_map(|(owner, _)| owner.dir.as_ref());
+    let by_hand = Button::new(i18n.t(I18nKey::ConflictEdit)).small();
+    ui.horizontal(|ui| {
+        if ui.add_enabled(start.is_some(), by_hand).on_hover_text(i18n.t(I18nKey::ConflictEditHover)).clicked()
+            && let Some(dir) = start
+        {
+            request = Some(resolve_request(point, dir, Some(resolve_sides(found, point))));
+        }
+        // `enterNotifyEvents` / `exitNotifyEvents`: the events of every mod can be kept.
+        if gui_shared::patch::is_event_array_conflict(&point.path)
+            && let Some(dir) = start
+            && ui
+                .add(Button::new(i18n.t(I18nKey::ConflictKeepAllEvents)).small())
+                .on_hover_text(i18n.t(I18nKey::ConflictKeepAllEventsHover))
+                .clicked()
+        {
+            let sides = resolve_sides(found, point);
+            request = Some(ResolveRequest { keep_all_events: true, sides, ..resolve_request(point, dir, None) });
+        }
+    });
+
     let mut toggle = None;
     let height = ui.available_height().max(MIN_VALUES_HEIGHT);
     egui::ScrollArea::vertical().id_salt("conflict_values").max_height(height).auto_shrink(false).show(ui, |ui| {
@@ -289,30 +324,13 @@ fn point_ui(
                 }
                 let hover = if owner.dir.is_some() { I18nKey::ConflictUseHover } else { I18nKey::ConflictFnisHover };
                 let usable = owner.dir.is_some();
-                let mut ask = |edit: bool| {
-                    request = owner.dir.as_ref().map(|dir| ResolveRequest {
-                        target: point.target.to_string(),
-                        path: point.path.to_string(),
-                        mod_dir: dir.clone(),
-                        edit,
-                        sides: if edit { resolve_sides(found, point) } else { Vec::new() },
-                    });
-                };
                 if ui
                     .add_enabled(usable, Button::new(i18n.t(I18nKey::ConflictUse)).small())
                     .on_hover_text(i18n.t(hover))
                     .on_disabled_hover_text(i18n.t(hover))
                     .clicked()
                 {
-                    ask(false);
-                }
-                if ui
-                    .add_enabled(usable, Button::new(i18n.t(I18nKey::ConflictEdit)).small())
-                    .on_hover_text(i18n.t(I18nKey::ConflictEditHover))
-                    .on_disabled_hover_text(i18n.t(hover))
-                    .clicked()
-                {
-                    ask(true);
+                    request = owner.dir.as_ref().map(|dir| resolve_request(point, dir, None));
                 }
                 let (label, hide_hover) = if is_hidden {
                     (I18nKey::ConflictUnhide, I18nKey::ConflictUnhideHover)

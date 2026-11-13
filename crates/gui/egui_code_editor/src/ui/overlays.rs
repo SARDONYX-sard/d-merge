@@ -92,6 +92,60 @@ pub(crate) fn gutter_width(ui: &egui::Ui, text: &str) -> f32 {
     width + 16.0 // padding on both sides
 }
 
+/// The widest a column of [`annotations`] gets: a longer note is cut off.
+const MAX_ANNOTATIONS_WIDTH: f32 = 280.0;
+
+/// The width of the column of `annotations`: its longest note, at most [`MAX_ANNOTATIONS_WIDTH`];
+/// `0` without any.
+pub(crate) fn annotations_width(ui: &egui::Ui, annotations: &[String]) -> f32 {
+    if annotations.iter().all(String::is_empty) {
+        return 0.0;
+    }
+    let font = egui::TextStyle::Small.resolve(ui.style());
+    let longest = annotations.iter().map(|note| note.chars().count()).max().unwrap_or(0);
+    let char_width = ui.fonts_mut(|f| f.glyph_width(&font, 'n'));
+    #[expect(clippy::cast_precision_loss, reason = "a short note")]
+    let width = (longest as f32).mul_add(char_width, 16.0);
+    width.min(MAX_ANNOTATIONS_WIDTH)
+}
+
+/// The notes of the lines in the column `x_range`, as GitLens' blame: the first line of a run of the
+/// same note has it, with a line above the run; the column has a faint background.
+pub(crate) fn annotations(
+    ui: &egui::Ui,
+    (galley, galley_pos): (&Galley, Pos2),
+    x_range: std::ops::Range<f32>,
+    annotations: &[String],
+) {
+    if x_range.is_empty() || annotations.is_empty() {
+        return;
+    }
+    let font = egui::TextStyle::Small.resolve(ui.style());
+    let visuals = ui.visuals();
+    let clip = ui.clip_rect();
+    let xs = egui::Rangef::new(x_range.start, x_range.end);
+    let column = egui::Rect::from_x_y_ranges(xs, clip.y_range());
+    let painter = ui.painter().with_clip_rect(column.intersect(clip));
+    painter.rect_filled(column, 0.0, visuals.faint_bg_color);
+    let border = visuals.widgets.noninteractive.bg_stroke;
+    for (line, row) in galley.rows.iter().enumerate() {
+        let rect = row.rect().translate(galley_pos.to_vec2());
+        if rect.bottom() < clip.top() || rect.top() > clip.bottom() {
+            continue; // only the visible ones
+        }
+        let note = annotations.get(line).map_or("", String::as_str);
+        let starts_run = line == 0 || annotations.get(line - 1).map(String::as_str) != Some(note);
+        if !starts_run || note.is_empty() {
+            continue;
+        }
+        if line > 0 {
+            painter.hline(xs, rect.top(), border);
+        }
+        let pos = egui::pos2(x_range.start + 8.0, rect.center().y);
+        painter.text(pos, egui::Align2::LEFT_CENTER, note, font.clone(), visuals.weak_text_color());
+    }
+}
+
 /// Line numbers right-aligned in the gutter `x_range`; the cursor line is brighter.
 pub(crate) fn line_numbers(
     ui: &egui::Ui,

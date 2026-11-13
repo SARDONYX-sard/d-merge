@@ -59,6 +59,18 @@ impl Frames {
     }
 
     fn frame(&mut self, events: Vec<egui::Event>) {
+        self.frame_output(events);
+    }
+
+    /// The text this frame put on the clipboard, if any.
+    fn copied(&mut self, events: Vec<egui::Event>) -> Option<String> {
+        self.frame_output(events).platform_output.commands.into_iter().find_map(|command| match command {
+            egui::OutputCommand::CopyText(text) => Some(text),
+            _ => None,
+        })
+    }
+
+    fn frame_output(&mut self, events: Vec<egui::Event>) -> egui::FullOutput {
         let raw = egui::RawInput { events, ..Default::default() };
         let (text, state, id, rect) = (&mut self.text, &mut self.state, &mut self.id, &mut self.rect);
         let (keymap, command, language) = (self.keymap, &mut self.command, self.language);
@@ -70,6 +82,7 @@ impl Frames {
             *rect = response.rect;
         });
         output.textures_delta.clear();
+        output
     }
 
     fn select(&self, from: usize, to: usize) {
@@ -345,4 +358,115 @@ fn selecting_with_the_mouse_asks_for_no_hover() {
 
     frames.move_to(dragged + egui::vec2(10.0, 0.0));
     assert!(frames.state.hover.resting.is_some(), "moved on");
+}
+
+#[test]
+fn copy_puts_the_selection_on_the_clipboard() {
+    for keymap in [Keymap::Normal, Keymap::Vim] {
+        let mut frames = Frames::new(
+            "abcdefghijkl
+second line",
+        );
+        frames.keymap = keymap;
+        frames.frame(Vec::new());
+        frames.select(0, 3);
+        frames.frame(Vec::new());
+        assert_eq!(frames.copied(vec![egui::Event::Copy]).as_deref(), Some("abc"), "{keymap:?}");
+    }
+}
+
+/// Vim's Visual mode: `Ctrl+C` copies what `v` selected, and leaves the mode.
+#[test]
+fn copy_in_vim_visual_mode() {
+    let mut frames = Frames::new(
+        "abcdefghijkl
+second line",
+    );
+    frames.keymap = Keymap::Vim;
+    frames.frame(Vec::new());
+    frames.select(0, 0);
+    for key in ["v", "l", "l"] {
+        frames.frame(vec![egui::Event::Text(key.to_owned())]);
+    }
+    assert_eq!(frames.copied(vec![egui::Event::Copy]).as_deref(), Some("abc"));
+    assert!(frames.selection().is_empty(), "back to Normal mode");
+}
+
+/// `Ctrl+Shift+P`: the palette opens with the keyboard in its field, as VS Code's.
+#[test]
+fn the_palette_takes_the_keyboard() {
+    for keymap in [Keymap::Normal, Keymap::Vim] {
+        let mut frames = Frames::new("abc");
+        frames.keymap = keymap;
+        frames.frame(Vec::new());
+        let modifiers = egui::Modifiers { ctrl: true, command: true, shift: true, ..Default::default() };
+        let key =
+            |pressed| egui::Event::Key { key: egui::Key::P, physical_key: None, pressed, repeat: false, modifiers };
+        frames.frame(vec![key(true), key(false)]);
+        frames.frame(Vec::new());
+        assert!(frames.state.palette.open, "{keymap:?}");
+        let field = frames.id.with("palette_field");
+        assert_eq!(frames.ctx.memory(|m| m.focused()), Some(field), "{keymap:?}");
+        frames.frame(vec![egui::Event::Text("fmt".to_owned())]);
+        assert_eq!(frames.state.palette.query, ">fmt", "{keymap:?}: typed after the `>` it opens with");
+    }
+}
+
+/// `Ctrl+/` comments the lines out and back in, in every keymap; Vim's `gcc` too.
+#[test]
+fn comments_are_toggled() {
+    let ctrl_slash = |pressed| egui::Event::Key {
+        key: egui::Key::Slash,
+        physical_key: None,
+        pressed,
+        repeat: false,
+        modifiers: egui::Modifiers { ctrl: true, command: true, ..Default::default() },
+    };
+    for keymap in [Keymap::Normal, Keymap::Vim] {
+        let mut frames = Frames::new("\t<a/>\n\t<b/>");
+        (frames.keymap, frames.language) = (keymap, &crate::languages::Xml);
+        frames.frame(Vec::new());
+        frames.select(1, 1);
+        frames.frame(vec![ctrl_slash(true), ctrl_slash(false)]);
+        assert_eq!(frames.text, "\t<!-- <a/> -->\n\t<b/>", "{keymap:?}");
+        frames.frame(vec![ctrl_slash(true), ctrl_slash(false)]);
+        assert_eq!(frames.text, "\t<a/>\n\t<b/>", "{keymap:?}: back");
+    }
+
+    let mut frames = Frames::new("\t<a/>\n\t<b/>");
+    (frames.keymap, frames.language) = (Keymap::Vim, &crate::languages::Xml);
+    frames.frame(Vec::new());
+    frames.select(0, 0);
+    for key in ["g", "c", "j"] {
+        frames.frame(vec![egui::Event::Text(key.to_owned())]);
+    }
+    assert_eq!(frames.text, "\t<!-- <a/> -->\n\t<!-- <b/> -->", "gcj: this line and the next");
+    for key in ["g", "c", "c"] {
+        frames.frame(vec![egui::Event::Text(key.to_owned())]);
+    }
+    assert_eq!(frames.text, "\t<a/>\n\t<!-- <b/> -->", "gcc: the line");
+}
+
+/// The palette without `>` searches the text: `Enter` goes to the line found, as VS Code's.
+#[test]
+fn the_palette_finds_a_line() {
+    let mut frames = Frames::new(
+        "first
+  second line
+third",
+    );
+    frames.select(0, 0);
+    frames.state.palette.reopen();
+    frames.state.palette.query = "SECOND".to_owned();
+    let enter = |pressed| egui::Event::Key {
+        key: egui::Key::Enter,
+        physical_key: None,
+        pressed,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    };
+    frames.frame(vec![enter(true), enter(false)]);
+    frames.frame(Vec::new());
+    assert!(!frames.state.palette.open);
+    assert_eq!(frames.selection(), 8..8, "at `second` of line 2");
 }

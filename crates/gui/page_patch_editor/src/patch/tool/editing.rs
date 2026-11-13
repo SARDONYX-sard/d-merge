@@ -2,29 +2,108 @@
 
 use std::{borrow::Cow, path::Path, rc::Rc, time::Instant};
 
-use egui_code_editor::{EditorCommand, InlineDiff};
+use egui_code_editor::{CodeEditorState, Diagnostic, EditorCommand, InlineDiff};
+use gui_shared::settings::ui::editor::{EditorMode, LspOptions};
 
 use crate::patch::{
     EditorResult, FocusAt, PatchTool, REFRESH_DELAY, SAVE_DELAY, TabEvent, anim, editor, workspace,
     workspace::PANDORA_DOC,
 };
 
+/// The editor of the open object, and what is shown beside it.
+///
+/// ```text
+/// [tabs]                                             (PatchTool::tabs)
+/// ┌ editor (text, state) ──────────┬ preview / merge ┐
+/// │ underlines: problems            │ preview_view    │
+/// │ inline diff: inline_diff        │ merge_values    │
+/// └─────────────────────────────────┴─────────────────┘
+/// [status bar: mode, lsp]
+/// ```
+#[derive(Debug, Default)]
+pub(in crate::patch) struct EditorPane {
+    /// The text in the editor.
+    pub(in crate::patch) text: String,
+    /// What `text` belongs to: `(behavior, id)`.
+    pub(in crate::patch) opened: Option<(usize, String)>,
+    pub(in crate::patch) state: CodeEditorState,
+    /// The editor had the keyboard last frame. See [`PatchTool::note_editor_focus`].
+    pub(in crate::patch) had_focus: bool,
+    /// Where the keyboard goes next frame.
+    pub(in crate::patch) focus: Option<FocusAt>,
+    /// The line of the cursor, last frame.
+    pub(in crate::patch) cursor_line: usize,
+    /// The patch of the open object and the parser's word on it. `None`: to compute again, see
+    /// [`PatchTool::refresh_preview`].
+    pub(in crate::patch) preview: Option<(Option<String>, Result<(), String>)>,
+    /// When the text was last typed: the preview waits for a pause.
+    pub(in crate::patch) typed_at: Option<Instant>,
+    /// The problems of the open object, underlined in the editor.
+    pub(in crate::patch) problems: Vec<Diagnostic>,
+    pub(in crate::patch) inline_diff: InlineDiff,
+    pub(in crate::patch) show_inline_diff: bool,
+    pub(in crate::patch) show_preview: bool,
+    /// The preview scrolls with the cursor.
+    pub(in crate::patch) follow_preview: bool,
+    pub(in crate::patch) preview_view: Option<editor::preview::Preview>,
+    /// What the merge panel shows, and the lines accepted last. See [`editor::merge`].
+    pub(in crate::patch) merge_values: Option<editor::resolve::MergeValues>,
+    pub(in crate::patch) merge_accepted: Vec<String>,
+    /// The window of the references of an object.
+    pub(in crate::patch) references: Option<editor::navigate::ReferenceList>,
+    /// Back and forward, as `Alt+←` / `Alt+→`.
+    pub(in crate::patch) history: editor::navigate::History,
+    pub(in crate::patch) mode: EditorMode,
+    pub(in crate::patch) lsp: LspOptions,
+    pub(in crate::patch) show_lsp_options: bool,
+    /// `(behavior, values)`: enum / flag values per field, for the completion.
+    pub(in crate::patch) field_values: Option<(usize, Rc<editor::language::FieldValues>)>,
+    /// What each line of an animation data file is. See [`anim::lines`].
+    pub(in crate::patch) anim_roles: Vec<anim::lines::LineRole>,
+    /// The trigger names of the clip data template, read once; and those known now, for the completion.
+    pub(in crate::patch) template_triggers: Option<std::collections::BTreeSet<String>>,
+    pub(in crate::patch) trigger_names: Vec<String>,
+}
 impl PatchTool {
     /// The next or previous tab, with the keyboard staying in the editor.
+    /// The next / previous tab, the views' after the objects', around the ends. `current`: the
+    /// object shown, if no view is.
     pub(in crate::patch) fn step_tab(&mut self, current: &str, forward: bool) {
-        if let Some(next) = self.tabs.neighbor(self.active, current, forward) {
-            self.selected = Some(next.into());
-            self.focus_editor = Some(FocusAt::Keep);
+        #[derive(Clone)]
+        enum Tab {
+            Object(String),
+            View(usize),
         }
+        let mut order: Vec<Tab> = self.tabs.of(self.active).map(|tab| Tab::Object(tab.id.clone())).collect();
+        order.extend(self.views.tabs_of(self.active).into_iter().map(|tab| Tab::View(tab.at)));
+        let here = order.iter().position(|tab| match (tab, self.views.shown) {
+            (Tab::View(at), Some(shown)) => *at == shown,
+            (Tab::Object(id), None) => id == current,
+            _ => false,
+        });
+        let (Some(here), len) = (here, order.len()) else { return };
+        let next = if forward { (here + 1) % len } else { (here + len - 1) % len };
+        match order[next].clone() {
+            Tab::Object(id) => {
+                self.views.shown = None;
+                self.selected = Some(id.into());
+            }
+            Tab::View(at) => {
+                self.selected = self.views.list.get(at).map(|view| view.id.as_str().into());
+                self.views.show(at);
+                return; // its own editor takes the keyboard: see `Views::show`
+            }
+        }
+        self.pane.focus = Some(FocusAt::Keep);
     }
 
     /// Vim `Ctrl+O` / `Ctrl+I`: the previous / next visited object (skips deleted ones).
     pub(in crate::patch) fn walk_history(&mut self, older: bool, current: &str) {
         let mut current = current.to_string();
-        while let Some(target) = self.history.walk(older, &current) {
+        while let Some(target) = self.pane.history.walk(older, &current) {
             if self.workspace.behaviors[self.active].text(&target).is_some() {
                 self.selected = Some(target.into());
-                self.focus_editor = Some(FocusAt::Keep);
+                self.pane.focus = Some(FocusAt::Keep);
                 return;
             }
             current = target;
@@ -34,10 +113,10 @@ impl PatchTool {
     /// Opens `document` at `line` (go to definition, a click in the references window).
     pub(in crate::patch) fn open_location(&mut self, current: &str, document: &str, line: usize) {
         if document != current {
-            self.history.visit(current);
+            self.pane.history.visit(current);
             self.selected = Some(document.into());
         }
-        self.focus_editor = Some(FocusAt::Line(line));
+        self.pane.focus = Some(FocusAt::Line(line));
     }
 
     /// Double click or menu in the tree and the list: shows `id` in a tab that stays.
@@ -46,6 +125,24 @@ impl PatchTool {
         self.tabs.open(self.active, id, current);
         self.tabs.pin(self.active, id);
         self.selected = Some(id.into());
+    }
+
+    /// What the editor shows, to find it again in another workspace: the behavior's `meshes_path`
+    /// (e.g. `meshes/actors/character/behaviors/0_master.bin`) and the object id (e.g. `#0106`).
+    pub(in crate::patch) fn editor_place(&self) -> Option<(String, Rc<str>)> {
+        let behavior = self.workspace.behaviors.get(self.active)?;
+        Some((behavior.meshes_path.clone(), self.selected.clone()?))
+    }
+
+    /// Shows the place of [`Self::editor_place`] again, if the work still has it, with the keyboard in
+    /// the editor at its cursor.
+    pub(in crate::patch) fn reopen_editor_place(&mut self, (meshes_path, id): &(String, Rc<str>)) {
+        let found = self.workspace.behaviors.iter().position(|behavior| behavior.meshes_path == *meshes_path);
+        let Some(index) = found.filter(|&index| self.workspace.behaviors[index].text(id).is_some()) else { return };
+        self.active = index;
+        self.tabs.open(index, id, None);
+        self.selected = Some(Rc::clone(id));
+        self.pane.focus = Some(FocusAt::Keep);
     }
 
     /// Opens the Pandora patch file of the active behavior. The first time, it is written from what
@@ -60,30 +157,30 @@ impl PatchTool {
             self.mark_dirty();
         }
         if let Some(current) = self.selected.as_deref().filter(|id| *id != PANDORA_DOC) {
-            self.history.visit(current);
+            self.pane.history.visit(current);
         }
         self.selected = Some(PANDORA_DOC.into());
     }
 
     /// Loads `id` into the editor if it is not the open object already.
     pub(in crate::patch) fn open_in_editor(&mut self, id: &str) {
-        if self.editor_for.as_ref().is_some_and(|(active, open)| *active == self.active && open == id) {
+        if self.pane.opened.as_ref().is_some_and(|(active, open)| *active == self.active && open == id) {
             return;
         }
         // The tab being left keeps its undo history and Vim state.
-        let left = self.editor_for.take();
+        let left = self.pane.opened.take();
         if let Some((behavior, left)) = &left {
-            self.tabs.store_state(*behavior, left, std::mem::take(&mut self.editor));
+            self.tabs.store_state(*behavior, left, std::mem::take(&mut self.pane.state));
         }
         let current = left.as_ref().filter(|(behavior, _)| *behavior == self.active).map(|(_, id)| id.as_str());
         self.tabs.open(self.active, id, current);
-        self.editor = self.tabs.take_state(self.active, id);
+        self.pane.state = self.tabs.take_state(self.active, id);
         self.refresh_trigger_names();
 
         let text = self.workspace.behaviors[self.active].text(id).unwrap_or_default();
-        text.clone_into(&mut self.editor_text);
-        self.preview = None;
-        self.editor_for = Some((self.active, id.to_owned()));
+        text.clone_into(&mut self.pane.text);
+        self.pane.preview = None;
+        self.pane.opened = Some((self.active, id.to_owned()));
     }
 
     /// In a clip data file, trigger lines complete with the known names.
@@ -93,16 +190,17 @@ impl PatchTool {
             return;
         }
         let template_dir = Path::new(&self.template_dir);
-        let template = self.template_triggers.get_or_insert_with(|| anim::data::template_trigger_names(template_dir));
-        self.trigger_names = anim::data::trigger_names(template, behavior);
+        let template =
+            self.pane.template_triggers.get_or_insert_with(|| anim::data::template_trigger_names(template_dir));
+        self.pane.trigger_names = anim::data::trigger_names(template, behavior);
     }
 
     /// Gives the editor the keyboard and moves its cursor, if that was asked for.
     pub(in crate::patch) fn apply_focus_request(&mut self, ctx: &egui::Context, editor: egui::Id) {
-        let Some(at) = self.focus_editor.take() else { return };
+        let Some(at) = self.pane.focus.take() else { return };
         let index = match at {
             FocusAt::Line(line) => {
-                egui_code_editor::text_pos::LinePos { line, column: 0 }.to_char_index(&self.editor_text)
+                egui_code_editor::text_pos::LinePos { line, column: 0 }.to_char_index(&self.pane.text)
             }
             FocusAt::Keep => egui::TextEdit::load_state(ctx, editor)
                 .and_then(|state| state.cursor.char_range())
@@ -114,11 +212,11 @@ impl PatchTool {
     /// The pause after typing is over: `preview` goes, for [`Self::refresh_preview`] to compute it.
     /// Until then the last results stay on screen, as in VS Code.
     pub(in crate::patch) fn expire_preview(&mut self, ctx: &egui::Context) {
-        let Some(typed_at) = self.typed_at else { return };
+        let Some(typed_at) = self.pane.typed_at else { return };
         let left = REFRESH_DELAY.saturating_sub(typed_at.elapsed());
         if left.is_zero() {
-            self.typed_at = None;
-            self.preview = None;
+            self.pane.typed_at = None;
+            self.pane.preview = None;
         } else {
             ctx.request_repaint_after(left);
         }
@@ -126,35 +224,35 @@ impl PatchTool {
 
     /// Recomputes the patch, its check and the underlines after the text changed.
     pub(in crate::patch) fn refresh_preview(&mut self, id: &str) {
-        if self.preview.is_some() {
+        if self.pane.preview.is_some() {
             return;
         }
         self.sync_pandora_doc();
         let behavior = &self.workspace.behaviors[self.active];
         let patch = behavior.patch(self.mod_code.trim(), id);
         let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(id, patch, self.parser_mode));
-        self.field_problems = if id == PANDORA_DOC {
-            editor::pandora::diagnostics(&self.editor_text, behavior)
+        self.pane.problems = if id == PANDORA_DOC {
+            editor::pandora::diagnostics(&self.pane.text, behavior)
         } else if behavior.is_anim_data() {
-            self.anim_roles = anim::lines::roles(behavior.adsf, id, &self.editor_text);
+            self.pane.anim_roles = anim::lines::roles(behavior.adsf, id, &self.pane.text);
             Vec::new() // Only the parser's, below: see `anim_lines`.
         } else if behavior.is_ref(id) {
             Vec::new() // not this mod's to fix
         } else {
             let is_new = behavior.added.contains_key(id);
-            editor::diagnostics::field_diagnostics(&self.editor_text, behavior, is_new, self.mod_code.trim())
+            editor::diagnostics::field_diagnostics(&self.pane.text, behavior, is_new, self.mod_code.trim())
         };
         // Keep the ▲ / ▼ position across edits.
-        let current = self.preview_view.as_ref().map_or(0, |view| view.current);
+        let current = self.pane.preview_view.as_ref().map_or(0, |view| view.current);
         let nemesis_view = patch.as_deref().map(editor::preview::Preview::new);
         // The parser reads the patch, whose lines are the Nemesis preview's: back to the editor's.
         if let Err(error) = &check {
             let view = nemesis_view.as_ref();
-            let to_editor_line = |line| view.and_then(|view| view.editor_line_of(line, &self.editor_text));
-            editor::diagnostics::add_parser_error(&mut self.field_problems, &self.editor_text, error, to_editor_line);
+            let to_editor_line = |line| view.and_then(|view| view.editor_line_of(line, &self.pane.text));
+            editor::diagnostics::add_parser_error(&mut self.pane.problems, &self.pane.text, error, to_editor_line);
         }
         // What the export would write. Animation data stays lines: Pandora's export doesn't write it.
-        let as_pandora = self.workspace.export_format == workspace::ExportFormat::Pandora && !behavior.is_anim_data();
+        let as_pandora = self.workspace.export_format == workspace::ExportFormat::PandoraV5 && !behavior.is_anim_data();
         let (view, check) = if as_pandora {
             match editor::pandora::op_preview(behavior, id) {
                 Ok(view) => (Some(view), Ok(())),
@@ -163,24 +261,24 @@ impl PatchTool {
         } else {
             (nemesis_view, check)
         };
-        self.preview_view = view;
-        if let Some(view) = &mut self.preview_view {
+        self.pane.preview_view = view;
+        if let Some(view) = &mut self.pane.preview_view {
             view.keep_current(current);
         }
-        self.preview = Some((patch.map(Cow::into_owned), check));
-        self.inline_diff = behavior.template_object(id).map_or_else(InlineDiff::default, |template| {
-            editor::inline_diff::changes(&template.text, &self.editor_text)
-        });
-        self.refresh_work_check(id);
+        self.pane.preview = Some((patch.map(Cow::into_owned), check));
+        self.pane.inline_diff = behavior
+            .template_object(id)
+            .map_or_else(InlineDiff::default, |template| editor::inline_diff::changes(&template.text, &self.pane.text));
+        self.refresh_problems(id);
     }
 
     /// Enum / flag values only depend on the template: computed once per behavior.
     pub(in crate::patch) fn field_values(&mut self) -> Rc<editor::language::FieldValues> {
         let active = self.active;
-        let cached = self.field_values.take().filter(|(cached, _)| *cached == active);
+        let cached = self.pane.field_values.take().filter(|(cached, _)| *cached == active);
         let (_, values) = cached
             .unwrap_or_else(|| (active, Rc::new(editor::language::field_values(&self.workspace.behaviors[active]))));
-        self.field_values = Some((active, Rc::clone(&values)));
+        self.pane.field_values = Some((active, Rc::clone(&values)));
         values
     }
 
@@ -188,7 +286,30 @@ impl PatchTool {
     pub(in crate::patch) fn apply_tab_event(&mut self, event: Option<TabEvent>, current: &str) {
         let active = self.active;
         match event {
-            Some(TabEvent::Show(id)) => self.selected = Some(id.into()),
+            Some(TabEvent::Show(id)) => {
+                self.views.shown = None;
+                self.selected = Some(id.into());
+            }
+            Some(TabEvent::ShowView(at)) => {
+                if let Some(view) = self.views.list.get(at) {
+                    self.selected = Some(view.id.as_str().into());
+                    self.views.show(at);
+                }
+            }
+            Some(TabEvent::CloseView(at)) => self.views.close(at),
+            Some(TabEvent::CloseOthersOfView(at)) => {
+                self.tabs.close_all(active);
+                self.views.close_others(at);
+                if let Some(view) = self.views.shown.and_then(|shown| self.views.list.get(shown)) {
+                    self.selected = Some(view.id.as_str().into());
+                }
+            }
+            Some(TabEvent::CloseViewsRight(at)) => self.views.close_to_the_right(at),
+            Some(TabEvent::KeepView(at)) => {
+                if let Some(view) = self.views.list.get_mut(at) {
+                    view.pinned = true;
+                }
+            }
             Some(TabEvent::KeepOpen(id)) => self.tabs.pin(active, &id),
             Some(TabEvent::CloseToTheRight(id)) => {
                 self.tabs.close_to_the_right(active, &id);
@@ -198,20 +319,22 @@ impl PatchTool {
             }
             Some(TabEvent::CloseAll) => {
                 self.tabs.close_all(active);
+                self.views.close_all(active);
                 self.selected = None;
-                self.editor_for = None;
+                self.pane.opened = None;
             }
             Some(TabEvent::Close(id)) => {
                 let neighbor = self.tabs.close(active, &id);
                 if id == current {
                     self.selected = neighbor.map(Rc::from);
-                    self.editor_for = None; // its editor state went with the tab
+                    self.pane.opened = None; // its editor state went with the tab
                 }
             }
             Some(TabEvent::CloseOthers(id)) => {
                 self.tabs.close_others(active, &id);
                 self.selected = Some(id.into());
             }
+            Some(TabEvent::File(action, id)) => self.file_asked = Some((action, id)),
             None => {}
         }
     }
@@ -219,14 +342,14 @@ impl PatchTool {
     /// Does what the editor asked for. Returns whether the keyboard goes to the object tree.
     pub(in crate::patch) fn apply_editor_result(&mut self, result: EditorResult, id: &str) -> bool {
         if result.changed {
-            self.workspace.behaviors[self.active].set_text(id, &self.editor_text);
-            self.typed_at = Some(Instant::now());
+            self.workspace.behaviors[self.active].set_text(id, &self.pane.text);
+            self.pane.typed_at = Some(Instant::now());
             self.tabs.pin(self.active, id); // edited: it stays open
             self.object_changed(id);
             self.note_pandora_edit(id);
         }
         if let Some(line) = result.jump_to_line {
-            self.focus_editor = Some(FocusAt::Line(line));
+            self.pane.focus = Some(FocusAt::Line(line));
         }
         self.apply_tab_event(result.tab_event, id);
         if let Some(index) = result.inline_revert {
@@ -241,14 +364,23 @@ impl PatchTool {
             Some(EditorCommand::PreviousTab) => self.step_tab(id, false),
             Some(EditorCommand::CloseTab) => {
                 self.apply_tab_event(Some(TabEvent::Close(id.to_owned())), id);
-                self.focus_editor = Some(FocusAt::Keep);
+                self.pane.focus = Some(FocusAt::Keep);
             }
-            Some(EditorCommand::TogglePreview) => self.show_preview = !self.show_preview,
-            Some(EditorCommand::ToggleInlineDiff) => self.show_inline_diff = !self.show_inline_diff,
+            Some(EditorCommand::TogglePreview) => self.pane.show_preview = !self.pane.show_preview,
+            Some(EditorCommand::ToggleInlineDiff) => self.pane.show_inline_diff = !self.pane.show_inline_diff,
             Some(EditorCommand::NextChange) => self.step_change(true),
+            Some(EditorCommand::RevealFile) => {
+                self.file_asked = Some((crate::patch::tool::list::FileAction::Reveal, id.to_owned()));
+            }
             Some(EditorCommand::PreviousChange) => self.step_change(false),
             Some(EditorCommand::ToggleExplorer | EditorCommand::GoToDefinition | EditorCommand::FindReferences)
             | None => {}
+        }
+        match result.configure {
+            // The palette's "Open Keyboard Shortcuts (JSON)" comes the same way.
+            Some(action) if self.key_ui.run_action(action) => {}
+            Some(command) => self.key_ui.configure_command(command),
+            None => {}
         }
         if let Some(older) = result.walk_history {
             self.walk_history(older, id);
@@ -262,13 +394,13 @@ impl PatchTool {
     /// Vim `]c` / `[c`: to the next or previous changed place of what shows the changes, as its `▲ ▼` do.
     /// The inline diff first, as it is where the cursor is. e.g. changes at lines 3 and 9: from 5, `]c` is 9.
     pub(in crate::patch) fn step_change(&mut self, forward: bool) {
-        if self.show_inline_diff {
-            let line = editor::inline_diff::step(&self.inline_diff, self.cursor_line, forward);
+        if self.pane.show_inline_diff {
+            let line = editor::inline_diff::step(&self.pane.inline_diff, self.pane.cursor_line, forward);
             if line.is_some() {
-                self.focus_editor = line.map(FocusAt::Line);
+                self.pane.focus = line.map(FocusAt::Line);
             }
-        } else if self.show_preview
-            && let Some(view) = &mut self.preview_view
+        } else if self.pane.show_preview
+            && let Some(view) = &mut self.pane.preview_view
         {
             view.step(forward);
         }
@@ -278,27 +410,27 @@ impl PatchTool {
     pub(in crate::patch) fn revert_inline(&mut self, id: &str, index: usize) {
         let behavior = &mut self.workspace.behaviors[self.active];
         let Some(template) = behavior.template_object(id) else { return };
-        self.editor_text = editor::inline_diff::revert(&template.text, &self.editor_text, index);
-        behavior.set_text(id, &self.editor_text);
-        self.preview = None;
+        self.pane.text = editor::inline_diff::revert(&template.text, &self.pane.text, index);
+        behavior.set_text(id, &self.pane.text);
+        self.pane.preview = None;
         self.object_changed(id);
         self.note_pandora_edit(id);
     }
 
     /// `↶` in the preview: puts changed block `block` back to the template.
     pub(in crate::patch) fn revert_block(&mut self, id: &str, block: usize) {
-        let is_pandora = self.preview_view.as_ref().is_some_and(editor::preview::Preview::is_pandora);
+        let is_pandora = self.pane.preview_view.as_ref().is_some_and(editor::preview::Preview::is_pandora);
         let behavior = &mut self.workspace.behaviors[self.active];
         let Some(template) = behavior.template_object(id) else { return };
         if is_pandora {
-            let opened = nemesis_diff::open_kept_arrays(&self.editor_text);
+            let opened = nemesis_diff::open_kept_arrays(&self.pane.text);
             let Some(text) = pandora_patch::doc::without_op(&template.text, &opened, block) else { return };
-            self.editor_text = text;
+            self.pane.text = text;
         } else {
-            self.editor_text = nemesis_diff::revert_hunk(&template.text, &self.editor_text, block);
+            self.pane.text = nemesis_diff::revert_hunk(&template.text, &self.pane.text, block);
         }
-        behavior.set_text(id, &self.editor_text);
-        self.preview = None;
+        behavior.set_text(id, &self.pane.text);
+        self.pane.preview = None;
         self.object_changed(id);
         self.note_pandora_edit(id);
     }
@@ -342,5 +474,44 @@ impl PatchTool {
     pub(in crate::patch) fn reset_names(&mut self) {
         self.names = None;
         self.changed_objects.clear();
+        self.edits += 1; // what was found of the work before is not of this one
+        self.problems.stale = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::Path;
+
+    use super::*;
+    use crate::patch::workspace::{ADSF, Behavior};
+
+    /// A clip data "behavior" with the files `ids` (it needs no template file).
+    fn clip_data(ids: &[&str]) -> Behavior {
+        let mut adsf = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
+        for id in ids {
+            adsf.added.insert((*id).to_owned(), String::new());
+        }
+        adsf
+    }
+
+    /// Reading the mod again: the object being edited is shown again, if it is still there.
+    #[test]
+    fn the_editor_place_comes_back() {
+        let mut tool = PatchTool::default();
+        tool.workspace.behaviors.push(clip_data(&["M~1/a.txt"]));
+        tool.selected = Some("M~1/a.txt".into());
+        let place = tool.editor_place().unwrap();
+
+        tool.selected = None;
+        tool.reopen_editor_place(&place);
+        assert_eq!(tool.selected.as_deref(), Some("M~1/a.txt"));
+        assert!(matches!(tool.pane.focus, Some(FocusAt::Keep)));
+
+        // Gone from the mod: nothing is opened.
+        tool.workspace.behaviors[0] = clip_data(&[]);
+        tool.selected = None;
+        tool.reopen_editor_place(&place);
+        assert_eq!(tool.selected, None);
     }
 }

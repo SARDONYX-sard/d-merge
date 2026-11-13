@@ -350,6 +350,20 @@ pub fn replace_object_ops(doc: &str, id: &str, ops: &[Op<'_>], new_object: Optio
 mod tests {
     use super::*;
 
+    /// A file written with pointers pushed (`<Append>` of words) is read back as that push.
+    #[test]
+    fn pushed_pointers_are_read_back() {
+        let template =
+            "<hkobject name=\"#1\" class=\"c\">\n\t<hkparam name=\"s\" numelements=\"1\">#2</hkparam>\n</hkobject>\n";
+        let edited = template.replace(">#2<", ">#2 #m$0<");
+        let ops = crate::object_ops(template, &edited).unwrap();
+        let doc = crate::patch_file("m", &[], &ops);
+        assert!(doc.contains("<Append path=\"#1/s\">\n\t\t#m$0\n\t</Append>"), "{doc}");
+        let applied = apply_doc(&doc, |_| Some(template)).unwrap();
+        let (_, text) = &applied.edited[0];
+        assert!(parse(text).unwrap().children[0].words == ["#2", "#m$0"], "{text}");
+    }
+
     /// Pandora's own mod has this: ` iState_NPCSneaking`, with the space, where the template has it too.
     #[test]
     fn replacing_by_the_same_is_no_edit() {

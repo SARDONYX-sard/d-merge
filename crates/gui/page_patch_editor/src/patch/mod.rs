@@ -16,9 +16,12 @@
 //! Work is cached under the patch page's output dir and saved a moment after each edit (see [`workspace`]).
 
 mod anim;
+mod changes;
 mod checklist;
 mod editor;
 mod new_work;
+mod problems;
+mod repeat;
 mod search;
 mod template_tree;
 mod tool;
@@ -30,7 +33,7 @@ mod workspace;
 
 use std::{path::PathBuf, rc::Rc, time::Instant};
 
-use egui_code_editor::{CodeEditorState, Diagnostic, EditorCommand, InlineDiff};
+use egui_code_editor::EditorCommand;
 use egui_widgets::notify::Notification;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
@@ -39,11 +42,11 @@ use gui_shared::{
             patch::behavior::ParserMode,
             patch_editor::{PatchEditorSettings, RecentWork},
         },
-        ui::editor::{EditorMode, LspOptions},
+        ui::editor::LspOptions,
     },
 };
 
-use self::workspace::{Behavior, TemplateEntry, Workspace};
+use self::workspace::{Behavior, Workspace};
 
 /// How many works the list of recent ones keeps.
 const MAX_RECENT: usize = 12;
@@ -82,8 +85,15 @@ pub(crate) struct PatchTool {
     cache_root: PathBuf,
     /// This tool is the user patch's, in its window: see [`user_patch`].
     is_user_patch: bool,
-    /// What the mods have at the conflict being edited, shown beside the editor.
-    merge_values: Option<editor::resolve::MergeValues>,
+    /// The commands this frame's keys asked for: see [`Self::key_command`].
+    key_commands: Vec<&'static str>,
+    /// The keys of the palette and its `⚙`. See [`keybinding::KeyUi`].
+    key_ui: keybinding::KeyUi,
+    /// Copy path / reveal of an object asked for by a tab or the editor: done by
+    /// [`Self::file_keys`], which has what it needs.
+    file_asked: Option<(tool::list::FileAction, String)>,
+    /// The editor of the open object and what is beside it: preview, merge, problems. See [`tool::editing`].
+    pane: tool::editing::EditorPane,
     /// What `Edit...` proposed, until it is edited.
     draft: Option<user_patch::Draft>,
     /// Its bulk delete asks once more.
@@ -103,11 +113,8 @@ pub(crate) struct PatchTool {
     mod_code: String,
     /// `settings.behavior.template_dir` (`.bin` or `.xml` templates under `meshes/`).
     template_dir: String,
-    /// Templates found in `template_dir`, for the picker.
-    catalog: Vec<TemplateEntry>,
-    catalog_for: Option<String>,
-    picker_open: bool,
-    picker_filter: String,
+    /// The window of the templates to add. See [`ui::template_picker`].
+    picker: ui::template_picker::TemplatePicker,
     /// The next quick pick window drawn takes the keyboard.
     focus_quick_pick: bool,
     /// The details of the bar above are shown. See [`ui::top_bar`].
@@ -124,83 +131,40 @@ pub(crate) struct PatchTool {
 
     active: usize,
     selected: Option<Rc<str>>,
-    filter: String,
-    changed_only: bool,
+    /// The objects of the explorer: the filters, the tree or the list, the keyboard in them. See [`tool::list`].
+    explorer: tool::list::Explorer,
+    /// The mod code being typed to rename the work to, while that form is open.
+    rename_to: Option<String>,
+    /// What runs on another thread: reading a mod, renaming its code. See [`tool::job`].
+    job: Option<tool::job::Job>,
 
-    /// The text in the editor and what it belongs to (`(behavior, id)`).
-    editor_text: String,
-    editor_for: Option<(usize, String)>,
-    editor: CodeEditorState,
     /// The patch page's parser mode: what d-merge will accept, so what is checked here.
     parser_mode: ParserMode,
-    /// The trigger names of the template, read once (see [`anim::data::template_trigger_names`]).
-    template_triggers: Option<std::collections::BTreeSet<String>>,
-    /// Those and the work's, for completion in clip data files. Updated when one is opened.
-    trigger_names: Vec<String>,
     /// The "animation data" window.
     anim_data_dialog: Option<ui::anim_data::AnimDataDialog>,
     /// The objects open in tabs.
     tabs: editor::tabs::EditorTabs,
-    /// Preview of `editor_for`: (patch, parser result). Recomputed when the text changes.
-    preview: Option<(Option<String>, Result<(), String>)>,
-    /// Typed at this time: `preview` is out of date, and is computed again after [`REFRESH_DELAY`].
-    typed_at: Option<Instant>,
-    /// Unknown class / field names in the editor text (underlined).
-    field_problems: Vec<Diagnostic>,
-    /// The changes shown inside the editor, compared to the template.
-    inline_diff: InlineDiff,
-    /// Show `inline_diff`. From the settings.
-    show_inline_diff: bool,
-    /// Show preview diff. From the settings.
-    show_preview: bool,
-    /// The preview scrolls to and highlights the editor's cursor line. From the settings.
-    follow_preview: bool,
-    /// One label per changed block of the selected object (its `↶` revert buttons).
-    preview_view: Option<editor::preview::Preview>,
-    /// `Shift+F12`: who uses a symbol.
-    references: Option<editor::navigate::ReferenceList>,
-    history: editor::navigate::History,
-    /// The keyboard goes to the editor on the next frame, and the cursor to this place.
-    /// (An editor's id depends on its object, so this can only be done once the object is open.)
-    focus_editor: Option<FocusAt>,
-    /// The keyboard is in the object tree (Vim `Space e`).
-    tree_focus: bool,
-    /// The flat object list after its filter, cached: it is drawn every frame.
-    list: Option<ObjectList>,
 
-    /// Normal / Vim keys of the object editor.
-    editor_mode: EditorMode,
-    /// Language features (shared with hkanno's options), and their window is open.
-    lsp: LspOptions,
-    show_lsp_options: bool,
-    /// The editor's cursor line last frame (for the class around it).
-    cursor_line: usize,
-
-    /// `(behavior, values)`: enum / flag values per field, for the completion.
-    field_values: Option<(usize, std::rc::Rc<editor::language::FieldValues>)>,
-    /// Object list as a tree from the root container.
-    tree_view: bool,
     /// The "New" class list is open, and its filter.
     class_picker: bool,
     class_filter: String,
-    /// The tree of each behavior, by template path.
-    trees: fast_hash::HashMap<String, tree::TreeState>,
-    /// `Space` was pressed with the keyboard in the flat list. See [`tree::TreeState::leader`].
-    list_leader: bool,
-
-    /// Left panel shows events / variables instead of objects.
-    show_vars: bool,
-    /// Left panel shows the text search instead of those. See [`search`].
-    show_search: bool,
     search: search::Search,
     /// The search field takes the keyboard next frame.
     focus_search: bool,
-    /// The actors opened in the anim data list (`DefaultMale~1`). See [`ui::anim_tree`].
-    anim_folders_open: fast_hash::HashSet<String>,
-    /// The button above the list was clicked: done where the list has its files.
-    anim_expand_all: bool,
-    /// The selection the way to it was last opened for.
-    anim_revealed: Option<Rc<str>>,
+    /// The side bar: which view, and whether it shows. See [`ui::side_bar`].
+    side: ui::side_bar::SideBar,
+    /// Edits made, counted: what is found anew after one, e.g. [`changes::Pending`].
+    edits: u64,
+    /// The Changes view: what changed since the last revision, and what is typed there. See [`changes`].
+    scm: changes::Scm,
+    /// The window making many objects from one. See [`repeat`].
+    repeat: Option<ui::repeat::RepeatForm>,
+    /// The diffs and blames of the history open as tabs. See [`ui::revision_view`].
+    views: ui::revision_view::Views,
+    /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
+    problems: problems::Problems,
+    /// The tree of the animation data files. See [`ui::anim_tree`].
+    anim_tree: ui::anim_tree::AnimTreeState,
     /// A conflict's value to change in the editor, taken in on the next frame.
     pending_resolution: Option<gui_shared::patch::ResolveRequest>,
     /// The works opened lately, the last one first. From the settings.
@@ -209,26 +173,22 @@ pub(crate) struct PatchTool {
     session_seen: (usize, Option<Rc<str>>),
     /// The window of the user patch, and what it asks for.
     user_patch: user_patch::UserPatchView,
+    /// The user patch written as a mod of its own. See [`user_patch::ModExport`].
+    mod_export: user_patch::ModExport,
     /// The projects of the clip data template, read once. See [`anim::data::template_projects`].
     template_projects: Option<Vec<String>>,
-    /// The window of what was checked on request.
-    work_check: Option<ui::work_check::WorkCheck>,
     /// The "duplicate to" window.
     duplicate_form: Option<ui::anim_data::DuplicateForm>,
     /// What a row's menu asked to duplicate: `(files, to the project)`.
     pending_duplicate: Option<(Vec<String>, String)>,
     /// The "new clips" window.
     new_clips: Option<ui::anim_data::NewClipsForm>,
-    /// What each line of the open anim data file is. Recomputed with the preview.
-    anim_roles: Vec<anim::lines::LineRole>,
     /// The events / variables panel shows variables (else events).
     show_variables: bool,
     /// `(behavior, names)` of the events / variables panel and the completion.
     names: Option<(usize, Rc<editor::names::Names>)>,
     /// Objects edited since `names` last looked. See [`Self::object_changed`].
     changed_objects: Vec<String>,
-    /// Directories opened / closed in the template picker's tree.
-    picker_toggled: fast_hash::HashSet<String>,
     new_names: vars_edit::NewNames,
     vars_error: Option<String>,
 }
@@ -259,6 +219,8 @@ struct EditorResult {
     /// The `↶` of this place of the inline diff was clicked.
     inline_revert: Option<usize>,
     tab_event: Option<TabEvent>,
+    /// The `⚙` of this palette action: record its keys.
+    configure: Option<&'static str>,
 }
 
 /// What a click on the tab bar asked for.
@@ -270,15 +232,27 @@ enum TabEvent {
     CloseOthers(String),
     CloseToTheRight(String),
     CloseAll,
+    /// A tab of [`ui::revision_view::Views`]: shown, or closed.
+    ShowView(usize),
+    CloseView(usize),
+    /// A double click on a view's tab: it is kept.
+    KeepView(usize),
+    /// A view's menu: every other tab of the behavior closes, objects' and views'.
+    CloseOthersOfView(usize),
+    /// A view's menu: the views to its right close.
+    CloseViewsRight(usize),
+    /// The object's file: its path to the clipboard, or shown in the file manager.
+    File(tool::list::FileAction, String),
 }
 
-/// See [`PatchTool::list`].
+/// See [`tool::list::Explorer::list`].
 #[derive(Debug)]
 struct ObjectList {
     /// The state of the graph it was computed from.
     generation: u64,
     filter: String,
     changed_only: bool,
+    unlinked_only: bool,
     rows: Vec<tree::Node>,
 }
 
@@ -292,38 +266,38 @@ impl PatchTool {
     pub(crate) fn set_parser_mode(&mut self, mode: ParserMode) {
         if self.parser_mode != mode {
             self.parser_mode = mode;
-            self.preview = None;
+            self.pane.preview = None;
         }
     }
 
     /// The editor's settings, shared with the hkanno editor.
     fn read_editor_options(&mut self, editor: &LspOptions) {
-        self.editor_mode = editor.editor_mode;
-        self.lsp.clone_from(editor);
+        self.pane.mode = editor.editor_mode;
+        self.pane.lsp.clone_from(editor);
     }
 
     /// Back to the settings: changed by the keymap box and the options window.
     fn write_editor_options(&mut self, editor: &mut LspOptions) {
         // Both hold the keymap: the box only changes `editor_mode`.
-        self.lsp.editor_mode = self.editor_mode;
-        if *editor != self.lsp {
-            editor.clone_from(&self.lsp);
+        self.pane.lsp.editor_mode = self.pane.mode;
+        if *editor != self.pane.lsp {
+            editor.clone_from(&self.pane.lsp);
         }
     }
 
     /// What is shown of the editor, kept in the settings.
     const fn read_view_settings(&mut self, settings: &PatchEditorSettings) {
-        self.show_inline_diff = settings.inline_diff;
-        self.follow_preview = settings.follow_preview;
-        self.show_preview = settings.show_preview;
-        self.tree_view = settings.tree_view;
+        self.pane.show_inline_diff = settings.inline_diff;
+        self.pane.follow_preview = settings.follow_preview;
+        self.pane.show_preview = settings.show_preview;
+        self.explorer.tree_view = settings.tree_view;
     }
 
     const fn write_view_settings(&self, settings: &mut PatchEditorSettings) {
-        settings.inline_diff = self.show_inline_diff;
-        settings.show_preview = self.show_preview;
-        settings.follow_preview = self.follow_preview;
-        settings.tree_view = self.tree_view;
+        settings.inline_diff = self.pane.show_inline_diff;
+        settings.show_preview = self.pane.show_preview;
+        settings.follow_preview = self.pane.follow_preview;
+        settings.tree_view = self.explorer.tree_view;
     }
 
     pub(crate) fn ui(
@@ -332,8 +306,8 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut Notification,
         paths: PatchPaths<'_>,
-        settings: &mut PatchEditorSettings,
-        editor: &mut LspOptions,
+        (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
+        keys: &mut keybinding::Keybindings,
     ) {
         self.read_editor_options(editor);
         if self.template_dir != paths.template_dir {
@@ -360,12 +334,19 @@ impl PatchTool {
             // What is set once stays out of the way, unless it still has to be set.
             self.project_open = false;
             self.behaviors_open = true;
-            self.trees =
+            self.explorer.trees =
                 settings.tree_open.iter().map(|(path, open)| (path.clone(), tree::TreeState::restored(open))).collect();
         }
         self.read_view_settings(settings);
-        self.changed_only = settings.changed_only;
+        self.explorer.changed_only = settings.changed_only;
+        if self.poll_job(notify, i18n) {
+            ui.ctx().request_repaint();
+        }
         self.sync_workspace(notify, i18n);
+        self.diagnose_work();
+        // The user patch window, above the page, has the keys while it is open.
+        let keys = (!self.user_patch.open).then_some(keys);
+        self.take_key_commands(ui.ctx(), keys, i18n, notify);
         self.draw(ui, i18n, notify);
 
         self.write_editor_options(editor);
@@ -376,8 +357,8 @@ impl PatchTool {
             settings.recent.clone_from(&self.recent);
         }
         self.write_view_settings(settings);
-        settings.changed_only = self.changed_only;
-        for (path, tree) in &mut self.trees {
+        settings.changed_only = self.explorer.changed_only;
+        for (path, tree) in &mut self.explorer.trees {
             if let Some(open) = tree.take_open_changes() {
                 settings.tree_open.insert(path.clone(), open);
             }
@@ -389,6 +370,18 @@ impl PatchTool {
     }
 
     fn draw(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        // The work is on another thread: only how far it is.
+        if let Some(job) = &self.job {
+            ui.add_space(12.0);
+            ui.label(format!("{}: {}", i18n.t(job.label), job.detail));
+            let done = job.done.load(std::sync::atomic::Ordering::Relaxed);
+            let (ratio, text) = match job.progress() {
+                Some(ratio) => (ratio, format!("{done} / {}", job.total)),
+                None => (0.0, done.to_string()),
+            };
+            ui.add(egui::ProgressBar::new(ratio).text(text).animate(true));
+            return;
+        }
         self.code_choice_window(ui.ctx(), i18n, notify);
         if self.is_user_patch {
             self.user_patch_bar(ui, i18n, notify);
@@ -403,17 +396,11 @@ impl PatchTool {
         self.anim_data_window(ui.ctx(), i18n, notify);
         self.new_clips_window(ui.ctx(), i18n);
         self.duplicate_window(ui.ctx(), i18n);
-        self.work_check_window(ui.ctx(), i18n);
+        self.repeat_window(ui.ctx(), i18n);
         self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
 
-        // Like VS Code: the side bar, and the editor with what belongs to it on the right of it.
-        let objects_id = if self.is_user_patch { "user_patch_objects" } else { "nemesis_objects" };
-        egui::Panel::left(objects_id).resizable(true).default_size(320.0).show(ui, |ui| {
-            self.behaviors_section(ui, i18n, notify);
-            if !self.workspace.behaviors.is_empty() {
-                self.object_list(ui, i18n);
-            }
-        });
+        // Like VS Code: the activity bar, the side bar, and the editor with what belongs to it.
+        self.side_bar(ui, i18n, notify);
         if self.workspace.behaviors.is_empty() {
             egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisNoBehavior)));
             return;
@@ -502,7 +489,8 @@ mod tests {
         let selected = std::env::var("PATCH_EDITOR_MOD").unwrap();
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../resource/assets/templates");
         let (workspace, code, _) = Workspace::import(Path::new(&selected), &root).unwrap();
-        let mut tool = PatchTool { workspace, mod_code: code, tree_view: true, ..PatchTool::default() };
+        let explorer = tool::list::Explorer { tree_view: true, ..Default::default() };
+        let mut tool = PatchTool { workspace, mod_code: code, explorer, ..PatchTool::default() };
         let i18n = I18nMap::new();
 
         for active in 0..tool.workspace.behaviors.len() {
@@ -513,7 +501,7 @@ mod tests {
                 println!("{active} {id}");
                 tool.selected = Some(id.as_str().into());
                 egui::__run_test_ui(|ui| {
-                    tool.object_list(ui, &i18n);
+                    tool.object_list(ui, &i18n, &mut egui_widgets::notify::Notification::default());
                     tool.object_editor(ui, &i18n);
                 });
                 if tool.workspace.behaviors[active].is_anim_data() {
@@ -521,11 +509,11 @@ mod tests {
                 }
                 let names = tool.names();
                 let path = &tool.workspace.behaviors[active].meshes_path;
-                let tree = &tool.trees[path];
+                let tree = &tool.explorer.trees[path];
                 let found = tree.rows().get(tree.cursor).map(|row| names.graph.id(row.node));
                 assert_eq!(found, Some(id.as_str()), "`{id}` is not selected in the tree");
-                assert_eq!(tool.editor_for.as_ref().map(|(_, open)| open.as_str()), Some(id.as_str()));
-                assert!(!tool.editor_text.is_empty(), "`{id}` opened empty");
+                assert_eq!(tool.pane.opened.as_ref().map(|(_, open)| open.as_str()), Some(id.as_str()));
+                assert!(!tool.pane.text.is_empty(), "`{id}` opened empty");
             }
         }
     }
@@ -550,8 +538,9 @@ mod work_tests {
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir);
 
-        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned());
+        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         assert_eq!(tool.loaded_for.as_deref(), Some("aaaa"));
         tool.workspace.info.name = "first".to_owned();
         tool.mark_dirty();
@@ -560,8 +549,9 @@ mod work_tests {
         // `File > New`: the first one goes away, and the second one starts empty.
         tool.close_work(&mut notify, &i18n);
         assert_eq!(tool.loaded_for, None);
-        tool.create_work("bbbb".to_owned(), "D:/mods/a".to_owned());
+        tool.create_work("bbbb".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         assert_eq!(tool.loaded_for.as_deref(), Some("bbbb"));
         assert_eq!(tool.workspace.info.name, "");
         tool.save_now(&mut notify, &i18n);
@@ -572,6 +562,7 @@ mod work_tests {
         // Back to the first one.
         tool.switch_work("aaaa", "D:/mods/a", "", &mut notify, &i18n);
         tool.sync_workspace(&mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         let name = tool.workspace.info.name.clone();
         std::fs::remove_dir_all(&dir).unwrap();
 
@@ -585,8 +576,9 @@ mod work_tests {
         let dir = std::env::temp_dir().join(format!("d_merge_other_output_{}", std::process::id()));
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir.join("one"));
-        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned());
+        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
 
         tool.set_patch_output(&dir.join("two").display().to_string(), &mut notify, &i18n);
         assert_eq!(tool.loaded_for, None);
@@ -611,6 +603,8 @@ mod work_tests {
         let mut tool = tool_in(&dir.join("out"));
 
         tool.open_mod(&root, &mut notify, &i18n);
+
+        tool.wait_job(&mut notify, &i18n);
         let opened_at_once = tool.loaded_for.clone();
         let choice = tool
             .code_choice
@@ -618,6 +612,7 @@ mod work_tests {
             .map(|choice| choice.codes.iter().map(|code| code.code.clone()).collect::<Vec<_>>());
 
         tool.open_chosen_code("ecnpc", &mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         let opened = tool.loaded_for.clone();
         let asked_again = tool.code_choice.is_some();
         std::fs::remove_dir_all(&dir).unwrap();
@@ -638,10 +633,13 @@ mod work_tests {
         let mut tool = tool_in(&dir.join("out"));
 
         tool.open_mod(&one, &mut notify, &i18n);
+
+        tool.wait_job(&mut notify, &i18n);
         let of_one = (tool.loaded_for.clone(), tool.code_choice.is_some());
 
         // The code of 7 letters, as Nemesis' own mod has it.
         tool.open_mod(&several.join("Nemesis_Engine/mod/nemesis"), &mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         let of_patch_dir = (tool.loaded_for.clone(), tool.code_choice.is_some());
         std::fs::remove_dir_all(&dir).unwrap();
 
@@ -675,13 +673,15 @@ mod work_tests {
             let mut tool = tool_in(&dir.join("out"));
             tool.template_dir = dir.join("templates").display().to_string();
             tool.open_mod(&mod_dir, notify, &i18n);
+            tool.wait_job(notify, &i18n);
             tool.sync_workspace(notify, &i18n);
+            tool.wait_job(notify, &i18n);
             tool
         };
 
         let mut first = open(&mut notify);
         assert!(first.workspace.behaviors[0].edits["#0001"].contains(">false<"), "read from the mod");
-        assert_eq!(first.workspace.export_format, workspace::ExportFormat::Pandora);
+        assert_eq!(first.workspace.export_format, workspace::ExportFormat::PandoraV5);
         first.mark_dirty();
         first.save_now(&mut notify, &i18n);
 
@@ -697,7 +697,7 @@ mod work_tests {
         }
         let json = cache.join("workspace.json");
         let text = std::fs::read_to_string(&json).unwrap();
-        std::fs::write(&json, text.replace("\"export_format\":\"Pandora\",", "")).unwrap();
+        std::fs::write(&json, text.replace("\"export_format\":\"PandoraV5\",", "")).unwrap();
 
         let second = open(&mut notify);
         let edits = second.workspace.behaviors.first().map(|behavior| behavior.edits.len());
@@ -712,40 +712,41 @@ mod work_tests {
         assert_eq!(edits, Some(1));
         assert!(edited.unwrap().contains(">false<"));
         assert!(changed, "the list marks it");
-        assert_eq!(format, workspace::ExportFormat::Pandora);
+        assert_eq!(format, workspace::ExportFormat::PandoraV5);
     }
 
     /// Vim `]c`: in the text while the inline diff shows, else in the preview.
     #[test]
     fn the_change_keys_go_to_what_shows_the_changes() {
-        let mut tool = PatchTool {
+        let pane = tool::editing::EditorPane {
             inline_diff: editor::inline_diff::changes("a\nb\nc\nd\n", "a\nx\nc\ny\n"),
             preview_view: Some(editor::preview::Preview::new(
                 "<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- CLOSE -->\n<!-- MOD_CODE ~m~ OPEN -->\nd\n<!-- CLOSE -->\n",
             )),
             show_inline_diff: true,
             show_preview: true,
-            ..PatchTool::default()
+            ..Default::default()
         };
-        let current = |tool: &PatchTool| tool.preview_view.as_ref().map(|view| view.current);
+        let mut tool = PatchTool { pane, ..PatchTool::default() };
+        let current = |tool: &PatchTool| tool.pane.preview_view.as_ref().map(|view| view.current);
 
         tool.step_change(true);
-        assert!(matches!(tool.focus_editor, Some(FocusAt::Line(1))));
-        tool.cursor_line = 1;
+        assert!(matches!(tool.pane.focus, Some(FocusAt::Line(1))));
+        tool.pane.cursor_line = 1;
         tool.step_change(true);
-        assert!(matches!(tool.focus_editor, Some(FocusAt::Line(3))));
-        tool.cursor_line = 3;
+        assert!(matches!(tool.pane.focus, Some(FocusAt::Line(3))));
+        tool.pane.cursor_line = 3;
         tool.step_change(false);
-        assert!(matches!(tool.focus_editor, Some(FocusAt::Line(1))));
+        assert!(matches!(tool.pane.focus, Some(FocusAt::Line(1))));
         assert_eq!(current(&tool), Some(0), "the preview stays");
 
-        tool.focus_editor = None;
-        tool.show_inline_diff = false;
+        tool.pane.focus = None;
+        tool.pane.show_inline_diff = false;
         tool.step_change(true);
         assert_eq!(current(&tool), Some(1));
-        assert!(tool.focus_editor.is_none(), "the cursor stays");
+        assert!(tool.pane.focus.is_none(), "the cursor stays");
 
-        tool.show_preview = false;
+        tool.pane.show_preview = false;
         tool.step_change(true);
         assert_eq!(current(&tool), Some(1), "neither shows");
     }
@@ -772,19 +773,21 @@ mod work_tests {
         let mut tool = tool_in(&dir.join("out"));
         tool.template_dir = dir.join("templates").display().to_string();
         tool.open_mod(&mod_dir, &mut notify, &i18n);
+        tool.wait_job(&mut notify, &i18n);
         tool.sync_workspace(&mut notify, &i18n);
-        tool.editor_text = tool.workspace.behaviors[0].text("#0001").unwrap().to_owned();
+        tool.wait_job(&mut notify, &i18n);
+        tool.pane.text = tool.workspace.behaviors[0].text("#0001").unwrap().to_owned();
 
         let shown = |tool: &mut PatchTool| {
-            tool.preview = None;
+            tool.pane.preview = None;
             tool.refresh_preview("#0001");
-            let lines = tool.preview_view.as_ref().map(|view| view.lines().iter().map(|(_, line)| line.clone()));
+            let lines = tool.pane.preview_view.as_ref().map(|view| view.lines().iter().map(|(_, line)| line.clone()));
             lines.map_or_else(String::new, |lines| lines.collect::<Vec<_>>().join("\n"))
         };
         let as_pandora = shown(&mut tool);
         tool.workspace.export_format = workspace::ExportFormat::Nemesis;
         let as_nemesis = shown(&mut tool);
-        tool.workspace.export_format = workspace::ExportFormat::Pandora;
+        tool.workspace.export_format = workspace::ExportFormat::PandoraV5;
         shown(&mut tool);
         tool.revert_block("#0001", 0);
         let edits = tool.workspace.behaviors[0].edits.len();
@@ -799,16 +802,17 @@ mod work_tests {
     #[test]
     fn the_keymap_box_changes_the_keymap() {
         let mut tool = PatchTool::default();
-        let mut editor = LspOptions { editor_mode: EditorMode::Normal, ..LspOptions::default() };
+        let mut editor =
+            LspOptions { editor_mode: gui_shared::settings::ui::editor::EditorMode::Normal, ..LspOptions::default() };
         tool.read_editor_options(&editor);
-        tool.editor_mode = EditorMode::Vim;
+        tool.pane.mode = gui_shared::settings::ui::editor::EditorMode::Vim;
         tool.write_editor_options(&mut editor);
-        assert_eq!(editor.editor_mode, EditorMode::Vim);
+        assert_eq!(editor.editor_mode, gui_shared::settings::ui::editor::EditorMode::Vim);
 
         tool.read_editor_options(&editor);
-        tool.lsp.hover = !tool.lsp.hover;
+        tool.pane.lsp.hover = !tool.pane.lsp.hover;
         tool.write_editor_options(&mut editor);
-        assert_eq!(editor.hover, tool.lsp.hover);
-        assert_eq!(editor.editor_mode, EditorMode::Vim);
+        assert_eq!(editor.hover, tool.pane.lsp.hover);
+        assert_eq!(editor.editor_mode, gui_shared::settings::ui::editor::EditorMode::Vim);
     }
 }

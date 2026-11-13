@@ -22,11 +22,12 @@ use gui_shared::{
 use crate::patch::{
     PatchTool,
     new_work::NewWork,
+    tool::rename::rename_problem,
     workspace::{ExportFormat, Workspace},
 };
 
 /// The width of the box of [`PatchTool::export_format_box`].
-const EXPORT_FORMAT_WIDTH: f32 = 96.0;
+const EXPORT_FORMAT_WIDTH: f32 = 112.0;
 
 /// See [`PathRow`].
 pub(super) const PATH_ACTIONS: PathActions =
@@ -68,7 +69,7 @@ impl PatchTool {
     fn file_menu(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let mut action = None;
         // With a frame and an arrow: it should be seen to be a menu.
-        let button = egui::Button::new(format!("{} ▾", i18n.t(I18nKey::NemesisFileMenu)));
+        let button = egui::Button::new(format!("{} ▾", i18n.t(I18nKey::FileLabel)));
         egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
             let mut item = |ui: &mut egui::Ui, label, hover, picked| {
                 if ui.button(i18n.t(label)).on_hover_text(i18n.t(hover)).clicked() {
@@ -99,7 +100,7 @@ impl PatchTool {
                 // Usually next to the one that was open.
                 let output = self.output.clone();
                 self.close_work(notify, i18n);
-                self.new_work = Some(NewWork { code: String::new(), output });
+                self.new_work = Some(NewWork { code: String::new(), output, ..NewWork::default() });
             }
             Some(FileAction::Open) => self.pick_mod(notify, i18n),
             Some(FileAction::Recent(work)) => self.open_recent(&work, notify, i18n),
@@ -123,20 +124,18 @@ impl PatchTool {
 
     /// What `Export` writes. Beside it, as it belongs to it and not to what opens something.
     fn export_format_box(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        const FORMATS: [(ExportFormat, &str); 2] =
-            [(ExportFormat::Nemesis, "Nemesis"), (ExportFormat::Pandora, "Pandora")];
         let format = self.workspace.export_format;
-        let mut selected = FORMATS.iter().position(|(known, _)| *known == format).unwrap_or(0);
+        let mut selected = ExportFormat::ALL.iter().position(|(known, _)| *known == format).unwrap_or(0);
         let response = ComboBox::from_id_salt("nemesis_export_format").width(EXPORT_FORMAT_WIDTH).show_index(
             ui,
             &mut selected,
-            FORMATS.len(),
-            |index| FORMATS[index].1,
+            ExportFormat::ALL.len(),
+            |index| ExportFormat::ALL[index].1,
         );
         let response = response.on_hover_text(i18n.t(I18nKey::NemesisExportFormatHover));
         if response.changed() {
-            self.workspace.export_format = FORMATS[selected].0;
-            self.preview = None; // it says what the export would write
+            self.workspace.export_format = ExportFormat::ALL[selected].0;
+            self.pane.preview = None; // it says what the export would write
             self.mark_dirty();
         }
     }
@@ -152,7 +151,7 @@ impl PatchTool {
 
     /// The directories, and the mod's `info.ini`.
     fn project_form(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let output = PathRow::new(i18n.t(I18nKey::NemesisOutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
+        let output = PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
             .help(i18n.t(I18nKey::NemesisOutputHover))
             .show(ui, &mut self.output);
         if let Some(err) = output.open_error {
@@ -165,16 +164,19 @@ impl PatchTool {
         self.ref_mods_row(ui, i18n);
 
         ui.horizontal_wrapped(|ui| {
-            // Fixed: it is in the ids of the new objects and the names of the folders.
+            // It is in the ids of the new objects and the names of the folders: renamed, not typed over.
             let hover = i18n.t(I18nKey::NemesisModCodeHover);
             ui.label(i18n.t(I18nKey::NemesisModCodeLabel)).on_hover_text(hover);
             ui.strong(self.mod_code.trim()).on_hover_text(hover);
+            if !self.is_user_patch {
+                self.rename_form(ui, i18n, notify);
+            }
 
             let info = &mut self.workspace.info;
             let mut changed = false;
             for (label, hover, value, width) in [
                 (I18nKey::NemesisNameLabel, I18nKey::NemesisNameHover, &mut info.name, 260.0),
-                (I18nKey::NemesisAuthorLabel, I18nKey::NemesisAuthorHover, &mut info.author, 130.0),
+                (I18nKey::AuthorLabel, I18nKey::NemesisAuthorHover, &mut info.author, 130.0),
                 (I18nKey::NemesisSiteLabel, I18nKey::NemesisSiteHover, &mut info.site, 320.0),
                 (I18nKey::NemesisVersionLabel, I18nKey::NemesisVersionHover, &mut info.version, 70.0),
             ] {
@@ -186,6 +188,36 @@ impl PatchTool {
                 self.mark_dirty();
             }
         });
+    }
+
+    /// `[Rename…]`, then `[newc] [Rename] [Cancel] why not`. See [`crate::patch::tool::rename`].
+    fn rename_form(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        let Some(new) = &mut self.rename_to else {
+            if ui
+                .add(Button::new(i18n.t(I18nKey::NemesisRenameCode)).small())
+                .on_hover_text(i18n.t(I18nKey::NemesisRenameCodeHover))
+                .clicked()
+            {
+                self.rename_to = Some(String::new());
+            }
+            return;
+        };
+        ui.add(TextEdit::singleline(new).hint_text(i18n.t(I18nKey::NemesisModCodeHint)).desired_width(90.0));
+        let old = self.loaded_for.as_deref().unwrap_or_default();
+        let problem = rename_problem(old, new, |code| Workspace::exists(&self.cache_root, code));
+        let rename =
+            ui.add_enabled(problem.is_none(), Button::new(i18n.t(I18nKey::NemesisRenameCode)).small().primary());
+        let cancel = ui.add(Button::new(i18n.t(I18nKey::CancelButton)).small()).clicked();
+        if let Some(problem) = problem.filter(|_| !new.is_empty()) {
+            ui.colored_label(ui.visuals().warn_fg_color, i18n.t(problem));
+        }
+        if rename.on_hover_text(i18n.t(I18nKey::NemesisRenameCodeHover)).clicked() {
+            let new = std::mem::take(new);
+            self.rename_to = None;
+            self.start_rename(&new, notify, i18n);
+        } else if cancel {
+            self.rename_to = None;
+        }
     }
 
     /// `[Read from] D:/mods/Paraglider  [Reload]`, if the work was read from a mod.
@@ -259,7 +291,7 @@ impl PatchTool {
             return;
         }
         self.reset_names();
-        self.editor_for = None;
+        self.pane.opened = None;
         self.mark_dirty();
     }
 }

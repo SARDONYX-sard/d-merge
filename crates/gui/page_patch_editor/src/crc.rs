@@ -94,9 +94,7 @@ impl CrcTool {
             ui.label(i18n.t(I18nKey::CrcModDirLabel)).on_hover_text(hover);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add(
-                    TextEdit::singleline(&mut self.filter)
-                        .hint_text(i18n.t(I18nKey::CrcFilterHint))
-                        .desired_width(160.0),
+                    TextEdit::singleline(&mut self.filter).hint_text(i18n.t(I18nKey::FilterLabel)).desired_width(160.0),
                 );
                 if ui.add(Button::new(i18n.t(I18nKey::SelectButton))).clicked()
                     && let Some(dir) = gui_shared::rfd::FileDialog::new().set_directory(&self.mod_dir).pick_folder()

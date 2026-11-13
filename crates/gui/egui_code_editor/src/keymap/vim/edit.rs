@@ -48,10 +48,26 @@ impl VimState {
                 exec.edit(self.cursor, start..end, &changed);
                 self.cursor = start;
             }
+            Operator::Comment => {
+                let (first, last) = (buf.line_of(start), buf.line_of(end.saturating_sub(1).max(start)));
+                self.toggle_comment(first, last, exec);
+            }
         }
         if op != Operator::Change && self.mode.is_visual() {
             self.mode = Mode::Normal;
         }
+    }
+
+    /// `gc` on lines `first..=last`, by the language's comment: see [`crate::comment`]. The cursor
+    /// goes to the first of them.
+    fn toggle_comment(&mut self, first: usize, last: usize, exec: &mut Exec) {
+        let Some(comment) = self.options.comment else { return };
+        let start = exec.buf.nth_line_start(first);
+        let end = exec.buf.line_end(exec.buf.nth_line_start(last));
+        let block = exec.buf.slice(start..end);
+        let Some((toggled, _)) = crate::comment::toggle(&block, 0, last - first, comment) else { return };
+        exec.edit(self.cursor, start..end, &toggled);
+        self.cursor = exec.buf.first_non_blank(exec.buf.nth_line_start(first));
     }
 
     fn yank(&mut self, text: String, linewise: bool, is_yank: bool, exec: &Exec) {
@@ -213,6 +229,7 @@ impl VimState {
             (_, '~') => Operator::ToggleCase,
             (_, 'u') => Operator::Lower,
             (_, 'U') => Operator::Upper,
+            (true, 'c') => Operator::Comment,
             (false, 'S' | 'J' | 'p' | 'P' | 'o' | 'O' | 'I' | 'A') => {
                 return self.visual_special(c, exec);
             }

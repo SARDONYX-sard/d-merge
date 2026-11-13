@@ -29,6 +29,7 @@
 //! 4. overlays are drawn (cursor line, block cursor, hover, signature help, inlay hints)
 
 mod command;
+mod comment;
 mod completion;
 mod cursor;
 mod edit_ops;
@@ -41,7 +42,9 @@ pub mod language;
 pub mod languages;
 mod layout;
 mod palette;
+pub mod problems;
 mod quick_fix;
+mod request;
 mod search;
 mod state;
 mod status;
@@ -50,17 +53,19 @@ mod ui;
 
 pub(crate) use self::cursor::scroll_request_id;
 pub use self::{
-    command::{EditorCommand, EditorFeatures, tab_switch_keys},
+    command::{EditorCommand, EditorFeatures},
     cursor::{editor_id, set_cursor},
     editor::{CodeEditor, CodeEditorOutput, Navigation},
     inline_diff::{CharChange, DiffHunk, InlineDiff},
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
     language::{
-        CompletionItem, CompletionList, Diagnostic, Indent, Language, Location, QuickFix, References, Severity,
-        SignatureHelp,
+        Comment, CompletionItem, CompletionList, Diagnostic, Indent, Language, Location, QuickFix, References,
+        Severity, SignatureHelp,
     },
     layout::line_job,
     palette::{EditorAction, EditorLabels},
+    problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
+    request::EditorRequest,
     state::CodeEditorState,
-    status::status_line,
+    status::{StatusBar, StatusBarOutput, status_line},
 };

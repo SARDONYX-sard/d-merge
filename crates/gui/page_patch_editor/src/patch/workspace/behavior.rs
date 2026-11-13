@@ -44,8 +44,6 @@ pub(crate) struct Behavior {
     pub(crate) meshes_path: String,
     /// The Nemesis folder, if Nemesis supports this template.
     pub(crate) nemesis: Option<(String, bool)>,
-    /// Write as NemesisExt even if Nemesis supports it.
-    pub(crate) force_ext: bool,
     pub(crate) objects: Vec<TemplateObject>,
     /// `id` -> index in `objects`. The lookups run for every object in several places, so a scan
     /// of `objects` (a few thousand) each time would be quadratic.
@@ -158,7 +156,6 @@ impl Behavior {
                 template_path: template_path.to_path_buf(),
                 meshes_path: format!("meshes/{ADSF}.bin"),
                 nemesis: Some((ADSF.to_string(), false)),
-                force_ext: false,
                 object_index: fast_hash::HashMap::default(),
                 objects: Vec::new(),
                 edits: BTreeMap::new(),
@@ -193,7 +190,6 @@ impl Behavior {
                 template_path: template_path.to_path_buf(),
                 meshes_path: meshes_path(template_path),
                 nemesis: Some((ASDSF.to_string(), false)),
-                force_ext: false,
                 object_index: index_objects(&objects),
                 objects,
                 edits: BTreeMap::new(),
@@ -226,7 +222,6 @@ impl Behavior {
             template_path: template_path.to_path_buf(),
             meshes_path,
             nemesis,
-            force_ext: false,
             object_index: index_objects(&objects),
             objects,
             edits: BTreeMap::new(),
@@ -263,20 +258,21 @@ impl Behavior {
         }
     }
 
-    pub(crate) fn target(&self) -> Target {
+    /// `ext`: the work is exported as NemesisExt ([`super::ExportFormat::NemesisExt`]), so even the
+    /// templates Nemesis knows go there.
+    pub(crate) fn target(&self, ext: bool) -> Target {
         match &self.nemesis {
-            Some((name, first_person)) if !self.force_ext => {
-                Target::Nemesis { name: name.clone(), first_person: *first_person }
-            }
+            Some((name, first_person)) if !ext => Target::Nemesis { name: name.clone(), first_person: *first_person },
             _ => Target::Ext,
         }
     }
 
-    /// The patch folder of this behavior under `<output>`.
+    /// The patch folder of this behavior under `<output>`. `ext`: see [`Self::target`]. Animation data
+    /// has only the Nemesis folder.
     ///
     /// e.g. `Nemesis_Engine/mod/mymod/_1stperson/0_master`,
     /// `Nemesis_EngineExt/mod/mymod/meshes/actors/troll/behaviors/trollbehavior.bin`
-    pub(crate) fn patch_dir(&self, code: &str) -> PathBuf {
+    pub(crate) fn patch_dir(&self, code: &str, ext: bool) -> PathBuf {
         let nemesis = Path::new("Nemesis_Engine");
         if self.asdsf {
             return joined(nemesis, &["mod", code, ASDSF]);
@@ -284,7 +280,7 @@ impl Behavior {
         if self.adsf {
             return joined(nemesis, &["mod", code, ADSF]);
         }
-        match self.target() {
+        match self.target(ext) {
             Target::Nemesis { name, first_person: true } => joined(nemesis, &["mod", code, "_1stperson", &name]),
             Target::Nemesis { name, first_person: false } => joined(nemesis, &["mod", code, &name]),
             Target::Ext => joined(Path::new("Nemesis_EngineExt"), &["mod", code, &self.meshes_path]),

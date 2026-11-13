@@ -109,7 +109,7 @@ impl VimState {
         self.operate(op, start..end_line_start, true, exec);
     }
 
-    /// `:s/pat/rep/[g]`
+    /// `:s/pat/rep/[g]`. `pat` is a regex, as Vim's; `rep` is text.
     fn substitute(&mut self, (from, to): Lines, args: &str, exec: &mut Exec) {
         let mut chars = args.chars();
         let Some(delimiter) = chars.next() else {
@@ -129,7 +129,7 @@ impl VimState {
         } else {
             pattern
         };
-        let Some(matcher) = Matcher::new(&pattern) else { return };
+        let Some(matcher) = Matcher::regex(&pattern) else { return };
 
         let start = exec.buf.nth_line_start(from);
         let end = exec.buf.line_end(exec.buf.nth_line_start(to));

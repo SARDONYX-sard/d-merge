@@ -35,6 +35,17 @@ pub(super) fn remove_owned(output: &Path, file: &str) -> Result<(), String> {
 }
 
 impl Workspace {
+    /// The templates with patches that Nemesis itself can't read when the work is written as
+    /// [`super::ExportFormat::Nemesis`]: Nemesis does not know them, so [`Self::export`] puts them in
+    /// `Nemesis_EngineExt`, which only d-merge reads. (Animation data always goes to Nemesis.)
+    ///
+    /// e.g. `meshes/actors/troll/behaviors/trollbehavior.bin`
+    pub(crate) fn outside_nemesis(&self) -> impl Iterator<Item = &str> {
+        let patched = |behavior: &&super::Behavior| !(behavior.edits.is_empty() && behavior.added.is_empty());
+        let unknown = |behavior: &&super::Behavior| !behavior.is_anim_data() && behavior.nemesis.is_none();
+        self.behaviors.iter().filter(patched).filter(unknown).map(|behavior| behavior.meshes_path.as_str())
+    }
+
     /// The mod codes this mod depends on: what it said when it was read, and the mods it refers to.
     ///
     /// e.g. a reference `D:/mods/a/Nemesis_Engine/mod/amco` -> `amco`
@@ -79,8 +90,9 @@ impl Workspace {
         let info = self.info.exported();
 
         let (mut written, mut invalid) = (0, Vec::new());
+        let ext = self.export_format.is_ext();
         for behavior in &self.behaviors {
-            let relative = behavior.patch_dir(code);
+            let relative = behavior.patch_dir(code, ext);
             for id in behavior.edits.keys().chain(behavior.added.keys()) {
                 let Some(patch) = behavior.patch(code, id) else { continue };
                 if let Err(err) = behavior.validate(id, &patch, mode) {

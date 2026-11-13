@@ -5,6 +5,8 @@
 //! are drawn every frame, so what depends on the whole list is kept up to date instead of being
 //! computed again: `visible` changes only with the filter, the count only with a check.
 
+use stdx::text::contains_ignore_case;
+
 /// See the module docs.
 #[derive(Debug)]
 pub(super) struct Checklist {
@@ -66,7 +68,7 @@ impl Checklist {
     /// Call when [`Self::query`] changed.
     pub(super) fn refilter(&mut self) {
         let query = self.query.trim();
-        let matching = self.items.iter().enumerate().filter(|(_, item)| contains_ignore_ascii_case(item, query));
+        let matching = self.items.iter().enumerate().filter(|(_, item)| contains_ignore_case(item, query));
         self.visible = matching.map(|(index, _)| index).collect();
     }
 
@@ -74,12 +76,6 @@ impl Checklist {
     pub(super) fn checked_items(&self) -> impl Iterator<Item = &str> {
         self.items.iter().zip(&self.checked).filter(|(_, on)| **on).map(|(item, _)| item.as_str())
     }
-}
-
-/// Does `text` contain `query`, ignoring ASCII case? Without allocating: this runs per item, per key
-/// typed. e.g., `paraglide` is in `ParaGlideEquip.hkx`.
-pub(super) fn contains_ignore_ascii_case(text: &str, query: &str) -> bool {
-    query.is_empty() || text.as_bytes().windows(query.len()).any(|window| window.eq_ignore_ascii_case(query.as_bytes()))
 }
 
 #[cfg(test)]

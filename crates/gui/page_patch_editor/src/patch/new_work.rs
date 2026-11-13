@@ -3,12 +3,16 @@
 use gui_shared::i18n::I18nKey;
 use nemesis_diff::is_valid_mod_code;
 
-/// e.g. `NewWork { code: "mymod", output: "D:/MO2/mods/MyMod" }`
+use crate::patch::workspace::TemplateScope;
+
+/// e.g. `NewWork { code: "mymod", output: "D:/MO2/mods/MyMod", scope: TemplateScope::Nemesis }`
 #[derive(Debug, Default)]
 pub(super) struct NewWork {
     pub(super) code: String,
     /// The mod's root: what it is exported to.
     pub(super) output: String,
+    /// Which templates it can patch, for good. See [`TemplateScope`].
+    pub(super) scope: TemplateScope,
 }
 
 impl NewWork {
@@ -31,7 +35,7 @@ mod tests {
     use super::*;
 
     fn problem(code: &str, output: &str, exists: bool) -> Option<I18nKey> {
-        NewWork { code: code.to_owned(), output: output.to_owned() }.problem(|_| exists)
+        NewWork { code: code.to_owned(), output: output.to_owned(), scope: TemplateScope::Nemesis }.problem(|_| exists)
     }
 
     #[test]

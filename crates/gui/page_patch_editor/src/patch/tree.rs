@@ -36,7 +36,10 @@ use std::{
 
 use fast_hash::{HashMap, HashSet};
 
-use super::workspace::{Behavior, ObjectText};
+use super::{
+    tool::list::{ListScroll, offset_to_show},
+    workspace::{Behavior, ObjectText},
+};
 
 /// Index of an object in [`Graph`]. Stable for the life of the graph, also across edits.
 pub(super) type Node = u32;
@@ -391,6 +394,12 @@ impl Graph {
         &self.unlinked
     }
 
+    /// Is `node` one of [`Self::unlinked`]? Without looking through them.
+    pub(super) fn is_unlinked(&self, node: Node) -> bool {
+        let entry = self.entry(node);
+        entry.is_new && !entry.reachable && entry.id.starts_with('#')
+    }
+
     pub(super) const fn generation(&self) -> u64 {
         self.generation
     }
@@ -455,6 +464,9 @@ const fn guide_bit(depth: u16) -> u64 {
 pub(super) const fn has_guide(guides: u64, level: u16) -> bool {
     guides & guide_bit(level) != 0
 }
+
+/// How many ancestors are pinned over the tree at most. See [`TreeState::sticky_rows`].
+pub(super) const MAX_STICKY: usize = 5;
 
 /// A tree command, whichever key asked for it. The keys are in [`super::ui::tree::read_keys`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -541,16 +553,17 @@ pub(super) struct TreeState {
     built_for: Option<(u64, bool)>,
     /// The row of the selected object.
     pub(super) cursor: usize,
-    /// The selection `rows` was revealed for (to notice a selection made elsewhere, e.g. Vim `gd`).
-    revealed: Option<Rc<str>>,
+    /// The editor got the keyboard: the next [`Self::prepare`] opens the way to the selection and
+    /// scrolls to it. Only then: a tree being used must not move by itself.
+    reveal_asked: bool,
+    /// The selection the cursor was put on (it follows a selection made elsewhere, without scrolling).
+    cursor_for: Option<Rc<str>>,
     /// Bring this row into view on the next draw.
     pub(super) scroll_to: Option<usize>,
     pub(super) scroll_offset: f32,
     pub(super) view_height: f32,
     pub(super) scroll_x: f32,
     pub(super) view_width: f32,
-    /// `Space` was pressed: the next `e` leaves the tree (same keys as entering it).
-    pub(super) leader: bool,
 }
 
 impl TreeState {
@@ -595,23 +608,35 @@ impl TreeState {
         }
     }
 
-    /// Rebuilds the rows if needed and shows `selected` if it changed (opens its parents).
+    /// Rebuilds the rows if needed, and puts the cursor on `selected`. Opens the way to it and scrolls
+    /// there only if [`Self::reveal_again`] asked for it.
+    ///
+    /// ```text
+    /// selection changed (a click in the tree, a tab, `gd`)  -> the cursor follows; nothing moves
+    /// the editor got the keyboard (reveal_again)          -> parents opened, scrolled to it
+    /// ```
     pub(super) fn prepare(&mut self, graph: &Graph, selected: Option<&str>, changed_only: bool) {
-        let revealed = self.reveal(graph, selected, changed_only);
+        let revealed = std::mem::take(&mut self.reveal_asked) && self.reveal(graph, selected, changed_only);
         let stale = self.built_for != Some((graph.tree_generation(), changed_only));
         if stale {
             self.rebuild_rows(graph, changed_only);
         }
-        if revealed || stale {
+        let moved = self.cursor_for.as_deref() != selected;
+        if revealed || stale || moved {
+            self.cursor_for = selected.map(Rc::from);
             self.follow_selection(graph, selected, revealed);
         }
     }
 
-    /// Opens the parents of `selected` if it is a new selection. Returns whether it was.
+    /// The editor got the keyboard: the next [`Self::prepare`] shows the selection (opens its parents,
+    /// scrolls to it), as VS Code's explorer follows the file being edited.
+    pub(super) const fn reveal_again(&mut self) {
+        self.reveal_asked = true;
+    }
+
+    /// Opens the parents of `selected`. Returns whether it is in the tree.
     fn reveal(&mut self, graph: &Graph, selected: Option<&str>, changed_only: bool) -> bool {
-        let new_selection = selected.filter(|id| self.revealed.as_deref() != Some(*id));
-        let Some(target) = new_selection.and_then(|id| graph.node_of(id)) else { return false };
-        self.revealed = Some(Rc::clone(&graph.entry(target).id));
+        let Some(target) = selected.and_then(|id| graph.node_of(id)) else { return false };
         let mut parent = graph.entry(target).first_parent;
         while let Some(node) = parent {
             if !self.is_open(graph, node, changed_only) {
@@ -711,7 +736,7 @@ impl TreeState {
     fn select_cursor(&mut self, graph: &Graph, selected: &mut Option<Rc<str>>) {
         self.scroll_to = Some(self.cursor);
         if let Some(row) = self.rows.get(self.cursor) {
-            self.revealed = Some(Rc::clone(&graph.entry(row.node).id));
+            self.cursor_for = Some(Rc::clone(&graph.entry(row.node).id));
             *selected = Some(graph.id(row.node).into());
         }
     }
@@ -766,17 +791,12 @@ impl TreeState {
         (!visible.contains(&indent)).then_some((indent - MARGIN).max(0.0))
     }
 
-    /// The scroll offset that brings row `row` into view (`None`: it already is).
-    pub(super) fn offset_for(&self, row: usize, row_height: f32) -> Option<f32> {
-        #[expect(clippy::cast_precision_loss, reason = "row counts are small")]
-        let top = row as f32 * row_height;
-        if top < self.scroll_offset {
-            Some(top)
-        } else if top + row_height > self.scroll_offset + self.view_height {
-            Some(top + row_height - self.view_height)
-        } else {
-            None
-        }
+    /// The scroll offset that brings row `row` into view, below its parents pinned over the top
+    /// ([`Self::sticky_rows`]) (`None`: it is seen already). See [`offset_to_show`].
+    pub(super) fn offset_for(&self, row: usize, sizes: (f32, f32)) -> Option<f32> {
+        let covered = self.ancestors(row).len().min(MAX_STICKY);
+        let scroll = ListScroll { offset: self.scroll_offset, view: self.view_height };
+        offset_to_show(row, sizes, self.rows.len(), scroll, covered)
     }
 }
 
@@ -889,6 +909,15 @@ mod tests {
         state.prepare(&graph, None, false);
         assert_eq!(ids(&graph, &state), ["#root", "#a", "#b"]); // only the root starts open
         assert_eq!(unlinked(&graph), ["#new1"]);
+    }
+
+    /// The list's "unlinked only" asks each node: it must agree with the list of them.
+    #[test]
+    fn is_unlinked_agrees_with_the_unlinked_list() {
+        let graph = sample();
+        let asked: Vec<&str> =
+            graph.nodes().filter(|&node| graph.is_unlinked(node)).map(|node| graph.id(node)).collect();
+        assert_eq!(asked, unlinked(&graph));
     }
 
     #[test]
@@ -1053,14 +1082,28 @@ mod tests {
         assert!(has_guide(rows[4].guides, 1));
     }
 
+    /// A selection alone moves nothing: a tree being used must stay as it is.
     #[test]
-    fn selecting_opens_the_parents() {
+    fn selecting_alone_does_not_open_or_scroll() {
         let graph = sample();
         let mut state = TreeState::default();
+        state.prepare(&graph, Some("#new0"), false);
+        assert_eq!(ids(&graph, &state), ["#root", "#a", "#b"], "only the root starts open");
+        assert_eq!(state.scroll_to, None);
+    }
+
+    /// The editor got the keyboard: the way to the selection opens, and it is scrolled to.
+    #[test]
+    fn revealing_opens_the_parents_and_scrolls() {
+        let graph = sample();
+        let mut state = TreeState::default();
+        state.reveal_again();
         state.prepare(&graph, Some("#new0"), false);
         assert_eq!(ids(&graph, &state), ["#root", "#a", "#b", "#c", "#new0"]);
         assert_eq!(state.cursor, 4);
         assert_eq!(state.scroll_to, Some(4));
+        state.prepare(&graph, Some("#new0"), false);
+        assert_eq!(state.scroll_to, Some(4), "asked once: nothing more");
     }
 
     #[test]

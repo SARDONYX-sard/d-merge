@@ -1,11 +1,14 @@
 //! Reading a mod's patches into a work: only their blocks go on the templates.
 
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 use nemesis_diff::{View, apply_to_template, resolve};
 
 use super::{
-    Workspace,
+    ExportFormat, TemplateScope, Workspace,
     behavior::{ADSF, ASDSF, Behavior},
     export::owned_key,
     locations::{
@@ -81,6 +84,17 @@ pub(super) fn import_asdsf(
     Ok(Some(behavior))
 }
 
+/// The id of the object a patch file patches: the `name` of its first `<hkobject>`, which is what
+/// Nemesis and d-merge go by, not the file's name. `None`: the file has none (e.g. animation data).
+///
+/// e.g. BFCO's `1hm_behavior/#3018.txt` patches `#3108`: its name has the digits swapped, but the
+/// patch is right, and must be read as `#3108`'s, or its blocks would go on another object.
+fn patched_id(patch: &str) -> Option<&str> {
+    let head = patch.lines().find(|line| line.trim_start().starts_with("<hkobject"))?;
+    let (_, rest) = head.split_once("name=\"")?;
+    rest.split('"').next().filter(|id| id.starts_with('#'))
+}
+
 impl Workspace {
     /// Imports a mod. `selected` is its root (see [`mod_dir_of`]) or
     /// `.../Nemesis_Engine/mod/<code>` or `.../Nemesis_EngineExt/mod/<code>`.
@@ -90,7 +104,18 @@ impl Workspace {
     /// - `meshes/.../<x>.bin/` (NemesisExt): by that path (`.bin` -> `.xml`)
     ///
     /// Returns `(workspace, code, folders without a template)`.
+    #[cfg(test)]
     pub(crate) fn import(selected: &Path, template_root: &Path) -> Result<(Self, String, Vec<String>), String> {
+        Self::import_counted(selected, template_root, &AtomicUsize::new(0))
+    }
+
+    /// [`Self::import`], counting the patch files read in `done`: a big mod has thousands, and the
+    /// editor shows how far it is (see `tool::job`).
+    pub(crate) fn import_counted(
+        selected: &Path,
+        template_root: &Path,
+        done: &AtomicUsize,
+    ) -> Result<(Self, String, Vec<String>), String> {
         let code = code_of(selected);
         let root = mod_root_of(selected);
         // A mod has its patches for templates Nemesis does not know in the other engine's directory.
@@ -105,11 +130,13 @@ impl Workspace {
         let mut workspace = Self { info, ..Self::default() };
         let mut skipped = Vec::new();
         for dir in &dirs {
-            workspace.read_patch_dir(dir, root.as_deref(), template_root, &mut skipped)?;
+            workspace.read_patch_dir(dir, root.as_deref(), template_root, &mut skipped, done)?;
         }
         if let Some(pandora) = &pandora {
             workspace.read_pandora_dir(pandora, template_root, &mut skipped)?;
         }
+        // A mod of Nemesis only: its work shows only the templates Nemesis knows.
+        workspace.scope = TemplateScope::of(&workspace);
         Ok((workspace, code, skipped))
     }
 
@@ -121,6 +148,7 @@ impl Workspace {
         root: Option<&Path>,
         template_root: &Path,
         skipped: &mut Vec<String>,
+        done: &AtomicUsize,
     ) -> Result<(), String> {
         for folder in patch_folders(mod_dir) {
             let relative = folder.strip_prefix(mod_dir).unwrap_or(&folder);
@@ -140,10 +168,14 @@ impl Workspace {
             };
             let at = self.open_behavior(&template, &meshes_path)?;
             let behavior = &mut self.behaviors[at];
-            behavior.force_ext |= relative.to_ascii_lowercase().starts_with("meshes/") && behavior.nemesis.is_some();
+            // A template Nemesis knows, patched in `Nemesis_EngineExt`: the mod is written as NemesisExt.
+            if relative.to_ascii_lowercase().starts_with("meshes/") && behavior.nemesis.is_some() {
+                self.export_format = ExportFormat::NemesisExt;
+            }
             for file in read_dir(&folder)?.filter(|p| p.extension().is_some_and(|e| e == "txt")) {
-                let id = file_stem(&file);
+                done.fetch_add(1, Ordering::Relaxed);
                 let patch = read_text(&file)?;
+                let id = patched_id(&patch).map_or_else(|| file_stem(&file), str::to_owned);
                 if let Some(template) = behavior.template_object(&id) {
                     let text = apply_to_template(&patch, &template.text);
                     behavior.set_text(&id, &text);
@@ -177,5 +209,82 @@ impl Workspace {
             let files = files.filter(|path| path.is_file());
             self.owned.extend(files.filter_map(|file| file.strip_prefix(root).ok().map(owned_key)));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::path::{Path, PathBuf};
+
+    use super::*;
+
+    /// The shipped templates of the repository.
+    fn template_root() -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../resource/assets/templates")
+    }
+
+    /// On all the mods in a folder (`PATCH_EDITOR_MODS`, e.g. MO2's `mods`): a behavior patch that
+    /// d-merge's parser accepts as the mod has it is still accepted once read and written again.
+    ///
+    /// e.g., `Combat Gameplay Overhaul` deletes elements of `#0521` with blank lines. They were read as
+    /// lines, and the written patch had a block adding blank lines, which the parser rejects.
+    ///
+    /// `PATCH_EDITOR_ONLY`: only the mods whose folder name contains it, with the patches that break
+    /// printed whole.
+    /// A file is read as the patch of the object it names, not of its file name.
+    #[test]
+    fn a_patch_is_of_the_object_it_names() {
+        let patch = "		<hkobject name=\"#3108\" class=\"hkbClipTriggerArray\" signature=\"0x59c23a0f\">
+";
+        assert_eq!(patched_id(patch), Some("#3108"));
+        assert_eq!(
+            patched_id(
+                "V3
+1
+"
+            ),
+            None,
+            "animation data"
+        );
+    }
+
+    #[test]
+    #[ignore = "needs real mods"]
+    fn a_patch_read_and_written_again_still_parses() {
+        let mods = std::env::var("PATCH_EDITOR_MODS").unwrap();
+        let only = std::env::var("PATCH_EDITOR_ONLY").ok();
+        let (mut total, mut broken) = (0, 0);
+        let mod_dirs = std::fs::read_dir(&mods).unwrap().flatten().map(|entry| entry.path());
+        let mod_dirs = mod_dirs.filter(|dir| only.as_deref().is_none_or(|only| dir.to_string_lossy().contains(only)));
+        for mod_dir in mod_dirs {
+            let Ok(codes) = std::fs::read_dir(mod_dir.join("Nemesis_Engine").join("mod")) else { continue };
+            for code_dir in codes.flatten().map(|entry| entry.path()).filter(|dir| dir.is_dir()) {
+                let Ok((workspace, code, _)) = Workspace::import(&code_dir, &template_root()) else { continue };
+                for behavior in workspace.behaviors.iter().filter(|behavior| !behavior.is_anim_data()) {
+                    for id in behavior.edits.keys() {
+                        // By the object it patches: e.g. BFCO's `#3018.txt` is `#3108`'s.
+                        let files =
+                            behavior.patch_folders_in(&code_dir).into_iter().filter_map(|dir| read_dir(&dir).ok());
+                        let mut texts = files.flatten().filter_map(|path| read_text(&path).ok());
+                        let Some(original) = texts.find(|text| patched_id(text) == Some(id.as_str())) else { continue };
+                        if nemesis_diff::validate(&original).is_err() {
+                            continue; // d-merge rejects it as well: not ours to fix.
+                        }
+                        total += 1;
+                        let written = behavior.patch(&code, id).unwrap_or_default();
+                        if let Err(err) = nemesis_diff::validate(&written) {
+                            broken += 1;
+                            let first = err.lines().next().unwrap_or_default();
+                            println!("{} {}/{id}: {first}", code_dir.display(), behavior.name);
+                            if only.is_some() {
+                                println!("--- original\n{original}\n--- written\n{written}\n--- error\n{err}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        println!("{broken} of {total} patches broken by writing them again");
+        assert_eq!(broken, 0);
     }
 }

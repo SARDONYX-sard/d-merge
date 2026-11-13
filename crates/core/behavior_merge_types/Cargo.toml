@@ -24,6 +24,7 @@ tracing   = { workspace = true, optional = true }
 json_patch       = { workspace = true, features = ["serde"] }
 nemesis_xml      = { workspace = true }
 skyrim_anim_data = { workspace = true, features = ["alt_map", "serde"] }
+stdx             = { workspace = true }
 
 [lints]
 workspace = true

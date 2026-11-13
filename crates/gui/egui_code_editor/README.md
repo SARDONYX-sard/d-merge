@@ -32,6 +32,22 @@ egui_code_editor::status_line(ui, &state, Keymap::Vim);
 | `Shift+F12`          | Find references (`Language::references`)  |
 | Mouse rest on a word | Hover (diagnostics + docs)                |
 
+## Problems panel
+
+`ProblemsPanel` (`problems` module) lists the host's diagnostics; `status_counts` shows `✖ 2  ⚠ 5`
+in the status bar, and a click on it shows or hides the panel. With `.cursor(&mut ProblemsCursor)`
+the keyboard works it too:
+
+| Key                          | Action                                        |
+| ---------------------------- | --------------------------------------------- |
+| `Ctrl+Shift+L`               | Show the panel with the keyboard / hide it    |
+| `j` `k`, `↓` `↑`             | Next / previous problem                       |
+| `g` `G`, `Home` `End`        | First / last problem                          |
+| `Enter`                      | Go to the problem (the editor gets the keys)  |
+| `Esc`                        | Back to the editor                            |
+
+`Ctrl+Shift+L` is the host's key binding (`problems.toggle` of the `keybinding` crate): the host owns the focus.
+
 ## Command palette and host API
 
 `Ctrl+Shift+P` lists the editor's commands and the host's, like Monaco's `editor.addAction`:
@@ -65,6 +81,7 @@ Search is the same as Vim's `/` (plain text, smartcase).
 | `Shift+Alt+↑` / `Shift+Alt+↓` | Copy the line(s) up / down               | `yyP`   |
 | `Ctrl+Enter`                  | Insert a line below                      | `o`     |
 | `Ctrl+Shift+Enter`            | Insert a line above                      | `O`     |
+| `Ctrl+/`                      | Toggle line comment (Vim keymap too)     | `gcc`   |
 
 ## Vim
 
@@ -124,6 +141,7 @@ Used as `{operator}{motion}`, `{operator}{text object}` or doubled for whole lin
 | `y`         | Yank (also to the clipboard) |
 | `>` / `<`   | Indent / outdent lines       |
 | `gu` / `gU` | Lowercase / uppercase        |
+| `gc`        | Toggle comment (`gcc`: line) |
 | `g~`        | Toggle case                  |
 
 ### Text objects

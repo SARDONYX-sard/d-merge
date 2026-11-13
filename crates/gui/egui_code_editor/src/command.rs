@@ -56,10 +56,13 @@ pub enum EditorCommand {
     NextChange,
     /// Vim `[c`: the host's previous change.
     PreviousChange,
+    /// Vim `<Space>V`: show the file of what is edited in the file manager (VS Code's "Reveal in
+    /// File Explorer", which the host's `Shift+Alt+R` also does).
+    RevealFile,
 }
 
 impl EditorCommand {
-    pub(crate) const ALL: [Self; 13] = [
+    pub(crate) const ALL: [Self; 14] = [
         Self::Save,
         Self::GoToDefinition,
         Self::FindReferences,
@@ -73,6 +76,7 @@ impl EditorCommand {
         Self::ToggleInlineDiff,
         Self::NextChange,
         Self::PreviousChange,
+        Self::RevealFile,
     ];
 
     pub(crate) const fn action_id(self) -> &'static str {
@@ -90,6 +94,7 @@ impl EditorCommand {
             Self::ToggleInlineDiff => "toggle_inline_diff",
             Self::NextChange => "next_change",
             Self::PreviousChange => "previous_change",
+            Self::RevealFile => "reveal_file",
         }
     }
 
@@ -101,21 +106,6 @@ impl EditorCommand {
     /// [`CodeEditorOutput::command`], the same as its key.
     #[inline]
     pub const fn action(self, label: &str) -> EditorAction<'_> {
-        EditorAction { id: self.action_id(), label }
+        EditorAction::new(self.action_id(), label)
     }
-}
-
-/// `Ctrl+PageDown`: `Some(true)`, the next tab. `Ctrl+PageUp`: `Some(false)`, the previous one. As in
-/// VS Code, in every keymap. For a host with tabs to ask before showing its editor.
-pub fn tab_switch_keys(ui: &egui::Ui) -> Option<bool> {
-    use egui::{Key, Modifiers};
-    ui.input_mut(|input| {
-        if input.consume_key(Modifiers::COMMAND, Key::PageDown) {
-            Some(true)
-        } else if input.consume_key(Modifiers::COMMAND, Key::PageUp) {
-            Some(false)
-        } else {
-            None
-        }
-    })
 }

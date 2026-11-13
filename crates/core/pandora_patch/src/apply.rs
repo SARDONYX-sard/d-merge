@@ -35,7 +35,9 @@ fn apply_op<'a>(object: &mut Element<'a>, op: &Op<'a>) -> Option<()> {
         }
         OpKind::Append => {
             let position = parent.child_position(last)?;
-            parent.children[position].children.extend(op.elements.iter().cloned());
+            let list = &mut parent.children[position];
+            list.children.extend(op.elements.iter().cloned());
+            list.words.extend(op.words.iter().copied());
         }
         OpKind::Insert => return None,
     }
@@ -134,7 +136,12 @@ mod tests {
     #[test]
     fn a_path_that_leads_nowhere_is_told() {
         let mut object = parse(TEMPLATE).unwrap();
-        let op = Op { kind: OpKind::Remove, path: "#0001/none/Element0".to_owned(), elements: Vec::new() };
+        let op = Op {
+            kind: OpKind::Remove,
+            path: "#0001/none/Element0".to_owned(),
+            elements: Vec::new(),
+            words: Vec::new(),
+        };
         assert_eq!(apply_ops(&mut object, &[op]), Err("#0001/none/Element0".to_owned()));
     }
 

@@ -66,6 +66,15 @@ pub(super) fn behavior_patch(behavior: &Behavior, code: &str, problems: &mut Vec
 }
 
 impl Behavior {
+    /// Its patch file in a Pandora mod: `<output>/Pandora_Engine/mod/<code>/patches/<pack file>.xml`.
+    /// `None`: no project has this template, so Pandora has no name for it.
+    ///
+    /// e.g. `D:/mods/My/Pandora_Engine/mod/mymod/patches/defaultmale~0_master.xml`
+    pub(crate) fn pandora_patch_path(&self, output: &Path, code: &str) -> Option<PathBuf> {
+        let name = self.pandora_file.clone().or_else(|| pack_file_name(&self.meshes_path))?;
+        Some(joined(output, &["Pandora_Engine", "mod", code, "patches", &format!("{name}.xml")]))
+    }
+
     /// Takes in the Pandora patch file: its operations on the template become the edits of the objects,
     /// so that they show as any others do. Returns the objects that changed and the paths that lead
     /// nowhere. A file that isn't well formed changes nothing: the editor says what is wrong with it.
@@ -202,7 +211,7 @@ impl Workspace {
             behavior.pandora_file = Some(name);
             let (_, failed) = behavior.apply_pandora_doc();
             skipped.extend(failed);
-            self.export_format = ExportFormat::Pandora;
+            self.export_format = ExportFormat::PandoraV5;
         }
         if dir.join(ASDSF).is_dir() {
             skipped.push(ASDSF.to_owned());
@@ -248,12 +257,11 @@ impl Workspace {
                 None => behavior_patch(behavior, code, &mut export.problems),
             };
             let Some(text) = text else { continue };
-            let name = behavior.pandora_file.clone().or_else(|| pack_file_name(&behavior.meshes_path));
-            let Some(name) = name else {
+            let Some(file) = behavior.pandora_patch_path(output, code) else {
                 export.problems.push(format!("{}: not written: no project has this template", behavior.name));
                 continue;
             };
-            write(&joined(&root, &["patches", &format!("{name}.xml")]), &text)?;
+            write(&file, &text)?;
             export.written += 1;
         }
         if export.written > 0 {

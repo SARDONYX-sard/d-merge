@@ -125,6 +125,8 @@ pub(super) enum Operator {
     Lower,
     Upper,
     ToggleCase,
+    /// `gc`: comment the lines out, or back in (`gcc`: the line).
+    Comment,
 }
 
 /// Text objects after `i` / `a`.

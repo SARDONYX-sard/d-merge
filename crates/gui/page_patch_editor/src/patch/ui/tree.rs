@@ -4,54 +4,32 @@ use std::rc::Rc;
 
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use crate::patch::tree::{Graph, Node, Row, TreeInput, TreeState, has_guide};
+use super::object_list::{RowAction, row_menu};
+use crate::patch::{
+    tool::list::{fixed_row, row_height},
+    tree::{Graph, MAX_STICKY, Node, Row, TreeInput, TreeState, has_guide},
+};
 
 /// Pixels of indent per tree level.
 const INDENT: f32 = 12.0;
 
-/// This frame's keys as [`TreeInput`]s (several for a held key on a slow frame).
-///
-/// `leader`: `Space` was pressed; the next key decides. Frames also come without keys (e.g., the
-/// mouse moved), so only another key ends it. Kept by the caller between frames.
-pub(in crate::patch) fn read_keys(ui: &egui::Ui, leader: &mut bool) -> Vec<TreeInput> {
-    use egui::{Key, Modifiers};
-    const BINDINGS: [(Key, TreeInput); 11] = [
-        (Key::J, TreeInput::Next),
-        (Key::ArrowDown, TreeInput::Next),
-        (Key::K, TreeInput::Previous),
-        (Key::ArrowUp, TreeInput::Previous),
-        (Key::H, TreeInput::Close),
-        (Key::ArrowLeft, TreeInput::Close),
-        (Key::L, TreeInput::Open),
-        (Key::ArrowRight, TreeInput::Open),
-        (Key::O, TreeInput::Toggle),
-        (Key::Enter, TreeInput::Leave),
-        (Key::Escape, TreeInput::Leave),
-    ];
-    let mut inputs = Vec::new();
-    ui.input_mut(|input| {
-        *leader |= input.consume_key(Modifiers::NONE, Key::Space);
-        if *leader {
-            let leave = input.consume_key(Modifiers::NONE, Key::E);
-            if leave {
-                inputs.push(TreeInput::Leave);
-            }
-            *leader = !leave && !input.events.iter().any(|e| matches!(e, egui::Event::Key { pressed: true, .. }));
-        }
-        // Before `g`: `consume_key` with no modifiers also takes the Shift variant.
-        if input.consume_key(Modifiers::SHIFT, Key::G) {
-            inputs.push(TreeInput::Last);
-        }
-        if input.consume_key(Modifiers::NONE, Key::G) {
-            inputs.push(TreeInput::First);
-        }
-        for (key, tree_input) in BINDINGS {
-            while input.consume_key(Modifiers::NONE, key) {
-                inputs.push(tree_input);
-            }
-        }
-    });
-    inputs
+/// The explorer's command of a key binding command. e.g. `explorer.down` -> `Next`
+pub(in crate::patch) fn tree_input(command: &str) -> Option<TreeInput> {
+    use keybinding::commands::{
+        EXPLORER_COLLAPSE, EXPLORER_DOWN, EXPLORER_EXPAND, EXPLORER_FIRST, EXPLORER_LAST, EXPLORER_LEAVE,
+        EXPLORER_TOGGLE, EXPLORER_UP,
+    };
+    Some(match command {
+        EXPLORER_DOWN => TreeInput::Next,
+        EXPLORER_UP => TreeInput::Previous,
+        EXPLORER_FIRST => TreeInput::First,
+        EXPLORER_LAST => TreeInput::Last,
+        EXPLORER_COLLAPSE => TreeInput::Close,
+        EXPLORER_EXPAND => TreeInput::Open,
+        EXPLORER_TOGGLE => TreeInput::Toggle,
+        EXPLORER_LEAVE => TreeInput::Leave,
+        _ => return None,
+    })
 }
 
 /// What a click on a row asked for.
@@ -63,8 +41,8 @@ enum RowEvent {
     SetOpenBelow(Node, bool),
     /// Bring the selected row into view.
     Locate,
-    /// Double click or menu: the row's object stays in a tab.
-    KeepOpen(usize),
+    /// Double click (`KeepOpen`) or the menu of the row with this index: see [`RowAction`].
+    Menu(usize, RowAction),
 }
 
 /// Draws the tree; a click selects an object (`selected`).
@@ -72,24 +50,25 @@ enum RowEvent {
 /// `changed_only`: only the branches leading to edited / new objects.
 /// `focused`: the keyboard is in the tree: the selected row gets a frame.
 ///
-/// Returns the object to keep open in a tab (double click, menu).
-pub(in crate::patch) fn tree_ui<'g>(
+/// Returns what a row's menu (or a double click: keep it open) asked for, of the row's object.
+pub(super) fn tree_ui(
     ui: &mut egui::Ui,
-    graph: &'g Graph,
+    graph: &Graph,
     selected: &mut Option<Rc<str>>,
     state: &mut TreeState,
     (changed_only, focused): (bool, bool),
     i18n: &I18nMap,
-) -> Option<&'g str> {
+) -> Option<(Node, RowAction)> {
     state.prepare(graph, selected.as_deref(), changed_only);
     unlinked_section(ui, graph, selected, i18n);
     let mut event = breadcrumb(ui, graph, state, selected.as_deref(), i18n);
 
-    let row_height = ui.spacing().interact_size.y.max(ui.text_style_height(&egui::TextStyle::Monospace) + 4.0);
-    let mut scroll = egui::ScrollArea::both().id_salt("nemesis_tree").auto_shrink(false);
+    let row_height = row_height(ui);
+    // Up and down only, as VS Code's explorer: the rows are cut with `…` (see `object_button`).
+    let mut scroll = egui::ScrollArea::vertical().id_salt("nemesis_tree").auto_shrink(false);
     let row_with_spacing = row_height + ui.spacing().item_spacing.y;
     if let Some(row) = state.scroll_to.take() {
-        if let Some(offset) = state.offset_for(row, row_with_spacing) {
+        if let Some(offset) = state.offset_for(row, (row_height, ui.spacing().item_spacing.y)) {
             scroll = scroll.vertical_scroll_offset(offset);
         }
         let indent = state.rows().get(row).map_or(0.0, |row| f32::from(row.depth) * INDENT);
@@ -113,11 +92,11 @@ pub(in crate::patch) fn tree_ui<'g>(
     state.view_width = output.inner_rect.width();
     event = sticky_rows_ui(ui, graph, state, output.inner_rect, row_with_spacing).or(event);
 
-    let mut keep_open = None;
+    let mut action = None;
     match event {
-        Some(RowEvent::KeepOpen(row)) => {
+        Some(RowEvent::Menu(row, picked)) => {
             state.cursor = row;
-            keep_open = state.rows().get(row).map(|row| graph.id(row.node));
+            action = state.rows().get(row).map(|row| (row.node, picked));
         }
         Some(RowEvent::Select(row)) => {
             state.cursor = row;
@@ -129,7 +108,7 @@ pub(in crate::patch) fn tree_ui<'g>(
         Some(RowEvent::Locate) => state.scroll_to = Some(state.cursor),
         None => {}
     }
-    keep_open
+    action
 }
 
 /// `⚠ Not linked (2)` and the new objects nothing points to. Above the tree: always in view,
@@ -144,8 +123,7 @@ fn unlinked_section(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Rc<s
     egui::ScrollArea::vertical().id_salt("nemesis_unlinked").max_height(80.0).show(ui, |ui| {
         for &node in unlinked {
             let id = graph.id(node);
-            let text = object_label(ui, graph, node, false);
-            if ui.add(egui::Button::selectable(selected.as_deref() == Some(id), text)).clicked() {
+            if object_button(ui, graph, node, (selected.as_deref() == Some(id), false)).clicked() {
                 *selected = Some(id.into());
             }
         }
@@ -164,8 +142,7 @@ fn row_ui(
     i18n: &I18nMap,
 ) -> Option<RowEvent> {
     let mut event = None;
-    ui.horizontal(|ui| {
-        ui.set_height(height);
+    fixed_row(ui, height, |ui| {
         ui.add_space(f32::from(row.depth) * INDENT);
         let glyph = if row.expandable && row.open {
             "▼"
@@ -178,20 +155,21 @@ fn row_ui(
             event = Some(RowEvent::SetOpen(row.node, !row.open));
         }
 
-        let response = ui.add(egui::Button::selectable(is_selected, object_label(ui, graph, row.node, row.dimmed)));
+        let response = object_button(ui, graph, row.node, (is_selected, row.dimmed));
         if response.clicked() {
             event = Some(RowEvent::Select(index));
         }
         if response.double_clicked() {
-            event = Some(RowEvent::KeepOpen(index));
+            event = Some(RowEvent::Menu(index, RowAction::KeepOpen));
         }
         if focused && is_selected {
             let stroke = ui.visuals().selection.stroke;
             ui.painter().rect_stroke(response.rect, 2.0, stroke, egui::StrokeKind::Outside);
         }
         response.context_menu(|ui| {
-            if ui.button(i18n.t(I18nKey::NemesisKeepOpen)).clicked() {
-                event = Some(RowEvent::KeepOpen(index));
+            // The same as the flat list's, then what only a tree has.
+            if let Some(picked) = row_menu(ui, i18n, graph.is_new(row.node), graph.is_changed(row.node)) {
+                event = Some(RowEvent::Menu(index, picked));
                 ui.close();
             }
             if row.expandable {
@@ -302,9 +280,6 @@ fn breadcrumb(
     event
 }
 
-/// How many ancestors are pinned over the tree at most.
-const MAX_STICKY: usize = 5;
-
 /// The ancestors of the rows on screen, pinned over the top of the tree. Without them, a long list
 /// of children shows nothing of what they belong to. A click selects one.
 fn sticky_rows_ui(
@@ -331,12 +306,51 @@ fn sticky_rows_ui(
         let line = state.rows()[row];
         sticky.horizontal(|ui| {
             ui.add_space(f32::from(line.depth).mul_add(INDENT, -state.scroll_x).max(0.0));
-            if ui.add(egui::Button::selectable(false, object_label(ui, graph, line.node, false))).clicked() {
+            if object_button(ui, graph, line.node, (false, false)).clicked() {
                 event = Some(RowEvent::Select(row));
             }
         });
     }
     event
+}
+
+/// The button of a row of `node`, its label cut with `…` to fit, and the whole label on hover when
+/// it was: on lines of its own, the pointers wrapped, as wide as a hover.
+///
+/// ```text
+/// #0106
+/// hkbStateMachine
+/// GetUpStateMachine
+/// ← #0105 #0109 #0110 #0111 #0112
+///   #0113 ...
+/// ```
+pub(in crate::patch) fn object_button(
+    ui: &mut egui::Ui,
+    graph: &Graph,
+    node: Node,
+    (selected, dimmed): (bool, bool),
+) -> egui::Response {
+    // Cut with `…` to the width left, as VS Code's explorer: the list never scrolls sideways.
+    let width = ui.spacing().button_padding.x.mul_add(-2.0, ui.available_width());
+    let fitted = egui_widgets::fit(ui, object_label(ui, graph, node, dimmed), width);
+    let response = ui.add(egui::Button::selectable(selected, fitted.galley));
+    egui_widgets::CutHover::new().show_if(ui, response, fitted.elided, |ui| {
+        let (head, class, name, links) = graph.label_parts(node);
+        let visuals = ui.visuals().clone();
+        let parts = [
+            (head, visuals.text_color()),
+            (class, egui_widgets::markdown::class_color(&visuals)),
+            (name, egui_widgets::markdown::name_color(&visuals)),
+            (links, visuals.weak_text_color()),
+        ];
+        for (text, color) in parts {
+            let text = text.trim();
+            if !text.is_empty() {
+                let label = egui::RichText::new(text).monospace().color(color);
+                ui.add(egui::Label::new(label).wrap());
+            }
+        }
+    })
 }
 
 /// A row's text: the class and the name each have their color, to find them in a long list.

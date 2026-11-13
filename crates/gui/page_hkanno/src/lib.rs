@@ -46,6 +46,8 @@ pub struct HkannoPageCtx<'a> {
     pub notify: &'a mut Notification,
     /// Frame (background) of the page's panels, from the app theme.
     pub panel_frame: egui::Frame,
+    /// The key bindings: their commands are taken out of the frame's keys by the page.
+    pub keys: &'a mut keybinding::Keybindings,
 }
 
 /// Open files and transient dialog state. Keep one in the app.
@@ -57,6 +59,14 @@ pub struct HkannoPage {
     show_lsp_options: bool,
     /// "Revert?" confirmation modal.
     show_revert: bool,
+    /// The Problems panel is hidden: a click on the status bar's counts. It shows by default.
+    problems_hidden: bool,
+    /// The keyboard in the Problems panel: `Ctrl+Shift+L` moves it there and back.
+    problems_cursor: egui_code_editor::ProblemsCursor,
+    /// The commands this frame's keys asked for: see [`HkannoPage::key_command`].
+    key_commands: Vec<&'static str>,
+    /// The keys of the palette and its `⚙`. See [`keybinding::KeyUi`].
+    key_ui: keybinding::KeyUi,
 }
 
 impl std::fmt::Debug for HkannoPage {

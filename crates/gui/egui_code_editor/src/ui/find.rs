@@ -4,7 +4,7 @@ use egui::Key;
 
 use crate::{
     find::{FindBar, Kind},
-    search::Matcher,
+    search::index_of,
 };
 
 impl FindBar {
@@ -40,7 +40,7 @@ impl FindBar {
             });
     }
 
-    /// `[query] 2/5 ↑ ↓ ✖`
+    /// `[query] .* 2/5 ↑ ↓ ✖`
     pub(crate) fn find_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, text: &str) {
         let field = ui.add(
             egui::TextEdit::singleline(&mut self.query)
@@ -53,11 +53,15 @@ impl FindBar {
             self.select_from_origin(ui.ctx(), id, text);
         }
 
-        let chars: Vec<char> = text.chars().collect();
-        let matcher = Matcher::new(&self.query);
-        let total = matcher.as_ref().map_or(0, |m| m.count(&chars));
-        let current =
-            self.current_match(ui.ctx(), id, text).and_then(|range| matcher.as_ref()?.index_of(&chars, range.start));
+        // `.*`, as VS Code's: the query is a regex.
+        let regex = egui::Button::selectable(self.regex, egui::RichText::new(".*").monospace()).small();
+        if ui.add(regex).on_hover_text("Use regular expression").clicked() {
+            self.regex = !self.regex;
+            self.select_from_origin(ui.ctx(), id, text);
+        }
+        let matches = self.matcher().map(|matcher| matcher.find_all(text)).unwrap_or_default();
+        let total = matches.len();
+        let current = self.current_match(ui.ctx(), id, text).and_then(|range| index_of(&matches, range.start));
         let counter = match (total, current) {
             (0, _) if self.query.is_empty() => String::new(),
             (0, _) => "No results".to_string(),

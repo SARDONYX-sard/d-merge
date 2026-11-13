@@ -33,7 +33,7 @@ impl PatchTool {
             ui.colored_label(ui.visuals().error_fg_color, error);
         }
         let names = self.names();
-        let filter = self.filter.as_str();
+        let filter = self.explorer.filter.as_str();
         let (events, template_events) = (&names.events, names.template_events);
         let (variables, template_variables) = (&names.variables, names.template_variables);
 
@@ -101,7 +101,7 @@ impl PatchTool {
         let ids = Ids { string_data, graph_data, value_set };
         match self.apply(action, &ids, events, variables) {
             Ok(changed) => {
-                self.editor_for = None; // the open object may be one of them
+                self.pane.opened = None; // the open object may be one of them
                 for id in changed {
                     self.object_changed(&id);
                 }
@@ -136,6 +136,7 @@ fn name_rows(
         (0..list.names.len()).rev().filter(|&i| contains_ignore_case(&list.names[i], filter)).collect();
     let row_height = ui.spacing().interact_size.y.max(ui.text_style_height(&egui::TextStyle::Monospace) + 6.0);
     let mut action = None;
+    // Up and down only: a long name is cut with `…` (sideways, the width changed with the rows drawn).
     egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, shown.len(), |ui, range| {
         for &index in &shown[range] {
             ui.horizontal(|ui| action = name_row(ui, i18n, list, index, renaming).or(action));
@@ -161,12 +162,19 @@ fn name_row(
     if is_being_renamed {
         return rename_field(ui, renaming, is_variable, index);
     }
-    let name = egui::RichText::new(&names[index]).monospace();
-    if index < template_count {
-        ui.label(name);
+    // Cut with `…` to the room left (the mod's own have `✎ ✖` after it), the whole on hover.
+    let own = index >= template_count;
+    let buttons = if own { 2.0 * (ui.spacing().interact_size.y + ui.spacing().item_spacing.x) } else { 0.0 };
+    let color = if own { ui.visuals().strong_text_color() } else { ui.visuals().text_color() };
+    let fitted = egui_widgets::fit_text(ui, &names[index], color, ui.available_width() - buttons);
+    // Its own hover only: egui's label would show one more for a cut text.
+    let label = ui.add(egui::Label::new(fitted.galley).sense(egui::Sense::hover()).show_tooltip_when_elided(false));
+    egui_widgets::CutHover::new().show_if(ui, label, fitted.elided, |ui| {
+        ui.add(egui::Label::new(egui::RichText::new(&names[index]).monospace()).wrap());
+    });
+    if !own {
         return None;
     }
-    ui.label(name.strong());
     if ui.small_button("✎").on_hover_text(i18n.t(I18nKey::NemesisRename)).clicked() {
         *renaming = Some(Renaming { is_variable, index, text: names[index].clone(), focus: true });
     }

@@ -18,6 +18,11 @@ pub(super) struct HkannoLanguage {
 }
 
 impl Language for HkannoLanguage {
+    /// `# a comment`, as hkanno's lines have them.
+    fn comment(&self) -> Option<egui_code_editor::Comment> {
+        Some(egui_code_editor::Comment::Line("#"))
+    }
+
     fn highlight(&self, line: &str, visuals: &egui::Visuals) -> Vec<(Range<usize>, Color32)> {
         features::highlight::highlight_line(line, self.semantic)
             .into_iter()

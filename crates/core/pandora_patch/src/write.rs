@@ -39,6 +39,11 @@ pub fn op_text(op: &Op<'_>) -> String {
 pub(crate) fn write_op(out: &mut String, op: &Op<'_>) {
     let tag = op.kind.tag();
     let path = &op.path;
+    if !op.words.is_empty() {
+        // e.g. `<Append path="#0340/states">` / `#dmco$0` / `</Append>`, as the Pandora mods write it.
+        let _ = writeln!(out, "\t<{tag} path=\"{path}\">\n\t\t{}\n\t</{tag}>", op.words.join(" "));
+        return;
+    }
     if op.kind == OpKind::Remove || op.elements.is_empty() {
         let _ = writeln!(out, "\t<{tag} path=\"{path}\" />");
         return;
@@ -112,7 +117,8 @@ mod tests {
 
     #[test]
     fn a_remove_has_nothing_in_it() {
-        let op = Op { kind: OpKind::Remove, path: "#0001/a/Element0".to_owned(), elements: Vec::new() };
+        let op =
+            Op { kind: OpKind::Remove, path: "#0001/a/Element0".to_owned(), elements: Vec::new(), words: Vec::new() };
         assert!(patch_file("amco", &[], &[op]).contains("<Remove path=\"#0001/a/Element0\" />"));
     }
 

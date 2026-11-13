@@ -104,6 +104,26 @@ impl Draft {
     }
 }
 
+/// Writing the user patch as a mod of its own, e.g. into MO2's `mods` to manage or share it there:
+/// to `output`, as `format`. Its own place (`<output>/.d_merge/user_patch`, NemesisExt) and what it
+/// wrote there stay as they are.
+///
+/// As `Nemesis`, the templates Nemesis does not know can't be in `Nemesis_Engine`: they go to
+/// `Nemesis_EngineExt` as always ([`workspace::Workspace::outside_nemesis`]), and the window says so.
+///
+/// ```text
+/// [Export as mod…] -> Output: [D:/MO2/mods/My Patch] [Select]   Format: [Nemesis ▼]   [Export]
+///                     ⚠ Nemesis does not know these templates: ... (1)   <- only as Nemesis
+/// ```
+#[derive(Debug, Default)]
+pub(super) struct ModExport {
+    pub(super) open: bool,
+    /// The mod's root, e.g. `D:/MO2/mods/My Patch`.
+    pub(super) output: String,
+    /// Any of them. See the struct docs for `Nemesis`.
+    pub(super) format: workspace::ExportFormat,
+}
+
 /// The window's state. See the module docs.
 #[derive(Debug, Default)]
 pub(super) struct UserPatchView {
@@ -117,7 +137,10 @@ pub(super) struct UserPatchView {
 impl PatchTool {
     fn for_user_patch(paths: PatchPaths<'_>) -> Self {
         let output = paths.patch_output_dir.trim();
+        let mut workspace = Workspace::default();
+        workspace.use_user_patch_format();
         Self {
+            workspace,
             is_user_patch: true,
             restored: true,
             patch_output: output.to_owned(),
@@ -127,7 +150,7 @@ impl PatchTool {
             template_dir: paths.template_dir.to_owned(),
             parser_mode: paths.parser_mode,
             behaviors_open: true,
-            changed_only: true,
+            explorer: super::tool::list::Explorer { changed_only: true, ..Default::default() },
             ..Self::default()
         }
     }
@@ -159,6 +182,8 @@ impl PatchTool {
             paths.template_dir.clone_into(&mut tool.template_dir);
         }
         tool.sync_workspace(notify, i18n);
+        // Small, and what comes next uses it at once.
+        tool.wait_job(notify, i18n);
         tool
     }
 
@@ -189,15 +214,15 @@ impl PatchTool {
         let root = PathBuf::from(paths.template_dir);
         let tool = self.user_patch_tool(paths, notify, i18n);
         if tool.workspace.info.name.is_empty() {
-            i18n.t(I18nKey::NemesisUserPatchName).clone_into(&mut tool.workspace.info.name);
+            i18n.t(I18nKey::UserPatchTitle).clone_into(&mut tool.workspace.info.name);
         }
         // What the value points to is that mod's.
         tool.workspace.add_ref(Path::new(&request.mod_dir), USER_PATCH_CODE);
         resolve::apply(&mut tool.workspace, &root, request)?;
         tool.workspace.reload_refs(); // a behavior may have been opened
         tool.reset_names();
-        tool.editor_for = None;
-        tool.preview = None;
+        tool.pane.opened = None;
+        tool.pane.preview = None;
         let invalid = tool.write_user_patch()?;
         self.mod_written = true;
         if invalid.is_empty() { Ok(()) } else { Err(invalid.join("\n")) }
@@ -221,7 +246,7 @@ impl PatchTool {
 
     /// What `Edit...` proposed goes, unless it was edited. See [`Draft`].
     pub(super) fn undo_unedited_draft(&mut self) {
-        self.merge_values = None;
+        self.pane.merge_values = None;
         let Some(draft) = self.draft.take() else { return };
         if draft.is_edited(&self.workspace) {
             return;
@@ -229,8 +254,8 @@ impl PatchTool {
         let id = draft.id.clone();
         draft.undo(&mut self.workspace);
         self.reset_names();
-        self.editor_for = None;
-        self.preview = None;
+        self.pane.opened = None;
+        self.pane.preview = None;
         self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
         if self.workspace.behaviors.get(self.active).is_none_or(|behavior| behavior.text(&id).is_none()) {
             self.tabs.clear();
@@ -252,10 +277,54 @@ impl PatchTool {
         self.tabs.clear();
         self.active = 0;
         self.selected = None;
-        self.editor_for = None;
-        self.preview = None;
+        self.pane.opened = None;
+        self.pane.preview = None;
         match self.write_user_patch() {
             Ok(_) => self.mod_written = true,
+            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+        }
+    }
+
+    /// Writes the user patch as a mod: see [`ModExport`].
+    pub(super) fn export_user_patch_as_mod(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        let output = self.mod_export.output.trim().to_owned();
+        if output.is_empty() {
+            return;
+        }
+        let root = Path::new(&output);
+        let chosen = self.mod_export.format;
+        let written = if chosen == workspace::ExportFormat::PandoraV5 {
+            self.workspace.export_pandora(root, USER_PATCH_CODE).map(|export| export.problems)
+        } else {
+            // The files of its own place are what its next save replaces: not those of this mod.
+            let work = &mut self.workspace;
+            let owned = std::mem::take(&mut work.owned);
+            let format = std::mem::replace(&mut work.export_format, chosen);
+            let written = work.export(root, USER_PATCH_CODE, self.parser_mode).map(|(_, invalid)| invalid);
+            (work.owned, work.export_format) = (owned, format);
+            written
+        };
+        let outside: Vec<&str> = match chosen {
+            workspace::ExportFormat::Nemesis => self.workspace.outside_nemesis().collect(),
+            _ => Vec::new(),
+        };
+        match written {
+            Ok(problems) if problems.is_empty() && outside.is_empty() => {
+                notify.success(format!("{}: {output}", i18n.t(I18nKey::ExportedMessage)));
+            }
+            Ok(problems) if problems.is_empty() => notify.warn(format!(
+                "{}: {output}\n{} ({}):\n{}",
+                i18n.t(I18nKey::ExportedMessage),
+                i18n.t(I18nKey::UserPatchOutsideNemesis),
+                outside.len(),
+                outside.join("\n")
+            )),
+            Ok(problems) => notify.warn(format!(
+                "{} ({}):\n{}",
+                i18n.t(I18nKey::NemesisRejected),
+                problems.len(),
+                problems.join("\n")
+            )),
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
         }
     }
@@ -300,6 +369,7 @@ mod tests {
             mod_dir: "D:/mods/a".into(),
             edit: false,
             sides: Vec::new(),
+            keep_all_events: false,
         };
         let mut main = PatchTool::default();
         assert!(main.resolve_now(&request, paths(""), &mut notify, &i18n).is_err());
@@ -320,6 +390,7 @@ mod tests {
             mod_dir: dir.join("mods/a").display().to_string(),
             edit: true,
             sides: Vec::new(),
+            keep_all_events: false,
         };
         main.open_resolution(request, paths(&output), &mut notify, &i18n);
         main.user_patch.tool.as_mut().unwrap().take_in_resolution(&mut notify, &i18n);
@@ -406,7 +477,15 @@ mod tests {
         for _ in 0..3 {
             let mut drawn = ctx.run_ui(egui::RawInput::default(), |ui| {
                 let ctx = ui.ctx().clone();
-                main.user_patch_window(&ctx, &i18n, &mut notify, paths(&output), &mut settings, &mut editor);
+                let mut keys = keybinding::Keybindings::default();
+                main.user_patch_window(
+                    &ctx,
+                    &i18n,
+                    &mut notify,
+                    paths(&output),
+                    (&mut settings, &mut editor),
+                    &mut keys,
+                );
             });
             drawn.textures_delta.clear();
         }
