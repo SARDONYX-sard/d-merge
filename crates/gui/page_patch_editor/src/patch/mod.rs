@@ -126,8 +126,6 @@ pub(crate) struct PatchTool {
     views: ui::revision_view::Views,
     /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
     problems: problems::Problems,
-    /// The tree of the animation data files. See [`ui::anim_tree`].
-    anim_tree: ui::anim_tree::AnimTreeState,
     /// A conflict's value to change in the editor, taken in on the next frame.
     pending_resolution: Option<gui_shared::patch::ResolveRequest>,
     /// The works opened lately, the last one first. From the settings.

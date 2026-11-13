@@ -8,6 +8,7 @@
 //! The title's actions are the explorer's: what is done to one object is in its right-click menu.
 //! A window has the class list: nothing moves in the side bar when it is opened.
 mod anim_list;
+mod explorer;
 mod flat;
 mod title;
 
@@ -18,15 +19,15 @@ use egui_widgets::{
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
 
-use super::{
-    anim_data::{DuplicateForm, NewClipsForm},
-    anim_tree::{self, AnimFile, AnimRow},
+use self::{
+    anim_list::{DuplicatePick, Files},
+    explorer::ListOutput,
 };
+use super::anim_data::{DuplicateForm, NewClipsForm};
 use crate::patch::{
     PatchTool,
     anim::data,
-    tool::list::take_reveal,
-    tree::{Graph, Node, TreeState},
+    tree::{Graph, Node},
     workspace::PANDORA_DOC,
 };
 
@@ -76,14 +77,49 @@ impl PatchTool {
         self.explorer.changed_only ^= self.key_command(keybinding::commands::EXPLORER_TOGGLE_CHANGED_ONLY);
         self.explorer.unlinked_only ^= self.key_command(keybinding::commands::EXPLORER_TOGGLE_UNLINKED_ONLY) && !anim;
         let names = self.names();
-        // A tree from the root container, unless filtering: a filter wants the flat list.
-        if anim {
-            self.anim_tree_panel(ui, i18n, &names.graph, notify);
-        } else if self.explorer.tree_view && self.explorer.filter.is_empty() && !self.explorer.unlinked_only {
-            self.tree_panel(ui, i18n, &names.graph, notify);
+        let graph = &names.graph;
+        let keys = if self.explorer.tree_focus {
+            keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key)
         } else {
-            self.flat_list(ui, i18n, &names.graph, notify);
+            Vec::new()
+        };
+
+        // A tree from the root container, unless filtering: a filter wants the flat list.
+        let output = if anim {
+            let projects = self.anim_projects();
+            let is_adsf = self.workspace.behaviors[self.active].adsf;
+            self.explorer.anim(ui, i18n, (graph, is_adsf, &projects), &keys, &mut self.selected)
+        } else if self.explorer.tree_view && self.explorer.filter.is_empty() && !self.explorer.unlinked_only {
+            let path = &self.workspace.behaviors[self.active].meshes_path;
+            self.explorer.tree(ui, i18n, (graph, path), &keys, &mut self.selected)
+        } else {
+            self.explorer.flat(ui, i18n, graph, &keys, &mut self.selected)
+        };
+        self.apply_list_output(ui, graph, output, notify);
+    }
+
+    /// What the list asked of the tool: back to the editor, a row's menu, a duplicate.
+    fn apply_list_output(&mut self, ui: &egui::Ui, graph: &Graph, output: ListOutput, notify: &mut Notification) {
+        if output.leave {
+            self.leave_tree();
         }
+        self.apply_row_action(ui, graph, output.menu, notify);
+
+        if let Some((pick, files, from)) = output.duplicate {
+            let behavior = &self.workspace.behaviors[self.active];
+            let files = match files {
+                Files::ChangedOf(folder) => data::changed_files(behavior, &folder),
+                Files::WithMotion(id) => data::with_motion(behavior, &id),
+            };
+            match pick {
+                DuplicatePick::To(to) => self.panels.pending_duplicate = Some((files, to)),
+                DuplicatePick::Choose => {
+                    let projects = self.anim_projects();
+                    self.panels.duplicate_form = Some(DuplicateForm::new(files, projects, &from));
+                }
+            }
+        }
+        self.duplicate_anim_files();
     }
 
     /// What a button of the title asked for.
@@ -91,8 +127,8 @@ impl PatchTool {
         use title::TitleAsk;
         match asked {
             TitleAsk::ToggleTreeView => self.explorer.tree_view = !self.explorer.tree_view,
-            TitleAsk::ExpandAll => self.anim_tree.expand_all = true,
-            TitleAsk::CollapseAll => self.anim_tree.open.clear(),
+            TitleAsk::ExpandAll => self.explorer.anim_tree.expand_all = true,
+            TitleAsk::CollapseAll => self.explorer.anim_tree.open.clear(),
 
             TitleAsk::OpenPandoraDoc => self.open_pandora_doc(),
             TitleAsk::Duplicate(id) => self.new_object(Some(&id)),
@@ -108,149 +144,6 @@ impl PatchTool {
         }
     }
 
-    /// The tree, and its keys while it has the keyboard.
-    fn tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph, notify: &mut Notification) {
-        let path = &self.workspace.behaviors[self.active].meshes_path;
-        if !self.explorer.trees.contains_key(path) {
-            self.explorer.trees.insert(path.clone(), TreeState::default());
-        }
-        let Some(tree) = self.explorer.trees.get_mut(path) else { return };
-        if std::mem::take(&mut self.explorer.reveal) {
-            tree.reveal_again();
-        }
-        if self.explorer.tree_focus {
-            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            let inputs = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key);
-            let source = super::super::tree::ObjectTree { graph, changed_only: self.explorer.changed_only };
-            tree.prepare(&source, self.selected.as_deref());
-            let keys = tree.apply_keys(&source, &inputs);
-            if let Some(node) = keys.selected {
-                self.selected = Some(graph.id(node).into());
-            }
-            if keys.leave {
-                self.leave_tree();
-                return;
-            }
-        }
-        let flags = (self.explorer.changed_only, self.explorer.tree_focus);
-        let action = super::tree::tree_ui(ui, graph, &mut self.selected, tree, flags, i18n);
-        self.apply_row_action(ui, graph, action, notify);
-    }
-
-    /// The anim data files after the filter: the rows of [`anim_tree::rows`].
-    fn anim_tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph, notify: &mut Notification) {
-        self.refresh_list(graph);
-        let is_adsf = self.workspace.behaviors[self.active].adsf;
-
-        // Only when the editor gets the keyboard: else what is open, and where it is scrolled, is the user's.
-        let forced = std::mem::take(&mut self.explorer.reveal);
-        let reveal = take_reveal(self.selected.as_ref(), forced);
-        if reveal && let Some(id) = &self.selected {
-            anim_tree::reveal(&mut self.anim_tree.open, is_adsf, id);
-        }
-
-        let files: Vec<AnimFile<'_>> = {
-            let nodes = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
-            nodes.iter().map(|&node| AnimFile { node, id: graph.id(node), changed: graph.is_changed(node) }).collect()
-        };
-        if std::mem::take(&mut self.anim_tree.expand_all) {
-            anim_tree::expand_all(&mut self.anim_tree.open, &files);
-        }
-        let filtering = !self.explorer.filter.is_empty();
-        let rebuild = |state: &anim_tree::AnimTreeState| anim_tree::rows(&files, &state.open, is_adsf, filtering);
-        let mut rows = rebuild(&self.anim_tree);
-
-        let moved = self.anim_keys(ui, i18n, graph, &mut rows, &rebuild);
-        let cursor = self.explorer.tree_focus.then_some(self.anim_tree.cursor);
-
-        let projects = self.anim_projects();
-        let (event, scroll) = {
-            let selected_row =
-                self.selected.as_deref().and_then(|id| graph.node_of(id)).and_then(|node| file_row(&rows, node));
-            let input = anim_list::ListInput {
-                graph,
-                selected: self.selected.as_deref(),
-                cursor,
-                scroll_to: if moved { cursor } else { selected_row.filter(|_| reveal) },
-                scroll: self.explorer.list_scroll,
-                projects: &projects,
-            };
-            anim_list::show(ui, i18n, &rows, &input)
-        };
-        self.explorer.list_scroll = scroll;
-
-        if let Some(event) = event {
-            self.apply_anim_event(ui, graph, event, &projects, notify);
-        }
-        self.duplicate_anim_files();
-    }
-
-    /// The keys, while the list has the keyboard: a file the cursor gets to is selected. Else the
-    /// cursor follows the selection. Returns whether the keys moved it.
-    fn anim_keys<'a>(
-        &mut self,
-        ui: &mut egui::Ui,
-        i18n: &I18nMap,
-        graph: &Graph,
-        rows: &mut Vec<AnimRow<'a>>,
-        rebuild: &impl Fn(&anim_tree::AnimTreeState) -> Vec<AnimRow<'a>>,
-    ) -> bool {
-        let mut moved = false;
-        if self.explorer.tree_focus {
-            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            let keys = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key);
-            let done = anim_list::keys(&mut self.anim_tree, &keys, rows, rebuild);
-            if done.leave {
-                self.leave_tree();
-            }
-            moved = done.moved;
-            if moved && let Some(AnimRow::File { node, .. }) = rows.get(self.anim_tree.cursor) {
-                self.selected = Some(graph.id(*node).into());
-            }
-        } else if let Some(at) =
-            self.selected.as_deref().and_then(|id| graph.node_of(id)).and_then(|node| file_row(rows, node))
-        {
-            self.anim_tree.cursor = at; // the keyboard starts where the selection is
-        }
-
-        self.anim_tree.cursor = self.anim_tree.cursor.min(rows.len().saturating_sub(1));
-        moved
-    }
-
-    /// What a row of the list asked for.
-    fn apply_anim_event(
-        &mut self,
-        ui: &egui::Ui,
-        graph: &Graph,
-        event: anim_list::AnimEvent,
-        projects: &[String],
-        notify: &mut Notification,
-    ) {
-        use anim_list::{AnimEvent, DuplicatePick, Files};
-        match event {
-            AnimEvent::Toggle(key) => anim_tree::toggle(&mut self.anim_tree.open, &key),
-            AnimEvent::ExpandBelow(folder) => anim_tree::expand(&mut self.anim_tree.open, &folder),
-            AnimEvent::CollapseBelow(folder) => anim_tree::collapse(&mut self.anim_tree.open, &folder),
-
-            AnimEvent::Select(node) => self.selected = Some(graph.id(node).into()),
-            AnimEvent::Menu(node, action) => self.apply_row_action(ui, graph, Some((node, action)), notify),
-
-            AnimEvent::Duplicate { pick, files, from } => {
-                let behavior = &self.workspace.behaviors[self.active];
-                let files = match files {
-                    Files::ChangedOf(folder) => data::changed_files(behavior, &folder),
-                    Files::WithMotion(id) => data::with_motion(behavior, &id),
-                };
-                match pick {
-                    DuplicatePick::To(to) => self.panels.pending_duplicate = Some((files, to)),
-                    DuplicatePick::Choose => {
-                        self.panels.duplicate_form = Some(DuplicateForm::new(files, projects.to_vec(), &from));
-                    }
-                }
-            }
-        }
-    }
-
     /// The files go to the other project, which opens to show them.
     fn duplicate_anim_files(&mut self) {
         let Some((files, to)) = self.panels.pending_duplicate.take() else { return };
@@ -258,34 +151,7 @@ impl PatchTool {
         for id in &made {
             self.object_changed(id);
         }
-        self.anim_tree.open.insert(to);
-    }
-
-    /// The flat list after the filter (only the rows on screen are laid out).
-    fn flat_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph, notify: &mut Notification) {
-        self.refresh_list(graph);
-        if self.explorer.tree_focus {
-            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            self.list_keys(graph);
-        }
-
-        let rows = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
-        // Only when the editor gets the keyboard: else where it is scrolled is the user's.
-        let forced = std::mem::take(&mut self.explorer.reveal);
-        if take_reveal(self.selected.as_ref(), forced) {
-            let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
-            self.explorer.list_scroll_to = selected.and_then(|node| rows.iter().position(|&row| row == node));
-        }
-
-        let scroll = (self.explorer.list_scroll_to.take(), self.explorer.list_scroll);
-        let (event, scroll) = flat::show(ui, i18n, (graph, rows), self.selected.as_deref(), scroll);
-        self.explorer.list_scroll = scroll;
-
-        match event {
-            Some(flat::FlatEvent::Select(node)) => self.selected = Some(graph.id(node).into()),
-            Some(flat::FlatEvent::Menu(node, action)) => self.apply_row_action(ui, graph, Some((node, action)), notify),
-            None => {}
-        }
+        self.explorer.anim_tree.open.insert(to);
     }
 
     fn apply_row_action(
@@ -313,11 +179,6 @@ impl PatchTool {
             RowAction::Reveal => self.reveal_object(id, notify),
         }
     }
-}
-
-/// The row of file `node`, if it is shown.
-fn file_row(rows: &[AnimRow<'_>], node: Node) -> Option<usize> {
-    rows.iter().position(|row| matches!(row, AnimRow::File { node: n, .. } if *n == node))
 }
 
 /// What a row's right-click menu asked for, in the flat list and the tree.

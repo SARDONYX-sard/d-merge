@@ -2,9 +2,7 @@
 
 use std::rc::Rc;
 
-use stdx::text::{cmp_ignore_case, contains_ignore_case};
-
-use crate::patch::{FocusAt, ObjectList, PatchTool, tree, workspace::PANDORA_DOC};
+use crate::patch::{FocusAt, PatchTool, workspace::PANDORA_DOC};
 
 /// The state of the objects in the explorer.
 ///
@@ -23,7 +21,7 @@ pub(in crate::patch) struct Explorer {
     pub(in crate::patch) tree_view: bool,
     /// The tree of each behavior, by template path.
     pub(in crate::patch) trees: fast_hash::HashMap<String, crate::patch::tree::TreeState>,
-    /// The flat list, as it was computed. See [`PatchTool::refresh_list`].
+    /// The flat list, as it was computed. See `Explorer::refresh_list`.
     pub(in crate::patch) list: Option<crate::patch::ObjectList>,
 
     /// Where the flat list (or the animation data's tree) was scrolled. See [`offset_to_show`].
@@ -34,6 +32,8 @@ pub(in crate::patch) struct Explorer {
     pub(in crate::patch) tree_focus: bool,
     /// Show the selected object again, even if it was shown already: the editor got the keyboard.
     pub(in crate::patch) reveal: bool,
+    /// What is open in the animation data's list, and its cursor.
+    pub(in crate::patch) anim_tree: crate::patch::ui::anim_tree::AnimTreeState,
 }
 
 /// Should a list scroll to the selection? Only when `forced`: the editor got the keyboard, as VS Code's
@@ -218,65 +218,6 @@ impl PatchTool {
     pub(in crate::patch) const fn leave_tree(&mut self) {
         self.explorer.tree_focus = false;
         self.pane.focus = Some(FocusAt::Keep);
-    }
-
-    /// The flat list has the same keys as the tree, without the folding.
-    pub(in crate::patch) fn list_keys(&mut self, graph: &tree::Graph) {
-        let rows = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
-        let selected = self.selected.as_deref();
-        let mut current = rows.iter().position(|&node| selected == Some(graph.id(node))).unwrap_or(0);
-        let mut leave = false;
-        let before = current;
-        for input in keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key) {
-            leave |= input == tree::TreeKey::Leave;
-            current = input.step(current, rows.len()).unwrap_or(current);
-        }
-        if let Some(&node) = rows.get(current) {
-            self.selected = Some(graph.id(node).into());
-        }
-        if current != before {
-            self.explorer.list_scroll_to = Some(current);
-        }
-        if leave {
-            self.leave_tree();
-        }
-    }
-
-    /// Recomputes the flat list when the objects, the filter, "changed only" or "unlinked only" changed.
-    ///
-    /// New objects come first and show where they are linked: `+ #mymod$0  hkbFoo  ← #0106`.
-    ///
-    /// Without a filter the labels do not matter, so typing in the editor does not recompute it.
-    pub(in crate::patch) fn refresh_list(&mut self, graph: &tree::Graph) {
-        let generation = if self.explorer.filter.is_empty() { graph.tree_generation() } else { graph.generation() };
-        let fresh = self.explorer.list.as_ref().is_some_and(|list| {
-            list.generation == generation
-                && list.filter == self.explorer.filter
-                && list.changed_only == self.explorer.changed_only
-                && list.unlinked_only == self.explorer.unlinked_only
-        });
-        if fresh {
-            return;
-        }
-        let filter = self.explorer.filter.as_str();
-        let rows = graph
-            .nodes()
-            .filter(|&node| !self.explorer.changed_only || graph.is_changed(node))
-            .filter(|&node| !self.explorer.unlinked_only || graph.is_unlinked(node))
-            .filter(|&node| contains_ignore_case(graph.label(node), filter))
-            .collect();
-        // Anim data is grouped by actor: see `ui::anim_tree`.
-        let mut rows: Vec<tree::Node> = rows;
-        if self.workspace.behaviors[self.active].is_anim_data() {
-            rows.sort_by(|&a, &b| cmp_ignore_case(graph.id(a), graph.id(b)));
-        }
-        self.explorer.list = Some(ObjectList {
-            generation,
-            filter: self.explorer.filter.clone(),
-            changed_only: self.explorer.changed_only,
-            unlinked_only: self.explorer.unlinked_only,
-            rows,
-        });
     }
 
     /// Deletes a new object, or drops the edits of a template object.
