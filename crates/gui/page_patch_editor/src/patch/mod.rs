@@ -206,33 +206,14 @@ impl PatchTool {
         }
     }
 
-    /// The editor's settings, shared with the hkanno editor.
-    fn read_editor_options(&mut self, editor: &LspOptions) {
-        self.pane.mode = editor.editor_mode;
-        self.pane.lsp.clone_from(editor);
-    }
-
-    /// Back to the settings: changed by the keymap box and the options window.
-    fn write_editor_options(&mut self, editor: &mut LspOptions) {
-        // Both hold the keymap: the box only changes `editor_mode`.
-        self.pane.lsp.editor_mode = self.pane.mode;
-        if *editor != self.pane.lsp {
-            editor.clone_from(&self.pane.lsp);
-        }
-    }
-
     /// What is shown of the editor, kept in the settings.
     const fn read_view_settings(&mut self, settings: &PatchEditorSettings) {
-        self.pane.show_inline_diff = settings.inline_diff;
-        self.pane.follow_preview = settings.follow_preview;
-        self.pane.show_preview = settings.show_preview;
+        self.pane.read_view(settings);
         self.explorer.tree_view = settings.tree_view;
     }
 
     const fn write_view_settings(&self, settings: &mut PatchEditorSettings) {
-        settings.inline_diff = self.pane.show_inline_diff;
-        settings.show_preview = self.pane.show_preview;
-        settings.follow_preview = self.pane.follow_preview;
+        self.pane.write_view(settings);
         settings.tree_view = self.explorer.tree_view;
     }
 
@@ -245,7 +226,7 @@ impl PatchTool {
         (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
         keys: &mut keybinding::Keybindings,
     ) {
-        self.read_editor_options(editor);
+        self.pane.read_options(editor);
         if self.place.template_dir != paths.template_dir {
             paths.template_dir.clone_into(&mut self.place.template_dir);
         }
@@ -291,7 +272,7 @@ impl PatchTool {
         self.take_key_commands(ui.ctx(), keys, i18n, notify);
         self.draw(ui, i18n, notify);
 
-        self.write_editor_options(editor);
+        self.pane.write_options(editor);
         if settings.mod_dir != self.place.mod_dir {
             settings.mod_dir.clone_from(&self.place.mod_dir);
         }
@@ -786,14 +767,14 @@ mod work_tests {
         let mut tool = PatchTool::default();
         let mut editor =
             LspOptions { editor_mode: gui_shared::settings::ui::editor::EditorMode::Normal, ..LspOptions::default() };
-        tool.read_editor_options(&editor);
+        tool.pane.read_options(&editor);
         tool.pane.mode = gui_shared::settings::ui::editor::EditorMode::Vim;
-        tool.write_editor_options(&mut editor);
+        tool.pane.write_options(&mut editor);
         assert_eq!(editor.editor_mode, gui_shared::settings::ui::editor::EditorMode::Vim);
 
-        tool.read_editor_options(&editor);
+        tool.pane.read_options(&editor);
         tool.pane.lsp.hover = !tool.pane.lsp.hover;
-        tool.write_editor_options(&mut editor);
+        tool.pane.write_options(&mut editor);
         assert_eq!(editor.hover, tool.pane.lsp.hover);
         assert_eq!(editor.editor_mode, gui_shared::settings::ui::editor::EditorMode::Vim);
     }

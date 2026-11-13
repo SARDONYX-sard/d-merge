@@ -14,7 +14,10 @@
 use std::{borrow::Cow, path::Path, rc::Rc};
 
 use egui_code_editor::InlineDiff;
-use gui_shared::settings::pages::patch::behavior::ParserMode;
+use gui_shared::settings::{
+    pages::{patch::behavior::ParserMode, patch_editor::PatchEditorSettings},
+    ui::editor::LspOptions,
+};
 
 use super::editing::EditorPane;
 use crate::patch::{
@@ -164,5 +167,33 @@ impl EditorPane {
         } else {
             Some(nemesis_diff::revert_hunk(template, &self.text, block))
         }
+    }
+
+    /// The editor's settings, shared with the hkanno editor.
+    pub(in crate::patch) fn read_options(&mut self, editor: &LspOptions) {
+        self.mode = editor.editor_mode;
+        self.lsp.clone_from(editor);
+    }
+
+    /// Back to the settings: changed by the keymap box and the options window.
+    pub(in crate::patch) fn write_options(&mut self, editor: &mut LspOptions) {
+        // Both hold the keymap: the box only changes `editor_mode`.
+        self.lsp.editor_mode = self.mode;
+        if *editor != self.lsp {
+            editor.clone_from(&self.lsp);
+        }
+    }
+
+    /// What is shown beside the text, kept in the settings.
+    pub(in crate::patch) const fn read_view(&mut self, settings: &PatchEditorSettings) {
+        self.show_inline_diff = settings.inline_diff;
+        self.follow_preview = settings.follow_preview;
+        self.show_preview = settings.show_preview;
+    }
+
+    pub(in crate::patch) const fn write_view(&self, settings: &mut PatchEditorSettings) {
+        settings.inline_diff = self.show_inline_diff;
+        settings.show_preview = self.show_preview;
+        settings.follow_preview = self.follow_preview;
     }
 }
