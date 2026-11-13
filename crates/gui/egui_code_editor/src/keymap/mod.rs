@@ -41,6 +41,20 @@ impl Keymap {
             Self::Vim => "Vim",
         }
     }
+
+    /// `true`: [`Self::Vim`]. e.g. from the app's editor mode: `Keymap::from_vim(mode.is_vim())`
+    #[inline]
+    #[must_use]
+    pub const fn from_vim(vim: bool) -> Self {
+        if vim { Self::Vim } else { Self::Normal }
+    }
+
+    /// Is it [`Self::Vim`]?
+    #[inline]
+    #[must_use]
+    pub const fn is_vim(self) -> bool {
+        matches!(self, Self::Vim)
+    }
 }
 
 /// What a keymap did this frame.

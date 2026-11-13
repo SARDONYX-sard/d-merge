@@ -15,10 +15,7 @@
 
 use egui_code_editor::{DiffView, EditorCommand, Keymap, languages::Xml};
 use egui_widgets::preview_tabs::PreviewTabs;
-use gui_shared::{
-    i18n::{I18nKey, I18nMap},
-    settings::ui::editor::EditorMode,
-};
+use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
     PatchTool,
@@ -163,7 +160,7 @@ impl PatchTool {
         });
         self.views.list.active = shown;
         let Some(at) = shown else { return false };
-        let keymap = if self.pane.mode == EditorMode::Vim { Keymap::Vim } else { Keymap::Normal };
+        let keymap = Keymap::from_vim(self.pane.mode.is_vim());
         let names = self.names();
         let mut tab_event = None;
         let mut command = None;

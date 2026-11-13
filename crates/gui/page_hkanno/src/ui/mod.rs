@@ -188,7 +188,7 @@ impl HkannoPage {
             inlay_hints: lsp.inlay_hints,
             signature_help: lsp.signature_help,
         };
-        let keymap = to_keymap(ctx.lsp_settings.editor_mode);
+        let keymap = Keymap::from_vim(ctx.lsp_settings.editor_mode.is_vim());
         let show_preview = ctx.settings.show_preview;
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
 
@@ -214,10 +214,7 @@ impl HkannoPage {
                 .show(ui);
             toggle_problems = status.problems.clicked();
             if status.keymap_changed {
-                ctx.lsp_settings.editor_mode = match chosen {
-                    Keymap::Normal => EditorMode::Normal,
-                    Keymap::Vim => EditorMode::Vim,
-                };
+                ctx.lsp_settings.editor_mode = EditorMode::from_vim(chosen.is_vim());
             }
         });
         if toggle_problems {
@@ -461,34 +458,24 @@ impl HkannoPage {
 
     /// Was `command` asked for by this frame's keys? It is done then: asked again, `false`.
     fn key_command(&mut self, command: &str) -> bool {
-        let Some(at) = self.key_commands.iter().position(|asked| *asked == command) else { return false };
-        self.key_commands.swap_remove(at);
-        true
+        keybinding::host::take(&mut self.key_commands, command)
     }
 
     /// Who has the keyboard: what a binding's `when` sees.
     fn key_context(&self, egui_ctx: &egui::Context, ctx: &HkannoPageCtx<'_>) -> keybinding::KeyContext {
-        let keymap = to_keymap(ctx.lsp_settings.editor_mode);
+        let keymap = Keymap::from_vim(ctx.lsp_settings.editor_mode.is_vim());
         let tab = self.tabs.get(self.active);
         let editor_focus = tab.is_some_and(|tab| egui_ctx.memory(|m| m.has_focus(tab.editor_id())));
         keybinding::KeyContext {
             page: "hkanno",
             editor_focus,
-            vim: keymap == Keymap::Vim,
+            vim: keymap.is_vim(),
             vim_mode: tab.and_then(|tab| tab.editor.keymap.vim_mode(keymap)),
             problems_focus: self.problems_cursor.focused,
             problems_visible: !self.problems_hidden,
             input_focus: !editor_focus && egui_ctx.egui_wants_keyboard_input(),
             ..Default::default()
         }
-    }
-}
-
-/// Settings enum -> editor enum.
-const fn to_keymap(mode: EditorMode) -> Keymap {
-    match mode {
-        EditorMode::Normal => Keymap::Normal,
-        EditorMode::Vim => Keymap::Vim,
     }
 }
 

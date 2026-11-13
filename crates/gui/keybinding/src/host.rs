@@ -33,6 +33,15 @@ pub const EDITOR_ACTIONS: [(&str, &str); 8] = [
     (OPEN_JSON_ACTION, KEYBINDINGS_OPEN_JSON),
 ];
 
+/// Takes `command` out of `commands` if a key asked for it this frame: each is done once.
+///
+/// e.g. `[tabs.next, editor.save]`, `editor.save` -> `true`, `[tabs.next]` left
+pub fn take(commands: &mut Vec<&'static str>, command: &str) -> bool {
+    let Some(at) = commands.iter().position(|asked| *asked == command) else { return false };
+    commands.swap_remove(at);
+    true
+}
+
 /// Takes the commands `map` knows out of `commands`, in the order they came, as what `map` makes
 /// them. e.g. `[explorer.down, tabs.next, explorer.down]` -> `[Next, Next]`, `[tabs.next]` left
 pub fn take_mapped<T>(commands: &mut Vec<&'static str>, map: impl Fn(&str) -> Option<T>) -> Vec<T> {
@@ -245,7 +254,7 @@ impl KeyUi {
             }
         }
         which_key(ctx, bindings, context);
-        let keymap = if context.vim { egui_code_editor::Keymap::Vim } else { egui_code_editor::Keymap::Normal };
+        let keymap = egui_code_editor::Keymap::from_vim(context.vim);
         if let Some(saved) = self.json.show(ctx, bindings, keymap, &texts) {
             out.saved = Some(saved);
         }

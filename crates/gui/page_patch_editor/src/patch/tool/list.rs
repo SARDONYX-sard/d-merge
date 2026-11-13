@@ -119,21 +119,17 @@ impl PatchTool {
     ///
     /// e.g. `self.key_command(keybinding::commands::TABS_CLOSE)`
     pub(in crate::patch) fn key_command(&mut self, command: &str) -> bool {
-        let Some(at) = self.key_commands.iter().position(|asked| *asked == command) else { return false };
-        self.key_commands.swap_remove(at);
-        true
+        keybinding::host::take(&mut self.key_commands, command)
     }
 
     /// Who has the keyboard: what a binding's `when` sees.
     pub(in crate::patch) fn key_context(&self, ctx: &egui::Context) -> keybinding::KeyContext {
-        use gui_shared::settings::ui::editor::EditorMode;
-        let vim = self.pane.mode == EditorMode::Vim;
-        let keymap = if vim { egui_code_editor::Keymap::Vim } else { egui_code_editor::Keymap::Normal };
+        let keymap = egui_code_editor::Keymap::from_vim(self.pane.mode.is_vim());
         let editor_focus = self.pane.had_focus;
         keybinding::KeyContext {
             page: "patchEditor",
             editor_focus,
-            vim,
+            vim: keymap.is_vim(),
             vim_mode: self.pane.state.keymap.vim_mode(keymap),
             explorer_focus: self.explorer.tree_focus,
             explorer_view: Some(if self.explorer.tree_view { "tree" } else { "list" }),

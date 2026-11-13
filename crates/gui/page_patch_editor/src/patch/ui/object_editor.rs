@@ -300,10 +300,7 @@ impl PatchTool {
             &language
         };
         let features = editor_features(&self.pane.lsp, anim_data);
-        let keymap = match self.pane.mode {
-            EditorMode::Normal => Keymap::Normal,
-            EditorMode::Vim => Keymap::Vim,
-        };
+        let keymap = Keymap::from_vim(self.pane.mode.is_vim());
         let labels = EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n));
         // With their keys as the key bindings have them, and a `⚙` to change them, as VS Code's.
         // With their keys as the key bindings have them and a `⚙` to change them, and found by their
@@ -392,10 +389,7 @@ impl PatchTool {
                     .show(ui);
                 toggle_problems |= status.problems.clicked();
                 if status.keymap_changed {
-                    self.pane.mode = match chosen {
-                        Keymap::Normal => EditorMode::Normal,
-                        Keymap::Vim => EditorMode::Vim,
-                    };
+                    self.pane.mode = EditorMode::from_vim(chosen.is_vim());
                 }
             });
             if self.problems.open

@@ -24,6 +24,20 @@ impl EditorMode {
             Self::Vim => "Vim",
         }
     }
+
+    /// `true`: [`Self::Vim`]. e.g. from the code editor's keymap: `EditorMode::from_vim(mode.is_vim())`
+    #[inline]
+    #[must_use]
+    pub const fn from_vim(vim: bool) -> Self {
+        if vim { Self::Vim } else { Self::Normal }
+    }
+
+    /// Is it [`Self::Vim`]?
+    #[inline]
+    #[must_use]
+    pub const fn is_vim(self) -> bool {
+        matches!(self, Self::Vim)
+    }
 }
 
 /// Toggles for each editor language feature.
