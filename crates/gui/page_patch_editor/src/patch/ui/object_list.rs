@@ -164,10 +164,6 @@ impl PatchTool {
     /// The anim data files after the filter: the rows of [`anim_tree::rows`].
     fn anim_tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph, notify: &mut Notification) {
         self.refresh_list(graph);
-        if self.explorer.tree_focus {
-            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            self.list_keys(graph);
-        }
         let is_adsf = self.workspace.behaviors[self.active].adsf;
         // Only when the editor gets the keyboard: else what is open, and where it is scrolled, is the user's.
         let forced = std::mem::take(&mut self.explorer.reveal);
@@ -181,7 +177,42 @@ impl PatchTool {
         if std::mem::take(&mut self.anim_tree.expand_all) {
             anim_tree::expand_all(&mut self.anim_tree.open, &files);
         }
-        let rows = anim_tree::rows(&files, &self.anim_tree.open, is_adsf, !self.explorer.filter.is_empty());
+        let filtering = !self.explorer.filter.is_empty();
+        let mut rows = anim_tree::rows(&files, &self.anim_tree.open, is_adsf, filtering);
+
+        // The keys on the rows shown, as in the object tree; a file the cursor gets to opens.
+        let mut cursor_moved = false;
+        if self.explorer.tree_focus {
+            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
+            let inputs = keybinding::host::take_mapped(&mut self.key_commands, super::tree::tree_input);
+            for input in inputs {
+                match anim_tree::apply_key(input, &rows, self.anim_tree.cursor) {
+                    anim_tree::AnimKeyEffect::Cursor(at) => {
+                        self.anim_tree.cursor = at;
+                        cursor_moved = true;
+                    }
+                    anim_tree::AnimKeyEffect::Toggle(key) => {
+                        anim_tree::toggle(&mut self.anim_tree.open, &key);
+                        rows = anim_tree::rows(&files, &self.anim_tree.open, is_adsf, filtering);
+                    }
+                    anim_tree::AnimKeyEffect::Leave => self.leave_tree(),
+                    anim_tree::AnimKeyEffect::None => {}
+                }
+            }
+            if cursor_moved && let Some(AnimRow::File { node, .. }) = rows.get(self.anim_tree.cursor) {
+                self.selected = Some(graph.id(*node).into());
+            }
+        } else if let Some(at) = self
+            .selected
+            .as_deref()
+            .and_then(|id| graph.node_of(id))
+            .and_then(|node| rows.iter().position(|row| matches!(row, AnimRow::File { node: n, .. } if *n == node)))
+        {
+            // The keyboard starts where the selection is.
+            self.anim_tree.cursor = at;
+        }
+        self.anim_tree.cursor = self.anim_tree.cursor.min(rows.len().saturating_sub(1));
+        let focused_row = self.explorer.tree_focus.then_some(self.anim_tree.cursor);
 
         let (mut toggled, mut menu_action) = (None, None);
         let row_height = row_height(ui);
@@ -192,13 +223,18 @@ impl PatchTool {
         let at = selected
             .and_then(|node| rows.iter().position(|row| matches!(row, AnimRow::File { node: n, .. } if *n == node)));
         let sizes = (row_height, ui.spacing().item_spacing.y);
-        if let Some(offset) =
-            at.filter(|_| reveal).and_then(|at| offset_to_show(at, sizes, rows.len(), self.explorer.list_scroll, 0))
-        {
+        let to = if cursor_moved { focused_row } else { at.filter(|_| reveal) };
+        if let Some(offset) = to.and_then(|at| offset_to_show(at, sizes, rows.len(), self.explorer.list_scroll, 0)) {
             scroll = scroll.vertical_scroll_offset(offset);
         }
         let output = scroll.show_rows(ui, row_height, rows.len(), |ui, range| {
-            for row in &rows[range] {
+            let first = range.start;
+            for (offset, row) in rows[range].iter().enumerate() {
+                // The keyboard's row has a frame, as in the object tree.
+                if focused_row == Some(first + offset) {
+                    let rect = egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), row_height));
+                    ui.painter().rect_stroke(rect, 2.0, ui.visuals().selection.stroke, egui::StrokeKind::Inside);
+                }
                 fixed_row(ui, row_height, |ui| match row {
                     AnimRow::Folder { name, files, changed, open } => {
                         let response = anim_group_row(ui, name, (*files, *changed, *open), 0);
