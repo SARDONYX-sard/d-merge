@@ -87,6 +87,9 @@ pub(crate) struct PatchTool {
     is_user_patch: bool,
     /// The commands this frame's keys asked for: see [`Self::key_command`].
     key_commands: Vec<&'static str>,
+    /// Copy path / reveal of an object asked for by a tab or the editor: done by
+    /// [`Self::file_keys`], which has what it needs.
+    file_asked: Option<(tool::list::FileAction, String)>,
     /// The editor of the open object and what is beside it: preview, merge, problems. See [`tool::editing`].
     pane: tool::editing::EditorPane,
     /// What `Edit...` proposed, until it is edited.
@@ -225,6 +228,8 @@ enum TabEvent {
     CloseOthers(String),
     CloseToTheRight(String),
     CloseAll,
+    /// The object's file: its path to the clipboard, or shown in the file manager.
+    File(tool::list::FileAction, String),
 }
 
 /// See [`tool::list::Explorer::list`].

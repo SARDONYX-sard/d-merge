@@ -23,8 +23,13 @@ use crate::{
 };
 
 /// What this page's editor acts on: see [`HkannoPage::apply_command`].
-const HOST_COMMANDS: [EditorCommand; 4] =
-    [EditorCommand::NextTab, EditorCommand::PreviousTab, EditorCommand::CloseTab, EditorCommand::TogglePreview];
+const HOST_COMMANDS: [EditorCommand; 5] = [
+    EditorCommand::NextTab,
+    EditorCommand::PreviousTab,
+    EditorCommand::CloseTab,
+    EditorCommand::TogglePreview,
+    EditorCommand::RevealFile,
+];
 
 impl HkannoPage {
     /// Draws the page.
@@ -33,6 +38,14 @@ impl HkannoPage {
         let context = self.key_context(ui.ctx(), &ctx);
         self.key_commands = ctx.keys.dispatch(ui.ctx(), &context);
         self.handle_shortcuts(&mut ctx);
+        if self.key_command(commands::FILE_REVEAL) {
+            self.reveal_active(&mut ctx);
+        }
+        if self.key_command(commands::FILE_COPY_PATH)
+            && let Some(tab) = self.tabs.get(self.active)
+        {
+            ui.ctx().copy_text(tab.settings.input_path.clone());
+        }
 
         // egui's default scroll bars are thin until hovered, which hides where in the file
         // you are. Always-visible solid bars, like a code editor (only on this page).
@@ -206,6 +219,7 @@ impl HkannoPage {
             EditorCommand::PreviousTab => self.step_tab(ui, false),
             EditorCommand::CloseTab => self.close_active_from_keyboard(ui, ctx),
             EditorCommand::TogglePreview => ctx.settings.show_preview = !ctx.settings.show_preview,
+            EditorCommand::RevealFile => self.reveal_active(ctx),
             EditorCommand::GoToDefinition
             | EditorCommand::FindReferences
             | EditorCommand::JumpBack
@@ -347,11 +361,10 @@ impl HkannoPage {
 /// Close
 /// ```
 fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) -> bool {
-    // The parent: an existing file itself would be opened with its default app.
+    // The file selected in its folder, as VS Code's "Reveal in File Explorer"; the folder if the
+    // file isn't there.
     let open_dir = |path: &str| {
-        let path = std::path::Path::new(path);
-        let dir = path.parent().unwrap_or(path);
-        if let Err(err) = gui_shared::fs::open_existing_dir_or_ancestor(dir) {
+        if let Err(err) = gui_shared::fs::reveal_file(std::path::Path::new(path)) {
             tracing::error!("{err}");
         }
     };
@@ -375,6 +388,14 @@ fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) -> bool {
 }
 
 impl HkannoPage {
+    /// The active tab's file, selected in the file manager (`Shift+Alt+R`, Vim `<Space>V`).
+    fn reveal_active(&self, ctx: &mut HkannoPageCtx<'_>) {
+        let Some(tab) = self.tabs.get(self.active) else { return };
+        if let Err(err) = gui_shared::fs::reveal_file(std::path::Path::new(&tab.settings.input_path)) {
+            ctx.notify.error(err);
+        }
+    }
+
     /// Was `command` asked for by this frame's keys? It is done then: asked again, `false`.
     fn key_command(&mut self, command: &str) -> bool {
         let Some(at) = self.key_commands.iter().position(|asked| *asked == command) else { return false };

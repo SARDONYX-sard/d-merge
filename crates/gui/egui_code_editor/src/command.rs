@@ -56,10 +56,13 @@ pub enum EditorCommand {
     NextChange,
     /// Vim `[c`: the host's previous change.
     PreviousChange,
+    /// Vim `<Space>V`: show the file of what is edited in the file manager (VS Code's "Reveal in
+    /// File Explorer", which the host's `Shift+Alt+R` also does).
+    RevealFile,
 }
 
 impl EditorCommand {
-    pub(crate) const ALL: [Self; 13] = [
+    pub(crate) const ALL: [Self; 14] = [
         Self::Save,
         Self::GoToDefinition,
         Self::FindReferences,
@@ -73,6 +76,7 @@ impl EditorCommand {
         Self::ToggleInlineDiff,
         Self::NextChange,
         Self::PreviousChange,
+        Self::RevealFile,
     ];
 
     pub(crate) const fn action_id(self) -> &'static str {
@@ -90,6 +94,7 @@ impl EditorCommand {
             Self::ToggleInlineDiff => "toggle_inline_diff",
             Self::NextChange => "next_change",
             Self::PreviousChange => "previous_change",
+            Self::RevealFile => "reveal_file",
         }
     }
 

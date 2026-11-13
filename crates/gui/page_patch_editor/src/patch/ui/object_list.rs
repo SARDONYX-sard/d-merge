@@ -491,7 +491,7 @@ pub(super) enum RowAction {
 }
 
 /// The name VS Code gives "show the file in the file manager" on this OS.
-const REVEAL_LABEL: I18nKey = if cfg!(windows) {
+pub(in crate::patch) const REVEAL_LABEL: I18nKey = if cfg!(windows) {
     I18nKey::RevealInFileExplorer
 } else if cfg!(target_os = "macos") {
     I18nKey::RevealInFinder

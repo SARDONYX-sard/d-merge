@@ -33,7 +33,7 @@ const ACTION_FOCUS_TREE: &str = "focus_tree";
 const ACTION_BACK: &str = "go_back";
 const ACTION_FORWARD: &str = "go_forward";
 /// What this editor acts on: see [`crate::patch::PatchTool::apply_editor_result`].
-const HOST_COMMANDS: [EditorCommand; 8] = [
+const HOST_COMMANDS: [EditorCommand; 9] = [
     EditorCommand::NextTab,
     EditorCommand::PreviousTab,
     EditorCommand::CloseTab,
@@ -42,6 +42,7 @@ const HOST_COMMANDS: [EditorCommand; 8] = [
     EditorCommand::NextChange,
     EditorCommand::PreviousChange,
     EditorCommand::ToggleExplorer,
+    EditorCommand::RevealFile,
 ];
 
 impl PatchTool {
@@ -622,6 +623,18 @@ fn tab_menu(ui: &mut egui::Ui, i18n: &I18nMap, id: &str, pinned: bool) -> Option
     if ui.button(i18n.t(I18nKey::NemesisCopyId)).clicked() {
         ui.ctx().copy_text(id.to_owned());
         ui.close();
+    }
+    // As the explorer's menu: the file the object is in.
+    let hover = i18n.t(I18nKey::NemesisObjectFileHover);
+    let files = [
+        (I18nKey::NemesisCopyPath, crate::patch::tool::list::FileAction::CopyPath),
+        (super::object_list::REVEAL_LABEL, crate::patch::tool::list::FileAction::Reveal),
+    ];
+    for (label, action) in files {
+        if ui.button(i18n.t(label)).on_hover_text(hover).clicked() {
+            picked = Some(TabEvent::File(action, id.to_owned()));
+            ui.close();
+        }
     }
     picked
 }

@@ -58,6 +58,9 @@ pub(super) fn parse(keys: &[VimKey]) -> Parse {
     match after_count {
         [VimKey::Char(' ')] => return Parse::Incomplete,
         [VimKey::Char(' '), VimKey::Char('e'), ..] => return done(Command::Simple(Simple::ToggleExplorer), None),
+        [VimKey::Char(' '), VimKey::Char('V'), ..] => {
+            return done(Command::Simple(Simple::Ask(EditorCommand::RevealFile)), None);
+        }
 
         [VimKey::Char(' '), VimKey::Char('f'), ..] => {
             return done(Command::Simple(Simple::Format { save: false }), None);
@@ -330,6 +333,7 @@ mod tests {
     fn space_is_a_leader_key() {
         assert_eq!(parse(&keys(" ")), Parse::Incomplete);
         assert_eq!(command(" e"), Command::Simple(Simple::ToggleExplorer));
+        assert_eq!(command(" V"), Command::Simple(Simple::Ask(EditorCommand::RevealFile)));
         assert_eq!(parse(&keys(" x")), Parse::Invalid);
         // After an operator it is still a motion.
         assert_eq!(command("d "), Command::Operate(Operator::Delete, Target::Motion(Motion::Right)));

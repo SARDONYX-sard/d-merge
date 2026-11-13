@@ -286,6 +286,7 @@ impl PatchTool {
                 self.tabs.close_others(active, &id);
                 self.selected = Some(id.into());
             }
+            Some(TabEvent::File(action, id)) => self.file_asked = Some((action, id)),
             None => {}
         }
     }
@@ -320,6 +321,9 @@ impl PatchTool {
             Some(EditorCommand::TogglePreview) => self.pane.show_preview = !self.pane.show_preview,
             Some(EditorCommand::ToggleInlineDiff) => self.pane.show_inline_diff = !self.pane.show_inline_diff,
             Some(EditorCommand::NextChange) => self.step_change(true),
+            Some(EditorCommand::RevealFile) => {
+                self.file_asked = Some((crate::patch::tool::list::FileAction::Reveal, id.to_owned()));
+            }
             Some(EditorCommand::PreviousChange) => self.step_change(false),
             Some(EditorCommand::ToggleExplorer | EditorCommand::GoToDefinition | EditorCommand::FindReferences)
             | None => {}

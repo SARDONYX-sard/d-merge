@@ -43,6 +43,13 @@ pub(in crate::patch) struct Explorer {
 pub(in crate::patch) const fn take_reveal(selected: Option<&Rc<str>>, forced: bool) -> bool {
     forced && selected.is_some()
 }
+/// What is done with the file an object is in, as VS Code's "Copy Path" / "Reveal in File Explorer".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::patch) enum FileAction {
+    CopyPath,
+    Reveal,
+}
+
 /// Where a list of rows (`ScrollArea::show_rows`) was scrolled when last drawn.
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub(in crate::patch) struct ListScroll {
@@ -191,16 +198,20 @@ impl PatchTool {
         }
     }
 
-    /// `Shift+Alt+C` / `Shift+Alt+R` (key bindings), as VS Code: of the selected object.
+    /// `Shift+Alt+C` / `Shift+Alt+R` (key bindings), as VS Code: of the selected object. Also what a
+    /// tab's menu or Vim's `<Space>V` asked for ([`Self::file_asked`]).
     pub(in crate::patch) fn file_keys(&mut self, ctx: &egui::Context, notify: &mut egui_widgets::notify::Notification) {
         use keybinding::commands::{FILE_COPY_PATH, FILE_REVEAL};
         let (copy, reveal) = (self.key_command(FILE_COPY_PATH), self.key_command(FILE_REVEAL));
-        let Some(id) = self.selected.clone() else { return };
-        if copy {
-            self.copy_object_path(ctx, &id);
-        }
-        if reveal {
-            self.reveal_object(&id, notify);
+        let selected = self.selected.as_deref().map(str::to_owned);
+        let asked = [(copy, FileAction::CopyPath), (reveal, FileAction::Reveal)]
+            .into_iter()
+            .filter_map(|(on, action)| on.then_some(action).zip(selected.clone()));
+        for (action, id) in asked.chain(self.file_asked.take()) {
+            match action {
+                FileAction::CopyPath => self.copy_object_path(ctx, &id),
+                FileAction::Reveal => self.reveal_object(&id, notify),
+            }
         }
     }
 

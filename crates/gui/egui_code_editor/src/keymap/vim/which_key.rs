@@ -76,6 +76,7 @@ const LEADER: &[WhichKey] = &[
     host(" p", EditorCommand::TogglePreview, "Show or hide the preview"),
     host(" d", EditorCommand::ToggleInlineDiff, "Show or hide the inline diff"),
     host(" e", EditorCommand::ToggleExplorer, "Move to the tree"),
+    host(" V", EditorCommand::RevealFile, "Reveal the file in the file manager"),
 ];
 
 const G: &[WhichKey] = &[
