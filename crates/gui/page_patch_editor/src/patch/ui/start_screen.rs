@@ -56,7 +56,9 @@ impl PatchTool {
             if ui.add(open).on_hover_text(i18n.t(I18nKey::NemesisOpenModHover)).clicked() {
                 self.pick_mod(notify, i18n);
             }
-            self.open_cache_button(ui, i18n, notify);
+            if super::top_bar::cache_button(ui, i18n, &self.cache_dir()) {
+                self.open_cache(notify, i18n);
+            }
         });
     }
 

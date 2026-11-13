@@ -82,7 +82,9 @@ impl PatchTool {
         ui.horizontal(|ui| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 self.clear_button(ui, i18n, notify);
-                self.open_cache_button(ui, i18n, notify);
+                if super::top_bar::cache_button(ui, i18n, &self.cache_dir()) {
+                    self.open_cache(notify, i18n);
+                }
                 let export = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::UserPatchExportMod));
                 if ui.add(export).on_hover_text(i18n.t(I18nKey::UserPatchExportModHover)).clicked() {
                     self.mod_export.open = true;
