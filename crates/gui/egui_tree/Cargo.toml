@@ -16,5 +16,9 @@ rust-version.workspace = true
 [dependencies]
 egui = { workspace = true }
 
+[dev-dependencies]
+# `cargo run -p egui_tree --example tree`: the same features as the app, to share its build.
+eframe = { workspace = true, features = ["accesskit", "clipboard", "default_fonts", "glow", "links"] }
+
 [lints]
 workspace = true

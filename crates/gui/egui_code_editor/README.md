@@ -16,8 +16,30 @@ let output = CodeEditor::new("my_editor", &mut text)
     .show(ui, &mut state);
 
 // Optional: the keymap status line, e.g. `[ NORMAL ]  recording @a` (colored by mode).
-egui_code_editor::status_line(ui, &state, Keymap::Vim);
+egui_code_editor::status_line(ui, &state, Keymap::Vim, &text);
 ```
+
+To see the parts together, as a small VS Code (explorer, preview tabs, editor, diff tab, search):
+
+```sh
+cargo run -p egui_code_editor --example vscode
+```
+
+## The parts around the editor
+
+Each is documented in its module; none needs the others.
+
+| Part                      | What it is (VS Code's)                                               |
+| ------------------------- | -------------------------------------------------------------------- |
+| `InlineDiff`              | the changes from an older text, shown in the editor; `▲ ▼ 2/5`, `]c` |
+| `DiffView`                | a read-only diff or blame (GitLens) in the editor                     |
+| `SearchView`              | the search of every document (`Ctrl+Shift+F`)                        |
+| `ReferenceList`           | the references window (`Shift+F12`)                                  |
+| `NavHistory`              | Go Back / Go Forward (`Alt+←` / `Alt+→`, mouse buttons)              |
+| `ProblemsPanel`, `StatusBar` | the Problems panel and the status bar                             |
+
+The tabs, the activity bar and other widgets are in `egui_widgets`; trees and lists driven by the
+keys in `egui_tree` (`cargo run -p egui_tree --example tree`).
 
 ## Editor keys (all keymaps)
 
