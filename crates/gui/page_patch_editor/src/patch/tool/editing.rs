@@ -268,7 +268,7 @@ impl PatchTool {
         self.pane.preview = Some((patch.map(Cow::into_owned), check));
         self.pane.inline_diff = behavior
             .template_object(id)
-            .map_or_else(InlineDiff::default, |template| editor::inline_diff::changes(&template.text, &self.pane.text));
+            .map_or_else(InlineDiff::default, |template| InlineDiff::between(&template.text, &self.pane.text));
         self.refresh_problems(id);
     }
 
@@ -395,7 +395,7 @@ impl PatchTool {
     /// The inline diff first, as it is where the cursor is. e.g. changes at lines 3 and 9: from 5, `]c` is 9.
     pub(in crate::patch) fn step_change(&mut self, forward: bool) {
         if self.pane.show_inline_diff {
-            let line = editor::inline_diff::step(&self.pane.inline_diff, self.pane.cursor_line, forward);
+            let line = self.pane.inline_diff.step(self.pane.cursor_line, forward);
             if line.is_some() {
                 self.pane.focus = line.map(FocusAt::Line);
             }
@@ -410,7 +410,7 @@ impl PatchTool {
     pub(in crate::patch) fn revert_inline(&mut self, id: &str, index: usize) {
         let behavior = &mut self.workspace.behaviors[self.active];
         let Some(template) = behavior.template_object(id) else { return };
-        self.pane.text = editor::inline_diff::revert(&template.text, &self.pane.text, index);
+        self.pane.text = InlineDiff::revert(&template.text, &self.pane.text, index);
         behavior.set_text(id, &self.pane.text);
         self.pane.preview = None;
         self.object_changed(id);

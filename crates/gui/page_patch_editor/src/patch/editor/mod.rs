@@ -2,7 +2,6 @@
 //! beside the text. The drawing is in [`crate::patch::ui`].
 
 pub(in crate::patch) mod diagnostics;
-pub(in crate::patch) mod inline_diff;
 pub(in crate::patch) mod language;
 pub(in crate::patch) mod merge;
 pub(in crate::patch) mod names;

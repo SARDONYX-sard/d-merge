@@ -461,7 +461,7 @@ mod tests {
         println!("  valid: {}", check.is_ok());
         time!("field_diagnostics", editor::diagnostics::field_diagnostics(&edited, &behavior, false, "m"));
         time!("Preview::new", editor::preview::Preview::new(&patch));
-        time!("inline_diff", editor::inline_diff::changes(&text, &edited));
+        time!("inline_diff", egui_code_editor::InlineDiff::between(&text, &edited));
         time!("apply_changes", names.apply_changes(&behavior, std::slice::from_ref(&id)));
 
         // A typo in a field name, and fixing it.
@@ -719,7 +719,7 @@ mod work_tests {
     #[test]
     fn the_change_keys_go_to_what_shows_the_changes() {
         let pane = tool::editing::EditorPane {
-            inline_diff: editor::inline_diff::changes("a\nb\nc\nd\n", "a\nx\nc\ny\n"),
+            inline_diff: egui_code_editor::InlineDiff::between("a\nb\nc\nd\n", "a\nx\nc\ny\n"),
             preview_view: Some(editor::preview::Preview::new(
                 "<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- CLOSE -->\n<!-- MOD_CODE ~m~ OPEN -->\nd\n<!-- CLOSE -->\n",
             )),

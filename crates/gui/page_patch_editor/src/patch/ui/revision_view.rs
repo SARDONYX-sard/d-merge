@@ -10,11 +10,10 @@
 //! │ NORMAL  Ln 2, Col 1        Vim ▾       │   └───────────────────────────────────────────┘
 //! └────────────────────────────────────────┘
 //! ```
-//! The diff is the code editor, read only: the newer text with the older lines in it, as the
-//! editor's inline diff colors them; `▲ ▼` and Vim's `]c` / `[c` go from change to change, Vim's
-//! keys move in it, `Space c` / `:q` close it.
+//! Each is an [`egui_code_editor::DiffView`] (the code editor, read only) in a tab after the
+//! objects'; `Space c` / `:q` close it.
 
-use egui_code_editor::{CodeEditor, CodeEditorState, EditorCommand, InlineDiff, Keymap, languages::Xml};
+use egui_code_editor::{DiffView, EditorCommand, Keymap, languages::Xml};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::ui::editor::EditorMode,
@@ -22,7 +21,6 @@ use gui_shared::{
 
 use crate::patch::{
     PatchTool,
-    editor::inline_diff,
     workspace::history::{ObjectKey, Origin},
 };
 
@@ -39,7 +37,7 @@ pub(in crate::patch) struct RevisionView {
     /// `false`: the preview tab of the views, which the next one opened replaces (italic), as an
     /// object's. A double click on it keeps it.
     pub(in crate::patch) pinned: bool,
-    body: Box<Compare>,
+    body: Box<DiffView>,
 }
 
 /// A tab of a view, for the tab bar. e.g. `{ at: 0, title: "Blame Root", shown: true, pinned: false }`
@@ -95,7 +93,7 @@ impl Views {
     /// Shows view `at`, its editor with the keyboard.
     pub(in crate::patch) fn show(&mut self, at: usize) {
         if let Some(view) = self.list.get_mut(at) {
-            view.body.focus = true;
+            view.body.focus();
             self.shown = Some(at);
         }
     }
@@ -147,25 +145,6 @@ impl Views {
     }
 }
 
-/// What a view shows, in the code editor read only: a diff's newer text with the changes from the
-/// older one in it, or a blame's text with the revision of each line beside it, as GitLens'.
-#[derive(Debug)]
-struct Compare {
-    text: String,
-    /// A diff's changes; none for a blame.
-    diff: InlineDiff,
-    /// A blame's note of each line, e.g. `3 days ago  #2 fix the speed`; none for a diff.
-    notes: Vec<String>,
-    state: CodeEditorState,
-    /// Where the cursor is: `▲ ▼` go from there.
-    cursor_line: usize,
-    /// Just opened: the cursor goes to the first change, as VS Code's diff editor opens.
-    to_first: bool,
-    /// Just shown (opened, a tab clicked, the tab keys): its editor takes the keyboard, as an
-    /// object's does.
-    pub(in crate::patch) focus: bool,
-}
-
 impl PatchTool {
     /// The text of object `id` of behavior `behavior` at revision `number` (`None`: in the work now).
     /// An object no revision changed is the template's.
@@ -187,17 +166,7 @@ impl PatchTool {
         let to_name = to.map_or_else(|| "working".to_owned(), |number| format!("#{number}"));
         let name = self.object_name(behavior, id);
         let title = format!("{name} (#{from}) ↔ {name} ({to_name})");
-        let diff = inline_diff::changes(&old, &new);
-        let compare = Compare {
-            text: new,
-            diff,
-            notes: Vec::new(),
-            state: CodeEditorState::default(),
-            cursor_line: 0,
-            to_first: true,
-            focus: false,
-        };
-        self.show_in_editor(behavior, id, title, Box::new(compare));
+        self.show_in_editor(behavior, id, title, Box::new(DiffView::diff(&old, new)));
     }
 
     /// The object's name as its tab says it. e.g. `GetUpModList`; its id if it has none.
@@ -211,7 +180,7 @@ impl PatchTool {
     }
 
     /// Opens a tab of object `id` with `body`, or shows the one open with that title.
-    fn show_in_editor(&mut self, behavior: usize, id: &str, title: String, body: Box<Compare>) {
+    fn show_in_editor(&mut self, behavior: usize, id: &str, title: String, body: Box<DiffView>) {
         if behavior != self.active {
             self.active = behavior;
             self.tabs.clear();
@@ -241,16 +210,7 @@ impl PatchTool {
         let notes = origins.into_iter().map(label).collect();
         let text = now.to_owned();
         let title = format!("Blame {}", self.object_name(behavior, id));
-        let blame = Compare {
-            text,
-            diff: InlineDiff::default(),
-            notes,
-            state: CodeEditorState::default(),
-            cursor_line: 0,
-            to_first: false,
-            focus: false,
-        };
-        self.show_in_editor(behavior, id, title, Box::new(blame));
+        self.show_in_editor(behavior, id, title, Box::new(DiffView::blame(text, notes)));
     }
 
     /// Draws the view shown, with the tabs, in the editor's place. Returns whether one is shown.
@@ -271,8 +231,7 @@ impl PatchTool {
             let view_tabs = self.views.tabs_of(self.active);
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let compare = &self.views.list[at].body;
-                    go_to = super::object_editor::inline_diff_nav(ui, i18n, &compare.diff, compare.cursor_line);
+                    go_to = self.views.list[at].body.nav(ui, i18n.t(I18nKey::NemesisJumpDiffHover));
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         let marks = super::object_editor::TabMarks { focused: true, problems: None };
                         let current = (self.active, "");
@@ -289,11 +248,16 @@ impl PatchTool {
                 });
             });
             let view = &mut self.views.list[at];
-            let id = view.id.clone();
-            command = compare_ui(ui, i18n, &id, &mut view.body, (keymap, go_to));
+            if let Some(line) = go_to {
+                view.body.go_to(line);
+            }
+            if view.body.is_unchanged() {
+                ui.weak(i18n.t(I18nKey::NemesisNoChange));
+            }
+            let output = view.body.show(ui, ("nemesis_revision_view", view.id.as_str()), &Xml, keymap);
+            command = output.command;
             // What the key bindings see (`editorFocus`): this editor, as the object's is seen.
-            let editor_id = egui_code_editor::editor_id(("nemesis_revision_view", id.as_str()));
-            self.pane.had_focus = ui.memory(|m| m.has_focus(editor_id));
+            self.pane.had_focus = output.has_focus;
         });
         // The keys of the tabs as on an object's: the tab bar's bindings, Vim's `gt` / `Space c`.
         let close = self.key_command(keybinding::commands::TABS_CLOSE) || command == Some(EditorCommand::CloseTab);
@@ -312,72 +276,6 @@ impl PatchTool {
         }
         true
     }
-}
-
-/// What the read only editor of a diff hosts: its changes, and closing it.
-const COMPARE_COMMANDS: [EditorCommand; 5] = [
-    EditorCommand::NextChange,
-    EditorCommand::PreviousChange,
-    EditorCommand::CloseTab,
-    EditorCommand::NextTab,
-    EditorCommand::PreviousTab,
-];
-
-/// The diff as the code editor: see the module docs. `go_to`: a line `▲ ▼` asked for. Returns
-/// what its editor asked of the tabs (Vim's `Space c`, `:q`, `gt`), if anything.
-fn compare_ui(
-    ui: &mut egui::Ui,
-    i18n: &I18nMap,
-    id: &str,
-    compare: &mut Compare,
-    (keymap, go_to): (Keymap, Option<usize>),
-) -> Option<EditorCommand> {
-    let editor_id = egui_code_editor::editor_id(("nemesis_revision_view", id));
-    if compare.diff.hunks.is_empty() && compare.notes.is_empty() {
-        ui.weak(i18n.t(I18nKey::NemesisNoChange));
-    }
-    egui::Panel::bottom(("nemesis_revision_status", id)).show(ui, |ui| {
-        egui_code_editor::status_line(ui, &compare.state, keymap, &compare.text);
-    });
-    let focus = std::mem::take(&mut compare.focus);
-    if focus {
-        ui.memory_mut(|m| m.request_focus(editor_id));
-    }
-    let output = egui::ScrollArea::both()
-        .id_salt(("nemesis_revision_scroll", id))
-        .auto_shrink(false)
-        .show(ui, |ui| {
-            CodeEditor::new(("nemesis_revision_view", id), &mut compare.text)
-                .language(&Xml)
-                .read_only(true)
-                .keymap(keymap)
-                .inline_diff(Some(&compare.diff))
-                .line_annotations(&compare.notes)
-                .host_commands(&COMPARE_COMMANDS)
-                .show(ui, &mut compare.state)
-        })
-        .inner;
-    // Asked again of the editor drawn: a focus asked for by id before it was may be lost.
-    if focus {
-        output.response.request_focus();
-    }
-    // Taken out before the text is read again: the output borrows it.
-    let (cursor, command) = (output.cursor, output.command);
-    if let Some(cursor) = cursor {
-        compare.cursor_line = cursor.line;
-    }
-    let step = match command {
-        Some(EditorCommand::NextChange) => inline_diff::step(&compare.diff, compare.cursor_line, true),
-        Some(EditorCommand::PreviousChange) => inline_diff::step(&compare.diff, compare.cursor_line, false),
-        _ => None,
-    };
-    let first = std::mem::take(&mut compare.to_first).then(|| inline_diff::first(&compare.diff)).flatten();
-    if let Some(line) = go_to.or(step).or(first) {
-        let at = compare.text.split('\n').take(line).map(|line| line.chars().count() + 1).sum();
-        egui_code_editor::set_cursor(ui.ctx(), editor_id, at);
-        ui.memory_mut(|m| m.request_focus(editor_id));
-    }
-    command
 }
 
 /// How long ago `time` was at `now` (seconds since the Unix epoch), as GitLens says it.
@@ -400,21 +298,7 @@ mod tests {
     use super::*;
 
     fn blank_view(title: &str) -> RevisionView {
-        RevisionView {
-            behavior: 0,
-            id: "#1".to_owned(),
-            title: title.to_owned(),
-            pinned: true,
-            body: Box::new(Compare {
-                text: String::new(),
-                diff: InlineDiff::default(),
-                notes: Vec::new(),
-                state: CodeEditorState::default(),
-                cursor_line: 0,
-                to_first: false,
-                focus: false,
-            }),
-        }
+        RevisionView { behavior: 0, id: "#1".to_owned(), title: title.to_owned(), pinned: true, body: Box::default() }
     }
 
     #[test]
@@ -475,11 +359,12 @@ mod tests {
     /// The diff is the newer text with the older lines in it, as the editor's inline diff has them.
     #[test]
     fn a_compare_is_the_newer_text_with_its_changes() {
-        let diff = inline_diff::changes("a\nb\nd\n", "a\nc\nd\ne\n");
+        let view = DiffView::diff("a\nb\nd\n", "a\nc\nd\ne\n".to_owned());
+        let diff = view.changes();
         assert_eq!(diff.hunks.len(), 2);
         assert_eq!(diff.hunks[0].old_lines, ["b"]);
         assert_eq!(diff.hunks[0].new_lines, 1..2);
-        assert_eq!(inline_diff::step(&diff, 1, true), Some(3), "`▼` / `]c`: to the next change");
-        assert_eq!(inline_diff::first(&diff), Some(1), "where it opens");
+        assert_eq!(diff.step(1, true), Some(3), "`▼` / `]c`: to the next change");
+        assert_eq!(diff.first_line(), Some(1), "where it opens");
     }
 }

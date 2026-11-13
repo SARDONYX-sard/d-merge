@@ -1,8 +1,7 @@
 //! The right side: the XML editor of the open object, and its patch preview below.
 
 use egui_code_editor::{
-    CodeEditor, EditorAction, EditorCommand, EditorFeatures, EditorLabels, InlineDiff, Keymap, Navigation,
-    languages::Xml,
+    CodeEditor, EditorAction, EditorCommand, EditorFeatures, EditorLabels, Keymap, Navigation, languages::Xml,
 };
 use egui_widgets::shadcn::{Button, Checkbox, Icon};
 use gui_shared::{
@@ -16,7 +15,6 @@ use crate::patch::{
     EditorResult, FocusAt, PatchTool, TabEvent,
     anim::lines::AnimDataLanguage,
     editor::{
-        inline_diff,
         language::NemesisXml,
         merge,
         pandora::{self, PandoraXml},
@@ -361,7 +359,8 @@ impl PatchTool {
                         self.pane.show_inline_diff = !self.pane.show_inline_diff;
                     }
                     if self.pane.show_inline_diff
-                        && let Some(line) = inline_diff_nav(ui, i18n, &self.pane.inline_diff, self.pane.cursor_line)
+                        && let Some(line) =
+                            self.pane.inline_diff.nav(ui, self.pane.cursor_line, i18n.t(I18nKey::NemesisJumpDiffHover))
                     {
                         self.pane.focus = Some(FocusAt::Line(line));
                     }
@@ -536,24 +535,6 @@ fn merge_values(ui: &mut egui::Ui, i18n: &I18nMap, values: &resolve::MergeValues
     });
     picked
 }
-/// `▲ ▼ 2/5` of the changes shown in the editor, drawn right to left. Returns the line to go to.
-pub(in crate::patch) fn inline_diff_nav(
-    ui: &mut egui::Ui,
-    i18n: &I18nMap,
-    diff: &InlineDiff,
-    cursor_line: usize,
-) -> Option<usize> {
-    let (at, count) = inline_diff::position(diff, cursor_line)?;
-    ui.label(format!("{}/{count}", at + 1));
-    let mut line = None;
-    for (forward, glyph) in [(true, "▼"), (false, "▲")] {
-        if ui.small_button(glyph).on_hover_text(i18n.t(I18nKey::NemesisJumpDiffHover)).clicked() {
-            line = inline_diff::step(diff, cursor_line, forward);
-        }
-    }
-    line
-}
-
 /// Shows or hides the patch preview beside the editor.
 fn split_preview_button(ui: &mut egui::Ui, i18n: &I18nMap, show_preview: &mut bool) {
     let hover = if *show_preview { I18nKey::EditorHidePreview } else { I18nKey::EditorShowPreview };
