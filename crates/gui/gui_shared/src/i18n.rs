@@ -329,6 +329,9 @@ pub enum I18nKey {
     /// Trigger Suggest
     EditorCompletion,
 
+    /// Configure Keybinding
+    EditorConfigureKeybinding,
+
     /// Copy
     EditorCopy,
 
@@ -546,6 +549,15 @@ pub enum I18nKey {
     /// # Notes
     /// GitHub account required.
     IssueReportHover,
+
+    /// Other commands with these keys:
+    KeybindingAlsoBound,
+
+    /// Press the desired key combination and then press Enter. Esc cancels.
+    KeybindingRecordHint,
+
+    /// Key binding saved to keybindings.json
+    KeybindingSaved,
 
     /// License:
     LicenseLabel,
@@ -1619,11 +1631,21 @@ impl I18nMap {
     }
 }
 
+/// The name VS Code gives "show the file in the file manager" on this OS: Reveal in File Explorer
+/// (Windows), Reveal in Finder (macOS), Open Containing Folder (Linux).
+pub const REVEAL_IN_FILE_MANAGER: I18nKey = if cfg!(windows) {
+    I18nKey::RevealInFileExplorer
+} else if cfg!(target_os = "macos") {
+    I18nKey::RevealInFinder
+} else {
+    I18nKey::OpenContainingFolder
+};
+
 /// The translated texts of the code editor's menus (right click, `Ctrl+Shift+P`).
 ///
 /// In the order `egui_code_editor::EditorLabels::from_texts` takes them: this crate does not know
 /// egui, so it cannot build that struct itself.
-pub fn editor_label_texts(i18n: &I18nMap) -> [&str; 15] {
+pub fn editor_label_texts(i18n: &I18nMap) -> [&str; 16] {
     [
         i18n.t(I18nKey::EditorGoToDefinition),
         i18n.t(I18nKey::EditorFindReferences),
@@ -1640,6 +1662,7 @@ pub fn editor_label_texts(i18n: &I18nMap) -> [&str; 15] {
         i18n.t(I18nKey::EditorCommandPalette),
         i18n.t(I18nKey::EditorRevertChange),
         i18n.t(I18nKey::EditorPaletteHint),
+        i18n.t(I18nKey::EditorConfigureKeybinding),
     ]
 }
 

@@ -87,6 +87,8 @@ pub(crate) struct PatchTool {
     is_user_patch: bool,
     /// The commands this frame's keys asked for: see [`Self::key_command`].
     key_commands: Vec<&'static str>,
+    /// The keys of the palette and its `⚙`. See [`keybinding::KeyUi`].
+    key_ui: keybinding::KeyUi,
     /// Copy path / reveal of an object asked for by a tab or the editor: done by
     /// [`Self::file_keys`], which has what it needs.
     file_asked: Option<(tool::list::FileAction, String)>,
@@ -217,6 +219,8 @@ struct EditorResult {
     /// The `↶` of this place of the inline diff was clicked.
     inline_revert: Option<usize>,
     tab_event: Option<TabEvent>,
+    /// The `⚙` of this palette action: record its keys.
+    configure: Option<&'static str>,
 }
 
 /// What a click on the tab bar asked for.
@@ -333,7 +337,7 @@ impl PatchTool {
         self.diagnose_work();
         // The user patch window, above the page, has the keys while it is open.
         let keys = (!self.user_patch.open).then_some(keys);
-        self.take_key_commands(ui.ctx(), keys);
+        self.take_key_commands(ui.ctx(), keys, i18n, notify);
         self.draw(ui, i18n, notify);
 
         self.write_editor_options(editor);

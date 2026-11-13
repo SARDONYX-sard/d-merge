@@ -490,14 +490,8 @@ pub(super) enum RowAction {
     RevertOrDelete,
 }
 
-/// The name VS Code gives "show the file in the file manager" on this OS.
-pub(in crate::patch) const REVEAL_LABEL: I18nKey = if cfg!(windows) {
-    I18nKey::RevealInFileExplorer
-} else if cfg!(target_os = "macos") {
-    I18nKey::RevealInFinder
-} else {
-    I18nKey::OpenContainingFolder
-};
+/// "Reveal in File Explorer" as VS Code names it on this OS.
+pub(in crate::patch) const REVEAL_LABEL: I18nKey = gui_shared::i18n::REVEAL_IN_FILE_MANAGER;
 
 /// `Keep Open / New / Duplicate / Repeat / Copy id / Copy path / Reveal in File Explorer / Revert (or Delete for a new object)`, for the flat list and
 /// the tree alike.

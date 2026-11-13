@@ -14,13 +14,31 @@
 
 use crate::{EditorFeatures, Keymap};
 
-/// A command the host adds to the palette, e.g. `EditorAction { id: "save", label: "Save" }`.
+/// A command the host adds to the palette, e.g. `EditorAction::new("save", "Save")`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EditorAction<'a> {
     /// Reported in [`crate::CodeEditorOutput::action`] when it is run.
     pub id: &'a str,
     /// Shown in the list.
     pub label: &'a str,
+    /// Its keys as the host's key bindings have them, e.g. `ctrl+w`; `""` for none. `Some`: they can
+    /// be changed, as in VS Code's palette: its `⚙` comes back as [`crate::CodeEditorOutput::configure`].
+    pub keys: Option<&'a str>,
+}
+
+impl<'a> EditorAction<'a> {
+    #[inline]
+    pub const fn new(id: &'a str, label: &'a str) -> Self {
+        Self { id, label, keys: None }
+    }
+
+    /// Its keys, and that they can be changed. See [`Self::keys`].
+    #[inline]
+    #[must_use]
+    pub const fn with_keys(mut self, keys: &'a str) -> Self {
+        self.keys = Some(keys);
+        self
+    }
 }
 
 /// Texts of the editor's own menus, for translation. The default is English.
@@ -43,11 +61,13 @@ pub struct EditorLabels<'a> {
     pub revert_change: &'a str,
     /// The palette's input field, when empty.
     pub palette_hint: &'a str,
+    /// The `⚙` of a palette row, on hover.
+    pub configure_keybinding: &'a str,
 }
 
 impl<'a> EditorLabels<'a> {
     /// The texts in the order of the fields, for a host that keeps them in a list.
-    pub const fn from_texts(texts: [&'a str; 15]) -> Self {
+    pub const fn from_texts(texts: [&'a str; 16]) -> Self {
         let [
             go_to_definition,
             find_references,
@@ -64,6 +84,7 @@ impl<'a> EditorLabels<'a> {
             command_palette,
             revert_change,
             palette_hint,
+            configure_keybinding,
         ] = texts;
         Self {
             go_to_definition,
@@ -81,6 +102,7 @@ impl<'a> EditorLabels<'a> {
             command_palette,
             revert_change,
             palette_hint,
+            configure_keybinding,
         }
     }
 }
@@ -103,6 +125,7 @@ impl Default for EditorLabels<'_> {
             command_palette: "Command Palette",
             revert_change: "Revert this change",
             palette_hint: "Type a command",
+            configure_keybinding: "Configure Keybinding",
         }
     }
 }
@@ -175,6 +198,8 @@ impl Builtin {
 pub(crate) enum Picked<'a> {
     Builtin(Builtin),
     Host(&'a str),
+    /// The `⚙` of a host action: change its keys.
+    Configure(&'a str),
 }
 
 impl<'a> Picked<'a> {
@@ -182,7 +207,15 @@ impl<'a> Picked<'a> {
     pub(crate) const fn host_action(self) -> Option<&'a str> {
         match self {
             Self::Host(action) => Some(action),
-            Self::Builtin(_) => None,
+            Self::Builtin(_) | Self::Configure(_) => None,
+        }
+    }
+
+    /// The id of the host action whose keys are to be changed.
+    pub(crate) const fn configure(self) -> Option<&'a str> {
+        match self {
+            Self::Configure(action) => Some(action),
+            Self::Builtin(_) | Self::Host(_) => None,
         }
     }
 }
@@ -202,7 +235,9 @@ pub(crate) struct Command<'a> {
     pub(crate) picked: Picked<'a>,
     pub(crate) label: &'a str,
     /// e.g., `Shift+F12`; `""` if it has none.
-    pub(crate) shortcut: &'static str,
+    pub(crate) shortcut: &'a str,
+    /// Its keys can be changed: a `⚙` on its row.
+    pub(crate) configurable: bool,
 }
 
 /// The commands available now that match `query`: the host's first.
@@ -212,12 +247,17 @@ pub(crate) fn commands<'a>(
     labels: &EditorLabels<'a>,
     actions: &'a [EditorAction<'a>],
 ) -> Vec<Command<'a>> {
-    let host =
-        actions.iter().map(|action| Command { picked: Picked::Host(action.id), label: action.label, shortcut: "" });
+    let host = actions.iter().map(|action| Command {
+        picked: Picked::Host(action.id),
+        label: action.label,
+        shortcut: action.keys.unwrap_or_default(),
+        configurable: action.keys.is_some(),
+    });
     let builtin = Builtin::ALL.into_iter().filter(|command| command.available(context)).map(|command| Command {
         picked: Picked::Builtin(command),
         label: command.label(labels),
         shortcut: command.shortcut(),
+        configurable: false,
     });
     host.chain(builtin).filter(|command| matches_query(query, command.label)).collect()
 }
@@ -304,8 +344,8 @@ mod tests {
     use super::*;
 
     const COMMANDS: [Command<'_>; 2] = [
-        Command { picked: Picked::Host("a"), label: "A", shortcut: "" },
-        Command { picked: Picked::Host("b"), label: "B", shortcut: "" },
+        Command { picked: Picked::Host("a"), label: "A", shortcut: "", configurable: false },
+        Command { picked: Picked::Host("b"), label: "B", shortcut: "", configurable: false },
     ];
 
     #[test]
@@ -328,7 +368,7 @@ mod tests {
     #[test]
     fn lists_only_what_applies() {
         let labels = EditorLabels::default();
-        let actions = [EditorAction { id: "save", label: "Save" }];
+        let actions = [EditorAction::new("save", "Save")];
         let vim_normal = PaletteContext { keymap: Keymap::Vim, features: EditorFeatures::default(), inserting: false };
 
         let listed = commands("", vim_normal, &labels, &actions);

@@ -14,8 +14,10 @@
 
 pub mod commands;
 pub mod file;
+pub mod host;
 mod jsonc;
 pub mod key;
+pub mod recorder;
 pub mod when;
 
 use std::{
@@ -25,7 +27,9 @@ use std::{
 
 pub use self::{
     commands::{COMMANDS, Command},
+    host::{FrameKeys, KeyUi},
     key::{Chord, Keys, keys_text, parse_keys},
+    recorder::RecorderTexts,
     when::{Context, Value, When},
 };
 
@@ -123,6 +127,8 @@ pub struct Keybindings {
     file: Option<UserFile>,
     /// What of the user file could not be taken: for the app to tell. See [`Self::take_warnings`].
     warnings: Vec<String>,
+    /// Another for each table made: what was computed of one is known to be stale.
+    generation: u64,
 }
 
 impl Default for Keybindings {
@@ -151,7 +157,9 @@ impl Keybindings {
                 warnings.push(format!("keybindings.json: entry {} (`{}`): {why}", at + 1, entry.key));
             }
         }
-        Self { bindings, pending: Vec::new(), pending_at: 0.0, file: None, warnings }
+        static GENERATIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let generation = GENERATIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Self { bindings, pending: Vec::new(), pending_at: 0.0, file: None, warnings, generation }
     }
 
     /// The defaults and the user file at `path`. A missing file is made (nothing changed in it), and
@@ -204,6 +212,48 @@ impl Keybindings {
     /// `keybindings.json: entry 2 (`ctrl+q`): `tabs.closee` is no command`.
     pub fn take_warnings(&mut self) -> Vec<String> {
         std::mem::take(&mut self.warnings)
+    }
+
+    /// The commands bound to `keys`, with their `when`: the last first, as they are looked up.
+    pub fn bound_to<'a>(&'a self, keys: &'a [Chord]) -> impl Iterator<Item = (&'static str, Option<&'a str>)> {
+        self.bindings.iter().rev().filter(move |b| b.keys == keys).map(|b| (b.command, b.when_text.as_deref()))
+    }
+
+    /// Gives `command` the keys `keys` in the user file, as VS Code's keyboard shortcuts do: the
+    /// binding of it that works in `context` (if any) is taken away (`-command`, its `when` kept for
+    /// the new one), and the new one added. The file is read again at once.
+    ///
+    /// # Errors
+    /// There is no user file (see [`Self::load`]), or it can't be written.
+    pub fn bind(&mut self, command: &str, keys: &[Chord], context: &KeyContext) -> Result<(), String> {
+        let Some(file) = &self.file else { return Err("no keybindings.json".to_owned()) };
+        let path = file.path.clone();
+        let replaced = self.bindings.iter().rev().find(|b| b.command == command && b.works(context));
+        let when = replaced.and_then(|b| b.when_text.clone());
+        let mut entries = Vec::with_capacity(2);
+        if let Some(old) = replaced {
+            entries.push(file::entry_text(&keys_text(&old.keys), &format!("-{command}"), old.when_text.as_deref()));
+        }
+        entries.push(file::entry_text(&keys_text(keys), command, when.as_deref()));
+        let text = std::fs::read_to_string(&path).unwrap_or_default();
+        std::fs::write(&path, file::add_entries(&text, &entries)).map_err(|e| format!("{}: {e}", path.display()))?;
+        let mut read = Self::read(&path);
+        read.file = Some(UserFile { modified: modified(&path), path, checked_at: 0.0 });
+        *self = read;
+        Ok(())
+    }
+
+    /// Changes each time the bindings are read or changed: a cache of them keeps it to know.
+    #[inline]
+    #[must_use]
+    pub const fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// The path of the user file, if loaded from one. e.g. `./.d_merge/keybindings.json`
+    #[must_use]
+    pub fn path(&self) -> Option<&Path> {
+        self.file.as_ref().map(|file| file.path.as_path())
     }
 
     /// The keys of the binding of `command` that works in `context`, as the file writes them: for

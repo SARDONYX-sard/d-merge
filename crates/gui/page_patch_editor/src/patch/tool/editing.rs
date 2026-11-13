@@ -328,6 +328,9 @@ impl PatchTool {
             Some(EditorCommand::ToggleExplorer | EditorCommand::GoToDefinition | EditorCommand::FindReferences)
             | None => {}
         }
+        if let Some(command) = result.configure {
+            self.key_ui.configure_command(command);
+        }
         if let Some(older) = result.walk_history {
             self.walk_history(older, id);
         }

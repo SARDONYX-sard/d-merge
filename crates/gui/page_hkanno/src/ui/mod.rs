@@ -36,7 +36,17 @@ impl HkannoPage {
     pub fn ui(&mut self, ui: &mut egui::Ui, mut ctx: HkannoPageCtx<'_>) {
         self.handle_drop(ui.ctx(), &mut ctx);
         let context = self.key_context(ui.ctx(), &ctx);
-        self.key_commands = ctx.keys.dispatch(ui.ctx(), &context);
+        let texts = keybinding::RecorderTexts {
+            hint: ctx.i18n.t(I18nKey::KeybindingRecordHint),
+            also_bound: ctx.i18n.t(I18nKey::KeybindingAlsoBound),
+        };
+        let frame = self.key_ui.frame(ui.ctx(), ctx.keys, &context, texts);
+        self.key_commands = frame.commands;
+        match frame.saved {
+            Some(Ok(())) => ctx.notify.success(ctx.i18n.t(I18nKey::KeybindingSaved)),
+            Some(Err(err)) => ctx.notify.error(err),
+            None => {}
+        }
         self.handle_shortcuts(&mut ctx);
         if self.key_command(commands::FILE_REVEAL) {
             self.reveal_active(&mut ctx);
@@ -144,11 +154,14 @@ impl HkannoPage {
         }
 
         let i18n = ctx.i18n;
+        // With their keys as the key bindings have them, and a `⚙` to change them, as VS Code's.
+        let keyed = |action| with_palette_keys(&self.key_ui, action);
         let actions = [
-            EditorCommand::NextTab.action(i18n.t(I18nKey::EditorNextTab)),
-            EditorCommand::PreviousTab.action(i18n.t(I18nKey::EditorPreviousTab)),
-            EditorCommand::CloseTab.action(i18n.t(I18nKey::EditorCloseTab)),
+            keyed(EditorCommand::NextTab.action(i18n.t(I18nKey::EditorNextTab))),
+            keyed(EditorCommand::PreviousTab.action(i18n.t(I18nKey::EditorPreviousTab))),
+            keyed(EditorCommand::CloseTab.action(i18n.t(I18nKey::EditorCloseTab))),
             EditorCommand::TogglePreview.action(i18n.t(I18nKey::EditorTogglePreview)),
+            keyed(EditorCommand::RevealFile.action(i18n.t(gui_shared::i18n::REVEAL_IN_FILE_MANAGER))),
         ];
         let lsp = &ctx.lsp_settings;
         let language = HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
@@ -180,7 +193,7 @@ impl HkannoPage {
         }
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
 
-        let CodeEditorOutput { changed, cursor, command, .. } = egui::ScrollArea::both()
+        let CodeEditorOutput { changed, cursor, command, configure, .. } = egui::ScrollArea::both()
             .id_salt("hkanno_editor_scroll")
             .auto_shrink(false)
             .show(ui, |ui| {
@@ -196,6 +209,10 @@ impl HkannoPage {
             })
             .inner;
 
+        if let Some(command) = configure.and_then(keybinding::host::command_of_action) {
+            self.key_ui.configure_command(command);
+        }
+        let Some(tab) = self.tabs.get_mut(self.active) else { return };
         if changed {
             tab.dirty = true;
             tab.text_changed();
@@ -418,6 +435,17 @@ impl HkannoPage {
             input_focus: !editor_focus && egui_ctx.egui_wants_keyboard_input(),
             ..Default::default()
         }
+    }
+}
+
+/// `action` with its keys and its `⚙`, if it is a command of the key bindings.
+fn with_palette_keys<'a>(
+    key_ui: &'a keybinding::KeyUi,
+    action: egui_code_editor::EditorAction<'a>,
+) -> egui_code_editor::EditorAction<'a> {
+    match key_ui.palette_keys(action.id) {
+        Some(keys) => action.with_keys(keys),
+        None => action,
     }
 }
 

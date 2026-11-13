@@ -54,6 +54,9 @@ pub struct CodeEditorOutput<'a> {
     pub navigation: Option<Navigation<'a>>,
     /// The id of the [`EditorAction`] run from the command palette.
     pub action: Option<&'a str>,
+    /// The id of the [`EditorAction`] whose `⚙` was clicked in the palette: the host lets its keys
+    /// be changed, as VS Code's palette does.
+    pub configure: Option<&'a str>,
     /// The `↶` of this [`InlineDiff::hunks`] entry was clicked: the host puts it back.
     pub inline_revert: Option<usize>,
 }
@@ -328,6 +331,7 @@ impl<'a> CodeEditor<'a> {
             pointer,
             navigation,
             action: input.picked.and_then(palette::Picked::host_action),
+            configure: input.picked.and_then(palette::Picked::configure),
             inline_revert,
         }
     }

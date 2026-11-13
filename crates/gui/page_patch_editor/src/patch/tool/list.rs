@@ -43,6 +43,15 @@ pub(in crate::patch) struct Explorer {
 pub(in crate::patch) const fn take_reveal(selected: Option<&Rc<str>>, forced: bool) -> bool {
     forced && selected.is_some()
 }
+/// The key recorder's texts. See [`keybinding::recorder`].
+pub(in crate::patch) fn recorder_texts(i18n: &gui_shared::i18n::I18nMap) -> keybinding::RecorderTexts<'_> {
+    use gui_shared::i18n::I18nKey;
+    keybinding::RecorderTexts {
+        hint: i18n.t(I18nKey::KeybindingRecordHint),
+        also_bound: i18n.t(I18nKey::KeybindingAlsoBound),
+    }
+}
+
 /// What is done with the file an object is in, as VS Code's "Copy Path" / "Reveal in File Explorer".
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::patch) enum FileAction {
@@ -145,15 +154,25 @@ impl PatchTool {
     /// Takes the commands of this frame's keys (see [`keybinding`]): carried out by those who ask for
     /// them with [`Self::key_command`] while it is drawn. `keys`: `None` when another has the keyboard
     /// (the main work's tool while the user patch window is open).
+    ///
+    /// While the palette's `⚙` records new keys, it has them all: see [`keybinding::KeyUi`].
     pub(in crate::patch) fn take_key_commands(
         &mut self,
         ctx: &egui::Context,
         keys: Option<&mut keybinding::Keybindings>,
+        i18n: &gui_shared::i18n::I18nMap,
+        notify: &mut egui_widgets::notify::Notification,
     ) {
         self.key_commands.clear();
         let Some(keys) = keys else { return };
         let context = self.key_context(ctx);
-        self.key_commands = keys.dispatch(ctx, &context);
+        let frame = self.key_ui.frame(ctx, keys, &context, recorder_texts(i18n));
+        self.key_commands = frame.commands;
+        match frame.saved {
+            Some(Ok(())) => notify.success(i18n.t(gui_shared::i18n::I18nKey::KeybindingSaved)),
+            Some(Err(err)) => notify.error(err),
+            None => {}
+        }
     }
 
     /// Was `command` asked for by this frame's keys? It is done then: asked again, `false`.

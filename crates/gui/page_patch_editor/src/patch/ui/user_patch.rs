@@ -70,7 +70,7 @@ impl PatchTool {
         self.read_view_settings(settings);
         self.sync_workspace(notify, i18n);
         self.take_in_resolution(notify, i18n);
-        self.take_key_commands(ui.ctx(), Some(keys));
+        self.take_key_commands(ui.ctx(), Some(keys), i18n, notify);
         self.draw(ui, i18n, notify);
         self.write_editor_options(editor);
         self.write_view_settings(settings);

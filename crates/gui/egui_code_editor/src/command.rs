@@ -106,6 +106,6 @@ impl EditorCommand {
     /// [`CodeEditorOutput::command`], the same as its key.
     #[inline]
     pub const fn action(self, label: &str) -> EditorAction<'_> {
-        EditorAction { id: self.action_id(), label }
+        EditorAction::new(self.action_id(), label)
     }
 }

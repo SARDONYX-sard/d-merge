@@ -111,17 +111,33 @@ fn draw<'a>(
                     palette.selected = 0;
                 }
                 for (i, command) in commands.iter().enumerate() {
-                    let button =
-                        egui::Button::selectable(i == palette.selected, command.label).right_text(command.shortcut);
-                    if ui.add_sized([ui.available_width(), 0.0], button).clicked() {
-                        clicked = Some(command.picked);
-                    }
+                    ui.horizontal(|ui| {
+                        // VS Code's `⚙`: change the keys of the command.
+                        let gear = if command.configurable { CONFIGURE_WIDTH } else { 0.0 };
+                        let button =
+                            egui::Button::selectable(i == palette.selected, command.label).right_text(command.shortcut);
+                        if ui.add_sized([ui.available_width() - gear, 0.0], button).clicked() {
+                            clicked = Some(command.picked);
+                        }
+                        let Picked::Host(id) = command.picked else { return };
+                        if command.configurable
+                            && ui
+                                .add(egui::Button::new("⚙").small().frame(false))
+                                .on_hover_text(input.labels.configure_keybinding)
+                                .clicked()
+                        {
+                            clicked = Some(Picked::Configure(id));
+                        }
+                    });
                 }
             });
         });
     palette.rect = Some(area.response.rect);
     clicked
 }
+
+/// The room of a row's `⚙`.
+const CONFIGURE_WIDTH: f32 = 22.0;
 
 fn field_id(editor: egui::Id) -> egui::Id {
     editor.with("palette_field")

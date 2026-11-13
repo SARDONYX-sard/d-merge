@@ -65,6 +65,8 @@ pub struct HkannoPage {
     problems_cursor: egui_code_editor::ProblemsCursor,
     /// The commands this frame's keys asked for: see [`HkannoPage::key_command`].
     key_commands: Vec<&'static str>,
+    /// The keys of the palette and its `⚙`. See [`keybinding::KeyUi`].
+    key_ui: keybinding::KeyUi,
 }
 
 impl std::fmt::Debug for HkannoPage {

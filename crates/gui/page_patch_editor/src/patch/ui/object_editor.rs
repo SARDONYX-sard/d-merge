@@ -288,15 +288,18 @@ impl PatchTool {
             EditorMode::Vim => Keymap::Vim,
         };
         let labels = EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n));
+        // With their keys as the key bindings have them, and a `⚙` to change them, as VS Code's.
+        let keyed = |action| with_palette_keys(&self.key_ui, action);
         let actions = [
-            EditorAction { id: ACTION_FOCUS_TREE, label: i18n.t(I18nKey::NemesisFocusTree) },
-            EditorAction { id: ACTION_BACK, label: i18n.t(I18nKey::NemesisGoBack) },
-            EditorAction { id: ACTION_FORWARD, label: i18n.t(I18nKey::NemesisGoForward) },
-            EditorCommand::NextTab.action(i18n.t(I18nKey::EditorNextTab)),
-            EditorCommand::PreviousTab.action(i18n.t(I18nKey::EditorPreviousTab)),
-            EditorCommand::CloseTab.action(i18n.t(I18nKey::EditorCloseTab)),
+            EditorAction::new(ACTION_FOCUS_TREE, i18n.t(I18nKey::NemesisFocusTree)),
+            keyed(EditorAction::new(ACTION_BACK, i18n.t(I18nKey::NemesisGoBack))),
+            keyed(EditorAction::new(ACTION_FORWARD, i18n.t(I18nKey::NemesisGoForward))),
+            keyed(EditorCommand::NextTab.action(i18n.t(I18nKey::EditorNextTab))),
+            keyed(EditorCommand::PreviousTab.action(i18n.t(I18nKey::EditorPreviousTab))),
+            keyed(EditorCommand::CloseTab.action(i18n.t(I18nKey::EditorCloseTab))),
             EditorCommand::TogglePreview.action(i18n.t(I18nKey::EditorTogglePreview)),
             EditorCommand::ToggleInlineDiff.action(i18n.t(I18nKey::NemesisToggleInlineDiff)),
+            keyed(EditorCommand::RevealFile.action(i18n.t(super::object_list::REVEAL_LABEL))),
         ];
 
         let mut result = EditorResult::default();
@@ -380,6 +383,7 @@ impl PatchTool {
                 result.changed = output.changed;
                 result.inline_revert = output.inline_revert;
                 result.command = output.command;
+                result.configure = output.configure.and_then(keybinding::host::command_of_action);
                 result.focus_tree = output.action == Some(ACTION_FOCUS_TREE);
                 match output.action {
                     Some(ACTION_BACK) => result.walk_history = Some(true),
@@ -601,6 +605,14 @@ fn tab_bar(
         });
     });
     event
+}
+
+/// `action` with its keys and its `⚙`, if it is a command of the key bindings.
+fn with_palette_keys<'a>(key_ui: &'a keybinding::KeyUi, action: EditorAction<'a>) -> EditorAction<'a> {
+    match key_ui.palette_keys(action.id) {
+        Some(keys) => action.with_keys(keys),
+        None => action,
+    }
 }
 
 /// A tab's right-click menu, like VS Code's.
