@@ -51,7 +51,8 @@ impl PatchTool {
 
         let mut action = None;
         if self.panels.show_variables {
-            ui.horizontal(|ui| {
+            // Wrapped, not wider than the side bar.
+            ui.horizontal_wrapped(|ui| {
                 let new = &mut self.new_names;
                 let name = TextEdit::singleline(&mut new.variable)
                     .hint_text(i18n.t(I18nKey::NemesisNewVariableHint))
@@ -83,7 +84,7 @@ impl PatchTool {
             };
             action = name_rows(ui, i18n, list, filter, &mut self.new_names.renaming).or(action);
         } else {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 let name = TextEdit::singleline(&mut self.new_names.event)
                     .hint_text(i18n.t(I18nKey::NemesisNewEventHint))
                     .desired_width(140.0);
@@ -139,7 +140,11 @@ fn name_rows(
     // Up and down only: a long name is cut with `…` (sideways, the width changed with the rows drawn).
     egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, shown.len(), |ui, range| {
         for &index in &shown[range] {
-            ui.horizontal(|ui| action = name_row(ui, i18n, list, index, renaming).or(action));
+            // The list's width exactly: a row a pixel wider would widen the side bar, a little more
+            // each time the view is shown again.
+            egui_tree::list::fixed_row(ui, row_height, |ui| {
+                action = name_row(ui, i18n, list, index, renaming).or(action);
+            });
         }
     });
     action
