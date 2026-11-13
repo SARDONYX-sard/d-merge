@@ -503,7 +503,12 @@ fn merge_values(ui: &mut egui::Ui, i18n: &I18nMap, values: &resolve::MergeValues
     picked
 }
 /// `▲ ▼ 2/5` of the changes shown in the editor, drawn right to left. Returns the line to go to.
-fn inline_diff_nav(ui: &mut egui::Ui, i18n: &I18nMap, diff: &InlineDiff, cursor_line: usize) -> Option<usize> {
+pub(in crate::patch) fn inline_diff_nav(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    diff: &InlineDiff,
+    cursor_line: usize,
+) -> Option<usize> {
     let (at, count) = inline_diff::position(diff, cursor_line)?;
     ui.label(format!("{}/{count}", at + 1));
     let mut line = None;
