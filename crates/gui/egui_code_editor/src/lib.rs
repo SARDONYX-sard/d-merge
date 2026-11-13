@@ -29,6 +29,7 @@
 //! 4. overlays are drawn (cursor line, block cursor, hover, signature help, inlay hints)
 
 mod command;
+mod comment;
 mod completion;
 mod cursor;
 mod edit_ops;
@@ -57,8 +58,8 @@ pub use self::{
     inline_diff::{CharChange, DiffHunk, InlineDiff},
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
     language::{
-        CompletionItem, CompletionList, Diagnostic, Indent, Language, Location, QuickFix, References, Severity,
-        SignatureHelp,
+        Comment, CompletionItem, CompletionList, Diagnostic, Indent, Language, Location, QuickFix, References,
+        Severity, SignatureHelp,
     },
     layout::line_job,
     palette::{EditorAction, EditorLabels},

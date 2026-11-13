@@ -119,9 +119,17 @@ impl Default for View {
 #[derive(Debug, Default)]
 pub struct KeymapState {
     vim: vim::VimState,
+    /// How the language comments a line out: see [`crate::Language::comment`].
+    comment: Option<crate::Comment>,
 }
 
 impl KeymapState {
+    /// The language's comment, for `Ctrl+/` and Vim's `gc`.
+    pub(crate) const fn set_comment(&mut self, comment: Option<crate::Comment>) {
+        self.comment = comment;
+        self.vim.options.comment = comment;
+    }
+
     /// Vim settings, e.g., the Insert-mode escape sequences (`jk`, ...).
     pub(crate) const fn vim_options_mut(&mut self) -> &mut vim::VimOptions {
         &mut self.vim.options
@@ -139,8 +147,11 @@ impl KeymapState {
         view: View,
     ) -> KeymapOutput {
         match keymap {
-            Keymap::Normal => normal::handle(ui, id, text),
-            Keymap::Vim => self.vim.handle(ui, id, text, view),
+            Keymap::Normal => normal::handle(ui, id, text, self.comment),
+            Keymap::Vim => match normal::comment_key(ui, id, text, self.comment) {
+                Some(output) => output,
+                None => self.vim.handle(ui, id, text, view),
+            },
         }
     }
 

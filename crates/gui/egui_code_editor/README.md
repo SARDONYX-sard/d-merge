@@ -81,6 +81,7 @@ Search is the same as Vim's `/` (plain text, smartcase).
 | `Shift+Alt+↑` / `Shift+Alt+↓` | Copy the line(s) up / down               | `yyP`   |
 | `Ctrl+Enter`                  | Insert a line below                      | `o`     |
 | `Ctrl+Shift+Enter`            | Insert a line above                      | `O`     |
+| `Ctrl+/`                      | Toggle line comment (Vim keymap too)     | `gcc`   |
 
 ## Vim
 
@@ -140,6 +141,7 @@ Used as `{operator}{motion}`, `{operator}{text object}` or doubled for whole lin
 | `y`         | Yank (also to the clipboard) |
 | `>` / `<`   | Indent / outdent lines       |
 | `gu` / `gU` | Lowercase / uppercase        |
+| `gc`        | Toggle comment (`gcc`: line) |
 | `g~`        | Toggle case                  |
 
 ### Text objects

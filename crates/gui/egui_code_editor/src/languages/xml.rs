@@ -19,6 +19,10 @@ use crate::language::{Indent, Language};
 pub struct Xml;
 
 impl Language for Xml {
+    fn comment(&self) -> Option<crate::Comment> {
+        Some(crate::Comment::Block("<!--", "-->"))
+    }
+
     /// Havok XML files are indented with tabs.
     #[inline]
     fn indent(&self) -> Indent {

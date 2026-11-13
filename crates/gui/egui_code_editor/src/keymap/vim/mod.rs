@@ -87,6 +87,8 @@ pub struct VimOptions {
     pub escape_timeout: f64,
     /// What `>` inserts and `<` removes. Follows [`crate::Language::indent`].
     pub indent: crate::Indent,
+    /// What `gc` puts in / takes out. Follows [`crate::Language::comment`].
+    pub comment: Option<crate::Comment>,
 }
 
 impl Default for VimOptions {
@@ -95,6 +97,7 @@ impl Default for VimOptions {
             insert_escapes: vec![['j', 'k'], ['k', 'j'], ['j', 'j']],
             escape_timeout: 0.5,
             indent: crate::Indent::default(),
+            comment: None,
         }
     }
 }

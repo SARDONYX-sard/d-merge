@@ -96,6 +96,7 @@ const G: &[WhichKey] = &[
     own("g#", "Search the word backward, also inside others"),
     own("gu", "Lowercase (then a motion)"),
     own("gU", "Uppercase (then a motion)"),
+    own("gc", "Toggle comment (then a motion; gcc: the line)"),
     own("g~", "Toggle the case (then a motion)"),
 ];
 

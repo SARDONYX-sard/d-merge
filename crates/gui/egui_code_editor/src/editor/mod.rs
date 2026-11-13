@@ -230,6 +230,7 @@ impl<'a> CodeEditor<'a> {
 
         state.indent = language.indent();
         state.keymap.vim_options_mut().indent = state.indent;
+        state.keymap.set_comment(language.comment());
         let input = read_input(frame, ui, state, text, &labels, actions);
         tab_key_follows_indent(ui, id, state.indent);
         let mut changed = input.keys.changed | input.pasted | {

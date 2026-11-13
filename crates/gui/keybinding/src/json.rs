@@ -172,6 +172,10 @@ fn closed(chars: &[char], range: &Range<usize>) -> bool {
 }
 
 impl Language for KeybindingsJson<'_> {
+    fn comment(&self) -> Option<egui_code_editor::Comment> {
+        Some(egui_code_editor::Comment::Line("//"))
+    }
+
     fn highlight(&self, line: &str, visuals: &egui::Visuals) -> Vec<(Range<usize>, Color32)> {
         let dark = visuals.dark_mode;
         let rgb = |d: (u8, u8, u8), l: (u8, u8, u8)| {

@@ -140,6 +140,7 @@ const fn operator(keys: &[VimKey]) -> OpParse {
         [VimKey::Char('g'), VimKey::Char('u'), ..] => return OpParse::Op(Operator::Lower, 2),
         [VimKey::Char('g'), VimKey::Char('U'), ..] => return OpParse::Op(Operator::Upper, 2),
         [VimKey::Char('g'), VimKey::Char('~'), ..] => return OpParse::Op(Operator::ToggleCase, 2),
+        [VimKey::Char('g'), VimKey::Char('c'), ..] => return OpParse::Op(Operator::Comment, 2),
         _ => return OpParse::None,
     };
     OpParse::Op(op, 1)
@@ -355,6 +356,7 @@ mod tests {
         );
         assert_eq!(command("gUU"), Command::Operate(Operator::Upper, Target::Line));
         assert_eq!(command("gugu"), Command::Operate(Operator::Lower, Target::Line));
+        assert_eq!(command("gcc"), Command::Operate(Operator::Comment, Target::Line));
         assert_eq!(command(">>"), Command::Operate(Operator::Indent, Target::Line));
         assert_eq!(
             command("da("),

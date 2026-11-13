@@ -23,13 +23,21 @@ use crate::text_pos::LinePos;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LineOp {
     Delete,
-    Move { up: bool },
-    Copy { up: bool },
-    Insert { above: bool },
+    Move {
+        up: bool,
+    },
+    Copy {
+        up: bool,
+    },
+    Insert {
+        above: bool,
+    },
+    /// `Ctrl+/`: comment the lines out, or back in.
+    ToggleComment,
 }
 
 /// Runs the line commands. Call before the `TextEdit` (only while the editor has the focus).
-pub(crate) fn handle(ui: &egui::Ui, id: egui::Id, text: &mut String) -> KeymapOutput {
+pub(crate) fn handle(ui: &egui::Ui, id: egui::Id, text: &mut String, comment: Option<crate::Comment>) -> KeymapOutput {
     let shift_alt = Modifiers::SHIFT | Modifiers::ALT;
     let ctrl_shift = Modifiers::COMMAND | Modifiers::SHIFT;
     let op = ui.input_mut(|i| {
@@ -42,19 +50,39 @@ pub(crate) fn handle(ui: &egui::Ui, id: egui::Id, text: &mut String) -> KeymapOu
             (Modifiers::ALT, Key::ArrowDown, LineOp::Move { up: false }),
             (ctrl_shift, Key::Enter, LineOp::Insert { above: true }),
             (Modifiers::COMMAND, Key::Enter, LineOp::Insert { above: false }),
+            (Modifiers::COMMAND, Key::Slash, LineOp::ToggleComment),
         ]
         .into_iter()
         .find(|&(modifiers, key, _)| i.consume_key(modifiers, key))
         .map(|(_, _, op)| op)
     });
     let Some(op) = op else { return KeymapOutput::default() };
+    run(ui, id, text, op, comment)
+}
 
+/// `Ctrl+/` in a keymap of its own (Vim's, as VSCodeVim keeps VS Code's key). `None`: not pressed.
+pub(crate) fn comment_key(
+    ui: &egui::Ui,
+    id: egui::Id,
+    text: &mut String,
+    comment: Option<crate::Comment>,
+) -> Option<KeymapOutput> {
+    let pressed = ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Slash));
+    pressed.then(|| run(ui, id, text, LineOp::ToggleComment, comment))
+}
+
+/// Does `op` on the lines of the selection.
+fn run(ui: &egui::Ui, id: egui::Id, text: &mut String, op: LineOp, comment: Option<crate::Comment>) -> KeymapOutput {
     let Some(range) = egui::TextEdit::load_state(ui.ctx(), id).and_then(|s| s.cursor.char_range()) else {
         return KeymapOutput::default();
     };
     let primary = LinePos::from_char_index(text, range.primary.index.0);
     let secondary = LinePos::from_char_index(text, range.secondary.index.0);
-    let Some((new_text, primary, secondary)) = apply(text, op, primary, secondary) else {
+    let applied = match op {
+        LineOp::ToggleComment => comment.and_then(|comment| toggle_comment(text, primary, secondary, comment)),
+        op => apply(text, op, primary, secondary),
+    };
+    let Some((new_text, primary, secondary)) = applied else {
         return KeymapOutput::default();
     };
     *text = new_text;
@@ -66,6 +94,21 @@ pub(crate) fn handle(ui: &egui::Ui, id: egui::Id, text: &mut String) -> KeymapOu
     )));
     state.store(ui.ctx(), id);
     KeymapOutput { changed: true, scroll: Some(Scroll::IntoView), ..Default::default() }
+}
+
+/// `Ctrl+/` on the lines of the selection (a selection ending at column 0 of a line leaves it out,
+/// as VS Code): the text and the ends, moved with what was put in or taken out.
+fn toggle_comment(
+    text: &str,
+    primary: LinePos,
+    secondary: LinePos,
+    comment: crate::Comment,
+) -> Option<(String, LinePos, LinePos)> {
+    let (start, end) = if primary.line <= secondary.line { (primary, secondary) } else { (secondary, primary) };
+    let last = if end.column == 0 && end.line > start.line { end.line - 1 } else { end.line };
+    let (toggled, edits) = crate::comment::toggle(text, start.line, last, comment)?;
+    let follow = |pos: LinePos| LinePos { column: crate::comment::follow(pos.line, pos.column, &edits), ..pos };
+    Some((toggled, follow(primary), follow(secondary)))
 }
 
 /// The edited text and the new cursor ends, or `None` when nothing changes (e.g., moving the
@@ -116,6 +159,7 @@ fn apply(text: &str, op: LineOp, primary: LinePos, secondary: LinePos) -> Option
             let cursor = LinePos { line: at, column: 0 };
             Some((lines.join("\n"), cursor, cursor))
         }
+        LineOp::ToggleComment => None, // needs the language: see `toggle_comment`
     }
 }
 

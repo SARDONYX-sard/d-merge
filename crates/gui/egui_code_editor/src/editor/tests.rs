@@ -411,3 +411,38 @@ fn the_palette_takes_the_keyboard() {
         assert_eq!(frames.state.palette.query, "fmt", "{keymap:?}: typed into the field");
     }
 }
+
+/// `Ctrl+/` comments the lines out and back in, in every keymap; Vim's `gcc` too.
+#[test]
+fn comments_are_toggled() {
+    let ctrl_slash = |pressed| egui::Event::Key {
+        key: egui::Key::Slash,
+        physical_key: None,
+        pressed,
+        repeat: false,
+        modifiers: egui::Modifiers { ctrl: true, command: true, ..Default::default() },
+    };
+    for keymap in [Keymap::Normal, Keymap::Vim] {
+        let mut frames = Frames::new("\t<a/>\n\t<b/>");
+        (frames.keymap, frames.language) = (keymap, &crate::languages::Xml);
+        frames.frame(Vec::new());
+        frames.select(1, 1);
+        frames.frame(vec![ctrl_slash(true), ctrl_slash(false)]);
+        assert_eq!(frames.text, "\t<!-- <a/> -->\n\t<b/>", "{keymap:?}");
+        frames.frame(vec![ctrl_slash(true), ctrl_slash(false)]);
+        assert_eq!(frames.text, "\t<a/>\n\t<b/>", "{keymap:?}: back");
+    }
+
+    let mut frames = Frames::new("\t<a/>\n\t<b/>");
+    (frames.keymap, frames.language) = (Keymap::Vim, &crate::languages::Xml);
+    frames.frame(Vec::new());
+    frames.select(0, 0);
+    for key in ["g", "c", "j"] {
+        frames.frame(vec![egui::Event::Text(key.to_owned())]);
+    }
+    assert_eq!(frames.text, "\t<!-- <a/> -->\n\t<!-- <b/> -->", "gcj: this line and the next");
+    for key in ["g", "c", "c"] {
+        frames.frame(vec![egui::Event::Text(key.to_owned())]);
+    }
+    assert_eq!(frames.text, "\t<a/>\n\t<!-- <b/> -->", "gcc: the line");
+}

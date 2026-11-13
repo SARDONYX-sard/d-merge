@@ -204,6 +204,10 @@ fn complete_operation(line: &str, column: usize) -> Option<CompletionList> {
 }
 
 impl Language for PandoraXml<'_> {
+    fn comment(&self) -> Option<egui_code_editor::Comment> {
+        Some(egui_code_editor::Comment::Block("<!--", "-->"))
+    }
+
     fn highlight(&self, line: &str, visuals: &egui::Visuals) -> Vec<(Range<usize>, Color32)> {
         self.inner.highlight(line, visuals)
     }

@@ -127,6 +127,10 @@ pub(crate) struct NemesisXml<'a> {
 }
 
 impl Language for NemesisXml<'_> {
+    fn comment(&self) -> Option<egui_code_editor::Comment> {
+        Some(egui_code_editor::Comment::Block("<!--", "-->"))
+    }
+
     fn highlight(&self, line: &str, visuals: &egui::Visuals) -> Vec<(Range<usize>, Color32)> {
         Xml.highlight(line, visuals)
     }
