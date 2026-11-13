@@ -113,6 +113,19 @@ pub fn counts<'a>(problems: impl IntoIterator<Item = &'a Diagnostic>) -> (usize,
     })
 }
 
+/// The worst severity of `problems`, e.g. for the color of a tab: `None` without any.
+#[must_use]
+pub fn worst<'a>(problems: impl IntoIterator<Item = &'a Diagnostic>) -> Option<Severity> {
+    let mut worst = None;
+    for problem in problems {
+        if problem.severity == Severity::Error {
+            return Some(Severity::Error);
+        }
+        worst = Some(problem.severity);
+    }
+    worst
+}
+
 /// `✖ 2  ⚠ 5` for the status bar, gray when there is nothing, red / yellow else. Its response is
 /// clicked to show or hide the panel.
 pub fn status_counts(ui: &mut egui::Ui, (errors, warnings): (usize, usize)) -> egui::Response {

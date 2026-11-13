@@ -58,6 +58,39 @@ impl<T> NavHistory<T> {
     }
 }
 
+impl<T> NavHistory<T> {
+    /// `←` `→`, enabled when there is somewhere to go, their hovers with the keys (`Go Back (Alt+←)`):
+    /// for those who don't know the keys. `(back, forward)`: their names in the host's language, e.g.
+    /// `("Go Back", "Go Forward")`. Returns `Some(true)` to go back, `Some(false)` forward.
+    pub fn buttons(&self, ui: &mut egui::Ui, (back, forward): (&str, &str)) -> Option<bool> {
+        use egui_widgets::shadcn::{Button, Icon};
+        let buttons = [(true, Icon::ArrowLeft, back, "Alt+←"), (false, Icon::ArrowRight, forward, "Alt+→")];
+        let mut walk = None;
+        for (older, icon, label, keys) in buttons {
+            let response = ui.add_enabled(self.can_walk(older), Button::new("").icon(icon).small());
+            if response.on_hover_text(format!("{label} ({keys})")).clicked() {
+                walk = Some(older);
+            }
+        }
+        walk
+    }
+
+    /// The mouse's back button: `Some(true)`; its forward button: `Some(false)`. As in VS Code, in
+    /// every keymap: going to a definition is only useful if you can come back.
+    #[must_use]
+    pub fn mouse(ui: &egui::Ui) -> Option<bool> {
+        ui.input(|input| {
+            if input.pointer.button_pressed(egui::PointerButton::Extra1) {
+                Some(true)
+            } else if input.pointer.button_pressed(egui::PointerButton::Extra2) {
+                Some(false)
+            } else {
+                None
+            }
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -102,12 +102,8 @@ impl HkannoPage {
                 ui.horizontal(|ui| {
                     ui.spacing_mut().item_spacing.x = 0.0; // the tabs touch, with a line between them
                     for (i, tab) in self.tabs.iter().enumerate() {
-                        let (errors, warnings) = egui_code_editor::problems::counts(&tab.editor_diagnostics);
-                        let tone = match (errors, warnings) {
-                            (0, 0) => None,
-                            (0, _) => Some(egui_code_editor::Severity::Warning.color(ui.visuals())),
-                            _ => Some(egui_code_editor::Severity::Error.color(ui.visuals())),
-                        };
+                        let worst = egui_code_editor::problems::worst(&tab.editor_diagnostics);
+                        let tone = worst.map(|severity| severity.color(ui.visuals()));
                         let focused = ui.memory(|m| m.has_focus(tab.editor_id()));
                         let shown = egui_widgets::EditorTab::new(tab.title(), i == self.active)
                             .focused(focused)

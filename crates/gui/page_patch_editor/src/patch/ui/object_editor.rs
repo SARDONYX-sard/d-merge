@@ -80,7 +80,7 @@ impl PatchTool {
         } else if self.key_command(commands::HISTORY_FORWARD) {
             Some(false)
         } else {
-            history_buttons_of_mouse(ui)
+            egui_code_editor::NavHistory::<String>::mouse(ui)
         };
         if let Some(older) = older {
             self.walk_history(older, &id);
@@ -365,7 +365,8 @@ impl PatchTool {
                         self.pane.focus = Some(FocusAt::Line(line));
                     }
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        result.walk_history = history_buttons(ui, i18n, &self.pane.history);
+                        let labels = (i18n.t(I18nKey::NemesisGoBack), i18n.t(I18nKey::NemesisGoForward));
+                        result.walk_history = self.pane.history.buttons(ui, labels);
                         let marks = TabMarks { focused: editor_focused, problems: self.problems.list.as_deref() };
                         let views = self.views.tabs_of(self.active);
                         result.tab_event =
@@ -544,43 +545,6 @@ fn split_preview_button(ui: &mut egui::Ui, i18n: &I18nMap, show_preview: &mut bo
     }
 }
 
-/// `Alt+←` or the mouse's back button: `Some(true)`. `Alt+→` or its forward button: `Some(false)`.
-/// As in VS Code, in every keymap: going to a definition is only useful if you can come back.
-fn history_buttons_of_mouse(ui: &egui::Ui) -> Option<bool> {
-    use egui::PointerButton;
-    ui.input(|input| {
-        let back = input.pointer.button_pressed(PointerButton::Extra1);
-        let forward = input.pointer.button_pressed(PointerButton::Extra2);
-        if back {
-            Some(true)
-        } else if forward {
-            Some(false)
-        } else {
-            None
-        }
-    })
-}
-
-/// `<-` `->` at the left of the tabs, which scroll without them. Returns `Some(true)` to go back,
-/// `Some(false)` to go forward. They are for those who don't know `Alt+Left` / `Alt+Right`, so their
-/// hovers tell.
-fn history_buttons(ui: &mut egui::Ui, i18n: &I18nMap, history: &egui_code_editor::NavHistory<String>) -> Option<bool> {
-    let buttons = [
-        (true, Icon::ArrowLeft, I18nKey::NemesisGoBack, "Alt+←"),
-        (false, Icon::ArrowRight, I18nKey::NemesisGoForward, "Alt+→"),
-    ];
-    let mut walk = None;
-    for (older, icon, label, keys) in buttons {
-        let button = Button::new("").icon(icon).small();
-        let response = ui.add_enabled(history.can_walk(older), button);
-        let response = response.on_hover_text(format!("{} ({keys})", i18n.t(label)));
-        if response.clicked() {
-            walk = Some(older);
-        }
-    }
-    walk
-}
-
 /// What the tabs show of the editor and the work, besides the tabs themselves.
 pub(in crate::patch) struct TabMarks<'a> {
     /// The editor has the keyboard: the shown tab's line is the accent color.
@@ -593,12 +557,7 @@ impl TabMarks<'_> {
     /// The worst problem of object `id` of `behavior`, if it has any.
     fn severity(&self, behavior: usize, id: &str) -> Option<egui_code_editor::Severity> {
         let group = self.problems?.iter().find(|group| group.behavior == behavior && group.id == id)?;
-        let error = group.problems.iter().any(|problem| problem.severity == egui_code_editor::Severity::Error);
-        if error {
-            Some(egui_code_editor::Severity::Error)
-        } else {
-            group.problems.first().map(|problem| problem.severity)
-        }
+        egui_code_editor::problems::worst(&group.problems)
     }
 }
 
