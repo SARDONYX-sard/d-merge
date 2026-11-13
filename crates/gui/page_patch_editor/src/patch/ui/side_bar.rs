@@ -442,7 +442,7 @@ impl PatchTool {
             return (None, false);
         }
         let mut moved = false;
-        for input in keybinding::host::take_mapped(&mut self.key_commands, super::tree::tree_input) {
+        for input in keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key) {
             let nav: Vec<_> = rows.iter().map(|row| row.nav(&self.scm.open_revisions)).collect();
             match egui_tree::navigate(input, &nav, self.scm.cursor) {
                 egui_tree::Nav::Cursor(at) => {

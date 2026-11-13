@@ -2986,6 +2986,7 @@ version = "0.0.0"
 dependencies = [
  "egui",
  "egui_code_editor",
+ "egui_tree",
  "serde",
  "serde_json",
 ]

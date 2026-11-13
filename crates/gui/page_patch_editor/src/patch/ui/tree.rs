@@ -7,30 +7,11 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use super::object_list::{RowAction, row_menu};
 use crate::patch::{
     tool::list::{fixed_row, row_height},
-    tree::{Graph, MAX_STICKY, Node, Row, TreeKey, TreeState, has_guide},
+    tree::{Graph, MAX_STICKY, Node, Row, TreeState, has_guide},
 };
 
 /// Pixels of indent per tree level.
 const INDENT: f32 = 12.0;
-
-/// The explorer's command of a key binding command. e.g. `explorer.down` -> `Next`
-pub(in crate::patch) fn tree_input(command: &str) -> Option<TreeKey> {
-    use keybinding::commands::{
-        EXPLORER_COLLAPSE, EXPLORER_DOWN, EXPLORER_EXPAND, EXPLORER_FIRST, EXPLORER_LAST, EXPLORER_LEAVE,
-        EXPLORER_TOGGLE, EXPLORER_UP,
-    };
-    Some(match command {
-        EXPLORER_DOWN => TreeKey::Next,
-        EXPLORER_UP => TreeKey::Previous,
-        EXPLORER_FIRST => TreeKey::First,
-        EXPLORER_LAST => TreeKey::Last,
-        EXPLORER_COLLAPSE => TreeKey::Close,
-        EXPLORER_EXPAND => TreeKey::Open,
-        EXPLORER_TOGGLE => TreeKey::Toggle,
-        EXPLORER_LEAVE => TreeKey::Leave,
-        _ => return None,
-    })
-}
 
 /// What a click on a row asked for.
 #[derive(Debug, Clone, Copy)]

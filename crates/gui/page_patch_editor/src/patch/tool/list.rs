@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use stdx::text::{cmp_ignore_case, contains_ignore_case};
 
-use crate::patch::{FocusAt, ObjectList, PatchTool, tree, ui, workspace::PANDORA_DOC};
+use crate::patch::{FocusAt, ObjectList, PatchTool, tree, workspace::PANDORA_DOC};
 
 /// The state of the objects in the explorer.
 ///
@@ -231,7 +231,7 @@ impl PatchTool {
         let mut current = rows.iter().position(|&node| selected == Some(graph.id(node))).unwrap_or(0);
         let mut leave = false;
         let before = current;
-        for input in keybinding::host::take_mapped(&mut self.key_commands, ui::tree::tree_input) {
+        for input in keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key) {
             leave |= input == tree::TreeKey::Leave;
             current = input.step(current, rows.len()).unwrap_or(current);
         }

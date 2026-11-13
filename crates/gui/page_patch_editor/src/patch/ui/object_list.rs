@@ -150,7 +150,7 @@ impl PatchTool {
         }
         if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            let inputs = keybinding::host::take_mapped(&mut self.key_commands, super::tree::tree_input);
+            let inputs = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key);
             if tree.apply_inputs(&inputs, graph, &mut self.selected, self.explorer.changed_only) {
                 self.leave_tree();
                 return;
@@ -184,7 +184,7 @@ impl PatchTool {
         let mut cursor_moved = false;
         if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            let inputs = keybinding::host::take_mapped(&mut self.key_commands, super::tree::tree_input);
+            let inputs = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key);
             for input in inputs {
                 let nav: Vec<_> = rows.iter().map(AnimRow::nav).collect();
                 match egui_tree::navigate(input, &nav, self.anim_tree.cursor) {

@@ -103,6 +103,28 @@ pub fn problems_key(command: &str) -> Option<egui_code_editor::ProblemsKey> {
     })
 }
 
+/// The tree's key of a command. e.g. `explorer.down` -> `Next`
+#[must_use]
+pub fn tree_key(command: &str) -> Option<egui_tree::TreeKey> {
+    use egui_tree::TreeKey;
+
+    use crate::commands::{
+        EXPLORER_COLLAPSE, EXPLORER_DOWN, EXPLORER_EXPAND, EXPLORER_FIRST, EXPLORER_LAST, EXPLORER_LEAVE,
+        EXPLORER_TOGGLE, EXPLORER_UP,
+    };
+    Some(match command {
+        EXPLORER_DOWN => TreeKey::Next,
+        EXPLORER_UP => TreeKey::Previous,
+        EXPLORER_FIRST => TreeKey::First,
+        EXPLORER_LAST => TreeKey::Last,
+        EXPLORER_COLLAPSE => TreeKey::Close,
+        EXPLORER_EXPAND => TreeKey::Open,
+        EXPLORER_TOGGLE => TreeKey::Toggle,
+        EXPLORER_LEAVE => TreeKey::Leave,
+        _ => return None,
+    })
+}
+
 /// The command of a palette action, if it is one. e.g. `close_tab` -> `tabs.close`
 #[must_use]
 pub fn command_of_action(action: &str) -> Option<&'static str> {
