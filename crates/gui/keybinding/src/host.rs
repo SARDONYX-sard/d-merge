@@ -33,6 +33,37 @@ pub const EDITOR_ACTIONS: [(&str, &str); 8] = [
     (OPEN_JSON_ACTION, KEYBINDINGS_OPEN_JSON),
 ];
 
+/// Takes the commands `map` knows out of `commands`, in the order they came, as what `map` makes
+/// them. e.g. `[explorer.down, tabs.next, explorer.down]` -> `[Next, Next]`, `[tabs.next]` left
+pub fn take_mapped<T>(commands: &mut Vec<&'static str>, map: impl Fn(&str) -> Option<T>) -> Vec<T> {
+    let mut taken = Vec::new();
+    commands.retain(|command| match map(command) {
+        Some(value) => {
+            taken.push(value);
+            false
+        }
+        None => true,
+    });
+    taken
+}
+
+/// The Problems panel's key of a command. e.g. `problems.down` -> `Next`
+#[must_use]
+pub fn problems_key(command: &str) -> Option<egui_code_editor::ProblemsKey> {
+    use egui_code_editor::ProblemsKey;
+
+    use crate::commands::{PROBLEMS_DOWN, PROBLEMS_FIRST, PROBLEMS_GO, PROBLEMS_LAST, PROBLEMS_LEAVE, PROBLEMS_UP};
+    Some(match command {
+        PROBLEMS_DOWN => ProblemsKey::Next,
+        PROBLEMS_UP => ProblemsKey::Previous,
+        PROBLEMS_FIRST => ProblemsKey::First,
+        PROBLEMS_LAST => ProblemsKey::Last,
+        PROBLEMS_GO => ProblemsKey::Go,
+        PROBLEMS_LEAVE => ProblemsKey::Leave,
+        _ => return None,
+    })
+}
+
 /// The command of a palette action, if it is one. e.g. `close_tab` -> `tabs.close`
 #[must_use]
 pub fn command_of_action(action: &str) -> Option<&'static str> {

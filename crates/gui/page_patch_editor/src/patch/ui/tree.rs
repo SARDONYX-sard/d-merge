@@ -13,49 +13,23 @@ use crate::patch::{
 /// Pixels of indent per tree level.
 const INDENT: f32 = 12.0;
 
-/// This frame's keys as [`TreeInput`]s (several for a held key on a slow frame).
-///
-/// `leader`: `Space` was pressed; the next key decides. Frames also come without keys (e.g., the
-/// mouse moved), so only another key ends it. Kept by the caller between frames.
-pub(in crate::patch) fn read_keys(ui: &egui::Ui, leader: &mut bool) -> Vec<TreeInput> {
-    use egui::{Key, Modifiers};
-    const BINDINGS: [(Key, TreeInput); 11] = [
-        (Key::J, TreeInput::Next),
-        (Key::ArrowDown, TreeInput::Next),
-        (Key::K, TreeInput::Previous),
-        (Key::ArrowUp, TreeInput::Previous),
-        (Key::H, TreeInput::Close),
-        (Key::ArrowLeft, TreeInput::Close),
-        (Key::L, TreeInput::Open),
-        (Key::ArrowRight, TreeInput::Open),
-        (Key::O, TreeInput::Toggle),
-        (Key::Enter, TreeInput::Leave),
-        (Key::Escape, TreeInput::Leave),
-    ];
-    let mut inputs = Vec::new();
-    ui.input_mut(|input| {
-        *leader |= input.consume_key(Modifiers::NONE, Key::Space);
-        if *leader {
-            let leave = input.consume_key(Modifiers::NONE, Key::E);
-            if leave {
-                inputs.push(TreeInput::Leave);
-            }
-            *leader = !leave && !input.events.iter().any(|e| matches!(e, egui::Event::Key { pressed: true, .. }));
-        }
-        // Before `g`: `consume_key` with no modifiers also takes the Shift variant.
-        if input.consume_key(Modifiers::SHIFT, Key::G) {
-            inputs.push(TreeInput::Last);
-        }
-        if input.consume_key(Modifiers::NONE, Key::G) {
-            inputs.push(TreeInput::First);
-        }
-        for (key, tree_input) in BINDINGS {
-            while input.consume_key(Modifiers::NONE, key) {
-                inputs.push(tree_input);
-            }
-        }
-    });
-    inputs
+/// The explorer's command of a key binding command. e.g. `explorer.down` -> `Next`
+pub(in crate::patch) fn tree_input(command: &str) -> Option<TreeInput> {
+    use keybinding::commands::{
+        EXPLORER_COLLAPSE, EXPLORER_DOWN, EXPLORER_EXPAND, EXPLORER_FIRST, EXPLORER_LAST, EXPLORER_LEAVE,
+        EXPLORER_TOGGLE, EXPLORER_UP,
+    };
+    Some(match command {
+        EXPLORER_DOWN => TreeInput::Next,
+        EXPLORER_UP => TreeInput::Previous,
+        EXPLORER_FIRST => TreeInput::First,
+        EXPLORER_LAST => TreeInput::Last,
+        EXPLORER_COLLAPSE => TreeInput::Close,
+        EXPLORER_EXPAND => TreeInput::Open,
+        EXPLORER_TOGGLE => TreeInput::Toggle,
+        EXPLORER_LEAVE => TreeInput::Leave,
+        _ => return None,
+    })
 }
 
 /// What a click on a row asked for.

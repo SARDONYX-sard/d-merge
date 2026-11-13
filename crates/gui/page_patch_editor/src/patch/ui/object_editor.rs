@@ -316,6 +316,8 @@ impl PatchTool {
         // Read before the panel borrows the work; what a click asks for is done after it.
         let (counts, mut toggle_problems, mut go_to_problem) = (self.problem_counts(), false, None);
         let mut left_problems = false;
+        // `j` / `k` / `Enter` ... of the key bindings, while the panel has the keyboard.
+        let problem_keys = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::problems_key);
 
         // The status bar counts the whole work's problems, of which the open object's are a part.
         self.pane.state.set_status_problems(counts);
@@ -367,7 +369,7 @@ impl PatchTool {
             {
                 let (behaviors, cursor) = (&self.workspace.behaviors, &mut self.problems.cursor);
                 let was_focused = cursor.focused;
-                go_to_problem = super::problems::problems_panel(ui, i18n, problems, behaviors, cursor);
+                go_to_problem = super::problems::problems_panel(ui, i18n, problems, behaviors, cursor, &problem_keys);
                 // `Esc`: back to the editor, where it was. (`Enter` goes to the problem's line.)
                 left_problems = was_focused && !cursor.focused && go_to_problem.is_none();
             }

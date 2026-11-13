@@ -137,13 +137,15 @@ pub struct ProblemsPanel<'a> {
     empty: &'a str,
     default_height: f32,
     cursor: Option<&'a mut ProblemsCursor>,
+    /// The keys of this frame, from the host's key bindings. `None`: the panel reads its own.
+    keys: Option<&'a [ProblemsKey]>,
 }
 
 impl<'a> ProblemsPanel<'a> {
     /// `id_salt`: of the panel, one per host. `title`: e.g. `Problems`.
     #[inline]
     pub const fn new(id_salt: &'a str, title: &'a str) -> Self {
-        Self { id_salt, title, empty: "", default_height: 140.0, cursor: None }
+        Self { id_salt, title, empty: "", default_height: 140.0, cursor: None, keys: None }
     }
 
     /// What it says without any problem, e.g. `No problems have been found.`
@@ -167,6 +169,13 @@ impl<'a> ProblemsPanel<'a> {
         self
     }
 
+    /// The keys of this frame as the host's key bindings made them: the panel then reads none.
+    #[inline]
+    pub const fn keys(mut self, keys: &'a [ProblemsKey]) -> Self {
+        self.keys = Some(keys);
+        self
+    }
+
     /// Draws it at the bottom of `ui`. `extra` draws more at the end of a row, e.g. a quick fix's
     /// button: it is given `(group, problem)` indices. Returns those of the problem clicked.
     pub fn show(
@@ -180,7 +189,14 @@ impl<'a> ProblemsPanel<'a> {
         // The keys come before the rows: a moved cursor is drawn, and scrolled to, this frame.
         let (mut moved, mut went) = (false, None);
         if let Some(cursor) = self.cursor.as_deref_mut().filter(|cursor| cursor.focused) {
-            for key in read_keys(ui.ctx()) {
+            let read;
+            let keys = if let Some(keys) = self.keys {
+                keys
+            } else {
+                read = read_keys(ui.ctx());
+                &read
+            };
+            for &key in keys {
                 went = cursor.apply(key, len);
                 moved = true;
                 if !cursor.focused {

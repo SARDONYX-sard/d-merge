@@ -22,6 +22,7 @@ pub(in crate::patch) fn problems_panel(
     groups: &[ObjectProblems],
     behaviors: &[Behavior],
     cursor: &mut ProblemsCursor,
+    keys: &[egui_code_editor::ProblemsKey],
 ) -> Option<(usize, String, usize)> {
     let shown: Vec<ProblemGroup<'_>> = groups
         .iter()
@@ -33,6 +34,7 @@ pub(in crate::patch) fn problems_panel(
     let (at, index) = ProblemsPanel::new("nemesis_problems", i18n.t(I18nKey::HkannoProblemsLabel))
         .empty_text(i18n.t(I18nKey::ProblemsNone))
         .cursor(cursor)
+        .keys(keys)
         .show(ui, &shown, |_, _, _| {})?;
     let group = &groups[at];
     Some((group.behavior, group.id.clone(), group.problems[index].line))

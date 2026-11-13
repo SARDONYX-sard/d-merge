@@ -26,8 +26,6 @@ pub(in crate::patch) struct Explorer {
     /// The flat list, as it was computed. See [`PatchTool::refresh_list`].
     pub(in crate::patch) list: Option<crate::patch::ObjectList>,
 
-    /// `Space` was pressed with the keyboard in the flat list. See [`crate::patch::tree::TreeState::leader`].
-    pub(in crate::patch) list_leader: bool,
     /// Where the flat list (or the animation data's tree) was scrolled. See [`offset_to_show`].
     pub(in crate::patch) list_scroll: ListScroll,
     /// The row of the flat list to scroll to: the keys moved to it, or the editor got the keyboard.
@@ -291,13 +289,13 @@ impl PatchTool {
     }
 
     /// The flat list has the same keys as the tree, without the folding.
-    pub(in crate::patch) fn list_keys(&mut self, ui: &egui::Ui, graph: &tree::Graph) {
+    pub(in crate::patch) fn list_keys(&mut self, graph: &tree::Graph) {
         let rows = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let selected = self.selected.as_deref();
         let mut current = rows.iter().position(|&node| selected == Some(graph.id(node))).unwrap_or(0);
         let mut leave = false;
         let before = current;
-        for input in ui::tree::read_keys(ui, &mut self.explorer.list_leader) {
+        for input in keybinding::host::take_mapped(&mut self.key_commands, ui::tree::tree_input) {
             leave |= input == tree::TreeInput::Leave;
             current = input.step(current, rows.len()).unwrap_or(current);
         }

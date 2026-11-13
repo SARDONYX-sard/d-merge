@@ -150,7 +150,7 @@ impl PatchTool {
         }
         if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            let inputs = super::tree::read_keys(ui, &mut tree.leader);
+            let inputs = keybinding::host::take_mapped(&mut self.key_commands, super::tree::tree_input);
             if tree.apply_inputs(&inputs, graph, &mut self.selected, self.explorer.changed_only) {
                 self.leave_tree();
                 return;
@@ -166,7 +166,7 @@ impl PatchTool {
         self.refresh_list(graph);
         if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            self.list_keys(ui, graph);
+            self.list_keys(graph);
         }
         let is_adsf = self.workspace.behaviors[self.active].adsf;
         // Only when the editor gets the keyboard: else what is open, and where it is scrolled, is the user's.
@@ -299,7 +299,7 @@ impl PatchTool {
         self.refresh_list(graph);
         if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
-            self.list_keys(ui, graph);
+            self.list_keys(graph);
         }
         let rows = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let mut menu_action = None;

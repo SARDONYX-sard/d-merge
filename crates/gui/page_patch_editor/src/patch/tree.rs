@@ -564,8 +564,6 @@ pub(super) struct TreeState {
     pub(super) view_height: f32,
     pub(super) scroll_x: f32,
     pub(super) view_width: f32,
-    /// `Space` was pressed: the next `e` leaves the tree (same keys as entering it).
-    pub(super) leader: bool,
 }
 
 impl TreeState {

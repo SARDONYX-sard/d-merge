@@ -345,7 +345,8 @@ impl HkannoPage {
         let group = ProblemGroup { title: std::borrow::Cow::Borrowed(""), problems: &tab.editor_diagnostics };
         let text = &tab.text;
         let was_focused = cursor.focused;
-        let panel = ProblemsPanel::new("hkanno_problems", title).default_height(120.0).cursor(cursor);
+        let keys = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::problems_key);
+        let panel = ProblemsPanel::new("hkanno_problems", title).default_height(120.0).cursor(cursor).keys(&keys);
         let clicked = panel.show(ui, &[group], |ui, _, index| {
             // Both lists are built from the same source, in the same order.
             if show_fixes

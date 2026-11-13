@@ -31,11 +31,27 @@ pub const EDITOR_SAVE: &str = "editor.save";
 pub const FILE_COPY_PATH: &str = "file.copyPath";
 pub const FILE_REVEAL: &str = "file.reveal";
 pub const KEYBINDINGS_OPEN_JSON: &str = "keybindings.openJson";
+pub const EXPLORER_DOWN: &str = "explorer.down";
+pub const EXPLORER_UP: &str = "explorer.up";
+pub const EXPLORER_FIRST: &str = "explorer.first";
+pub const EXPLORER_LAST: &str = "explorer.last";
+pub const EXPLORER_COLLAPSE: &str = "explorer.collapse";
+pub const EXPLORER_EXPAND: &str = "explorer.expand";
+pub const EXPLORER_TOGGLE: &str = "explorer.toggle";
+pub const EXPLORER_LEAVE: &str = "explorer.leave";
+pub const PROBLEMS_DOWN: &str = "problems.down";
+pub const PROBLEMS_UP: &str = "problems.up";
+pub const PROBLEMS_FIRST: &str = "problems.first";
+pub const PROBLEMS_LAST: &str = "problems.last";
+pub const PROBLEMS_GO: &str = "problems.go";
+pub const PROBLEMS_LEAVE: &str = "problems.leave";
 
 /// The editor of the Normal keymap has the keyboard. (Vim has `Ctrl+W` / `Ctrl+S` of its own.)
 const NORMAL_EDITOR: Option<&str> = Some("editorFocus && !vim");
 /// The explorer has the keyboard, not a text field.
 const EXPLORER: Option<&str> = Some("explorerFocus && !inputFocus");
+/// The Problems panel has the keyboard.
+const PROBLEMS: Option<&str> = Some("problemsFocus");
 
 /// Every command, in the order of the settings.
 pub const COMMANDS: &[Command] = &[
@@ -67,6 +83,52 @@ pub const COMMANDS: &[Command] = &[
         description: "Explorer: new objects nothing links to only",
         defaults: &[("u", EXPLORER)],
     },
+    Command { id: EXPLORER_DOWN, description: "Explorer: next row", defaults: &[("j", EXPLORER), ("down", EXPLORER)] },
+    Command { id: EXPLORER_UP, description: "Explorer: previous row", defaults: &[("k", EXPLORER), ("up", EXPLORER)] },
+    Command { id: EXPLORER_FIRST, description: "Explorer: first row", defaults: &[("g", EXPLORER)] },
+    Command { id: EXPLORER_LAST, description: "Explorer: last row", defaults: &[("shift+g", EXPLORER)] },
+    Command {
+        id: EXPLORER_COLLAPSE,
+        description: "Explorer: close the node, or go to its parent",
+        defaults: &[("h", EXPLORER), ("left", EXPLORER)],
+    },
+    Command {
+        id: EXPLORER_EXPAND,
+        description: "Explorer: open the node, or go into it",
+        defaults: &[("l", EXPLORER), ("right", EXPLORER)],
+    },
+    Command { id: EXPLORER_TOGGLE, description: "Explorer: open or close the node", defaults: &[("o", EXPLORER)] },
+    Command {
+        id: EXPLORER_LEAVE,
+        description: "Explorer: back to the editor",
+        defaults: &[("enter", EXPLORER), ("escape", EXPLORER), ("space e", EXPLORER)],
+    },
+    Command {
+        id: PROBLEMS_DOWN,
+        description: "Problems: next problem",
+        defaults: &[("j", PROBLEMS), ("down", PROBLEMS)],
+    },
+    Command {
+        id: PROBLEMS_UP,
+        description: "Problems: previous problem",
+        defaults: &[("k", PROBLEMS), ("up", PROBLEMS)],
+    },
+    Command {
+        id: PROBLEMS_FIRST,
+        description: "Problems: first problem",
+        defaults: &[("g", PROBLEMS), ("home", PROBLEMS)],
+    },
+    Command {
+        id: PROBLEMS_LAST,
+        description: "Problems: last problem",
+        defaults: &[("shift+g", PROBLEMS), ("end", PROBLEMS)],
+    },
+    Command {
+        id: PROBLEMS_GO,
+        description: "Problems: go to the problem (the editor gets the keyboard)",
+        defaults: &[("enter", PROBLEMS)],
+    },
+    Command { id: PROBLEMS_LEAVE, description: "Problems: back to the editor", defaults: &[("escape", PROBLEMS)] },
     Command { id: EDITOR_SAVE, description: "Save", defaults: &[("ctrl+s", None)] },
     Command {
         id: FILE_COPY_PATH,
