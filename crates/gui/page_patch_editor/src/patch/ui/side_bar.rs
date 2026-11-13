@@ -24,6 +24,7 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
     PatchTool,
+    changes::ScmRow,
     workspace::history::{ChangeKind, ObjectChange},
 };
 
@@ -219,27 +220,10 @@ impl PatchTool {
         self.commit_box(ui, i18n);
 
         let mut picked = None;
-        // The keys of the explorer go through the changes while the side bar has the keyboard: the
-        // object of the one the cursor gets to opens, as the tree's does.
-        let count = self.scm.pending.changes.len();
-        self.scm.cursor = self.scm.cursor.min(count.saturating_sub(1));
-        let mut moved = false;
-        if self.explorer.tree_focus {
-            for input in keybinding::host::take_mapped(&mut self.key_commands, super::tree::tree_input) {
-                if input == crate::patch::tree::TreeInput::Leave {
-                    self.leave_tree();
-                } else if let Some(at) = input.step(self.scm.cursor, count) {
-                    moved |= at != self.scm.cursor;
-                    self.scm.cursor = at;
-                }
-            }
-            if moved && let Some(change) = self.scm.pending.changes.get(self.scm.cursor) {
-                let behavior =
-                    self.workspace.behaviors.iter().position(|behavior| behavior.meshes_path == change.behavior);
-                picked = behavior.map(|at| ChangeAction::Open(at, change.id.clone()));
-            }
-        }
-        let cursor = self.explorer.tree_focus.then_some(self.scm.cursor);
+        // The keys of the explorer go through the changes and the history while the side bar has the
+        // keyboard (see `ScmRow`): what the cursor gets to opens, as a click does.
+        let (cursor, moved) = self.scm_keys(&mut picked);
+        let mut toggled = None;
         // Up and down only: the rows are cut with `…`, as VS Code's.
         egui::ScrollArea::vertical().id_salt("side_changes").auto_shrink(false).show(ui, |ui| {
             let title = format!("{} ({})", i18n.t(I18nKey::SideChanges), self.scm.pending.changes.len());
@@ -248,7 +232,7 @@ impl PatchTool {
                     ui.weak(i18n.t(I18nKey::SideNoChanges));
                 }
                 for (at, change) in self.scm.pending.changes.iter().enumerate() {
-                    let keyboard = (cursor == Some(at), moved);
+                    let keyboard = (cursor == Some(ScmRow::Change(at)), moved);
                     if let Some(action) = change_row(ui, i18n, (&self.workspace, change), None, keyboard) {
                         picked = Some(action);
                     }
@@ -268,22 +252,30 @@ impl PatchTool {
                             local_time(revision.time),
                             revision.changes.len()
                         );
+                        let number = revision.number;
                         let shown = egui::CollapsingHeader::new(title)
-                            .id_salt(("side_revision", revision.number))
+                            .id_salt(("side_revision", number))
+                            .open(Some(self.scm.open_revisions.contains(&number)))
                             .show(ui, |ui| {
-                                for change in &revision.changes {
-                                    let row = change_row(
-                                        ui,
-                                        i18n,
-                                        (&self.workspace, change),
-                                        Some(revision.number),
-                                        (false, false),
-                                    );
+                                for (at, change) in revision.changes.iter().enumerate() {
+                                    let keyboard = (cursor == Some(ScmRow::RevisionChange(number, at)), moved);
+                                    let row = change_row(ui, i18n, (&self.workspace, change), Some(number), keyboard);
                                     if let Some(action) = row {
                                         picked = Some(action);
                                     }
                                 }
                             });
+                        if shown.header_response.clicked() {
+                            toggled = Some(number);
+                        }
+                        if cursor == Some(ScmRow::Revision(number)) {
+                            let stroke = ui.visuals().selection.stroke;
+                            let rect = shown.header_response.rect;
+                            ui.painter().rect_stroke(rect, 2.0, stroke, egui::StrokeKind::Outside);
+                            if moved {
+                                shown.header_response.scroll_to_me(None);
+                            }
+                        }
                         // As GitLens' "Restore": the whole work as it was then.
                         shown.header_response.context_menu(|ui| {
                             let restore = Button::new(i18n.t(I18nKey::SideRestoreRevision)).destructive();
@@ -296,6 +288,11 @@ impl PatchTool {
                 },
             );
         });
+        if let Some(number) = toggled
+            && !self.scm.open_revisions.remove(&number)
+        {
+            self.scm.open_revisions.insert(number);
+        }
         match picked {
             Some(ChangeAction::Open(behavior, id)) => {
                 self.views.shown = None; // the object itself, not a diff of it
@@ -433,6 +430,56 @@ impl PatchTool {
             }
         });
         picked
+    }
+
+    /// The keys of the Changes view: see [`crate::patch::changes::scm_key`]. Returns the row the
+    /// keyboard is on (`None`: the side bar does not have it) and whether it moved this frame.
+    fn scm_keys(&mut self, picked: &mut Option<ChangeAction>) -> (Option<ScmRow>, bool) {
+        use crate::patch::changes::{ScmKeyEffect, scm_key, scm_rows};
+        let log: Vec<(u32, usize)> =
+            self.workspace.history.log().iter().map(|revision| (revision.number, revision.changes.len())).collect();
+        let mut rows = scm_rows(self.scm.pending.changes.len(), &log, &self.scm.open_revisions);
+        self.scm.cursor = self.scm.cursor.min(rows.len().saturating_sub(1));
+        if !self.explorer.tree_focus {
+            return (None, false);
+        }
+        let mut moved = false;
+        for input in keybinding::host::take_mapped(&mut self.key_commands, super::tree::tree_input) {
+            match scm_key(input, &rows, self.scm.cursor, &self.scm.open_revisions) {
+                ScmKeyEffect::Cursor(at) => {
+                    moved |= at != self.scm.cursor;
+                    self.scm.cursor = at;
+                }
+                ScmKeyEffect::Toggle(number) => {
+                    if !self.scm.open_revisions.remove(&number) {
+                        self.scm.open_revisions.insert(number);
+                    }
+                    rows = scm_rows(self.scm.pending.changes.len(), &log, &self.scm.open_revisions);
+                }
+                ScmKeyEffect::Leave => self.leave_tree(),
+                ScmKeyEffect::None => {}
+            }
+        }
+        let row = rows.get(self.scm.cursor).copied();
+        if moved {
+            *picked = match row {
+                Some(ScmRow::Change(at)) => self.scm.pending.changes.get(at).and_then(|change| {
+                    let behavior = self.workspace.behaviors.iter().position(|b| b.meshes_path == change.behavior)?;
+                    Some(ChangeAction::Open(behavior, change.id.clone()))
+                }),
+                Some(ScmRow::RevisionChange(number, at)) => {
+                    let history = &self.workspace.history;
+                    history.revision(number).and_then(|revision| revision.changes.get(at)).and_then(|change| {
+                        let behavior =
+                            self.workspace.behaviors.iter().position(|b| b.meshes_path == change.behavior)?;
+                        let parent = history.parent_number(number);
+                        Some(ChangeAction::Compare(behavior, change.id.clone(), parent, Some(number)))
+                    })
+                }
+                _ => None,
+            };
+        }
+        (row, moved)
     }
 
     /// `[message............] [Commit]`: a revision of the changes. `Ctrl+Enter` in the field too.
