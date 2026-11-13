@@ -120,6 +120,7 @@ impl Buffer {
     /// The `close` matching the `open` at `open_at`.
     pub(super) fn matching_close(&self, open_at: usize, open: char, close: char) -> Option<usize> {
         let mut depth = 0_usize;
+        #[expect(clippy::needless_range_loop)]
         for j in open_at + 1..self.len() {
             let c = self.chars[j];
             if c == open {
