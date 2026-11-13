@@ -124,6 +124,80 @@ pub(super) struct ModExport {
     pub(super) format: workspace::ExportFormat,
 }
 
+/// What [`export_as_mod`] wrote.
+struct ModExported<'a> {
+    output: &'a str,
+    /// The patches d-merge's parser rejects, or why nothing was written.
+    written: Result<Vec<String>, String>,
+    /// For the Nemesis format: the templates Nemesis does not know (their patches are of no use there).
+    outside: Vec<&'a str>,
+}
+
+/// Writes the user patch of `work` as a mod, where and how `export` says. `None`: no output yet.
+fn export_as_mod<'a>(
+    work: &'a mut Workspace,
+    export: &'a ModExport,
+    mode: gui_shared::settings::pages::patch::behavior::ParserMode,
+) -> Option<ModExported<'a>> {
+    let output = export.output.trim();
+    if output.is_empty() {
+        return None;
+    }
+
+    let root = Path::new(output);
+    let chosen = export.format;
+    let written = if chosen == workspace::ExportFormat::PandoraV5 {
+        work.export_pandora(root, USER_PATCH_CODE).map(|export| export.problems)
+    } else {
+        // The files of its own place are what its next save replaces: not those of this mod.
+        let owned = std::mem::take(&mut work.owned);
+        let format = std::mem::replace(&mut work.export_format, chosen);
+        let written = work.export(root, USER_PATCH_CODE, mode).map(|(_, invalid)| invalid);
+        (work.owned, work.export_format) = (owned, format);
+        written
+    };
+
+    let outside = match chosen {
+        workspace::ExportFormat::Nemesis => work.outside_nemesis().collect(),
+        _ => Vec::new(),
+    };
+    Some(ModExported { output, written, outside })
+}
+
+/// Tells how [`export_as_mod`] went: written, written with templates Nemesis does not know,
+/// rejected patches, or failed.
+fn report_mod_export(notify: &mut Notification, i18n: &I18nMap, exported: &ModExported<'_>) {
+    let ModExported { output, written, outside } = exported;
+    match written {
+        Ok(problems) if problems.is_empty() && outside.is_empty() => {
+            notify.success(format!("{}: {output}", i18n.t(I18nKey::ExportedMessage)));
+        }
+        Ok(problems) if problems.is_empty() => notify.warn(format!(
+            "{}: {output}
+{} ({}):
+{}",
+            i18n.t(I18nKey::ExportedMessage),
+            i18n.t(I18nKey::UserPatchOutsideNemesis),
+            outside.len(),
+            outside.join(
+                "
+"
+            )
+        )),
+        Ok(problems) => notify.warn(format!(
+            "{} ({}):
+{}",
+            i18n.t(I18nKey::NemesisRejected),
+            problems.len(),
+            problems.join(
+                "
+"
+            )
+        )),
+        Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+    }
+}
+
 /// The window's state. See the module docs.
 #[derive(Debug, Default)]
 pub(super) struct UserPatchView {
@@ -288,47 +362,10 @@ impl PatchTool {
         }
     }
 
-    /// Writes the user patch as a mod: see [`ModExport`].
+    /// Writes the user patch as a mod: see [`ModExport`] and [`export_as_mod`].
     pub(super) fn export_user_patch_as_mod(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        let output = self.mod_export.output.trim().to_owned();
-        if output.is_empty() {
-            return;
-        }
-        let root = Path::new(&output);
-        let chosen = self.mod_export.format;
-        let written = if chosen == workspace::ExportFormat::PandoraV5 {
-            self.workspace.export_pandora(root, USER_PATCH_CODE).map(|export| export.problems)
-        } else {
-            // The files of its own place are what its next save replaces: not those of this mod.
-            let work = &mut self.workspace;
-            let owned = std::mem::take(&mut work.owned);
-            let format = std::mem::replace(&mut work.export_format, chosen);
-            let written = work.export(root, USER_PATCH_CODE, self.parser_mode).map(|(_, invalid)| invalid);
-            (work.owned, work.export_format) = (owned, format);
-            written
-        };
-        let outside: Vec<&str> = match chosen {
-            workspace::ExportFormat::Nemesis => self.workspace.outside_nemesis().collect(),
-            _ => Vec::new(),
-        };
-        match written {
-            Ok(problems) if problems.is_empty() && outside.is_empty() => {
-                notify.success(format!("{}: {output}", i18n.t(I18nKey::ExportedMessage)));
-            }
-            Ok(problems) if problems.is_empty() => notify.warn(format!(
-                "{}: {output}\n{} ({}):\n{}",
-                i18n.t(I18nKey::ExportedMessage),
-                i18n.t(I18nKey::UserPatchOutsideNemesis),
-                outside.len(),
-                outside.join("\n")
-            )),
-            Ok(problems) => notify.warn(format!(
-                "{} ({}):\n{}",
-                i18n.t(I18nKey::NemesisRejected),
-                problems.len(),
-                problems.join("\n")
-            )),
-            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+        if let Some(exported) = export_as_mod(&mut self.workspace, &self.mod_export, self.parser_mode) {
+            report_mod_export(notify, i18n, &exported);
         }
     }
 
