@@ -18,7 +18,7 @@ pub(in crate::patch) struct ObjectTab {
 }
 
 /// An object's tab: its group is its behavior's index in the workspace.
-pub(in crate::patch) type EditorTab = Tab<ObjectTab>;
+type EditorTab = Tab<ObjectTab>;
 
 /// See the module docs. Tabs are named by behavior and object id.
 #[derive(Debug, Default)]

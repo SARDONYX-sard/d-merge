@@ -42,7 +42,7 @@ pub(in crate::patch) const fn take_reveal(selected: Option<&Rc<str>>, forced: bo
     forced && selected.is_some()
 }
 /// The key recorder's texts. See [`keybinding::recorder`].
-pub(in crate::patch) fn recorder_texts(i18n: &gui_shared::i18n::I18nMap) -> keybinding::RecorderTexts<'_> {
+fn recorder_texts(i18n: &gui_shared::i18n::I18nMap) -> keybinding::RecorderTexts<'_> {
     use gui_shared::i18n::I18nKey;
     keybinding::RecorderTexts {
         hint: i18n.t(I18nKey::KeybindingRecordHint),
@@ -123,7 +123,7 @@ impl PatchTool {
     }
 
     /// Who has the keyboard: what a binding's `when` sees.
-    pub(in crate::patch) fn key_context(&self, ctx: &egui::Context) -> keybinding::KeyContext {
+    fn key_context(&self, ctx: &egui::Context) -> keybinding::KeyContext {
         let keymap = egui_code_editor::Keymap::from_vim(self.pane.mode.is_vim());
         let editor_focus = self.pane.had_focus;
         keybinding::KeyContext {

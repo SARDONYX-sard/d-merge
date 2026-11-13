@@ -9,7 +9,7 @@ use crate::patch::{TabEvent, editor::tabs::EditorTabs, tree::Graph};
 /// What the tabs show of the editor and the work, besides the tabs themselves.
 pub(in crate::patch) struct TabMarks<'a> {
     /// The editor has the keyboard: the shown tab's line is the accent color.
-    pub(in crate::patch) focused: bool,
+    pub(super) focused: bool,
     /// The work's problems: a tab of an object with some is red (errors) or yellow (warnings only).
     pub(in crate::patch) problems: Option<&'a [crate::patch::problems::ObjectProblems]>,
 }
@@ -32,7 +32,7 @@ impl TabMarks<'_> {
 ///
 /// `views`: the diffs / blames open (see [`super::revision_view::Views`]), as tabs after the objects'.
 /// With one shown, no object's tab is (`current` is `""`).
-pub(in crate::patch) fn tab_bar(
+pub(super) fn tab_bar(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
     tabs: &EditorTabs,

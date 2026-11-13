@@ -152,7 +152,7 @@ impl PatchTool {
                 ..Default::default()
             },
             parser_mode: paths.parser_mode,
-            panels: super::ui::panels::Panels { behaviors_open: true, ..Default::default() },
+            panels: super::ui::panels::Panels::with_behaviors_open(),
             explorer: super::tool::list::Explorer { changed_only: true, ..Default::default() },
             ..Self::default()
         }

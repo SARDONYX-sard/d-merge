@@ -107,7 +107,7 @@ pub(in crate::patch) enum LineRole {
 
 impl LineRole {
     /// The label at the end of the line, e.g., `animInfos[3].file`.
-    pub(in crate::patch) fn hint(self) -> Cow<'static, str> {
+    fn hint(self) -> Cow<'static, str> {
         match self {
             Self::Version => Cow::Borrowed("version"),
             Self::TriggersLen | Self::ClipTriggersLen => Cow::Borrowed("triggers: count"),
@@ -182,7 +182,7 @@ impl LineRole {
     }
 
     /// What the hover says.
-    pub(in crate::patch) const fn doc(self) -> Option<&'static str> {
+    pub(super) const fn doc(self) -> Option<&'static str> {
         Some(match self {
             Self::Version => "**Version** of the anim set. Always `V3`.",
             Self::TriggersLen => "**Count** of the triggers below. Nemesis and d-merge count them when merging.",

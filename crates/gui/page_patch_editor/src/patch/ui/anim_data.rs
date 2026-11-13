@@ -59,7 +59,7 @@ struct SetProject {
 
 /// See the module docs.
 #[derive(Debug)]
-pub(in crate::patch) struct AnimDataDialog {
+pub(super) struct AnimDataDialog {
     root: PathBuf,
     rows: Vec<ClipRow>,
     /// The mod's animations, as [`data::anim_hkx_files`] gives them.
@@ -327,7 +327,7 @@ fn clip_row(ui: &mut egui::Ui, row: &mut ClipRow) {
 /// ```
 /// -> `Attack_0`, `Attack_1`, `Attack_2`, with `mymod$N` numbered after what exists.
 #[derive(Debug)]
-pub(in crate::patch) struct NewClipsForm {
+pub(super) struct NewClipsForm {
     folder: String,
     name: String,
     count: usize,
@@ -337,7 +337,7 @@ pub(in crate::patch) struct NewClipsForm {
 
 impl NewClipsForm {
     /// `selected`: the open file, whose actor is the likely one.
-    pub(in crate::patch) fn new(selected: Option<&str>, projects: Vec<String>) -> Self {
+    pub(super) fn new(selected: Option<&str>, projects: Vec<String>) -> Self {
         let folder = selected.and_then(|id| id.split_once('/')).map_or("DefaultMale~1", |(folder, _)| folder);
         Self { folder: folder.to_owned(), name: String::new(), count: 1, projects }
     }
@@ -379,7 +379,7 @@ fn actor_field(ui: &mut egui::Ui, i18n: &I18nMap, folder: &mut String, projects:
 
 /// `Duplicate to...`: which project, searched among the others.
 #[derive(Debug)]
-pub(in crate::patch) struct DuplicateForm {
+pub(super) struct DuplicateForm {
     /// What goes there. e.g. `DefaultMale~1/Idle~mod$0.txt`
     files: Vec<String>,
     /// The project that usually has the same patches first.
@@ -432,7 +432,7 @@ impl PatchTool {
     }
 
     /// Where a file of the open animation data can go. The template's are read once.
-    pub(in crate::patch) fn anim_projects(&mut self) -> Vec<String> {
+    pub(super) fn anim_projects(&mut self) -> Vec<String> {
         let is_adsf = self.workspace.behaviors[self.active].adsf;
         if is_adsf && self.template_projects.is_none() {
             self.template_projects = Some(data::template_projects(Path::new(&self.place.template_dir)));

@@ -21,7 +21,7 @@ use crate::patch::{
 };
 
 impl PatchTool {
-    pub(in crate::patch) fn vars_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
+    pub(super) fn vars_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         let behavior = &self.workspace.behaviors[self.active];
         let ids = [STRING_DATA, GRAPH_DATA, VALUE_SET].map(|class| behavior.object_of_class(class).map(str::to_string));
         let [Some(string_data), Some(graph_data), value_set] = ids else {

@@ -195,7 +195,7 @@ impl PatchTool {
     }
 
     /// What is open now, to write with the work.
-    pub(in crate::patch) fn current_session(&self) -> Session {
+    fn current_session(&self) -> Session {
         let behaviors = &self.workspace.behaviors;
         let name_of = |at: usize| behaviors.get(at).map_or_else(String::new, |behavior| behavior.name.clone());
         Session {
@@ -212,7 +212,7 @@ impl PatchTool {
     }
 
     /// Back to what the work just loaded had open. What no longer exists is left out.
-    pub(in crate::patch) fn restore_session(&mut self) {
+    pub(super) fn restore_session(&mut self) {
         let session = std::mem::take(&mut self.workspace.session);
         let behaviors = &self.workspace.behaviors;
         let at_of = |name: &str| behaviors.iter().position(|behavior| behavior.name == name);
@@ -341,7 +341,7 @@ impl PatchTool {
 
     /// Replaces the work by what is in the mod at `selected`, as a job: see [`Self::finish_read`].
     /// `kept`: what a reload keeps of the work.
-    pub(in crate::patch) fn read_mod(&mut self, selected: &Path, source: String, kept: Option<Kept>) {
+    fn read_mod(&mut self, selected: &Path, source: String, kept: Option<Kept>) {
         let (selected, templates) = (selected.to_path_buf(), PathBuf::from(&self.place.template_dir));
         let detail = selected.display().to_string();
         self.job = Some(Job::spawn(I18nKey::NemesisReadingWork, detail, 0, move |done| Done::Read {

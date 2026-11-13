@@ -42,7 +42,7 @@ pub(in crate::patch) struct ParserProblem {
     /// 0-based line of the patch.
     pub(in crate::patch) line: usize,
     /// 0-based column (chars).
-    pub(in crate::patch) column: usize,
+    column: usize,
     pub(in crate::patch) message: String,
 }
 

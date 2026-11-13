@@ -129,14 +129,14 @@ impl PatchTool {
 
     /// What the editor shows, to find it again in another workspace: the behavior's `meshes_path`
     /// (e.g. `meshes/actors/character/behaviors/0_master.bin`) and the object id (e.g. `#0106`).
-    pub(in crate::patch) fn editor_place(&self) -> Option<(String, Rc<str>)> {
+    pub(super) fn editor_place(&self) -> Option<(String, Rc<str>)> {
         let behavior = self.workspace.behaviors.get(self.active)?;
         Some((behavior.meshes_path.clone(), self.selected.clone()?))
     }
 
     /// Shows the place of [`Self::editor_place`] again, if the work still has it, with the keyboard in
     /// the editor at its cursor.
-    pub(in crate::patch) fn reopen_editor_place(&mut self, (meshes_path, id): &(String, Rc<str>)) {
+    pub(super) fn reopen_editor_place(&mut self, (meshes_path, id): &(String, Rc<str>)) {
         let found = self.workspace.behaviors.iter().position(|behavior| behavior.meshes_path == *meshes_path);
         let Some(index) = found.filter(|&index| self.workspace.behaviors[index].text(id).is_some()) else { return };
         self.active = index;
@@ -184,7 +184,7 @@ impl PatchTool {
     }
 
     /// In a clip data file, trigger lines complete with the known names.
-    pub(in crate::patch) fn refresh_trigger_names(&mut self) {
+    fn refresh_trigger_names(&mut self) {
         let behavior = &self.workspace.behaviors[self.active];
         if !behavior.adsf {
             return;
@@ -461,7 +461,7 @@ impl PatchTool {
 
     /// What was edited since the last time goes to the other side: an object to its part of the Pandora
     /// patch file, the file to the objects. After a pause in typing, as it reads the whole file.
-    pub(in crate::patch) fn sync_pandora_doc(&mut self) {
+    pub(super) fn sync_pandora_doc(&mut self) {
         let edited = std::mem::take(&mut self.pandora_edited);
         let active = self.active;
         for id in edited {

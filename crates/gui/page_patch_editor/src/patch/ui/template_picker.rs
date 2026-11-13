@@ -15,14 +15,14 @@ use crate::patch::{
 /// The window's state.
 #[derive(Debug, Default)]
 pub(in crate::patch) struct TemplatePicker {
-    pub(in crate::patch) open: bool,
+    pub(super) open: bool,
     /// Templates found in `template_dir` that the work's scope allows.
-    pub(in crate::patch) catalog: Vec<TemplateEntry>,
+    pub(super) catalog: Vec<TemplateEntry>,
     /// `(template_dir, scope)` of `catalog`.
-    pub(in crate::patch) catalog_for: Option<(String, crate::patch::workspace::TemplateScope)>,
+    pub(super) catalog_for: Option<(String, crate::patch::workspace::TemplateScope)>,
     pub(in crate::patch) filter: String,
     /// The directories of the tree flipped from how they start. See [`template_tree::toggle`].
-    pub(in crate::patch) toggled: HashSet<String>,
+    pub(super) toggled: HashSet<String>,
 }
 
 const MAX_HEIGHT: f32 = 420.0;
@@ -30,7 +30,7 @@ const MAX_HEIGHT: f32 = 420.0;
 const INDENT: f32 = 12.0;
 
 /// The tree. Returns the template clicked; a clicked directory flips its entry in `toggled`.
-pub(in crate::patch) fn tree_ui<'a>(
+pub(super) fn tree_ui<'a>(
     ui: &mut egui::Ui,
     catalog: &'a [TemplateEntry],
     toggled: &mut HashSet<String>,
@@ -73,7 +73,7 @@ pub(in crate::patch) fn tree_ui<'a>(
 }
 
 /// The flat list of the templates whose path contains `filter`. Returns the template clicked.
-pub(in crate::patch) fn filtered_ui<'a>(
+pub(super) fn filtered_ui<'a>(
     ui: &mut egui::Ui,
     catalog: &'a [TemplateEntry],
     filter: &str,

@@ -35,15 +35,22 @@ pub(in crate::patch) struct Panels {
     pub(in crate::patch) class_picker: bool,
     pub(in crate::patch) class_filter: String,
     /// The window making many objects from one. See [`ui::repeat`].
-    pub(in crate::patch) repeat: Option<ui::repeat::RepeatForm>,
+    pub(super) repeat: Option<ui::repeat::RepeatForm>,
     /// The "animation data" window.
-    pub(in crate::patch) anim_data_dialog: Option<ui::anim_data::AnimDataDialog>,
+    pub(super) anim_data_dialog: Option<ui::anim_data::AnimDataDialog>,
     /// The "duplicate to" window.
-    pub(in crate::patch) duplicate_form: Option<ui::anim_data::DuplicateForm>,
+    pub(super) duplicate_form: Option<ui::anim_data::DuplicateForm>,
     /// What a row's menu asked to duplicate: `(files, to the project)`.
     pub(in crate::patch) pending_duplicate: Option<(Vec<String>, String)>,
     /// The "new clips" window.
-    pub(in crate::patch) new_clips: Option<ui::anim_data::NewClipsForm>,
+    pub(super) new_clips: Option<ui::anim_data::NewClipsForm>,
     /// The bulk delete asks once more.
     pub(in crate::patch) confirm_clear: bool,
+}
+
+impl Panels {
+    /// All closed but the side bar's behavior list: the user patch's start.
+    pub(in crate::patch) fn with_behaviors_open() -> Self {
+        Self { behaviors_open: true, ..Self::default() }
+    }
 }

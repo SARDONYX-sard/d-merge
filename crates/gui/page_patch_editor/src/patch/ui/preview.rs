@@ -22,7 +22,7 @@ pub(in crate::patch) fn nav_ui(preview: &mut Preview, ui: &mut egui::Ui, hover: 
 
 /// What a click in the preview asked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::patch) enum PreviewEvent {
+pub(super) enum PreviewEvent {
     /// `↶`: put this changed block back to the template.
     Revert(usize),
     /// A double click: show this preview row in the editor.
@@ -30,7 +30,7 @@ pub(in crate::patch) enum PreviewEvent {
 }
 
 /// The lines (only the visible ones are laid out).
-pub(in crate::patch) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, revert_hover: &str) -> Option<PreviewEvent> {
+pub(super) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, revert_hover: &str) -> Option<PreviewEvent> {
     let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 2.0;
     let font = egui::TextStyle::Monospace.resolve(ui.style());
     // The painter below does not grow the rows, so the horizontal scroll needs the real width.

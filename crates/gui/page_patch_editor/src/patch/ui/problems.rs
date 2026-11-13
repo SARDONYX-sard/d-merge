@@ -16,7 +16,7 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use crate::patch::{problems::ObjectProblems, workspace::Behavior};
 
 /// Draws the panel. Returns where a click goes: `(behavior, object, line)`.
-pub(in crate::patch) fn problems_panel(
+pub(super) fn problems_panel(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
     groups: &[ObjectProblems],

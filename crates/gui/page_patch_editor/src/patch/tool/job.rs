@@ -29,7 +29,7 @@ use crate::patch::{PatchTool, workspace::Workspace};
 #[derive(Debug)]
 pub(in crate::patch) struct Kept {
     pub(in crate::patch) output: String,
-    pub(in crate::patch) refs: Vec<String>,
+    pub(super) refs: Vec<String>,
 }
 
 /// What a job made, to take in. See [`PatchTool::finish_job`].
@@ -55,7 +55,7 @@ pub(in crate::patch) struct Job {
 impl Job {
     /// Runs `run` on another thread, counting in the `AtomicUsize` it is given out of `total` (`0`:
     /// not known).
-    pub(in crate::patch) fn spawn(
+    pub(super) fn spawn(
         label: I18nKey,
         detail: String,
         total: usize,

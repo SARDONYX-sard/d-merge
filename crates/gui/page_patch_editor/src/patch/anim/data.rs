@@ -48,9 +48,9 @@ pub(in crate::patch) struct ClipSource {
     /// As written in the behavior, e.g. `Animations\NickNak\ParaGlideEquip.hkx`
     pub(in crate::patch) animation: String,
     /// What it is relative to, e.g. `meshes/actors/character`
-    pub(in crate::patch) base: String,
+    base: String,
     /// e.g. `DefaultMale`, `DefaultFemale`
-    pub(in crate::patch) projects: Vec<String>,
+    projects: Vec<String>,
 }
 
 /// What the data needs from a hkx.
@@ -61,7 +61,7 @@ pub(in crate::patch) struct HkxInfo {
     /// Annotations as `(time, text)`, e.g. `(0.03, "AnimObjDraw")`.
     pub(in crate::patch) triggers: Vec<(f32, String)>,
     /// The root motion, see [`serde_hkx_for_gui::hkanno::parse_root_motion`].
-    pub(in crate::patch) motion: Vec<[f32; 4]>,
+    motion: Vec<[f32; 4]>,
 }
 
 /// The value of a field on one line. e.g., `name` in `<hkparam name="name">x</hkparam>` -> `x`

@@ -13,7 +13,7 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use crate::patch::PatchTool;
 
 impl PatchTool {
-    pub(in crate::patch) fn search_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
+    pub(super) fn search_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         if std::mem::take(&mut self.focus_search) {
             self.search.focus();
         }

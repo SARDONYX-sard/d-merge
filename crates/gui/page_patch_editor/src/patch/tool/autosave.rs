@@ -15,7 +15,7 @@ use std::{
 };
 
 /// How long after the last change the work is saved.
-pub(in crate::patch) const SAVE_DELAY: Duration = Duration::from_secs(1);
+const SAVE_DELAY: Duration = Duration::from_secs(1);
 
 /// See the module docs.
 #[derive(Debug, Default)]
@@ -33,7 +33,7 @@ impl Autosave {
     }
 
     /// `Ctrl+S`: saved on the next frame.
-    pub(in crate::patch) fn save_soon(&mut self) {
+    pub(super) fn save_soon(&mut self) {
         self.since = Instant::now().checked_sub(SAVE_DELAY);
     }
 
@@ -44,7 +44,7 @@ impl Autosave {
     }
 
     /// Is it time to save?
-    pub(in crate::patch) fn is_due(&self) -> bool {
+    pub(super) fn is_due(&self) -> bool {
         self.since.is_some_and(|since| since.elapsed() >= SAVE_DELAY)
     }
 
@@ -55,11 +55,11 @@ impl Autosave {
 
     /// What `since` is, to put back with [`Self::restore`]: around something that must not count as
     /// a change (e.g. a proposal shown, not taken yet).
-    pub(in crate::patch) const fn since(&self) -> Option<Instant> {
+    pub(super) const fn since(&self) -> Option<Instant> {
         self.since
     }
 
-    pub(in crate::patch) const fn restore(&mut self, since: Option<Instant>) {
+    pub(super) const fn restore(&mut self, since: Option<Instant>) {
         self.since = since;
     }
 

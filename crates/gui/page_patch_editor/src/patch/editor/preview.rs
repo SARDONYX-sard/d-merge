@@ -116,7 +116,7 @@ impl Preview {
     }
 
     /// The operations of one object. They are shown one level less than in a file: the root isn't there.
-    pub(in crate::patch) fn of_pandora_ops(ops: &[Op<'_>]) -> Self {
+    pub(super) fn of_pandora_ops(ops: &[Op<'_>]) -> Self {
         let mut lines = Vec::new();
         let mut longest_line = 0;
         for (block, op) in ops.iter().enumerate() {

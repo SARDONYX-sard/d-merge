@@ -44,7 +44,7 @@ enum AddEvent {
 
 impl PatchTool {
     /// See the module docs.
-    pub(in crate::patch) fn behaviors_section(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+    pub(super) fn behaviors_section(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let mut add = None;
         let mut open = self.panels.behaviors_open;
         let scope = self.workspace.scope;

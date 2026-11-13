@@ -25,7 +25,7 @@ use crate::patch::{
 
 /// What the window holds.
 #[derive(Debug)]
-pub(in crate::patch) struct RepeatForm {
+pub(super) struct RepeatForm {
     /// The behavior the objects go to, in `Workspace::behaviors`.
     behavior: usize,
     /// e.g. `#0106`: what the template was taken from.

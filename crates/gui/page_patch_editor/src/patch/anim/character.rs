@@ -45,7 +45,7 @@ pub(in crate::patch) fn actor_and_name(hkx: &str) -> Option<(String, String)> {
 /// whose names start with `characters` (`characters female` too).
 ///
 /// e.g. `meshes/actors/character` -> `.../characters/defaultmale.bin`, `.../characters female/defaultfemale.bin`
-pub(in crate::patch) fn character_templates(template_root: &Path, actor: &str) -> Vec<PathBuf> {
+fn character_templates(template_root: &Path, actor: &str) -> Vec<PathBuf> {
     let Ok(folders) = std::fs::read_dir(template_root.join(actor)) else { return Vec::new() };
     let mut found: Vec<PathBuf> = folders
         .flatten()
@@ -68,7 +68,7 @@ pub(in crate::patch) fn character_templates(template_root: &Path, actor: &str) -
 
 /// `object` (a `hkbCharacterStringData`) with `names` added at the end of its `animationNames`, those
 /// it has left out (ignoring ASCII case, as the game does). `None`: it has no such list, or nothing to add.
-pub(in crate::patch) fn with_animation_names(object: &str, names: &[&str]) -> Option<String> {
+fn with_animation_names(object: &str, names: &[&str]) -> Option<String> {
     let lines: Vec<&str> = object.split_inclusive('\n').collect();
     let open = format!("<hkparam name=\"{ANIMATION_NAMES}\"");
     let start = lines.iter().position(|line| line.trim_start().starts_with(open.as_str()))?;

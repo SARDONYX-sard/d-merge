@@ -29,7 +29,7 @@ pub(in crate::patch) struct RevisionView {
     /// The object, e.g. `#0106`.
     pub(in crate::patch) id: String,
     /// What its tab says. e.g. `GetUpModList (#2) ↔ GetUpModList (working)`
-    pub(in crate::patch) title: String,
+    pub(super) title: String,
     body: Box<DiffView>,
 }
 
@@ -38,11 +38,11 @@ pub(in crate::patch) struct RevisionView {
 pub(in crate::patch) struct ViewTab<'a> {
     /// Its index in [`Views::list`].
     pub(in crate::patch) at: usize,
-    pub(in crate::patch) title: &'a str,
+    pub(super) title: &'a str,
     /// Its object, e.g. `#0106`.
     pub(in crate::patch) id: &'a str,
-    pub(in crate::patch) shown: bool,
-    pub(in crate::patch) pinned: bool,
+    pub(super) shown: bool,
+    pub(super) pinned: bool,
 }
 
 /// The views open, as tabs after the objects'. The one shown in the editor's place is
@@ -152,7 +152,7 @@ impl PatchTool {
     }
 
     /// Draws the view shown, with the tabs, in the editor's place. Returns whether one is shown.
-    pub(in crate::patch) fn views_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> bool {
+    pub(super) fn views_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> bool {
         // Another object selected (the tree, the list): its editor, the view's tab stays.
         let selected = self.selected.as_deref();
         let shown = self.views.list.active.filter(|&at| {

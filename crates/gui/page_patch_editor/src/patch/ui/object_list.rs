@@ -535,7 +535,7 @@ pub(super) enum RowAction {
 }
 
 /// "Reveal in File Explorer" as VS Code names it on this OS.
-pub(in crate::patch) const REVEAL_LABEL: I18nKey = gui_shared::i18n::REVEAL_IN_FILE_MANAGER;
+pub(super) const REVEAL_LABEL: I18nKey = gui_shared::i18n::REVEAL_IN_FILE_MANAGER;
 
 /// `Keep Open / New / Duplicate / Repeat / Copy id / Copy path / Reveal in File Explorer / Revert (or Delete for a new object)`, for the flat list and
 /// the tree alike.

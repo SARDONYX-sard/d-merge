@@ -73,7 +73,7 @@ impl AdsfFile {
     }
 
     /// Does it hold a whole clip, as opposed to its motion, a header or an edit?
-    pub(in crate::patch) fn is_whole_clip(self, patch: &str) -> bool {
+    pub(super) fn is_whole_clip(self, patch: &str) -> bool {
         match self {
             Self::AddAnim => true,
             Self::IndexedAnim => !is_edit(patch),
@@ -83,7 +83,7 @@ impl AdsfFile {
 }
 
 /// An `Indexed*` file is an edit if it has `MOD_CODE`, else it is whole.
-pub(in crate::patch) fn is_edit(patch: &str) -> bool {
+fn is_edit(patch: &str) -> bool {
     patch.contains("<!-- MOD_CODE")
 }
 

@@ -25,15 +25,15 @@ use crate::patch::{
 #[derive(Debug, Default)]
 pub(in crate::patch) struct AnimTreeState {
     /// The actors and groups open, e.g. `DefaultMale~1`, `DefaultMale~1/Clip`.
-    pub(in crate::patch) open: HashSet<String>,
+    pub(super) open: HashSet<String>,
     /// `Expand all` was clicked: every folder opens on the next frame.
-    pub(in crate::patch) expand_all: bool,
+    pub(super) expand_all: bool,
     /// The row the keyboard is on (`j` / `k` ...), while the explorer has it. See [`apply_key`].
-    pub(in crate::patch) cursor: usize,
+    pub(super) cursor: usize,
 }
 /// A kind of file, in the order they are shown. See [`AdsfFile`], [`AsdsfFile`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(in crate::patch) enum FileKind {
+pub(super) enum FileKind {
     Header,
     Clip,
     Motion,
