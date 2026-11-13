@@ -237,6 +237,10 @@ enum TabEvent {
     CloseView(usize),
     /// A double click on a view's tab: it is kept.
     KeepView(usize),
+    /// A view's menu: every other tab of the behavior closes, objects' and views'.
+    CloseOthersOfView(usize),
+    /// A view's menu: the views to its right close.
+    CloseViewsRight(usize),
     /// The object's file: its path to the clipboard, or shown in the file manager.
     File(tool::list::FileAction, String),
 }

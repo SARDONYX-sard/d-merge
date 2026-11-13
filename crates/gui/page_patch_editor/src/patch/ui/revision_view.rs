@@ -48,6 +48,8 @@ pub(in crate::patch) struct ViewTab<'a> {
     /// Its index in [`Views::list`].
     pub(in crate::patch) at: usize,
     pub(in crate::patch) title: &'a str,
+    /// Its object, e.g. `#0106`.
+    pub(in crate::patch) id: &'a str,
     pub(in crate::patch) shown: bool,
     pub(in crate::patch) pinned: bool,
 }
@@ -64,8 +66,14 @@ impl Views {
     /// The tabs of `behavior`, in order: see [`ViewTab`].
     pub(in crate::patch) fn tabs_of(&self, behavior: usize) -> Vec<ViewTab<'_>> {
         let of = self.list.iter().enumerate().filter(|(_, view)| view.behavior == behavior);
-        of.map(|(at, view)| ViewTab { at, title: &view.title, shown: self.shown == Some(at), pinned: view.pinned })
-            .collect()
+        of.map(|(at, view)| ViewTab {
+            at,
+            title: &view.title,
+            id: &view.id,
+            shown: self.shown == Some(at),
+            pinned: view.pinned,
+        })
+        .collect()
     }
 
     /// Opens `view` in a tab: the one of the same title if open, else the preview tab of its behavior
@@ -89,6 +97,39 @@ impl Views {
         if let Some(view) = self.list.get_mut(at) {
             view.body.focus = true;
             self.shown = Some(at);
+        }
+    }
+
+    /// Keeps only `at` of the views of its behavior.
+    pub(in crate::patch) fn close_others(&mut self, at: usize) {
+        let Some(behavior) = self.list.get(at).map(|view| view.behavior) else { return };
+        let mut index = 0;
+        self.list.retain(|view| {
+            let keep = view.behavior != behavior || index == at;
+            index += 1;
+            keep
+        });
+        let kept = self.list.iter().position(|view| view.behavior == behavior);
+        self.shown = kept;
+    }
+
+    /// Closes the views of `at`'s behavior to its right.
+    pub(in crate::patch) fn close_to_the_right(&mut self, at: usize) {
+        let Some(behavior) = self.list.get(at).map(|view| view.behavior) else { return };
+        // The last first: what is closed does not move those left to close.
+        for index in (at + 1..self.list.len()).rev() {
+            if self.list[index].behavior == behavior {
+                self.close(index);
+            }
+        }
+    }
+
+    /// Closes every view of `behavior`.
+    pub(in crate::patch) fn close_all(&mut self, behavior: usize) {
+        for index in (0..self.list.len()).rev() {
+            if self.list[index].behavior == behavior {
+                self.close(index);
+            }
         }
     }
 
@@ -415,7 +456,16 @@ mod tests {
         assert_eq!((views.list.len(), views.shown), (2, Some(1)));
         views.close(1);
         assert_eq!(views.shown, None, "the one shown closed");
-        assert_eq!(views.tabs_of(0), [ViewTab { at: 0, title: "b", shown: false, pinned: true }]);
+
+        let mut more = Views { list: vec![view("a"), view("b"), view("c")], shown: None };
+        more.close_to_the_right(0);
+        assert_eq!(more.list.len(), 1, "right of `a`");
+        more.list.extend([view("b"), view("c")]);
+        more.close_others(1);
+        assert_eq!((more.list.len(), more.list[0].title.as_str(), more.shown), (1, "b", Some(0)));
+        more.close_all(0);
+        assert!(more.list.is_empty());
+        assert_eq!(views.tabs_of(0), [ViewTab { at: 0, title: "b", id: "#1", shown: false, pinned: true }]);
         // A new view takes the place of the preview one, as an object's tab does.
         views.list[0].pinned = false;
         let at = views.open(view("d"));

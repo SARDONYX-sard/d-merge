@@ -297,6 +297,14 @@ impl PatchTool {
                 }
             }
             Some(TabEvent::CloseView(at)) => self.views.close(at),
+            Some(TabEvent::CloseOthersOfView(at)) => {
+                self.tabs.close_all(active);
+                self.views.close_others(at);
+                if let Some(view) = self.views.shown.and_then(|shown| self.views.list.get(shown)) {
+                    self.selected = Some(view.id.as_str().into());
+                }
+            }
+            Some(TabEvent::CloseViewsRight(at)) => self.views.close_to_the_right(at),
             Some(TabEvent::KeepView(at)) => {
                 if let Some(view) = self.views.list.get_mut(at) {
                     view.pinned = true;
@@ -311,6 +319,7 @@ impl PatchTool {
             }
             Some(TabEvent::CloseAll) => {
                 self.tabs.close_all(active);
+                self.views.close_all(active);
                 self.selected = None;
                 self.pane.opened = None;
             }

@@ -694,6 +694,7 @@ pub(in crate::patch) fn tab_bar(
                 if tab.close {
                     event = Some(TabEvent::CloseView(at));
                 }
+                tab.response.context_menu(|ui| event = view_menu(ui, i18n, *view, view.id).or_else(|| event.take()));
             }
         });
     });
@@ -717,6 +718,33 @@ fn tab_menu(ui: &mut egui::Ui, i18n: &I18nMap, id: &str, pinned: bool) -> Option
         }
     }
     ui.separator();
+    object_items(ui, i18n, id).or(picked)
+}
+
+/// A diff's / blame's tab's right-click menu: as an object's tab's, for the views, then its object's.
+fn view_menu(ui: &mut egui::Ui, i18n: &I18nMap, view: super::revision_view::ViewTab<'_>, id: &str) -> Option<TabEvent> {
+    let at = view.at;
+    let items = [
+        (I18nKey::NemesisKeepOpen, !view.pinned, TabEvent::KeepView(at)),
+        (I18nKey::CloseButton, true, TabEvent::CloseView(at)),
+        (I18nKey::NemesisCloseOtherTabs, true, TabEvent::CloseOthersOfView(at)),
+        (I18nKey::NemesisCloseTabsRight, true, TabEvent::CloseViewsRight(at)),
+        (I18nKey::NemesisCloseAllTabs, true, TabEvent::CloseAll),
+    ];
+    let mut picked = None;
+    for (label, enabled, event) in items {
+        if ui.add_enabled(enabled, egui::Button::new(i18n.t(label))).clicked() {
+            picked = Some(event);
+            ui.close();
+        }
+    }
+    ui.separator();
+    object_items(ui, i18n, id).or(picked)
+}
+
+/// `Copy id / Copy Path / Reveal in File Explorer` of object `id`, the end of a tab's menu.
+fn object_items(ui: &mut egui::Ui, i18n: &I18nMap, id: &str) -> Option<TabEvent> {
+    let mut picked = None;
     if ui.button(i18n.t(I18nKey::NemesisCopyId)).clicked() {
         ui.ctx().copy_text(id.to_owned());
         ui.close();
