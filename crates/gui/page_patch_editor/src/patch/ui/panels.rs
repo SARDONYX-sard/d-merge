@@ -27,8 +27,6 @@ pub(in crate::patch) struct Panels {
     pub(in crate::patch) code_choice: Option<ui::code_choice::ModCodeChoice>,
     /// The window of the templates to add. See [`ui::template_picker`].
     pub(in crate::patch) picker: ui::template_picker::TemplatePicker,
-    /// The next quick pick window drawn takes the keyboard.
-    pub(in crate::patch) focus_quick_pick: bool,
     /// The "New object" window. See [`ui::class_picker`].
     pub(in crate::patch) class_picker: ui::class_picker::ClassPicker,
     /// The window making many objects from one. See [`ui::repeat`].

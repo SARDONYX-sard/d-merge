@@ -8,14 +8,11 @@
 //! The template list opens as a window with the filter focused, like VS Code's quick open, but next
 //! to what was clicked.
 
-use std::{
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::{path::PathBuf, rc::Rc};
 
 use egui_widgets::{
     notify::Notification,
-    shadcn::{Button, Icon, TextEdit},
+    shadcn::{Button, Icon},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
@@ -31,6 +28,8 @@ const LIST_HEIGHT: f32 = 130.0;
 /// What a row asked for.
 #[derive(Debug, Clone, Copy)]
 enum RowEvent {
+    /// Another behavior is shown.
+    Select(usize),
     Remove(usize),
 }
 
@@ -53,16 +52,16 @@ impl PatchTool {
         });
         self.panels.behaviors_open = open;
         match add {
-            Some(AddEvent::Template) => {
-                self.panels.picker.open = true;
-                self.panels.focus_quick_pick = true;
-            }
+            Some(AddEvent::Template) => self.panels.picker.open(),
             Some(AddEvent::File) => self.add_custom_template(notify, i18n),
             Some(AddEvent::AnimData) => self.open_anim_data_for_mod(),
             None => {}
         }
         if self.panels.behaviors_open {
-            let event = self.behavior_rows(ui, i18n);
+            let code = self.place.mod_code.trim();
+            let code = if is_existing_mod_code(code) { code } else { "<code>" };
+            let ext = self.workspace.export_format.is_ext();
+            let event = behavior_rows(ui, i18n, (&self.workspace.behaviors, self.active), (code, ext));
             self.apply_row_event(event);
         }
         ui.separator();
@@ -84,36 +83,13 @@ impl PatchTool {
         }
     }
 
-    /// The rows. Their hover says where the patches go, as there is no room for it in the row.
-    fn behavior_rows(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<RowEvent> {
-        if self.workspace.behaviors.is_empty() {
-            ui.weak(i18n.t(I18nKey::NemesisNoBehavior));
-            return None;
-        }
-        let code = if is_existing_mod_code(self.place.mod_code.trim()) { self.place.mod_code.trim() } else { "<code>" };
-        let ext = self.workspace.export_format.is_ext();
-        let mut event = None;
-        egui::ScrollArea::both().id_salt("nemesis_behaviors").max_height(LIST_HEIGHT).show(ui, |ui| {
-            for (i, behavior) in self.workspace.behaviors.iter().enumerate() {
-                let response = ui
-                    .add(Button::selectable(i == self.active, row_label(behavior, ext)))
-                    .on_hover_text(row_hover(behavior, code, ext, i18n));
-                if response.clicked() && i != self.active {
-                    self.active = i;
-                    // Back to where it was left in that behavior.
-                    self.selected = self.tabs.last_of(i).map(Rc::from);
-                }
-                response.context_menu(|ui| {
-                    let picked = row_menu(ui, i, i18n);
-                    event = picked.or(event);
-                });
-            }
-        });
-        event
-    }
-
     fn apply_row_event(&mut self, event: Option<RowEvent>) {
         match event {
+            Some(RowEvent::Select(i)) => {
+                self.active = i;
+                // Back to where it was left in that behavior.
+                self.selected = self.tabs.last_of(i).map(Rc::from);
+            }
             Some(RowEvent::Remove(i)) => {
                 self.workspace.behaviors.remove(i);
                 self.reset_names(); // the numbers of the others shift
@@ -127,61 +103,17 @@ impl PatchTool {
         }
     }
 
-    /// The window of the templates of `template_dir`; a click adds one as a behavior.
+    /// The window of the templates of `template_dir`, if open; a click adds one as a behavior.
     pub(in crate::patch) fn template_picker_window(
         &mut self,
         ctx: &egui::Context,
         i18n: &I18nMap,
         notify: &mut Notification,
     ) {
-        if !self.panels.picker.open {
-            return;
-        }
-        let scope = self.workspace.scope;
-        let fresh = self
-            .panels
-            .picker
-            .catalog_for
-            .as_ref()
-            .is_some_and(|(dir, of)| *dir == self.place.template_dir && *of == scope);
-        if !fresh {
-            self.panels.picker.catalog = crate::patch::workspace::catalog(Path::new(&self.place.template_dir), scope);
-            self.panels.picker.catalog_for = Some((self.place.template_dir.clone(), scope));
-        }
-        let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
-        let mut picked = None;
-        egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisAddBehavior)).open(&mut open).show(ctx, |ui| {
-            picked = self.template_picker_ui(ui, i18n);
-        });
-        self.panels.picker.open = open && picked.is_none();
-        if let Some(path) = picked {
+        let place = (self.place.template_dir.as_str(), self.workspace.scope);
+        if let Some(path) = self.panels.picker.window(ctx, i18n, place) {
             self.add_behavior(&path, notify, i18n);
         }
-    }
-
-    fn template_picker_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PathBuf> {
-        let field = TextEdit::singleline(&mut self.panels.picker.filter)
-            .hint_text(i18n.t(I18nKey::NemesisFilterHint))
-            .desired_width(ui.available_width());
-        let field = ui.add(field);
-        if std::mem::take(&mut self.panels.focus_quick_pick) {
-            field.request_focus();
-        }
-        ui.weak(format!("{} ({})", self.place.template_dir, self.panels.picker.catalog.len()));
-        if self.workspace.scope == TemplateScope::Nemesis {
-            ui.weak(i18n.t(I18nKey::NemesisScopeNemesisOnly));
-        }
-        if self.panels.picker.catalog.is_empty() {
-            ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNoTemplates));
-            return None;
-        }
-        // No filter: as a directory tree. A filter wants all the matches at once.
-        let clicked = if self.panels.picker.filter.is_empty() {
-            super::template_picker::tree_ui(ui, &self.panels.picker.catalog, &mut self.panels.picker.toggled, i18n)
-        } else {
-            super::template_picker::filtered_ui(ui, &self.panels.picker.catalog, &self.panels.picker.filter, i18n)
-        };
-        clicked.map(Path::to_path_buf)
     }
 }
 
@@ -208,6 +140,37 @@ fn add_menu(ui: &mut egui::Ui, scope: TemplateScope, i18n: &I18nMap) -> Option<A
                 event = Some(item);
                 ui.close();
             }
+        }
+    });
+    event
+}
+
+/// The rows. Their hover says where the patches go, as there is no room for it in the row.
+/// `(code, ext)`: the mod code (or `<code>` while it is not one), and see [`Behavior::target`].
+fn behavior_rows(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    (behaviors, active): (&[Behavior], usize),
+    (code, ext): (&str, bool),
+) -> Option<RowEvent> {
+    if behaviors.is_empty() {
+        ui.weak(i18n.t(I18nKey::NemesisNoBehavior));
+        return None;
+    }
+
+    let mut event = None;
+    egui::ScrollArea::both().id_salt("nemesis_behaviors").max_height(LIST_HEIGHT).show(ui, |ui| {
+        for (i, behavior) in behaviors.iter().enumerate() {
+            let row = Button::selectable(i == active, row_label(behavior, ext));
+            let response = ui.add(row).on_hover_text(row_hover(behavior, code, ext, i18n));
+            if response.clicked() && i != active {
+                event = Some(RowEvent::Select(i));
+            }
+            response.context_menu(|ui| {
+                if let Some(picked) = row_menu(ui, i, i18n) {
+                    event = Some(picked);
+                }
+            });
         }
     });
     event

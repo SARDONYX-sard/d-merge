@@ -1,28 +1,104 @@
 //! Draws the template picker: a directory tree, or a flat list while filtering.
 //! The rows of the tree are computed in [`crate::patch::template_tree`].
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use egui_widgets::shadcn::TextEdit;
 use fast_hash::HashSet;
 use gui_shared::i18n::{I18nKey, I18nMap};
 use stdx::text::contains_ignore_case;
 
 use crate::patch::{
     template_tree::{self, RowKind},
-    workspace::TemplateEntry,
+    workspace::{TemplateEntry, TemplateScope},
 };
 
-/// The window's state.
+/// The window's state: its own only.
 #[derive(Debug, Default)]
 pub(in crate::patch) struct TemplatePicker {
-    pub(super) open: bool,
+    is_open: bool,
+    /// The filter takes the keyboard on the next draw.
+    focus: bool,
     /// Templates found in `template_dir` that the work's scope allows.
-    pub(super) catalog: Vec<TemplateEntry>,
+    catalog: Vec<TemplateEntry>,
     /// `(template_dir, scope)` of `catalog`.
-    pub(super) catalog_for: Option<(String, crate::patch::workspace::TemplateScope)>,
-    pub(in crate::patch) filter: String,
+    catalog_for: Option<(String, TemplateScope)>,
+    filter: String,
     /// The directories of the tree flipped from how they start. See [`template_tree::toggle`].
-    pub(super) toggled: HashSet<String>,
+    toggled: HashSet<String>,
+}
+
+impl TemplatePicker {
+    /// Shows the window, its filter with the keyboard.
+    pub(in crate::patch) const fn open(&mut self) {
+        self.is_open = true;
+        self.focus = true;
+    }
+
+    /// Draws the window, if open: the templates of `template_dir` that `scope` allows. Returns the
+    /// one clicked (the window closes then).
+    pub(in crate::patch) fn window(
+        &mut self,
+        ctx: &egui::Context,
+        i18n: &I18nMap,
+        (template_dir, scope): (&str, TemplateScope),
+    ) -> Option<PathBuf> {
+        if !self.is_open {
+            return None;
+        }
+        self.refresh(template_dir, scope);
+
+        let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
+        let window = egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisAddBehavior)).open(&mut open);
+        let picked =
+            window.show(ctx, |ui| self.contents(ui, i18n, (template_dir, scope))).and_then(|shown| shown.inner);
+        let picked = picked.flatten();
+
+        self.is_open = open && picked.is_none();
+        picked
+    }
+
+    /// The catalog again, if the directory or the scope changed since.
+    fn refresh(&mut self, template_dir: &str, scope: TemplateScope) {
+        let fresh = self.catalog_for.as_ref().is_some_and(|(dir, of)| dir == template_dir && *of == scope);
+        if !fresh {
+            self.catalog = crate::patch::workspace::catalog(Path::new(template_dir), scope);
+            self.catalog_for = Some((template_dir.to_owned(), scope));
+        }
+    }
+
+    /// The filter, where the templates are, and the tree (or, filtering, the matches).
+    fn contents(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        (template_dir, scope): (&str, TemplateScope),
+    ) -> Option<PathBuf> {
+        let field = TextEdit::singleline(&mut self.filter)
+            .hint_text(i18n.t(I18nKey::NemesisFilterHint))
+            .desired_width(ui.available_width());
+        let field = ui.add(field);
+        if std::mem::take(&mut self.focus) {
+            field.request_focus();
+        }
+
+        ui.weak(format!("{template_dir} ({})", self.catalog.len()));
+        if scope == TemplateScope::Nemesis {
+            ui.weak(i18n.t(I18nKey::NemesisScopeNemesisOnly));
+        }
+        if self.catalog.is_empty() {
+            ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNoTemplates));
+            return None;
+        }
+
+        // No filter: as a directory tree. A filter wants all the matches at once.
+        let clicked = if self.filter.is_empty() {
+            tree_ui(ui, &self.catalog, &mut self.toggled, i18n)
+        } else {
+            filtered_ui(ui, &self.catalog, &self.filter, i18n)
+        };
+        clicked.map(Path::to_path_buf)
+    }
 }
 
 const MAX_HEIGHT: f32 = 420.0;
@@ -30,7 +106,7 @@ const MAX_HEIGHT: f32 = 420.0;
 const INDENT: f32 = 12.0;
 
 /// The tree. Returns the template clicked; a clicked directory flips its entry in `toggled`.
-pub(super) fn tree_ui<'a>(
+fn tree_ui<'a>(
     ui: &mut egui::Ui,
     catalog: &'a [TemplateEntry],
     toggled: &mut HashSet<String>,
@@ -73,12 +149,7 @@ pub(super) fn tree_ui<'a>(
 }
 
 /// The flat list of the templates whose path contains `filter`. Returns the template clicked.
-pub(super) fn filtered_ui<'a>(
-    ui: &mut egui::Ui,
-    catalog: &'a [TemplateEntry],
-    filter: &str,
-    i18n: &I18nMap,
-) -> Option<&'a Path> {
+fn filtered_ui<'a>(ui: &mut egui::Ui, catalog: &'a [TemplateEntry], filter: &str, i18n: &I18nMap) -> Option<&'a Path> {
     let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 6.0;
     let shown: Vec<&TemplateEntry> = catalog.iter().filter(|e| contains_ignore_case(&e.meshes_path, filter)).collect();
     let mut picked = None;
