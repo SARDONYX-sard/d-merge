@@ -15,7 +15,6 @@ use egui_widgets::{
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
-use stdx::text::contains_ignore_case;
 
 use super::{
     anim_data::{DuplicateForm, NewClipsForm},
@@ -102,8 +101,7 @@ impl PatchTool {
                 self.panels.new_clips = Some(NewClipsForm::new(self.selected.as_deref(), projects));
             }
             TitleAsk::New => {
-                self.panels.class_picker = true;
-                self.panels.focus_quick_pick = true;
+                self.panels.class_picker.open();
             }
         }
     }
@@ -368,8 +366,7 @@ impl PatchTool {
         match action {
             RowAction::KeepOpen => self.keep_open(id),
             RowAction::NewObject => {
-                self.panels.class_picker = true;
-                self.panels.focus_quick_pick = true;
+                self.panels.class_picker.open();
             }
             RowAction::Duplicate => self.new_object(Some(id)),
             RowAction::Repeat => {
@@ -380,62 +377,6 @@ impl PatchTool {
             RowAction::RevertOrDelete => self.revert_or_delete(id),
             RowAction::CopyPath => self.copy_object_path(ui.ctx(), id),
             RowAction::Reveal => self.reveal_object(id, notify),
-        }
-    }
-
-    /// The window of [`Self::class_picker_ui`].
-    pub(in crate::patch) fn class_picker_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        if !self.panels.class_picker {
-            return;
-        }
-        let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
-        egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisNewObject))
-            .open(&mut open)
-            .show(ctx, |ui| self.class_picker_ui(ui, i18n));
-        self.panels.class_picker &= open; // a picked class has turned it off already
-    }
-
-    /// `[class filter]` + the class table's classes (the template's own first); a click adds a
-    /// new object of that class with every field at its default.
-    fn class_picker_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let field = ui.add(
-            TextEdit::singleline(&mut self.panels.class_filter)
-                .hint_text(i18n.t(I18nKey::NemesisClassFilterHint))
-                .desired_width(ui.available_width()),
-        );
-        if std::mem::take(&mut self.panels.focus_quick_pick) {
-            field.request_focus();
-        }
-        let behavior = &self.workspace.behaviors[self.active];
-        let filter = self.panels.class_filter.as_str();
-        let used = |class: &str| behavior.object_of_class(class).is_some();
-        let mut classes: Vec<&str> =
-            nemesis_diff::schema::class_names().into_iter().filter(|c| contains_ignore_case(c, filter)).collect();
-        classes.sort_by_key(|class| !used(class)); // stable: alphabetical within each group
-
-        let mut picked = None;
-        let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
-        egui::ScrollArea::vertical().id_salt("nemesis_class_picker").max_height(420.0).show_rows(
-            ui,
-            row_height,
-            classes.len(),
-            |ui, range| {
-                for class in &classes[range] {
-                    let text = egui::RichText::new(*class).monospace();
-                    let text = if used(class) { text } else { text.weak() };
-                    if ui.add(egui::Button::selectable(false, text)).clicked() {
-                        picked = Some((*class).to_string());
-                    }
-                }
-            },
-        );
-        if let Some(class) = picked {
-            let code = self.place.mod_code.trim().to_string();
-            if let Some(id) = self.workspace.behaviors[self.active].add_class(&code, &class) {
-                self.object_changed(&id);
-                self.selected = Some(id.into());
-                self.panels.class_picker = false;
-            }
         }
     }
 }

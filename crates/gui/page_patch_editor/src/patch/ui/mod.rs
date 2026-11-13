@@ -5,6 +5,7 @@ pub(super) mod anim_data;
 pub(super) mod anim_tree;
 mod behaviors;
 mod changes_view;
+pub(super) mod class_picker;
 pub(super) mod code_choice;
 mod object_editor;
 mod object_list;

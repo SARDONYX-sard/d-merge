@@ -5,7 +5,7 @@
 //! top bar      project_open (details), rename_to (the rename form)
 //! side bar     behaviors_open (BEHAVIORS)
 //! start screen new_work, code_choice (a mod with several codes)
-//! windows      picker (templates), class_picker + class_filter (New object), repeat,
+//! windows      picker (templates), class_picker (New object), repeat,
 //!              anim_data_dialog, duplicate_form + pending_duplicate, new_clips
 //! asks         confirm_clear (the bulk delete)
 //! ```
@@ -29,9 +29,8 @@ pub(in crate::patch) struct Panels {
     pub(in crate::patch) picker: ui::template_picker::TemplatePicker,
     /// The next quick pick window drawn takes the keyboard.
     pub(in crate::patch) focus_quick_pick: bool,
-    /// The "New" class list is open, and its filter.
-    pub(in crate::patch) class_picker: bool,
-    pub(in crate::patch) class_filter: String,
+    /// The "New object" window. See [`ui::class_picker`].
+    pub(in crate::patch) class_picker: ui::class_picker::ClassPicker,
     /// The window making many objects from one. See [`ui::repeat`].
     pub(in crate::patch) repeat: Option<ui::repeat::RepeatForm>,
     /// The "animation data" window.

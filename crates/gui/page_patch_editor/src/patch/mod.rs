@@ -316,6 +316,19 @@ impl PatchTool {
         }
     }
 
+    /// The "New object" window, if open: a class picked is a new object of it.
+    fn class_picker(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
+        let behavior = &self.workspace.behaviors[self.active];
+        let Some(class) = self.panels.class_picker.window(ctx, i18n, behavior) else { return };
+
+        let code = self.place.mod_code.trim().to_owned();
+        if let Some(id) = self.workspace.behaviors[self.active].add_class(&code, &class) {
+            self.object_changed(&id);
+            self.selected = Some(id.into());
+            self.panels.class_picker.close();
+        }
+    }
+
     /// The repeat window, if open, and what it asked for.
     fn repeat(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
         use ui::repeat::RepeatAsk;
@@ -372,7 +385,7 @@ impl PatchTool {
             egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisNoBehavior)));
             return;
         }
-        self.class_picker_window(ui.ctx(), i18n);
+        self.class_picker(ui.ctx(), i18n);
         self.object_editor(ui, i18n);
     }
 
