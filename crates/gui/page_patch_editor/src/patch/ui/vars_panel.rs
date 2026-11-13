@@ -136,7 +136,8 @@ fn name_rows(
         (0..list.names.len()).rev().filter(|&i| contains_ignore_case(&list.names[i], filter)).collect();
     let row_height = ui.spacing().interact_size.y.max(ui.text_style_height(&egui::TextStyle::Monospace) + 6.0);
     let mut action = None;
-    egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, shown.len(), |ui, range| {
+    // Sideways too: a long name widened the side bar, which takes its content's width.
+    egui::ScrollArea::both().auto_shrink(false).show_rows(ui, row_height, shown.len(), |ui, range| {
         for &index in &shown[range] {
             ui.horizontal(|ui| action = name_row(ui, i18n, list, index, renaming).or(action));
         }
@@ -162,11 +163,15 @@ fn name_row(
         return rename_field(ui, renaming, is_variable, index);
     }
     let name = egui::RichText::new(&names[index]).monospace();
+    // Cut off at the side bar's edge: the whole name on hover.
+    let hover = egui_widgets::CutHover::new();
     if index < template_count {
-        ui.label(name);
+        let label = ui.label(name);
+        hover.show_text(ui, label, &names[index]);
         return None;
     }
-    ui.label(name.strong());
+    let label = ui.label(name.strong());
+    hover.show_text(ui, label, &names[index]);
     if ui.small_button("✎").on_hover_text(i18n.t(I18nKey::NemesisRename)).clicked() {
         *renaming = Some(Renaming { is_variable, index, text: names[index].clone(), focus: true });
     }

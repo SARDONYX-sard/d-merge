@@ -366,7 +366,9 @@ impl PatchTool {
                     revision.message,
                     local_time(revision.time)
                 );
-                let response = ui.add(egui::Button::selectable(false, egui::RichText::new(text).monospace()));
+                let response = ui.add(egui::Button::selectable(false, egui::RichText::new(&text).monospace()));
+                // Cut off at the side bar's edge: the whole row on hover.
+                let response = egui_widgets::CutHover::new().show_text(ui, response, &text);
                 if response.clicked() {
                     let parent = self.workspace.history.parent_number(revision.number);
                     picked = Some(ChangeAction::Compare(self.active, id.to_owned(), parent, Some(revision.number)));
