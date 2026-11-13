@@ -234,11 +234,11 @@ impl PatchTool {
             }
             Some(EditorCommand::TogglePreview) => self.pane.show_preview = !self.pane.show_preview,
             Some(EditorCommand::ToggleInlineDiff) => self.pane.show_inline_diff = !self.pane.show_inline_diff,
-            Some(EditorCommand::NextChange) => self.step_change(true),
+            Some(EditorCommand::NextChange) => self.pane.step_change(true),
             Some(EditorCommand::RevealFile) => {
                 self.file_asked = Some((crate::patch::tool::list::FileAction::Reveal, id.to_owned()));
             }
-            Some(EditorCommand::PreviousChange) => self.step_change(false),
+            Some(EditorCommand::PreviousChange) => self.pane.step_change(false),
             Some(EditorCommand::ToggleExplorer | EditorCommand::GoToDefinition | EditorCommand::FindReferences)
             | None => {}
         }
@@ -257,45 +257,24 @@ impl PatchTool {
         result.focus_tree || result.command == Some(EditorCommand::ToggleExplorer)
     }
 
-    /// Vim `]c` / `[c`: to the next or previous changed place of what shows the changes, as its `▲ ▼` do.
-    /// The inline diff first, as it is where the cursor is. e.g. changes at lines 3 and 9: from 5, `]c` is 9.
-    pub(in crate::patch) fn step_change(&mut self, forward: bool) {
-        if self.pane.show_inline_diff {
-            let line = self.pane.inline_diff.step(self.pane.cursor_line, forward);
-            if line.is_some() {
-                self.pane.focus = line.map(FocusAt::Line);
-            }
-        } else if self.pane.show_preview
-            && let Some(view) = &mut self.pane.preview_view
-        {
-            view.step(forward);
-        }
-    }
-
     /// `↶` in the inline diff: puts a changed place back to the template.
     pub(in crate::patch) fn revert_inline(&mut self, id: &str, index: usize) {
-        let behavior = &mut self.workspace.behaviors[self.active];
-        let Some(template) = behavior.template_object(id) else { return };
-        self.pane.text = InlineDiff::revert(&template.text, &self.pane.text, index);
-        behavior.set_text(id, &self.pane.text);
-        self.pane.preview = None;
-        self.object_changed(id);
-        self.note_pandora_edit(id);
+        let Some(template) = self.workspace.behaviors[self.active].template_object(id) else { return };
+        let text = InlineDiff::revert(&template.text, &self.pane.text, index);
+        self.replace_object_text(id, text);
     }
 
     /// `↶` in the preview: puts changed block `block` back to the template.
     pub(in crate::patch) fn revert_block(&mut self, id: &str, block: usize) {
-        let is_pandora = self.pane.preview_view.as_ref().is_some_and(editor::preview::Preview::is_pandora);
-        let behavior = &mut self.workspace.behaviors[self.active];
-        let Some(template) = behavior.template_object(id) else { return };
-        if is_pandora {
-            let opened = nemesis_diff::open_kept_arrays(&self.pane.text);
-            let Some(text) = pandora_patch::doc::without_op(&template.text, &opened, block) else { return };
-            self.pane.text = text;
-        } else {
-            self.pane.text = nemesis_diff::revert_hunk(&template.text, &self.pane.text, block);
-        }
-        behavior.set_text(id, &self.pane.text);
+        let Some(template) = self.workspace.behaviors[self.active].template_object(id) else { return };
+        let Some(text) = self.pane.reverted_block(&template.text, block) else { return };
+        self.replace_object_text(id, text);
+    }
+
+    /// Object `id` is `text` now, in the editor and in the work.
+    fn replace_object_text(&mut self, id: &str, text: String) {
+        self.pane.text = text;
+        self.workspace.behaviors[self.active].set_text(id, &self.pane.text);
         self.pane.preview = None;
         self.object_changed(id);
         self.note_pandora_edit(id);

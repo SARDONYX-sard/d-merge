@@ -7,6 +7,8 @@
 //! apply_focus_request  the keyboard to the editor, the cursor to a line
 //! field_values         the enum / flag values of the behavior's fields, once per behavior
 //! refresh_trigger_names  the trigger names of clip data, for the completion
+//! step_change          `]c` / `[c`: the next / previous change
+//! reverted_block       the text with a block of the preview put back
 //! ```
 
 use std::{borrow::Cow, path::Path, rc::Rc};
@@ -136,5 +138,31 @@ impl EditorPane {
         }
         let template = self.template_triggers.get_or_insert_with(|| anim::data::template_trigger_names(template_dir));
         self.trigger_names = anim::data::trigger_names(template, behavior);
+    }
+
+    /// `]c` / `[c`, `▲ ▼`: the next / previous change, of the inline diff if shown, else of the
+    /// preview.
+    pub(in crate::patch) fn step_change(&mut self, forward: bool) {
+        if self.show_inline_diff {
+            if let Some(line) = self.inline_diff.step(self.cursor_line, forward) {
+                self.focus = Some(FocusAt::Line(line));
+            }
+        } else if self.show_preview
+            && let Some(view) = &mut self.preview_view
+        {
+            view.step(forward);
+        }
+    }
+
+    /// The text with block `block` of the preview put back as in `template`: an operation of the
+    /// Pandora file, or a hunk of the Nemesis patch. `None`: no such block.
+    pub(in crate::patch) fn reverted_block(&self, template: &str, block: usize) -> Option<String> {
+        let is_pandora = self.preview_view.as_ref().is_some_and(editor::preview::Preview::is_pandora);
+        if is_pandora {
+            let opened = nemesis_diff::open_kept_arrays(&self.text);
+            pandora_patch::doc::without_op(template, &opened, block)
+        } else {
+            Some(nemesis_diff::revert_hunk(template, &self.text, block))
+        }
     }
 }

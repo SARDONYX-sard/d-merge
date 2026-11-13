@@ -97,10 +97,10 @@ impl PatchTool {
         }
 
         if self.key_command(commands::EDITOR_NEXT_CHANGE) {
-            self.step_change(true);
+            self.pane.step_change(true);
         }
         if self.key_command(commands::EDITOR_PREVIOUS_CHANGE) {
-            self.step_change(false);
+            self.pane.step_change(false);
         }
 
         self.key_command(commands::EDITOR_FORMAT_AND_SAVE)

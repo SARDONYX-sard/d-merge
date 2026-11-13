@@ -712,24 +712,24 @@ mod work_tests {
         let mut tool = PatchTool { pane, ..PatchTool::default() };
         let current = |tool: &PatchTool| tool.pane.preview_view.as_ref().map(|view| view.current);
 
-        tool.step_change(true);
+        tool.pane.step_change(true);
         assert!(matches!(tool.pane.focus, Some(FocusAt::Line(1))));
         tool.pane.cursor_line = 1;
-        tool.step_change(true);
+        tool.pane.step_change(true);
         assert!(matches!(tool.pane.focus, Some(FocusAt::Line(3))));
         tool.pane.cursor_line = 3;
-        tool.step_change(false);
+        tool.pane.step_change(false);
         assert!(matches!(tool.pane.focus, Some(FocusAt::Line(1))));
         assert_eq!(current(&tool), Some(0), "the preview stays");
 
         tool.pane.focus = None;
         tool.pane.show_inline_diff = false;
-        tool.step_change(true);
+        tool.pane.step_change(true);
         assert_eq!(current(&tool), Some(1));
         assert!(tool.pane.focus.is_none(), "the cursor stays");
 
         tool.pane.show_preview = false;
-        tool.step_change(true);
+        tool.pane.step_change(true);
         assert_eq!(current(&tool), Some(1), "neither shows");
     }
 
