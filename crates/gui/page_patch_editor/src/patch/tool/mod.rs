@@ -7,5 +7,6 @@ pub(super) mod list;
 pub(super) mod pane;
 pub(super) mod place;
 pub(super) mod rename;
+mod session;
 mod tab_events;
 mod work;

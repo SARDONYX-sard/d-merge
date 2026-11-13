@@ -1,9 +1,6 @@
 //! Opening, saving and exporting a work.
 
-use std::{
-    path::{Path, PathBuf},
-    rc::Rc,
-};
+use std::path::{Path, PathBuf};
 
 use egui_widgets::notify::Notification;
 use gui_shared::{
@@ -17,7 +14,7 @@ use crate::patch::{
     FocusAt, PatchTool, editor, remember_recent,
     ui::code_choice::ModCodeChoice,
     user_patch, workspace,
-    workspace::{Behavior, Session, SessionTab, Workspace},
+    workspace::{Behavior, Workspace},
 };
 
 impl PatchTool {
@@ -172,7 +169,8 @@ impl PatchTool {
         if !self.autosave.take() {
             return;
         }
-        self.workspace.session = self.current_session();
+        let open = (self.active, self.selected.as_deref());
+        self.workspace.session = super::session::of(&self.workspace.behaviors, &self.tabs, open, &self.place);
         // It has no `Export`: what is edited is what the next merge gets.
         if self.is_user_patch {
             match self.workspace.export(Path::new(&self.place.output), &code, self.parser_mode) {
@@ -194,46 +192,19 @@ impl PatchTool {
         remember_recent(&mut self.recent, RecentWork { output: self.place.output.trim().to_owned(), mod_code: code });
     }
 
-    /// What is open now, to write with the work.
-    fn current_session(&self) -> Session {
-        let behaviors = &self.workspace.behaviors;
-        let name_of = |at: usize| behaviors.get(at).map_or_else(String::new, |behavior| behavior.name.clone());
-        Session {
-            mod_dir: self.place.mod_dir.clone(),
-            output: self.place.output.clone(),
-            active: name_of(self.active),
-            selected: self.selected.as_deref().map(str::to_owned),
-            tabs: self
-                .tabs
-                .all()
-                .map(|tab| SessionTab { behavior: name_of(tab.group), id: tab.id.clone(), pinned: tab.pinned })
-                .collect(),
-        }
-    }
-
-    /// Back to what the work just loaded had open. What no longer exists is left out.
+    /// Back to what the work just loaded had open. See [`super::session::restore`].
     pub(super) fn restore_session(&mut self) {
         let session = std::mem::take(&mut self.workspace.session);
-        let behaviors = &self.workspace.behaviors;
-        let at_of = |name: &str| behaviors.iter().position(|behavior| behavior.name == name);
-        for tab in &session.tabs {
-            if let Some(at) = at_of(&tab.behavior)
-                && behaviors[at].text(&tab.id).is_some()
-            {
-                self.tabs.restore(at, &tab.id, tab.pinned);
-            }
-        }
-        self.active = at_of(&session.active).unwrap_or(0);
-        self.selected = session
-            .selected
-            .filter(|id| behaviors.get(self.active).is_some_and(|b| b.text(id).is_some()))
-            .map(Rc::from);
-        if !session.mod_dir.is_empty() {
-            self.place.mod_dir = session.mod_dir;
+        let restored = super::session::restore(session, &self.workspace.behaviors, &mut self.tabs);
+
+        self.active = restored.active;
+        self.selected = restored.selected;
+        if !restored.mod_dir.is_empty() {
+            self.place.mod_dir = restored.mod_dir;
         }
         // The user patch's is decided by the patch page's.
-        if !session.output.is_empty() && !self.is_user_patch {
-            self.place.output = session.output;
+        if !restored.output.is_empty() && !self.is_user_patch {
+            self.place.output = restored.output;
         }
         self.autosave.seen_at(self.active, self.selected.as_ref());
     }
