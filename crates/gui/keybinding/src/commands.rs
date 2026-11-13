@@ -28,6 +28,8 @@ pub const EXPLORER_TOGGLE_VIEW: &str = "explorer.toggleView";
 pub const EXPLORER_TOGGLE_CHANGED_ONLY: &str = "explorer.toggleChangedOnly";
 pub const EXPLORER_TOGGLE_UNLINKED_ONLY: &str = "explorer.toggleUnlinkedOnly";
 pub const EDITOR_SAVE: &str = "editor.save";
+pub const FILE_COPY_PATH: &str = "file.copyPath";
+pub const FILE_REVEAL: &str = "file.reveal";
 
 /// The editor of the Normal keymap has the keyboard. (Vim has `Ctrl+W` / `Ctrl+S` of its own.)
 const NORMAL_EDITOR: Option<&str> = Some("editorFocus && !vim");
@@ -65,6 +67,16 @@ pub const COMMANDS: &[Command] = &[
         defaults: &[("u", EXPLORER)],
     },
     Command { id: EDITOR_SAVE, description: "Save", defaults: &[("ctrl+s", None)] },
+    Command {
+        id: FILE_COPY_PATH,
+        description: "Copy the path of the selected object's file (VS Code's Copy Path)",
+        defaults: &[("shift+alt+c", Some("!inputFocus"))],
+    },
+    Command {
+        id: FILE_REVEAL,
+        description: "Show the selected object's file in the file manager (VS Code's Reveal in File Explorer)",
+        defaults: &[("shift+alt+r", Some("!inputFocus"))],
+    },
 ];
 
 /// The command of `id`, if there is one.

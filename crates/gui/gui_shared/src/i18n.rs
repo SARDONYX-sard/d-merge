@@ -1021,9 +1021,6 @@ pub enum I18nKey {
     /// Open work data
     NemesisOpenCacheDir,
 
-    /// Open folder
-    NemesisOpenFolder,
-
     /// Open a mod…
     NemesisOpenMod,
 
@@ -1208,6 +1205,9 @@ pub enum I18nKey {
     /// Updating Mod list…
     NotifyInfoUpdatingModList,
 
+    /// Open Containing Folder
+    OpenContainingFolder,
+
     /// Open selected path.
     OpenSelectedPathHover,
 
@@ -1341,6 +1341,12 @@ pub enum I18nKey {
 
     /// Values (the first line names the columns; tabs or commas between them)
     RepeatValues,
+
+    /// Reveal in File Explorer
+    RevealInFileExplorer,
+
+    /// Reveal in Finder
+    RevealInFinder,
 
     /// Revert
     RevertButton,

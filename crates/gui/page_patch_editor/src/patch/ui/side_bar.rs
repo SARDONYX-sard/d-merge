@@ -71,6 +71,7 @@ impl PatchTool {
         notify: &mut egui_widgets::notify::Notification,
     ) {
         self.side_bar_keys();
+        self.file_keys(ui.ctx(), notify);
         let id = if self.is_user_patch { "user_patch" } else { "nemesis" };
         egui::Panel::left((id, "activity_bar"))
             .resizable(false)

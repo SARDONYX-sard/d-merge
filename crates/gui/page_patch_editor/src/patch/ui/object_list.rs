@@ -357,16 +357,8 @@ impl PatchTool {
             RowAction::Repeat => self.open_repeat(id),
             RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
             RowAction::RevertOrDelete => self.revert_or_delete(id),
-            RowAction::CopyPath => {
-                let path = self.object_file(id);
-                ui.ctx().copy_text(path.display().to_string());
-            }
-            RowAction::OpenFolder => {
-                // The file selected in its folder; what exists of the folder if it isn't written yet.
-                if let Err(err) = gui_shared::fs::reveal_file(&self.object_file(id)) {
-                    notify.error(err);
-                }
-            }
+            RowAction::CopyPath => self.copy_object_path(ui.ctx(), id),
+            RowAction::Reveal => self.reveal_object(id, notify),
         }
     }
 
@@ -493,12 +485,21 @@ pub(super) enum RowAction {
     CopyId,
     /// The path of the file the object is in: see [`PatchTool::object_file`].
     CopyPath,
-    /// Its folder in the file manager.
-    OpenFolder,
+    /// The file selected in the file manager: see [`PatchTool::reveal_object`].
+    Reveal,
     RevertOrDelete,
 }
 
-/// `Keep Open / New / Duplicate / Repeat / Copy id / Copy path / Open folder / Revert (or Delete for a new object)`, for the flat list and
+/// The name VS Code gives "show the file in the file manager" on this OS.
+const REVEAL_LABEL: I18nKey = if cfg!(windows) {
+    I18nKey::RevealInFileExplorer
+} else if cfg!(target_os = "macos") {
+    I18nKey::RevealInFinder
+} else {
+    I18nKey::OpenContainingFolder
+};
+
+/// `Keep Open / New / Duplicate / Repeat / Copy id / Copy path / Reveal in File Explorer / Revert (or Delete for a new object)`, for the flat list and
 /// the tree alike.
 pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> Option<RowAction> {
     let keep_open = ui.button(i18n.t(I18nKey::NemesisKeepOpen)).clicked();
@@ -509,7 +510,7 @@ pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed:
     let copy = ui.button(i18n.t(I18nKey::NemesisCopyId)).clicked();
     let hover = i18n.t(I18nKey::NemesisObjectFileHover);
     let copy_path = ui.button(i18n.t(I18nKey::NemesisCopyPath)).on_hover_text(hover).clicked();
-    let open_folder = ui.button(i18n.t(I18nKey::NemesisOpenFolder)).on_hover_text(hover).clicked();
+    let reveal = ui.button(i18n.t(REVEAL_LABEL)).on_hover_text(hover).clicked();
     let revert = changed && {
         ui.separator();
         let label = if is_new { I18nKey::NemesisDeleteObject } else { I18nKey::RevertButton };
@@ -522,7 +523,7 @@ pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed:
         (repeat, RowAction::Repeat),
         (copy, RowAction::CopyId),
         (copy_path, RowAction::CopyPath),
-        (open_folder, RowAction::OpenFolder),
+        (reveal, RowAction::Reveal),
         (revert, RowAction::RevertOrDelete),
     ]
     .into_iter()

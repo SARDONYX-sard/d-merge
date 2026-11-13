@@ -68,49 +68,101 @@ pub fn open_dir_of(path: &str) -> Result<(), String> {
     open_existing_dir_or_ancestor(path)
 }
 
-/// Shows `file` selected in the file manager, as VS Code's "Reveal in File Explorer". A file that
-/// doesn't exist (e.g. a patch not written yet) opens what exists of its folder instead.
+// NOTE: ref open-5.4 crate src/window.rs
+// SPDX-FileCopyrightText: (C) 2015 Sebastian Thiel
+// SPDX-License-Identifier: MIT
+/// Shows `file` selected in the file manager, as VS Code's "Reveal in File Explorer".
 ///
-/// The `open` crate only opens a path with its default program: selecting needs the file manager
-/// itself.
+/// As Electron's `shell.showItemInFolder`, which VS Code uses. A file that doesn't exist (e.g. a
+/// patch not written yet) opens what exists of its folder instead, as does a file manager that
+/// can't select.
+///
+/// The `open` crate only opens a path with its default program: selecting asks the shell itself.
 ///
 /// | OS      | how                                                                          |
 /// | ------- | ---------------------------------------------------------------------------- |
-/// | Windows | `explorer /select,"D:\mods\My\#0106.txt"`                                 |
+/// | Windows | `SHOpenFolderAndSelectItems`: an Explorer window of the folder is reused     |
 /// | macOS   | `open -R <file>`                                                             |
-/// | Linux   | D-Bus `org.freedesktop.FileManager1.ShowItems`; else the folder is opened   |
+/// | Linux   | D-Bus `org.freedesktop.FileManager1.ShowItems`                               |
+///
+/// It runs on a thread of its own: the shell may take a moment, and the UI does not wait for it.
 ///
 /// # Errors
-/// Neither the file manager nor the folder could be opened.
+/// The folder could not be opened, or the thread not started.
 pub fn reveal_file(file: &Path) -> Result<(), String> {
     if !file.is_file() {
         return open_existing_dir_or_ancestor(file.parent().unwrap_or(file));
     }
-    // Not `canonicalize`: on Windows it gives `\\?\D:\...`, which Explorer doesn't take.
+    // Not `canonicalize`: on Windows it gives `\\?\D:\...`, which the shell doesn't take.
     let file = std::path::absolute(file).map_err(|e| format!("{}: {e}", file.display()))?;
-    match reveal_selected(&file) {
-        Ok(()) => Ok(()),
-        Err(_) => open_existing_dir_or_ancestor(file.parent().unwrap_or(&file)),
-    }
+    std::thread::Builder::new()
+        .name("reveal_file".to_owned())
+        .spawn(move || {
+            if reveal_selected(&file).is_err() {
+                let _ = open_existing_dir_or_ancestor(file.parent().unwrap_or(&file));
+            }
+        })
+        .map(drop)
+        .map_err(|e| format!("reveal_file: {e}"))
 }
 
 #[cfg(windows)]
 fn reveal_selected(file: &Path) -> std::io::Result<()> {
-    use std::os::windows::process::CommandExt as _;
-    // Explorer reads `/select,` and the quoted path itself: Rust's quoting of a whole argument
-    // (`"/select,D:\a b"`) is not what it takes. It wants `\`, not `/`.
-    let path = file.to_string_lossy().replace('/', "\\");
-    std::process::Command::new("explorer").raw_arg(format!("/select,\"{path}\"")).spawn().map(drop)
+    use std::os::windows::ffi::OsStrExt as _;
+
+    /// `COINIT_APARTMENTTHREADED`: the shell's objects want a single-threaded apartment.
+    const COINIT_APARTMENTTHREADED: u32 = 0x2;
+
+    #[link(name = "shell32")]
+    unsafe extern "system" {
+        fn ILCreateFromPathW(path: *const u16) -> *mut core::ffi::c_void;
+        fn ILFree(pidl: *mut core::ffi::c_void);
+        fn SHOpenFolderAndSelectItems(
+            folder: *const core::ffi::c_void,
+            count: u32,
+            items: *const *const core::ffi::c_void,
+            flags: u32,
+        ) -> i32;
+    }
+    #[link(name = "ole32")]
+    unsafe extern "system" {
+        fn CoInitializeEx(reserved: *const core::ffi::c_void, flags: u32) -> i32;
+        fn CoUninitialize();
+    }
+
+    // The shell wants `\`. e.g. `D:/mods/My/#0106.txt` -> `D:\mods\My\#0106.txt`
+    let path = file.as_os_str().encode_wide().map(|c| if c == u16::from(b'/') { u16::from(b'\\') } else { c });
+    let path: Vec<u16> = path.chain(std::iter::once(0)).collect();
+    // SAFETY: `path` is a NUL-terminated wide string that outlives the calls; the item list made
+    // from it is freed once, after its use. COM is set up for this thread only, and undone when
+    // it was set up here (`S_OK` / `S_FALSE`, not `RPC_E_CHANGED_MODE`).
+    unsafe {
+        let initialized = CoInitializeEx(std::ptr::null(), COINIT_APARTMENTTHREADED) >= 0;
+        let item = ILCreateFromPathW(path.as_ptr());
+        let result = if item.is_null() {
+            Err(std::io::Error::last_os_error())
+        } else {
+            // No items: `item` itself is the one to select, in its folder (as Chromium does).
+            let hresult = SHOpenFolderAndSelectItems(item, 0, std::ptr::null(), 0);
+            ILFree(item);
+            if hresult >= 0 { Ok(()) } else { Err(std::io::Error::from_raw_os_error(hresult)) }
+        };
+        if initialized {
+            CoUninitialize();
+        }
+        result
+    }
 }
 
 #[cfg(target_os = "macos")]
 fn reveal_selected(file: &Path) -> std::io::Result<()> {
-    std::process::Command::new("open").arg("-R").arg(file).spawn().map(drop)
+    let status = std::process::Command::new("open").arg("-R").arg(file).status()?;
+    if status.success() { Ok(()) } else { Err(std::io::Error::other("Finder did not take it")) }
 }
 
 #[cfg(all(unix, not(target_os = "macos")))]
 fn reveal_selected(file: &Path) -> std::io::Result<()> {
-    let uri = format!("array:string:file://{}", file.display());
+    let uri = format!("array:string:{}", file_uri(file));
     let status = std::process::Command::new("dbus-send")
         .args(["--session", "--print-reply", "--dest=org.freedesktop.FileManager1", "--type=method_call"])
         .args(["/org/freedesktop/FileManager1", "org.freedesktop.FileManager1.ShowItems"])
@@ -118,6 +170,25 @@ fn reveal_selected(file: &Path) -> std::io::Result<()> {
         .arg("string:")
         .status()?;
     if status.success() { Ok(()) } else { Err(std::io::Error::other("no file manager took it")) }
+}
+
+/// `file://` and the path, its bytes other than the safe ones percent-encoded.
+///
+/// e.g. `/home/a/My Mod/#0106.txt` -> `file:///home/a/My%20Mod/%230106.txt`
+#[cfg(any(test, all(unix, not(target_os = "macos"))))]
+fn file_uri(file: &Path) -> String {
+    use std::fmt::Write as _;
+    let path = file.to_string_lossy();
+    let mut uri = String::with_capacity(path.len() + 16);
+    uri.push_str("file://");
+    for byte in path.bytes() {
+        if byte.is_ascii_alphanumeric() || b"/-._~".contains(&byte) {
+            uri.push(char::from(byte));
+        } else {
+            let _ = write!(uri, "%{byte:02X}");
+        }
+    }
+    uri
 }
 
 /// The folder dialog, starting from `current` or else what exists of it. `None`: cancelled.
@@ -129,4 +200,14 @@ pub fn pick_folder_from(current: &str) -> Option<std::path::PathBuf> {
         Err(_) => dialog,
     };
     dialog.pick_folder()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_file_uri_is_percent_encoded() {
+        assert_eq!(file_uri(Path::new("/home/a/My Mod/#0106.txt")), "file:///home/a/My%20Mod/%230106.txt");
+    }
 }

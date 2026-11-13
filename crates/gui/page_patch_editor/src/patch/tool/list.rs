@@ -178,6 +178,32 @@ impl PatchTool {
         }
     }
 
+    /// VS Code's "Copy Path": the path of the file object `id` is in, see [`Self::object_file`].
+    pub(in crate::patch) fn copy_object_path(&self, ctx: &egui::Context, id: &str) {
+        ctx.copy_text(self.object_file(id).display().to_string());
+    }
+
+    /// VS Code's "Reveal in File Explorer": the file object `id` is in, selected in its folder; what
+    /// exists of the folder if it isn't written yet.
+    pub(in crate::patch) fn reveal_object(&self, id: &str, notify: &mut egui_widgets::notify::Notification) {
+        if let Err(err) = gui_shared::fs::reveal_file(&self.object_file(id)) {
+            notify.error(err);
+        }
+    }
+
+    /// `Shift+Alt+C` / `Shift+Alt+R` (key bindings), as VS Code: of the selected object.
+    pub(in crate::patch) fn file_keys(&mut self, ctx: &egui::Context, notify: &mut egui_widgets::notify::Notification) {
+        use keybinding::commands::{FILE_COPY_PATH, FILE_REVEAL};
+        let (copy, reveal) = (self.key_command(FILE_COPY_PATH), self.key_command(FILE_REVEAL));
+        let Some(id) = self.selected.clone() else { return };
+        if copy {
+            self.copy_object_path(ctx, &id);
+        }
+        if reveal {
+            self.reveal_object(&id, notify);
+        }
+    }
+
     /// `Ctrl+Shift+L`, as VS Code's `Ctrl+Shift+M`: the Problems panel shows and gets the keyboard;
     /// if it has it, it hides and the editor gets it back. See [`egui_code_editor::problems`].
     pub(in crate::patch) fn toggle_problems_focus(&mut self, ui: &egui::Ui, editor: egui::Id) {
