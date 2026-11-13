@@ -36,7 +36,20 @@ pub(in crate::patch) struct RevisionView {
     pub(in crate::patch) id: String,
     /// What its tab says. e.g. `GetUpModList (#2) ↔ GetUpModList (working)`
     pub(in crate::patch) title: String,
-    body: Body,
+    /// `false`: the preview tab of the views, which the next one opened replaces (italic), as an
+    /// object's. A double click on it keeps it.
+    pub(in crate::patch) pinned: bool,
+    body: Box<Compare>,
+}
+
+/// A tab of a view, for the tab bar. e.g. `{ at: 0, title: "Blame Root", shown: true, pinned: false }`
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(in crate::patch) struct ViewTab<'a> {
+    /// Its index in [`Views::list`].
+    pub(in crate::patch) at: usize,
+    pub(in crate::patch) title: &'a str,
+    pub(in crate::patch) shown: bool,
+    pub(in crate::patch) pinned: bool,
 }
 
 /// The views open, as tabs after the objects'.
@@ -48,10 +61,27 @@ pub(in crate::patch) struct Views {
 }
 
 impl Views {
-    /// `(title, shown)` of the tabs of `behavior`, in order, with their indices in [`Self::list`].
-    pub(in crate::patch) fn tabs_of(&self, behavior: usize) -> Vec<(usize, &str, bool)> {
+    /// The tabs of `behavior`, in order: see [`ViewTab`].
+    pub(in crate::patch) fn tabs_of(&self, behavior: usize) -> Vec<ViewTab<'_>> {
         let of = self.list.iter().enumerate().filter(|(_, view)| view.behavior == behavior);
-        of.map(|(at, view)| (at, view.title.as_str(), self.shown == Some(at))).collect()
+        of.map(|(at, view)| ViewTab { at, title: &view.title, shown: self.shown == Some(at), pinned: view.pinned })
+            .collect()
+    }
+
+    /// Opens `view` in a tab: the one of the same title if open, else the preview tab of its behavior
+    /// (replaced), else a new one. Returns its index.
+    fn open(&mut self, view: RevisionView) -> usize {
+        let same = |known: &RevisionView| known.behavior == view.behavior && known.title == view.title;
+        if let Some(at) = self.list.iter().position(same) {
+            return at;
+        }
+        let preview = self.list.iter().position(|known| known.behavior == view.behavior && !known.pinned);
+        if let Some(at) = preview {
+            self.list[at] = view;
+            return at;
+        }
+        self.list.push(view);
+        self.list.len() - 1
     }
 
     /// Closes view `at`; the one shown stays the one shown.
@@ -68,18 +98,15 @@ impl Views {
     }
 }
 
-#[derive(Debug)]
-enum Body {
-    Compare(Box<Compare>),
-    /// Each line with what last changed it.
-    Blame(Vec<(String, String)>),
-}
-
-/// The newer text, read only, with the changes from the older one in it.
+/// What a view shows, in the code editor read only: a diff's newer text with the changes from the
+/// older one in it, or a blame's text with the revision of each line beside it, as GitLens'.
 #[derive(Debug)]
 struct Compare {
     text: String,
+    /// A diff's changes; none for a blame.
     diff: InlineDiff,
+    /// A blame's note of each line, e.g. `3 days ago  #2 fix the speed`; none for a diff.
+    notes: Vec<String>,
     state: CodeEditorState,
     /// Where the cursor is: `▲ ▼` go from there.
     cursor_line: usize,
@@ -109,8 +136,15 @@ impl PatchTool {
         let name = self.object_name(behavior, id);
         let title = format!("{name} (#{from}) ↔ {name} ({to_name})");
         let diff = inline_diff::changes(&old, &new);
-        let compare = Compare { text: new, diff, state: CodeEditorState::default(), cursor_line: 0, to_first: true };
-        self.show_in_editor(behavior, id, title, Body::Compare(Box::new(compare)));
+        let compare = Compare {
+            text: new,
+            diff,
+            notes: Vec::new(),
+            state: CodeEditorState::default(),
+            cursor_line: 0,
+            to_first: true,
+        };
+        self.show_in_editor(behavior, id, title, Box::new(compare));
     }
 
     /// The object's name as its tab says it. e.g. `GetUpModList`; its id if it has none.
@@ -124,19 +158,14 @@ impl PatchTool {
     }
 
     /// Opens a tab of object `id` with `body`, or shows the one open with that title.
-    fn show_in_editor(&mut self, behavior: usize, id: &str, title: String, body: Body) {
+    fn show_in_editor(&mut self, behavior: usize, id: &str, title: String, body: Box<Compare>) {
         if behavior != self.active {
             self.active = behavior;
             self.tabs.clear();
         }
         self.selected = Some(id.into());
-        let views = &mut self.views;
-        let open = views.list.iter().position(|view| view.behavior == behavior && view.title == title);
-        let at = open.unwrap_or_else(|| {
-            views.list.push(RevisionView { behavior, id: id.to_owned(), title, body });
-            views.list.len() - 1
-        });
-        views.shown = Some(at);
+        let at = self.views.open(RevisionView { behavior, id: id.to_owned(), title, pinned: false, body });
+        self.views.shown = Some(at);
     }
 
     /// Opens the blame of object `id` of behavior `behavior`, as the work has it now.
@@ -147,17 +176,27 @@ impl PatchTool {
         let template = of.template_object(id).map(|object| object.text.as_str());
         let history = &self.workspace.history;
         let origins = history.blame(&key, template, now);
+        let at = crate::patch::workspace::history::now();
         let label = |origin: Origin| match origin {
             Origin::Template => "template".to_owned(),
-            Origin::Working => "working".to_owned(),
-            Origin::Revision(number) => {
-                let message = history.revision(number).map_or("", |revision| revision.message.as_str());
-                format!("#{number} {message}")
-            }
+            Origin::Working => "working (not committed)".to_owned(),
+            Origin::Revision(number) => history.revision(number).map_or_else(
+                || format!("#{number}"),
+                |revision| format!("{}  #{number} {}", ago(at, revision.time), revision.message),
+            ),
         };
-        let lines = now.lines().zip(origins).map(|(line, origin)| (label(origin), line.to_owned())).collect();
+        let notes = origins.into_iter().map(label).collect();
+        let text = now.to_owned();
         let title = format!("Blame {}", self.object_name(behavior, id));
-        self.show_in_editor(behavior, id, title, Body::Blame(lines));
+        let blame = Compare {
+            text,
+            diff: InlineDiff::default(),
+            notes,
+            state: CodeEditorState::default(),
+            cursor_line: 0,
+            to_first: false,
+        };
+        self.show_in_editor(behavior, id, title, Box::new(blame));
     }
 
     /// Draws the view shown, with the tabs, in the editor's place. Returns whether one is shown.
@@ -172,15 +211,14 @@ impl PatchTool {
         let keymap = if self.pane.mode == EditorMode::Vim { Keymap::Vim } else { Keymap::Normal };
         let names = self.names();
         let mut tab_event = None;
-        let mut close = false;
+        let mut command = None;
         egui::CentralPanel::default().show(ui, |ui| {
             let mut go_to = None;
             let view_tabs = self.views.tabs_of(self.active);
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if let Body::Compare(compare) = &self.views.list[at].body {
-                        go_to = super::object_editor::inline_diff_nav(ui, i18n, &compare.diff, compare.cursor_line);
-                    }
+                    let compare = &self.views.list[at].body;
+                    go_to = super::object_editor::inline_diff_nav(ui, i18n, &compare.diff, compare.cursor_line);
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         let marks = super::object_editor::TabMarks { focused: true, problems: None };
                         let current = (self.active, "");
@@ -198,20 +236,18 @@ impl PatchTool {
             });
             let view = &mut self.views.list[at];
             let id = view.id.clone();
-            match &mut view.body {
-                Body::Compare(compare) => close |= compare_ui(ui, i18n, &id, compare, (keymap, go_to)),
-                Body::Blame(lines) => {
-                    egui::ScrollArea::both().id_salt(("nemesis_revision_view", &id)).auto_shrink(false).show(
-                        ui,
-                        |ui| {
-                            blame_lines(ui, lines);
-                        },
-                    );
-                }
-            }
+            command = compare_ui(ui, i18n, &id, &mut view.body, (keymap, go_to));
         });
+        // The keys of the tabs as on an object's: the tab bar's bindings, Vim's `gt` / `Space c`.
+        let close = self.key_command(keybinding::commands::TABS_CLOSE) || command == Some(EditorCommand::CloseTab);
+        let next = self.key_command(keybinding::commands::TABS_NEXT) || command == Some(EditorCommand::NextTab);
+        let previous =
+            self.key_command(keybinding::commands::TABS_PREVIOUS) || command == Some(EditorCommand::PreviousTab);
         if close {
             self.views.close(at);
+        } else if next || previous {
+            let current = self.selected.as_deref().unwrap_or_default().to_owned();
+            self.step_tab(&current, next);
         }
         if tab_event.is_some() {
             let current = self.selected.as_deref().unwrap_or_default().to_owned();
@@ -222,20 +258,25 @@ impl PatchTool {
 }
 
 /// What the read only editor of a diff hosts: its changes, and closing it.
-const COMPARE_COMMANDS: [EditorCommand; 3] =
-    [EditorCommand::NextChange, EditorCommand::PreviousChange, EditorCommand::CloseTab];
+const COMPARE_COMMANDS: [EditorCommand; 5] = [
+    EditorCommand::NextChange,
+    EditorCommand::PreviousChange,
+    EditorCommand::CloseTab,
+    EditorCommand::NextTab,
+    EditorCommand::PreviousTab,
+];
 
 /// The diff as the code editor: see the module docs. `go_to`: a line `▲ ▼` asked for. Returns
-/// whether it is to be closed (Vim's `Space c`, `:q`).
+/// what its editor asked of the tabs (Vim's `Space c`, `:q`, `gt`), if anything.
 fn compare_ui(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
     id: &str,
     compare: &mut Compare,
     (keymap, go_to): (Keymap, Option<usize>),
-) -> bool {
+) -> Option<EditorCommand> {
     let editor_id = egui_code_editor::editor_id(("nemesis_revision_view", id));
-    if compare.diff.hunks.is_empty() {
+    if compare.diff.hunks.is_empty() && compare.notes.is_empty() {
         ui.weak(i18n.t(I18nKey::NemesisNoChange));
     }
     egui::Panel::bottom(("nemesis_revision_status", id)).show(ui, |ui| {
@@ -250,6 +291,7 @@ fn compare_ui(
                 .read_only(true)
                 .keymap(keymap)
                 .inline_diff(Some(&compare.diff))
+                .line_annotations(&compare.notes)
                 .host_commands(&COMPARE_COMMANDS)
                 .show(ui, &mut compare.state)
         })
@@ -270,43 +312,89 @@ fn compare_ui(
         egui_code_editor::set_cursor(ui.ctx(), editor_id, at);
         ui.memory_mut(|m| m.request_focus(editor_id));
     }
-    command == Some(EditorCommand::CloseTab)
+    command
 }
 
-/// `#2 fix speed   <hkparam ...>`: the revision in a column of its own, as GitLens' blame.
-fn blame_lines(ui: &mut egui::Ui, lines: &[(String, String)]) {
-    egui::Grid::new("nemesis_blame").striped(true).show(ui, |ui| {
-        let mut last = "";
-        for (origin, line) in lines {
-            // Only where it changes: a run of lines of one revision reads as a block.
-            let shown = if origin == last { String::new() } else { origin.clone() };
-            ui.label(egui::RichText::new(shown).small().weak());
-            ui.label(egui::RichText::new(line).monospace());
-            ui.end_row();
-            last = origin;
-        }
-    });
+/// How long ago `time` was at `now` (seconds since the Unix epoch), as GitLens says it.
+///
+/// e.g. 90 s -> `1 minute ago`, 3 days -> `3 days ago`
+fn ago(now: u64, time: u64) -> String {
+    const STEPS: [(u64, &str); 6] =
+        [(60, "minute"), (3600, "hour"), (86_400, "day"), (2_592_000, "month"), (31_536_000, "year"), (u64::MAX, "")];
+    let seconds = now.saturating_sub(time);
+    if seconds < 60 {
+        return "just now".to_owned();
+    }
+    let (unit, name) = STEPS.windows(2).find(|pair| seconds < pair[1].0).map_or(STEPS[4], |pair| pair[0]);
+    let count = seconds / unit;
+    format!("{count} {name}{} ago", if count == 1 { "" } else { "s" })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// Closing a tab keeps the one shown, wherever it moved.
-    #[test]
-    fn a_view_closed_keeps_the_one_shown() {
-        let view = |title: &str| RevisionView {
+    fn blank_view(title: &str) -> RevisionView {
+        RevisionView {
             behavior: 0,
             id: "#1".to_owned(),
             title: title.to_owned(),
-            body: Body::Blame(Vec::new()),
-        };
+            pinned: true,
+            body: Box::new(Compare {
+                text: String::new(),
+                diff: InlineDiff::default(),
+                notes: Vec::new(),
+                state: CodeEditorState::default(),
+                cursor_line: 0,
+                to_first: false,
+            }),
+        }
+    }
+
+    #[test]
+    fn how_long_ago_as_gitlens_says_it() {
+        assert_eq!(ago(100, 90), "just now");
+        assert_eq!(ago(200, 100), "1 minute ago");
+        assert_eq!(ago(3 * 86_400 + 5, 5), "3 days ago");
+        assert_eq!(ago(2 * 2_592_000, 0), "2 months ago");
+        assert_eq!(ago(31_536_000, 0), "1 year ago");
+    }
+
+    /// The tabs go around the objects' then the views', within the behavior, as the keys go.
+    #[test]
+    fn the_next_tab_goes_through_the_views_too() {
+        let mut tool = PatchTool::default();
+        for id in ["#a", "#b"] {
+            tool.tabs.restore(0, id, true);
+        }
+        tool.tabs.restore(1, "#x", true);
+        let mut view = blank_view("Blame a");
+        view.id = "#a".to_owned();
+        tool.views.list.push(view);
+        tool.selected = Some("#b".into());
+
+        tool.step_tab("#b", true);
+        assert_eq!((tool.views.shown, tool.selected.as_deref()), (Some(0), Some("#a")), "the view after `#b`");
+        tool.step_tab("#a", true);
+        assert_eq!((tool.views.shown, tool.selected.as_deref()), (None, Some("#a")), "around the end");
+        tool.step_tab("#a", false);
+        assert_eq!(tool.views.shown, Some(0), "back around the start");
+    }
+
+    /// Closing a tab keeps the one shown, wherever it moved.
+    #[test]
+    fn a_view_closed_keeps_the_one_shown() {
+        let view = blank_view;
         let mut views = Views { list: vec![view("a"), view("b"), view("c")], shown: Some(2) };
         views.close(0);
         assert_eq!((views.list.len(), views.shown), (2, Some(1)));
         views.close(1);
         assert_eq!(views.shown, None, "the one shown closed");
-        assert_eq!(views.tabs_of(0), [(0, "b", false)]);
+        assert_eq!(views.tabs_of(0), [ViewTab { at: 0, title: "b", shown: false, pinned: true }]);
+        // A new view takes the place of the preview one, as an object's tab does.
+        views.list[0].pinned = false;
+        let at = views.open(view("d"));
+        assert_eq!((at, views.list.len(), views.list[0].title.as_str()), (0, 1, "d"));
     }
 
     /// The diff is the newer text with the older lines in it, as the editor's inline diff has them.

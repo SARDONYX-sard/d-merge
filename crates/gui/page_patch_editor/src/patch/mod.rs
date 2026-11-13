@@ -235,6 +235,8 @@ enum TabEvent {
     /// A tab of [`ui::revision_view::Views`]: shown, or closed.
     ShowView(usize),
     CloseView(usize),
+    /// A double click on a view's tab: it is kept.
+    KeepView(usize),
     /// The object's file: its path to the clipboard, or shown in the file manager.
     File(tool::list::FileAction, String),
 }

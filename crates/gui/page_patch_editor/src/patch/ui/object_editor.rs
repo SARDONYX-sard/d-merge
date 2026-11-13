@@ -633,8 +633,8 @@ impl TabMarks<'_> {
 /// A click shows a tab, a double click pins it, a middle click or `✖` closes it. `●`: the object is
 /// changed; italic: the preview tab; red / yellow: it has problems.
 ///
-/// `views`: the diffs / blames open (see [`super::revision_view::Views`]), as tabs after the objects':
-/// `(index, title, shown)`. With one shown, no object's tab is (`current` is `""`).
+/// `views`: the diffs / blames open (see [`super::revision_view::Views`]), as tabs after the objects'.
+/// With one shown, no object's tab is (`current` is `""`).
 pub(in crate::patch) fn tab_bar(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
@@ -642,7 +642,7 @@ pub(in crate::patch) fn tab_bar(
     (behavior, current): (usize, &str),
     graph: &Graph,
     marks: TabMarks<'_>,
-    views: &[(usize, &str, bool)],
+    views: &[super::revision_view::ViewTab<'_>],
 ) -> Option<TabEvent> {
     let mut event = None;
     egui::ScrollArea::horizontal().id_salt("nemesis_editor_tabs").show(ui, |ui| {
@@ -673,13 +673,18 @@ pub(in crate::patch) fn tab_bar(
                 response.context_menu(|ui| event = tab_menu(ui, i18n, &tab.id, tab.pinned).or_else(|| event.take()));
             }
             // The diffs and blames, read only: `GetUpModList (#2) ↔ GetUpModList (working) 🔒 ✖`.
-            for &(at, title, shown) in views {
-                let tab = egui_widgets::EditorTab::new(egui::RichText::new(title), shown)
+            for view in views {
+                let tab = egui_widgets::EditorTab::new(egui::RichText::new(view.title), view.shown)
                     .focused(marks.focused)
                     .read_only(true)
+                    .preview(!view.pinned)
                     .show(ui);
+                let at = view.at;
                 if tab.response.clicked() {
                     event = Some(TabEvent::ShowView(at));
+                }
+                if tab.response.double_clicked() {
+                    event = Some(TabEvent::KeepView(at));
                 }
                 if tab.close {
                     event = Some(TabEvent::CloseView(at));

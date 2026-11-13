@@ -66,11 +66,34 @@ pub(in crate::patch) struct EditorPane {
 }
 impl PatchTool {
     /// The next or previous tab, with the keyboard staying in the editor.
+    /// The next / previous tab, the views' after the objects', around the ends. `current`: the
+    /// object shown, if no view is.
     pub(in crate::patch) fn step_tab(&mut self, current: &str, forward: bool) {
-        if let Some(next) = self.tabs.neighbor(self.active, current, forward) {
-            self.selected = Some(next.into());
-            self.pane.focus = Some(FocusAt::Keep);
+        #[derive(Clone)]
+        enum Tab {
+            Object(String),
+            View(usize),
         }
+        let mut order: Vec<Tab> = self.tabs.of(self.active).map(|tab| Tab::Object(tab.id.clone())).collect();
+        order.extend(self.views.tabs_of(self.active).into_iter().map(|tab| Tab::View(tab.at)));
+        let here = order.iter().position(|tab| match (tab, self.views.shown) {
+            (Tab::View(at), Some(shown)) => *at == shown,
+            (Tab::Object(id), None) => id == current,
+            _ => false,
+        });
+        let (Some(here), len) = (here, order.len()) else { return };
+        let next = if forward { (here + 1) % len } else { (here + len - 1) % len };
+        match order[next].clone() {
+            Tab::Object(id) => {
+                self.views.shown = None;
+                self.selected = Some(id.into());
+            }
+            Tab::View(at) => {
+                self.selected = self.views.list.get(at).map(|view| view.id.as_str().into());
+                self.views.shown = Some(at);
+            }
+        }
+        self.pane.focus = Some(FocusAt::Keep);
     }
 
     /// Vim `Ctrl+O` / `Ctrl+I`: the previous / next visited object (skips deleted ones).
@@ -273,6 +296,11 @@ impl PatchTool {
                 }
             }
             Some(TabEvent::CloseView(at)) => self.views.close(at),
+            Some(TabEvent::KeepView(at)) => {
+                if let Some(view) = self.views.list.get_mut(at) {
+                    view.pinned = true;
+                }
+            }
             Some(TabEvent::KeepOpen(id)) => self.tabs.pin(active, &id),
             Some(TabEvent::CloseToTheRight(id)) => {
                 self.tabs.close_to_the_right(active, &id);

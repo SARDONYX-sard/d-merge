@@ -88,6 +88,7 @@ pub struct CodeEditor<'a> {
     host_commands: &'a [EditorCommand],
     requests: Option<&'a [EditorRequest]>,
     request_keys: Option<&'a [(EditorRequest, String)]>,
+    annotations: &'a [String],
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -116,7 +117,17 @@ impl<'a> CodeEditor<'a> {
             host_commands: &[],
             requests: None,
             request_keys: None,
+            annotations: &[],
         }
+    }
+
+    /// A note per line in a column left of the line numbers, as GitLens' blame: e.g.
+    /// `#2 fix the speed`. A run of lines with the same note shows it once, on its first line, with
+    /// a line above the run. Missing ones are none.
+    #[inline]
+    pub const fn line_annotations(mut self, annotations: &'a [String]) -> Self {
+        self.annotations = annotations;
+        self
     }
 
     /// The host's keys of the editor's commands, as its palette shows them (e.g.
@@ -240,6 +251,7 @@ impl<'a> CodeEditor<'a> {
             host_commands,
             requests,
             request_keys,
+            annotations,
         } = self;
         if read_only {
             // In a buffer that stays: this is every frame.
@@ -278,7 +290,10 @@ impl<'a> CodeEditor<'a> {
         let inserting = state.keymap.is_inserting(keymap);
 
         // Gutter for the line numbers on the left (drawn after the text is laid out, below).
-        let gutter = line_numbers.then(|| overlays::gutter_width(ui, text));
+        // The notes first, then the line numbers, in the one gutter.
+        let notes_width = overlays::annotations_width(ui, annotations);
+        let gutter = (line_numbers || notes_width > 0.0)
+            .then(|| notes_width + if line_numbers { overlays::gutter_width(ui, text) } else { 0.0 });
         let (gutter_left, output) = show_text(frame, ui, state, text, desired_rows, gutter);
         let response = &output.response.response;
         let placed = (&*output.galley, output.galley_pos);
@@ -307,9 +322,10 @@ impl<'a> CodeEditor<'a> {
             keymap,
             text,
             placed,
-            gutter.map(|width| gutter_left..gutter_left + width),
+            gutter.map(|width| gutter_left + notes_width..gutter_left + width),
             cursor,
         );
+        overlays::annotations(ui, placed, gutter_left..gutter_left + notes_width, annotations);
         if let Some(cursor) = anchor {
             scroll_to_cursor(ui, id, cursor, placed.0, input.keys.scroll);
         }
