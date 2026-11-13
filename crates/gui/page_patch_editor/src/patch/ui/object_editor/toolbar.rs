@@ -8,7 +8,10 @@
 use egui_widgets::shadcn::{Button, Icon};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use crate::patch::{FocusAt, PatchTool, TabEvent, tree::Graph, workspace::PANDORA_DOC};
+use crate::patch::{
+    FocusAt, TabEvent, editor::tabs::EditorTabs, problems::ObjectProblems, tool::editing::EditorPane, tree::Graph,
+    ui::revision_view::Views,
+};
 
 /// What the row asked for.
 #[derive(Debug, Default)]
@@ -18,62 +21,57 @@ pub(super) struct ToolbarOutput {
     pub(super) tab_event: Option<TabEvent>,
 }
 
-impl PatchTool {
-    /// Draws the row of object `id`. `editor_focused`: the shown tab's line takes the accent color.
-    pub(super) fn toolbar(
-        &mut self,
-        ui: &mut egui::Ui,
-        i18n: &I18nMap,
-        id: &str,
-        (graph, editor_focused): (&Graph, bool),
-    ) -> ToolbarOutput {
-        let mut output = ToolbarOutput::default();
-        ui.horizontal(|ui| {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                self.split_and_diff_buttons(ui, i18n, id);
+/// What the row is drawn with.
+pub(super) struct ToolbarInput<'a> {
+    pub(super) pane: &'a mut EditorPane,
+    pub(super) tabs: &'a EditorTabs,
+    pub(super) views: &'a Views,
+    /// The work's problems: the tabs are colored by them.
+    pub(super) problems: Option<&'a [ObjectProblems]>,
+    /// The active behavior, and the object shown (`id`).
+    pub(super) active: usize,
+    pub(super) id: &'a str,
+    pub(super) graph: &'a Graph,
+    /// The editor has the keyboard: the shown tab's line takes the accent color.
+    pub(super) focused: bool,
+    /// `▥` is shown: the object has a preview (not a new one, nor one of another mod).
+    pub(super) can_split: bool,
+}
 
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    output = self.history_and_tabs(ui, i18n, id, (graph, editor_focused));
-                });
+/// Draws the row of the object shown.
+pub(super) fn show(ui: &mut egui::Ui, i18n: &I18nMap, input: ToolbarInput<'_>) -> ToolbarOutput {
+    let ToolbarInput { pane, tabs, views, problems, active, id, graph, focused, can_split } = input;
+    let mut output = ToolbarOutput::default();
+    ui.horizontal(|ui| {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            split_and_diff_buttons(ui, i18n, pane, can_split);
+
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                let labels = (i18n.t(I18nKey::NemesisGoBack), i18n.t(I18nKey::NemesisGoForward));
+                output.walk_history = pane.history.buttons(ui, labels);
+
+                let marks = super::super::tab_bar::TabMarks { focused, problems };
+                let view_tabs = views.tabs_of(active);
+                output.tab_event =
+                    super::super::tab_bar::tab_bar(ui, i18n, tabs, (active, id), graph, marks, &view_tabs);
             });
         });
-        output
+    });
+    output
+}
+
+/// Right to left: `▥` (if `can_split`), `⇆`, and `▲ ▼ 2/5` while the inline diff is shown.
+fn split_and_diff_buttons(ui: &mut egui::Ui, i18n: &I18nMap, pane: &mut EditorPane, can_split: bool) {
+    if can_split {
+        let hover = i18n.t(preview_hover(pane.show_preview));
+        toggle(ui, &mut pane.show_preview, Icon::Columns2, hover);
     }
 
-    /// `← →` and the tabs: the objects', then the diffs' / blames'.
-    fn history_and_tabs(
-        &self,
-        ui: &mut egui::Ui,
-        i18n: &I18nMap,
-        id: &str,
-        (graph, focused): (&Graph, bool),
-    ) -> ToolbarOutput {
-        let labels = (i18n.t(I18nKey::NemesisGoBack), i18n.t(I18nKey::NemesisGoForward));
-        let walk_history = self.pane.history.buttons(ui, labels);
-
-        let marks = super::super::tab_bar::TabMarks { focused, problems: self.problems.list.as_deref() };
-        let views = self.views.tabs_of(self.active);
-        let tab_event = super::super::tab_bar::tab_bar(ui, i18n, &self.tabs, (self.active, id), graph, marks, &views);
-
-        ToolbarOutput { walk_history, tab_event }
-    }
-
-    /// Right to left: `▥` (not for a new object: it has no preview), `⇆`, and `▲ ▼ 2/5` while the
-    /// inline diff is shown.
-    fn split_and_diff_buttons(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, id: &str) {
-        let behavior = &self.workspace.behaviors[self.active];
-        let can_split = !behavior.added.contains_key(id) && !behavior.is_ref(id) && id != PANDORA_DOC;
-        if can_split {
-            let hover = i18n.t(preview_hover(self.pane.show_preview));
-            toggle(ui, &mut self.pane.show_preview, Icon::Columns2, hover);
-        }
-
-        toggle(ui, &mut self.pane.show_inline_diff, Icon::Diff, i18n.t(I18nKey::NemesisInlineDiffHover));
-        if self.pane.show_inline_diff {
-            let hover = i18n.t(I18nKey::NemesisJumpDiffHover);
-            if let Some(line) = self.pane.inline_diff.nav(ui, self.pane.cursor_line, hover) {
-                self.pane.focus = Some(FocusAt::Line(line));
-            }
+    toggle(ui, &mut pane.show_inline_diff, Icon::Diff, i18n.t(I18nKey::NemesisInlineDiffHover));
+    if pane.show_inline_diff {
+        let hover = i18n.t(I18nKey::NemesisJumpDiffHover);
+        if let Some(line) = pane.inline_diff.nav(ui, pane.cursor_line, hover) {
+            pane.focus = Some(FocusAt::Line(line));
         }
     }
 }

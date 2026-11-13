@@ -67,7 +67,19 @@ impl PatchTool {
         let mut toggle_problems = false;
         let mut problems = ProblemsOutput::default();
         egui::CentralPanel::default().show(ui, |ui| {
-            let toolbar = self.toolbar(ui, i18n, id, (&names.graph, editor_focused));
+            let behavior = &self.workspace.behaviors[self.active];
+            let input = super::toolbar::ToolbarInput {
+                pane: &mut self.pane,
+                tabs: &self.tabs,
+                views: &self.views,
+                problems: self.problems.list.as_deref(),
+                active: self.active,
+                id,
+                graph: &names.graph,
+                focused: editor_focused,
+                can_split: !behavior.added.contains_key(id) && !behavior.is_ref(id) && id != PANDORA_DOC,
+            };
+            let toolbar = super::toolbar::show(ui, i18n, input);
             (result.walk_history, result.tab_event) = (toolbar.walk_history, toolbar.tab_event);
 
             if self.workspace.behaviors[self.active].is_ref(id) {
