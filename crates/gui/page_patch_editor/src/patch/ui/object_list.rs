@@ -20,7 +20,7 @@ use super::{
 use crate::patch::{
     PatchTool,
     anim::data,
-    tool::list::{reveal_offset, take_reveal},
+    tool::list::{fixed_row, offset_to_show, row_height, take_reveal},
     tree::{Graph, Node, TreeState},
     workspace::PANDORA_DOC,
 };
@@ -184,17 +184,20 @@ impl PatchTool {
         let rows = anim_tree::rows(&files, &self.anim_tree.open, is_adsf, !self.explorer.filter.is_empty());
 
         let (mut toggled, mut menu_action) = (None, None);
-        let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
+        let row_height = row_height(ui);
         let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
         let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
         let at = selected
             .and_then(|node| rows.iter().position(|row| matches!(row, AnimRow::File { node: n, .. } if *n == node)));
-        if let Some(at) = at.filter(|_| reveal) {
-            scroll = scroll.vertical_scroll_offset(reveal_offset(at, row_height + ui.spacing().item_spacing.y));
+        let sizes = (row_height, ui.spacing().item_spacing.y);
+        if let Some(offset) =
+            at.filter(|_| reveal).and_then(|at| offset_to_show(at, sizes, rows.len(), self.explorer.list_scroll, 0))
+        {
+            scroll = scroll.vertical_scroll_offset(offset);
         }
-        scroll.show_rows(ui, row_height, rows.len(), |ui, range| {
+        let output = scroll.show_rows(ui, row_height, rows.len(), |ui, range| {
             for row in &rows[range] {
-                match row {
+                fixed_row(ui, row_height, |ui| match row {
                     AnimRow::Folder { name, files, changed, open } => {
                         let response = anim_group_row(ui, name, (*files, *changed, *open), 0);
                         if response.clicked() {
@@ -227,9 +230,10 @@ impl PatchTool {
                     AnimRow::File { node, name } => {
                         menu_action = self.anim_file_row(ui, i18n, graph, *node, name).or(menu_action);
                     }
-                }
+                });
             }
         });
+        self.explorer.list_scroll.note(&output);
         if let Some(key) = toggled {
             anim_tree::toggle(&mut self.anim_tree.open, &key);
         }
@@ -299,21 +303,24 @@ impl PatchTool {
         }
         let rows = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let mut menu_action = None;
-        let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 4.0;
+        let row_height = row_height(ui);
         let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
         let forced = std::mem::take(&mut self.explorer.reveal);
         if take_reveal(self.selected.as_ref(), forced) {
             let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
-            if let Some(at) = selected.and_then(|node| rows.iter().position(|&row| row == node)) {
-                scroll = scroll.vertical_scroll_offset(reveal_offset(at, row_height + ui.spacing().item_spacing.y));
-            }
+            self.explorer.list_scroll_to = selected.and_then(|node| rows.iter().position(|&row| row == node));
         }
-        scroll.show_rows(ui, row_height, rows.len(), |ui, range| {
+        let sizes = (row_height, ui.spacing().item_spacing.y);
+        let to = self.explorer.list_scroll_to.take();
+        if let Some(offset) = to.and_then(|at| offset_to_show(at, sizes, rows.len(), self.explorer.list_scroll, 0)) {
+            scroll = scroll.vertical_scroll_offset(offset);
+        }
+        let output = scroll.show_rows(ui, row_height, rows.len(), |ui, range| {
             for &node in &rows[range] {
                 let id = graph.id(node);
                 let text = super::tree::object_label(ui, graph, node, false);
                 let selected = self.selected.as_deref() == Some(id);
-                let response = ui.add(egui::Button::selectable(selected, text));
+                let response = fixed_row(ui, row_height, |ui| ui.add(egui::Button::selectable(selected, text)));
                 if response.clicked() {
                     self.selected = Some(id.into());
                 }
@@ -327,6 +334,7 @@ impl PatchTool {
                 });
             }
         });
+        self.explorer.list_scroll.note(&output);
         self.apply_row_action(ui, graph, menu_action);
     }
 

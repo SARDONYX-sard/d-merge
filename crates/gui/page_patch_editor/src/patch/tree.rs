@@ -36,7 +36,10 @@ use std::{
 
 use fast_hash::{HashMap, HashSet};
 
-use super::workspace::{Behavior, ObjectText};
+use super::{
+    tool::list::{ListScroll, offset_to_show},
+    workspace::{Behavior, ObjectText},
+};
 
 /// Index of an object in [`Graph`]. Stable for the life of the graph, also across edits.
 pub(super) type Node = u32;
@@ -462,6 +465,9 @@ pub(super) const fn has_guide(guides: u64, level: u16) -> bool {
     guides & guide_bit(level) != 0
 }
 
+/// How many ancestors are pinned over the tree at most. See [`TreeState::sticky_rows`].
+pub(super) const MAX_STICKY: usize = 5;
+
 /// A tree command, whichever key asked for it. The keys are in [`super::ui::tree::read_keys`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum TreeInput {
@@ -787,17 +793,12 @@ impl TreeState {
         (!visible.contains(&indent)).then_some((indent - MARGIN).max(0.0))
     }
 
-    /// The scroll offset that brings row `row` into view (`None`: it already is).
-    pub(super) fn offset_for(&self, row: usize, row_height: f32) -> Option<f32> {
-        #[expect(clippy::cast_precision_loss, reason = "row counts are small")]
-        let top = row as f32 * row_height;
-        if top < self.scroll_offset {
-            Some(top)
-        } else if top + row_height > self.scroll_offset + self.view_height {
-            Some(top + row_height - self.view_height)
-        } else {
-            None
-        }
+    /// The scroll offset that brings row `row` into view, below its parents pinned over the top
+    /// ([`Self::sticky_rows`]) (`None`: it is seen already). See [`offset_to_show`].
+    pub(super) fn offset_for(&self, row: usize, sizes: (f32, f32)) -> Option<f32> {
+        let covered = self.ancestors(row).len().min(MAX_STICKY);
+        let scroll = ListScroll { offset: self.scroll_offset, view: self.view_height };
+        offset_to_show(row, sizes, self.rows.len(), scroll, covered)
     }
 }
 

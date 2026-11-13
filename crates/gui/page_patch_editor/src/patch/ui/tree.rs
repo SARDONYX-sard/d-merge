@@ -5,7 +5,10 @@ use std::rc::Rc;
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::object_list::{RowAction, row_menu};
-use crate::patch::tree::{Graph, Node, Row, TreeInput, TreeState, has_guide};
+use crate::patch::{
+    tool::list::{fixed_row, row_height},
+    tree::{Graph, MAX_STICKY, Node, Row, TreeInput, TreeState, has_guide},
+};
 
 /// Pixels of indent per tree level.
 const INDENT: f32 = 12.0;
@@ -110,11 +113,11 @@ pub(super) fn tree_ui(
     unlinked_section(ui, graph, selected, i18n);
     let mut event = breadcrumb(ui, graph, state, selected.as_deref(), i18n);
 
-    let row_height = ui.spacing().interact_size.y.max(ui.text_style_height(&egui::TextStyle::Monospace) + 4.0);
+    let row_height = row_height(ui);
     let mut scroll = egui::ScrollArea::both().id_salt("nemesis_tree").auto_shrink(false);
     let row_with_spacing = row_height + ui.spacing().item_spacing.y;
     if let Some(row) = state.scroll_to.take() {
-        if let Some(offset) = state.offset_for(row, row_with_spacing) {
+        if let Some(offset) = state.offset_for(row, (row_height, ui.spacing().item_spacing.y)) {
             scroll = scroll.vertical_scroll_offset(offset);
         }
         let indent = state.rows().get(row).map_or(0.0, |row| f32::from(row.depth) * INDENT);
@@ -189,8 +192,7 @@ fn row_ui(
     i18n: &I18nMap,
 ) -> Option<RowEvent> {
     let mut event = None;
-    ui.horizontal(|ui| {
-        ui.set_height(height);
+    fixed_row(ui, height, |ui| {
         ui.add_space(f32::from(row.depth) * INDENT);
         let glyph = if row.expandable && row.open {
             "▼"
@@ -327,9 +329,6 @@ fn breadcrumb(
     ui.separator();
     event
 }
-
-/// How many ancestors are pinned over the tree at most.
-const MAX_STICKY: usize = 5;
 
 /// The ancestors of the rows on screen, pinned over the top of the tree. Without them, a long list
 /// of children shows nothing of what they belong to. A click selects one.
