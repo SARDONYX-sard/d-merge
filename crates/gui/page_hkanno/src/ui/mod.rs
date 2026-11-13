@@ -158,6 +158,11 @@ impl HkannoPage {
         } else if self.key_command(commands::TABS_PREVIOUS) {
             self.step_tab(ui, false);
         }
+        // Vim's `Space p` / `Space w` (key bindings).
+        if self.key_command(commands::EDITOR_TOGGLE_PREVIEW) {
+            ctx.settings.show_preview = !ctx.settings.show_preview;
+        }
+        let format_and_save = self.key_command(commands::EDITOR_FORMAT_AND_SAVE);
 
         let i18n = ctx.i18n;
         // With their keys as the key bindings have them, and a `⚙` to change them, as VS Code's.
@@ -201,7 +206,10 @@ impl HkannoPage {
         let mut toggle_problems = false;
         let options_hover = ctx.i18n.t(I18nKey::LspOptionsTitle);
         // The editor's own commands, by the key bindings' keys: it reads none of its keys itself then.
-        let requests = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::editor_request);
+        let mut requests = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::editor_request);
+        if format_and_save {
+            requests.push(egui_code_editor::EditorRequest::Format);
+        }
         egui::Panel::bottom("hkanno_status_bar").show(ui, |ui| {
             // Its counts show or hide the Problems panel; `Vim ▾` and `⚙` at its right end, as VS Code's.
             let mut chosen = keymap;
@@ -258,6 +266,8 @@ impl HkannoPage {
                 tab.preview.jump_from_editor_line(cursor.line);
             }
         }
+        // After the format of this frame.
+        let command = if format_and_save { Some(EditorCommand::Save) } else { command };
         if let Some(command) = command {
             self.apply_command(command, ui, ctx);
         }

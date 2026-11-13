@@ -9,8 +9,10 @@
 //! ```
 //! - The last binding that matches wins: the user's come after the defaults. An entry whose
 //!   command is `-tabs.close` takes the bindings of `tabs.close` before it away.
-//! - A sequence (`space e`) holds its first keys until the rest come, for [`PENDING_SECONDS`] at most.
-//!   Keys that turn out to start nothing are given back to the widgets, as they came.
+//! - A sequence (`space e`) holds its first keys until the rest come, as VS Code's chords: however
+//!   long it takes, with what may follow listed meanwhile ([`Keybindings::continuations`], the
+//!   which-key of Vim's leader). Keys that turn out to start nothing are given back to the widgets,
+//!   as they came.
 
 pub mod commands;
 pub mod file;
@@ -35,8 +37,6 @@ pub use self::{
     when::{Context, Value, When},
 };
 
-/// Seconds the first keys of a sequence wait for the rest (Vim's `timeoutlen`).
-pub const PENDING_SECONDS: f64 = 1.0;
 /// Seconds between two looks at the user file for changes.
 const RELOAD_SECONDS: f64 = 1.0;
 
@@ -125,7 +125,6 @@ struct UserFile {
 pub struct Keybindings {
     bindings: Vec<Binding>,
     pending: Keys,
-    pending_at: f64,
     file: Option<UserFile>,
     /// What of the user file could not be taken: for the app to tell. See [`Self::take_warnings`].
     warnings: Vec<String>,
@@ -159,7 +158,7 @@ impl Keybindings {
         }
         static GENERATIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let generation = GENERATIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        Self { bindings, pending: Vec::new(), pending_at: 0.0, file: None, warnings, generation }
+        Self { bindings, pending: Vec::new(), file: None, warnings, generation }
     }
 
     /// The defaults and the user file at `path`. A missing file is made (nothing changed in it), and
@@ -212,6 +211,39 @@ impl Keybindings {
     /// `keybindings.json: entry 2 (`ctrl+q`): `tabs.closee` is no command`.
     pub fn take_warnings(&mut self) -> Vec<String> {
         std::mem::take(&mut self.warnings)
+    }
+
+    /// The first keys of a sequence typed so far, waiting for the rest. e.g. `space`
+    #[inline]
+    #[must_use]
+    pub fn pending(&self) -> &[Chord] {
+        &self.pending
+    }
+
+    /// What may follow [`Self::pending`] in `context`: `(the rest of the keys, the command)`, each
+    /// rest once (the last binding of it wins, as the lookup does). e.g. after `space`: `e`
+    /// `explorer.focus`, `c` `tabs.close`
+    #[must_use]
+    pub fn continuations(&self, context: &KeyContext) -> Vec<(String, &'static Command)> {
+        let mut out: Vec<(String, &'static Command)> = Vec::new();
+        let typed = self.pending.len();
+        for binding in self.bindings.iter().rev() {
+            if typed == 0 || binding.keys.len() <= typed || !binding.keys.starts_with(&self.pending) {
+                continue;
+            }
+            if !binding.works(context) {
+                continue;
+            }
+            let rest = keys_text(&binding.keys[typed..]);
+            if out.iter().any(|(known, _)| *known == rest) {
+                continue;
+            }
+            if let Some(command) = commands::command(binding.command) {
+                out.push((rest, command));
+            }
+        }
+        out.sort_by(|a, b| a.0.cmp(&b.0));
+        out
     }
 
     /// The commands bound to `keys`, with their `when`: the last first, as they are looked up.
@@ -278,9 +310,6 @@ impl Keybindings {
     pub fn dispatch(&mut self, ctx: &egui::Context, context: &KeyContext) -> Vec<&'static str> {
         let mut commands = Vec::new();
         ctx.input_mut(|input| {
-            if !self.pending.is_empty() && input.time - self.pending_at > PENDING_SECONDS {
-                self.pending.clear();
-            }
             let mut at = 0;
             while at < input.events.len() {
                 let egui::Event::Key { key, pressed: true, modifiers, .. } = input.events[at] else {
@@ -299,7 +328,6 @@ impl Keybindings {
                     Lookup::Prefix => {
                         take_key(&mut input.events, at, chord);
                         self.pending = typed;
-                        self.pending_at = input.time;
                     }
                     Lookup::None if self.pending.is_empty() => at += 1,
                     Lookup::None => {

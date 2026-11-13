@@ -112,6 +112,41 @@ pub struct FrameKeys {
     pub saved: Option<Result<(), String>>,
 }
 
+/// What may follow the keys of a sequence typed so far, at the bottom right, as Vim's which-key:
+///
+/// ```text
+/// ┌ space ──────────────────────────────┐
+/// │ c        Close the tab              │
+/// │ e        Move the keyboard to ...   │
+/// │ shift+v  Show the selected ...      │
+/// └─────────────────────────────────────┘
+/// ```
+fn which_key(ctx: &egui::Context, bindings: &Keybindings, context: &KeyContext) {
+    if bindings.pending().is_empty() {
+        return;
+    }
+    let next = bindings.continuations(context);
+    if next.is_empty() {
+        return;
+    }
+    egui::Area::new(egui::Id::NULL.with("keybinding_which_key"))
+        .order(egui::Order::Foreground)
+        .anchor(egui::Align2::RIGHT_BOTTOM, egui::vec2(-12.0, -36.0))
+        .interactable(false)
+        .show(ctx, |ui| {
+            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                ui.strong(crate::keys_text(bindings.pending()));
+                egui::Grid::new("keybinding_which_key_rows").num_columns(2).spacing([16.0, 2.0]).show(ui, |ui| {
+                    for (rest, command) in next {
+                        ui.monospace(rest);
+                        ui.label(command.description);
+                        ui.end_row();
+                    }
+                });
+            });
+        });
+}
+
 /// Where the JSON opens.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum JsonAt {
@@ -168,6 +203,7 @@ impl KeyUi {
                 self.json_asked = Some(JsonAt::Top);
             }
         }
+        which_key(ctx, bindings, context);
         let keymap = if context.vim { egui_code_editor::Keymap::Vim } else { egui_code_editor::Keymap::Normal };
         if let Some(saved) = self.json.show(ctx, bindings, keymap, &texts) {
             out.saved = Some(saved);

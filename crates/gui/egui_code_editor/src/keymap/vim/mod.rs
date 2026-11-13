@@ -218,7 +218,15 @@ impl VimState {
     }
 
     /// Runs this frame's keys. Call **before** showing the `TextEdit` with id `id`.
-    pub(super) fn handle(&mut self, ui: &egui::Ui, id: egui::Id, text: &mut String, view: View) -> KeymapOutput {
+    /// `host_keys`: the host's key bindings have the leader (`Space e`, ...; see
+    /// [`crate::CodeEditor::requests`]): a `Space` that starts a command is theirs, not Vim's.
+    pub(super) fn handle(
+        &mut self,
+        ui: &egui::Ui,
+        id: egui::Id,
+        text: &mut String,
+        (view, host_keys): (View, bool),
+    ) -> KeymapOutput {
         self.view = view;
         let inserting = self.mode == Mode::Insert;
         if !inserting {
@@ -258,6 +266,13 @@ impl VimState {
             edits: 0,
         };
         for key in keys {
+            let leader = key == VimKey::Char(' ')
+                && self.pending.is_empty()
+                && self.prompt.is_none()
+                && self.mode != Mode::Insert;
+            if host_keys && leader {
+                continue; // a binding of the host's that was not completed: it means nothing to Vim
+            }
             self.feed(key, &mut exec);
         }
 

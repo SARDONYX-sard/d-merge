@@ -61,6 +61,10 @@ impl PatchTool {
         // Like VS Code: getting into the editor shows its object in the side bar.
         let has_focus = ui.memory(|m| m.has_focus(editor_id));
         self.note_editor_focus(ui.ctx(), has_focus);
+        // Vim's `Space e` (a key binding): to the tree, as the editor's own leader did.
+        if self.key_command(commands::EXPLORER_FOCUS) {
+            self.enter_tree(ui, editor_id);
+        }
         if self.key_command(commands::PROBLEMS_TOGGLE) {
             self.toggle_problems_focus(ui, editor_id);
         } else if has_focus {
@@ -240,6 +244,14 @@ impl PatchTool {
     /// The toolbar, the editor and the Vim status line. Returns what the editor asked for: it is
     /// done afterwards, as the language still borrows the behavior here.
     fn editor_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, id: &str) -> EditorResult {
+        // Vim's `Space p` / `Space d` / `Space w` (key bindings).
+        if self.key_command(commands::EDITOR_TOGGLE_PREVIEW) {
+            self.pane.show_preview = !self.pane.show_preview;
+        }
+        if self.key_command(commands::EDITOR_TOGGLE_INLINE_DIFF) {
+            self.pane.show_inline_diff = !self.pane.show_inline_diff;
+        }
+        let format_and_save = self.key_command(commands::EDITOR_FORMAT_AND_SAVE);
         let names = self.names();
         let values = self.field_values();
         // The class (and fields) around the cursor line of last frame: field names / hover.
@@ -319,7 +331,10 @@ impl PatchTool {
         // `j` / `k` / `Enter` ... of the key bindings, while the panel has the keyboard.
         let problem_keys = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::problems_key);
         // The editor's own commands, by the key bindings' keys: it reads none of its keys itself then.
-        let requests = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::editor_request);
+        let mut requests = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::editor_request);
+        if format_and_save {
+            requests.push(egui_code_editor::EditorRequest::Format);
+        }
 
         // The status bar counts the whole work's problems, of which the open object's are a part.
         self.pane.state.set_status_problems(counts);
@@ -423,6 +438,9 @@ impl PatchTool {
                 }
             });
         });
+        if format_and_save {
+            result.command = Some(EditorCommand::Save); // after the format of this frame
+        }
         if toggle_problems {
             self.problems.open = !self.problems.open;
         }

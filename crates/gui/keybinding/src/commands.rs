@@ -28,6 +28,10 @@ pub const EXPLORER_TOGGLE_VIEW: &str = "explorer.toggleView";
 pub const EXPLORER_TOGGLE_CHANGED_ONLY: &str = "explorer.toggleChangedOnly";
 pub const EXPLORER_TOGGLE_UNLINKED_ONLY: &str = "explorer.toggleUnlinkedOnly";
 pub const EDITOR_SAVE: &str = "editor.save";
+pub const EDITOR_FORMAT_AND_SAVE: &str = "editor.formatAndSave";
+pub const EDITOR_TOGGLE_PREVIEW: &str = "editor.togglePreview";
+pub const EDITOR_TOGGLE_INLINE_DIFF: &str = "editor.toggleInlineDiff";
+pub const EXPLORER_FOCUS: &str = "explorer.focus";
 pub const FILE_COPY_PATH: &str = "file.copyPath";
 pub const FILE_REVEAL: &str = "file.reveal";
 pub const KEYBINDINGS_OPEN_JSON: &str = "keybindings.openJson";
@@ -68,6 +72,8 @@ const NORMAL_EDITOR: Option<&str> = Some("editorFocus && !vim");
 const EXPLORER: Option<&str> = Some("explorerFocus && !inputFocus");
 /// The code editor has the keyboard.
 const EDITOR: Option<&str> = Some("editorFocus");
+/// Vim's leader keys (`Space ...`): in Normal mode, with no command being typed.
+const VIM_NORMAL: Option<&str> = Some("editorFocus && vim.mode == 'normal'");
 /// The Problems panel has the keyboard.
 const PROBLEMS: Option<&str> = Some("problemsFocus");
 
@@ -75,7 +81,31 @@ const PROBLEMS: Option<&str> = Some("problemsFocus");
 pub const COMMANDS: &[Command] = &[
     Command { id: TABS_NEXT, description: "Next tab", defaults: &[("ctrl+pagedown", None), ("alt+l", None)] },
     Command { id: TABS_PREVIOUS, description: "Previous tab", defaults: &[("ctrl+pageup", None), ("alt+h", None)] },
-    Command { id: TABS_CLOSE, description: "Close the tab", defaults: &[("ctrl+w", NORMAL_EDITOR)] },
+    Command {
+        id: TABS_CLOSE,
+        description: "Close the tab",
+        defaults: &[("ctrl+w", NORMAL_EDITOR), ("space c", VIM_NORMAL)],
+    },
+    Command {
+        id: EXPLORER_FOCUS,
+        description: "Move the keyboard to the object tree / list",
+        defaults: &[("space e", Some("editorFocus && vim.mode == 'normal' && page == 'patchEditor'"))],
+    },
+    Command {
+        id: EDITOR_TOGGLE_PREVIEW,
+        description: "Show or hide the preview beside the editor",
+        defaults: &[("space p", VIM_NORMAL)],
+    },
+    Command {
+        id: EDITOR_TOGGLE_INLINE_DIFF,
+        description: "Show or hide the changes inside the editor",
+        defaults: &[("space d", Some("editorFocus && vim.mode == 'normal' && page == 'patchEditor'"))],
+    },
+    Command {
+        id: EDITOR_FORMAT_AND_SAVE,
+        description: "Format the document and save",
+        defaults: &[("space w", VIM_NORMAL)],
+    },
     Command {
         id: HISTORY_BACK,
         description: "Back to the object shown before",
@@ -153,7 +183,11 @@ pub const COMMANDS: &[Command] = &[
         description: "Open the completion list",
         defaults: &[("ctrl+space", EDITOR)],
     },
-    Command { id: EDITOR_FORMAT, description: "Format the document", defaults: &[("shift+alt+f", EDITOR)] },
+    Command {
+        id: EDITOR_FORMAT,
+        description: "Format the document",
+        defaults: &[("shift+alt+f", EDITOR), ("space f", VIM_NORMAL)],
+    },
     Command { id: EDITOR_QUICK_FIX, description: "The quick fixes at the cursor", defaults: &[("ctrl+.", EDITOR)] },
     Command {
         id: EDITOR_COMMAND_PALETTE,
@@ -217,7 +251,7 @@ pub const COMMANDS: &[Command] = &[
     Command {
         id: FILE_REVEAL,
         description: "Show the selected object's file in the file manager (VS Code's Reveal in File Explorer)",
-        defaults: &[("shift+alt+r", Some("!inputFocus"))],
+        defaults: &[("shift+alt+r", Some("!inputFocus")), ("space shift+v", VIM_NORMAL)],
     },
 ];
 

@@ -92,15 +92,19 @@ fn a_sequence_waits_and_gives_back_what_starts_nothing() {
     assert!(commands.is_empty() && left.is_empty(), "held for the rest");
     assert_eq!(frame(&ctx, &mut keys, &EDITOR, press("b"), 0.1).0, [commands::HISTORY_BACK]);
 
-    // `space f` is Vim's own: both keys go on to it, as they came.
+    // `space z` starts nothing: both keys go on, as they came.
     frame(&ctx, &mut keys, &EDITOR, press("space"), 0.2);
-    let (commands, left) = frame(&ctx, &mut keys, &EDITOR, press("f"), 0.3);
+    let (commands, left) = frame(&ctx, &mut keys, &EDITOR, press("z"), 0.3);
     assert!(commands.is_empty());
-    assert_eq!(left, [press("space"), press("f")].concat());
+    assert_eq!(left, [press("space"), press("z")].concat());
 
-    // Too late: the held key is dropped.
+    // However long the rest takes, as VS Code's chords; meanwhile what may follow is known.
     frame(&ctx, &mut keys, &EDITOR, press("space"), 1.0);
-    assert!(frame(&ctx, &mut keys, &EDITOR, press("b"), 2.5).0.is_empty());
+    assert_eq!(keys.pending(), parse_keys("space").unwrap());
+    let next = keys.continuations(&EDITOR);
+    assert!(next.iter().any(|(rest, command)| rest == "b" && command.id == commands::HISTORY_BACK), "{next:?}");
+    assert!(next.iter().any(|(rest, command)| rest == "e" && command.id == commands::EXPLORER_FOCUS));
+    assert_eq!(frame(&ctx, &mut keys, &EDITOR, press("b"), 60.0).0, [commands::HISTORY_BACK]);
 }
 
 #[test]
