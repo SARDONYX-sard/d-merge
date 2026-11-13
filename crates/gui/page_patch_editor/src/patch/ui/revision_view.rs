@@ -84,6 +84,14 @@ impl Views {
         self.list.len() - 1
     }
 
+    /// Shows view `at`, its editor with the keyboard.
+    pub(in crate::patch) fn show(&mut self, at: usize) {
+        if let Some(view) = self.list.get_mut(at) {
+            view.body.focus = true;
+            self.shown = Some(at);
+        }
+    }
+
     /// Closes view `at`; the one shown stays the one shown.
     pub(in crate::patch) fn close(&mut self, at: usize) {
         if at >= self.list.len() {
@@ -112,6 +120,9 @@ struct Compare {
     cursor_line: usize,
     /// Just opened: the cursor goes to the first change, as VS Code's diff editor opens.
     to_first: bool,
+    /// Just shown (opened, a tab clicked, the tab keys): its editor takes the keyboard, as an
+    /// object's does.
+    pub(in crate::patch) focus: bool,
 }
 
 impl PatchTool {
@@ -143,6 +154,7 @@ impl PatchTool {
             state: CodeEditorState::default(),
             cursor_line: 0,
             to_first: true,
+            focus: false,
         };
         self.show_in_editor(behavior, id, title, Box::new(compare));
     }
@@ -165,7 +177,7 @@ impl PatchTool {
         }
         self.selected = Some(id.into());
         let at = self.views.open(RevisionView { behavior, id: id.to_owned(), title, pinned: false, body });
-        self.views.shown = Some(at);
+        self.views.show(at);
     }
 
     /// Opens the blame of object `id` of behavior `behavior`, as the work has it now.
@@ -195,6 +207,7 @@ impl PatchTool {
             state: CodeEditorState::default(),
             cursor_line: 0,
             to_first: false,
+            focus: false,
         };
         self.show_in_editor(behavior, id, title, Box::new(blame));
     }
@@ -237,6 +250,9 @@ impl PatchTool {
             let view = &mut self.views.list[at];
             let id = view.id.clone();
             command = compare_ui(ui, i18n, &id, &mut view.body, (keymap, go_to));
+            // What the key bindings see (`editorFocus`): this editor, as the object's is seen.
+            let editor_id = egui_code_editor::editor_id(("nemesis_revision_view", id.as_str()));
+            self.pane.had_focus = ui.memory(|m| m.has_focus(editor_id));
         });
         // The keys of the tabs as on an object's: the tab bar's bindings, Vim's `gt` / `Space c`.
         let close = self.key_command(keybinding::commands::TABS_CLOSE) || command == Some(EditorCommand::CloseTab);
@@ -282,6 +298,10 @@ fn compare_ui(
     egui::Panel::bottom(("nemesis_revision_status", id)).show(ui, |ui| {
         egui_code_editor::status_line(ui, &compare.state, keymap, &compare.text);
     });
+    let focus = std::mem::take(&mut compare.focus);
+    if focus {
+        ui.memory_mut(|m| m.request_focus(editor_id));
+    }
     let output = egui::ScrollArea::both()
         .id_salt(("nemesis_revision_scroll", id))
         .auto_shrink(false)
@@ -296,6 +316,10 @@ fn compare_ui(
                 .show(ui, &mut compare.state)
         })
         .inner;
+    // Asked again of the editor drawn: a focus asked for by id before it was may be lost.
+    if focus {
+        output.response.request_focus();
+    }
     // Taken out before the text is read again: the output borrows it.
     let (cursor, command) = (output.cursor, output.command);
     if let Some(cursor) = cursor {
@@ -347,6 +371,7 @@ mod tests {
                 state: CodeEditorState::default(),
                 cursor_line: 0,
                 to_first: false,
+                focus: false,
             }),
         }
     }

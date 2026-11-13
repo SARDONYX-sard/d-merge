@@ -10,6 +10,9 @@
 //! ```
 //! A row seen whole has none. egui shows the next tooltips at once once one was shown: moving over
 //! a list would show one per row, so the pointer has to rest first ([`CutHover::delay`]).
+//!
+//! A row is best cut with `…` ([`fit`]), as VS Code's lists: a list that scrolls sideways changes
+//! its width with the rows shown, and its scroll bars come and go.
 
 /// See the module docs. e.g. `CutHover::new().show(ui, response, |ui| { ui.label(full) })`
 #[derive(Debug, Clone, Copy)]
@@ -52,7 +55,19 @@ impl CutHover {
 
     /// `response` with `contents` on hover, if what it shows goes past `ui`'s visible right edge.
     pub fn show(self, ui: &egui::Ui, response: egui::Response, contents: impl FnOnce(&mut egui::Ui)) -> egui::Response {
-        if !response.hovered() || !is_cut(response.rect, ui.clip_rect()) {
+        let cut = is_cut(response.rect, ui.clip_rect());
+        self.show_if(ui, response, cut, contents)
+    }
+
+    /// `response` with `contents` on hover, if `cut` (e.g. [`Fitted::elided`]).
+    pub fn show_if(
+        self,
+        ui: &egui::Ui,
+        response: egui::Response,
+        cut: bool,
+        contents: impl FnOnce(&mut egui::Ui),
+    ) -> egui::Response {
+        if !response.hovered() || !cut {
             return response;
         }
         let still = f64::from(ui.input(|i| i.pointer.time_since_last_movement()));
@@ -73,6 +88,37 @@ impl CutHover {
             ui.add(egui::Label::new(egui::RichText::new(text).monospace()).wrap());
         })
     }
+}
+
+/// A text laid out to fit a width, and whether it had to be cut for it. See [`fit`].
+#[derive(Debug, Clone)]
+pub struct Fitted {
+    pub galley: std::sync::Arc<egui::Galley>,
+    /// Cut with `…`: the whole is for a hover ([`CutHover::show_if`]).
+    pub elided: bool,
+}
+
+/// `job` on one line of at most `width`, cut with `…` if longer, as VS Code's lists.
+///
+/// e.g. `#0106 hkbStateMachine GetUpStateMachine` in 120 px -> `#0106 hkbState…`, `elided`
+#[must_use]
+pub fn fit(ui: &egui::Ui, mut job: egui::text::LayoutJob, width: f32) -> Fitted {
+    job.wrap = egui::text::TextWrapping {
+        max_width: width.max(1.0),
+        max_rows: 1,
+        break_anywhere: true,
+        overflow_character: Some('…'),
+    };
+    let galley = ui.fonts_mut(|fonts| fonts.layout_job(job));
+    let elided = galley.elided;
+    Fitted { galley, elided }
+}
+
+/// [`fit`] of a plain text in the monospace font of `color`.
+#[must_use]
+pub fn fit_text(ui: &egui::Ui, text: &str, color: egui::Color32, width: f32) -> Fitted {
+    let font = egui::TextStyle::Monospace.resolve(ui.style());
+    fit(ui, egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color), width)
 }
 
 /// Does `rect` go past the right edge of `visible`? (Half a pixel is not.)

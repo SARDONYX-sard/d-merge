@@ -136,8 +136,8 @@ fn name_rows(
         (0..list.names.len()).rev().filter(|&i| contains_ignore_case(&list.names[i], filter)).collect();
     let row_height = ui.spacing().interact_size.y.max(ui.text_style_height(&egui::TextStyle::Monospace) + 6.0);
     let mut action = None;
-    // Sideways too: a long name widened the side bar, which takes its content's width.
-    egui::ScrollArea::both().auto_shrink(false).show_rows(ui, row_height, shown.len(), |ui, range| {
+    // Up and down only: a long name is cut with `…` (sideways, the width changed with the rows drawn).
+    egui::ScrollArea::vertical().auto_shrink(false).show_rows(ui, row_height, shown.len(), |ui, range| {
         for &index in &shown[range] {
             ui.horizontal(|ui| action = name_row(ui, i18n, list, index, renaming).or(action));
         }
@@ -162,16 +162,18 @@ fn name_row(
     if is_being_renamed {
         return rename_field(ui, renaming, is_variable, index);
     }
-    let name = egui::RichText::new(&names[index]).monospace();
-    // Cut off at the side bar's edge: the whole name on hover.
-    let hover = egui_widgets::CutHover::new();
-    if index < template_count {
-        let label = ui.label(name);
-        hover.show_text(ui, label, &names[index]);
+    // Cut with `…` to the room left (the mod's own have `✎ ✖` after it), the whole on hover.
+    let own = index >= template_count;
+    let buttons = if own { 2.0 * (ui.spacing().interact_size.y + ui.spacing().item_spacing.x) } else { 0.0 };
+    let color = if own { ui.visuals().strong_text_color() } else { ui.visuals().text_color() };
+    let fitted = egui_widgets::fit_text(ui, &names[index], color, ui.available_width() - buttons);
+    let label = ui.add(egui::Label::new(fitted.galley).sense(egui::Sense::hover()));
+    egui_widgets::CutHover::new().show_if(ui, label, fitted.elided, |ui| {
+        ui.add(egui::Label::new(egui::RichText::new(&names[index]).monospace()).wrap());
+    });
+    if !own {
         return None;
     }
-    let label = ui.label(name.strong());
-    hover.show_text(ui, label, &names[index]);
     if ui.small_button("✎").on_hover_text(i18n.t(I18nKey::NemesisRename)).clicked() {
         *renaming = Some(Renaming { is_variable, index, text: names[index].clone(), focus: true });
     }

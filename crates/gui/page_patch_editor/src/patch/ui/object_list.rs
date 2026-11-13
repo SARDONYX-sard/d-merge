@@ -185,7 +185,9 @@ impl PatchTool {
 
         let (mut toggled, mut menu_action) = (None, None);
         let row_height = row_height(ui);
-        let mut scroll = egui::ScrollArea::both().auto_shrink(false);
+        // Up and down only, as VS Code's: the rows are cut with `…`. (Sideways, its width changed with the
+        // rows drawn, and the scroll bars came and went.)
+        let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
         let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
         let at = selected
             .and_then(|node| rows.iter().position(|row| matches!(row, AnimRow::File { node: n, .. } if *n == node)));
@@ -271,8 +273,7 @@ impl PatchTool {
         let mut action = None;
         let is_selected = self.selected.as_deref() == Some(graph.id(node));
         let marker = if graph.is_changed(node) { "● " } else { "" };
-        let text = egui::RichText::new(format!("    {marker}{name}")).monospace();
-        let response = ui.add(egui::Button::selectable(is_selected, text));
+        let response = fitted_button(ui, is_selected, &format!("    {marker}{name}"));
         if response.clicked() {
             self.selected = Some(graph.id(node).into());
         }
@@ -304,7 +305,9 @@ impl PatchTool {
         let rows = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
         let mut menu_action = None;
         let row_height = row_height(ui);
-        let mut scroll = egui::ScrollArea::both().auto_shrink(false);
+        // Up and down only, as VS Code's: the rows are cut with `…`. (Sideways, its width changed with the
+        // rows drawn, and the scroll bars came and went.)
+        let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
         let forced = std::mem::take(&mut self.explorer.reveal);
         if take_reveal(self.selected.as_ref(), forced) {
             let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
@@ -318,12 +321,9 @@ impl PatchTool {
         let output = scroll.show_rows(ui, row_height, rows.len(), |ui, range| {
             for &node in &rows[range] {
                 let id = graph.id(node);
-                let text = super::tree::object_label(ui, graph, node, false);
                 let selected = self.selected.as_deref() == Some(id);
-                let response = fixed_row(ui, row_height, |ui| {
-                    let response = ui.add(egui::Button::selectable(selected, text));
-                    super::tree::hover_if_cut(ui, response, graph, node)
-                });
+                let response =
+                    fixed_row(ui, row_height, |ui| super::tree::object_button(ui, graph, node, (selected, false)));
                 if response.clicked() {
                     self.selected = Some(id.into());
                 }
@@ -460,10 +460,18 @@ fn anim_group_row(
     let glyph = if open { "▼" } else { "▶" };
     let marker = if changed { " ●" } else { "" };
     let indent = "  ".repeat(depth);
-    ui.add(egui::Button::selectable(
-        false,
-        egui::RichText::new(format!("{indent}{glyph} {label} ({files}){marker}")).monospace(),
-    ))
+    fitted_button(ui, false, &format!("{indent}{glyph} {label} ({files}){marker}"))
+}
+
+/// A button of `text` cut with `…` to the width left, the whole on hover when it was: a row of a
+/// list that scrolls only up and down, as VS Code's.
+pub(in crate::patch) fn fitted_button(ui: &mut egui::Ui, selected: bool, text: &str) -> egui::Response {
+    let width = ui.spacing().button_padding.x.mul_add(-2.0, ui.available_width());
+    let fitted = egui_widgets::fit_text(ui, text, ui.visuals().text_color(), width);
+    let response = ui.add(egui::Button::selectable(selected, fitted.galley));
+    egui_widgets::CutHover::new().show_if(ui, response, fitted.elided, |ui| {
+        ui.add(egui::Label::new(egui::RichText::new(text.trim()).monospace()).wrap());
+    })
 }
 
 const fn anim_kind_label(kind: FileKind) -> I18nKey {

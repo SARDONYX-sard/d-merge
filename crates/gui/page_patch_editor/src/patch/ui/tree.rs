@@ -64,7 +64,8 @@ pub(super) fn tree_ui(
     let mut event = breadcrumb(ui, graph, state, selected.as_deref(), i18n);
 
     let row_height = row_height(ui);
-    let mut scroll = egui::ScrollArea::both().id_salt("nemesis_tree").auto_shrink(false);
+    // Up and down only, as VS Code's explorer: the rows are cut with `…` (see `object_button`).
+    let mut scroll = egui::ScrollArea::vertical().id_salt("nemesis_tree").auto_shrink(false);
     let row_with_spacing = row_height + ui.spacing().item_spacing.y;
     if let Some(row) = state.scroll_to.take() {
         if let Some(offset) = state.offset_for(row, (row_height, ui.spacing().item_spacing.y)) {
@@ -119,12 +120,10 @@ fn unlinked_section(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Rc<s
     }
     let title = format!("⚠ {} ({})", i18n.t(I18nKey::NemesisNotLinked), unlinked.len());
     ui.colored_label(ui.visuals().warn_fg_color, title).on_hover_text(i18n.t(I18nKey::NemesisNotLinkedHover));
-    egui::ScrollArea::both().id_salt("nemesis_unlinked").max_height(80.0).show(ui, |ui| {
+    egui::ScrollArea::vertical().id_salt("nemesis_unlinked").max_height(80.0).show(ui, |ui| {
         for &node in unlinked {
             let id = graph.id(node);
-            let text = object_label(ui, graph, node, false);
-            let response = ui.add(egui::Button::selectable(selected.as_deref() == Some(id), text));
-            if hover_if_cut(ui, response, graph, node).clicked() {
+            if object_button(ui, graph, node, (selected.as_deref() == Some(id), false)).clicked() {
                 *selected = Some(id.into());
             }
         }
@@ -156,8 +155,7 @@ fn row_ui(
             event = Some(RowEvent::SetOpen(row.node, !row.open));
         }
 
-        let response = ui.add(egui::Button::selectable(is_selected, object_label(ui, graph, row.node, row.dimmed)));
-        let response = hover_if_cut(ui, response, graph, row.node);
+        let response = object_button(ui, graph, row.node, (is_selected, row.dimmed));
         if response.clicked() {
             event = Some(RowEvent::Select(index));
         }
@@ -308,7 +306,7 @@ fn sticky_rows_ui(
         let line = state.rows()[row];
         sticky.horizontal(|ui| {
             ui.add_space(f32::from(line.depth).mul_add(INDENT, -state.scroll_x).max(0.0));
-            if ui.add(egui::Button::selectable(false, object_label(ui, graph, line.node, false))).clicked() {
+            if object_button(ui, graph, line.node, (false, false)).clicked() {
                 event = Some(RowEvent::Select(row));
             }
         });
@@ -316,8 +314,8 @@ fn sticky_rows_ui(
     event
 }
 
-/// `response` of a row of `node`, with its whole label on hover if the row is cut off at the side
-/// bar's edge: on lines of its own, the pointers wrapped, as wide as a hover.
+/// The button of a row of `node`, its label cut with `…` to fit, and the whole label on hover when
+/// it was: on lines of its own, the pointers wrapped, as wide as a hover.
 ///
 /// ```text
 /// #0106
@@ -326,13 +324,17 @@ fn sticky_rows_ui(
 /// ← #0105 #0109 #0110 #0111 #0112
 ///   #0113 ...
 /// ```
-pub(in crate::patch) fn hover_if_cut(
-    ui: &egui::Ui,
-    response: egui::Response,
+pub(in crate::patch) fn object_button(
+    ui: &mut egui::Ui,
     graph: &Graph,
     node: Node,
+    (selected, dimmed): (bool, bool),
 ) -> egui::Response {
-    egui_widgets::CutHover::new().show(ui, response, |ui| {
+    // Cut with `…` to the width left, as VS Code's explorer: the list never scrolls sideways.
+    let width = ui.spacing().button_padding.x.mul_add(-2.0, ui.available_width());
+    let fitted = egui_widgets::fit(ui, object_label(ui, graph, node, dimmed), width);
+    let response = ui.add(egui::Button::selectable(selected, fitted.galley));
+    egui_widgets::CutHover::new().show_if(ui, response, fitted.elided, |ui| {
         let (head, class, name, links) = graph.label_parts(node);
         let visuals = ui.visuals().clone();
         let parts = [

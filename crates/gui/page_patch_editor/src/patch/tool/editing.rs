@@ -90,7 +90,8 @@ impl PatchTool {
             }
             Tab::View(at) => {
                 self.selected = self.views.list.get(at).map(|view| view.id.as_str().into());
-                self.views.shown = Some(at);
+                self.views.show(at);
+                return; // its own editor takes the keyboard: see `Views::show`
             }
         }
         self.pane.focus = Some(FocusAt::Keep);
@@ -292,7 +293,7 @@ impl PatchTool {
             Some(TabEvent::ShowView(at)) => {
                 if let Some(view) = self.views.list.get(at) {
                     self.selected = Some(view.id.as_str().into());
-                    self.views.shown = Some(at);
+                    self.views.show(at);
                 }
             }
             Some(TabEvent::CloseView(at)) => self.views.close(at),

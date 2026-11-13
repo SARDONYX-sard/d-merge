@@ -17,7 +17,7 @@ mod path_row;
 mod window;
 
 pub use self::{
-    cut_hover::CutHover,
+    cut_hover::{CutHover, Fitted, fit, fit_text},
     editor_tab::{EditorTab, EditorTabOutput},
     path_row::{PathActions, PathRow, PathRowOutput},
     window::{Modal, NearPointer, show_modal, vertical_splitter, window_near_pointer},
