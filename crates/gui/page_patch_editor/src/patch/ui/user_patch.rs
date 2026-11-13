@@ -81,7 +81,9 @@ impl PatchTool {
         self.mod_export_window(ui.ctx(), i18n, notify);
         ui.horizontal(|ui| {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                self.clear_button(ui, i18n, notify);
+                if clear_button(ui, i18n, &mut self.panels.confirm_clear) {
+                    self.clear_user_patch(notify, i18n);
+                }
                 if super::top_bar::cache_button(ui, i18n, &self.cache_dir()) {
                     self.open_cache(notify, i18n);
                 }
@@ -97,82 +99,92 @@ impl PatchTool {
         });
     }
 
-    /// `[Delete all]`, which asks first: nothing of it can be undone.
-    /// `Output: [...] [Select]  Format: [Nemesis Ext ▼]  [Export]`: see `user_patch::ModExport`.
+    /// `Export as a mod`'s window, if open; `Export` writes it.
     fn mod_export_window(&mut self, ctx: &egui::Context, i18n: &I18nMap, notify: &mut Notification) {
-        use crate::patch::workspace::ExportFormat;
-        if !self.mod_export.open {
-            return;
+        let outside: Vec<&str> = self.workspace.outside_nemesis().collect();
+        if self.mod_export.window(ctx, i18n, notify, &outside) {
+            self.export_user_patch_as_mod(notify, i18n);
         }
-        let label = |format: ExportFormat| {
-            ExportFormat::ALL.iter().find(|(known, _)| *known == format).map_or("", |(_, label)| *label)
-        };
+    }
+}
+
+/// `[Delete all]`, which asks first: nothing of it can be undone. `confirm`: the question is open.
+/// Returns whether it was confirmed.
+fn clear_button(ui: &mut egui::Ui, i18n: &I18nMap, confirm: &mut bool) -> bool {
+    let button = Button::new(i18n.t(I18nKey::UserPatchClear)).icon(Icon::Trash).destructive();
+    if ui.add(button).on_hover_text(i18n.t(I18nKey::UserPatchClearHover)).clicked() {
+        *confirm = true;
+    }
+    if !*confirm {
+        return false;
+    }
+
+    let dialog = AlertDialog::new(
+        i18n.t(I18nKey::UserPatchClearConfirm),
+        i18n.t(I18nKey::CancelButton),
+        i18n.t(I18nKey::UserPatchClear),
+    );
+    let choice = dialog.description(i18n.t(I18nKey::UserPatchClearHover)).action_icon(Icon::Trash).destructive();
+    let choice = choice.show(ui.ctx());
+    *confirm = choice.is_none();
+    choice == Some(AlertDialogChoice::Action)
+}
+
+impl crate::patch::user_patch::ModExport {
+    /// Draws the window, if open: `Output: [...] [Select]  Format: [Nemesis Ext ▼]  [Export]`, and a
+    /// note of the templates Nemesis does not know (`outside`) for its format. Returns whether to
+    /// export.
+    fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap, notify: &mut Notification, outside: &[&str]) -> bool {
+        use crate::patch::workspace::ExportFormat;
+        if !self.open {
+            return false;
+        }
+
         let (mut open, mut export) = (true, false);
         let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::UserPatchExportMod)).open(&mut open);
         window.show(ctx, |ui| {
             let path = super::top_bar::PATH_ACTIONS;
             let row = egui_widgets::PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), path)
                 .help(i18n.t(I18nKey::UserPatchExportModHover))
-                .show(ui, &mut self.mod_export.output);
+                .show(ui, &mut self.output);
             if let Some(err) = row.open_error {
                 notify.error(err);
             }
+
             ui.horizontal(|ui| {
                 ui.label(i18n.t(I18nKey::OutputFormatLabel));
-                let combo = ComboBox::from_id_salt("user_patch_mod_format");
-                combo.selected_text(label(self.mod_export.format)).show_ui(ui, |ui| {
+                let label =
+                    ExportFormat::ALL.iter().find(|(known, _)| *known == self.format).map_or("", |(_, label)| *label);
+                ComboBox::from_id_salt("user_patch_mod_format").selected_text(label).show_ui(ui, |ui| {
                     for &(format, text) in &ExportFormat::ALL {
-                        ui.selectable_value(&mut self.mod_export.format, format, text);
+                        ui.selectable_value(&mut self.format, format, text);
                     }
                 });
             });
-            if self.mod_export.format == ExportFormat::Nemesis {
-                self.outside_nemesis_note(ui, i18n);
+            if self.format == ExportFormat::Nemesis {
+                outside_nemesis_note(ui, i18n, outside);
             }
-            let ready = !self.mod_export.output.trim().is_empty();
+
+            let ready = !self.output.trim().is_empty();
             let button = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::NemesisExport)).primary();
             export = ui.add_enabled(ready, button).clicked();
         });
-        if export {
-            self.export_user_patch_as_mod(notify, i18n);
-        }
-        self.mod_export.open = open && !export;
-    }
 
-    /// `⚠ Nemesis does not know these templates: ... (2)`, the templates on hover. Nothing if all
-    /// are ones Nemesis knows. See `user_patch::ModExport`.
-    fn outside_nemesis_note(&self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let count = self.workspace.outside_nemesis().count();
-        if count == 0 {
-            return;
-        }
-        let text = format!("⚠ {} ({count})", i18n.t(I18nKey::UserPatchOutsideNemesis));
-        let note = ui.colored_label(ui.visuals().warn_fg_color, text);
-        note.on_hover_ui(|ui| {
-            for template in self.workspace.outside_nemesis() {
-                ui.label(template);
-            }
-        });
+        self.open = open && !export;
+        export
     }
+}
 
-    fn clear_button(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let button = Button::new(i18n.t(I18nKey::UserPatchClear)).icon(Icon::Trash).destructive();
-        if ui.add(button).on_hover_text(i18n.t(I18nKey::UserPatchClearHover)).clicked() {
-            self.panels.confirm_clear = true;
-        }
-        if !self.panels.confirm_clear {
-            return;
-        }
-        let dialog = AlertDialog::new(
-            i18n.t(I18nKey::UserPatchClearConfirm),
-            i18n.t(I18nKey::CancelButton),
-            i18n.t(I18nKey::UserPatchClear),
-        );
-        let choice = dialog.description(i18n.t(I18nKey::UserPatchClearHover)).action_icon(Icon::Trash).destructive();
-        let choice = choice.show(ui.ctx());
-        self.panels.confirm_clear = choice.is_none();
-        if choice == Some(AlertDialogChoice::Action) {
-            self.clear_user_patch(notify, i18n);
-        }
+/// `⚠ Nemesis does not know these templates: ... (2)`, the templates on hover. Nothing if all are
+/// ones Nemesis knows. See `user_patch::ModExport`.
+fn outside_nemesis_note(ui: &mut egui::Ui, i18n: &I18nMap, outside: &[&str]) {
+    if outside.is_empty() {
+        return;
     }
+    let text = format!("⚠ {} ({})", i18n.t(I18nKey::UserPatchOutsideNemesis), outside.len());
+    ui.colored_label(ui.visuals().warn_fg_color, text).on_hover_ui(|ui| {
+        for template in outside {
+            ui.label(*template);
+        }
+    });
 }
