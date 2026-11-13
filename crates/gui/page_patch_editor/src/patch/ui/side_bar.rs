@@ -209,7 +209,8 @@ impl PatchTool {
         self.commit_box(ui, i18n);
 
         let mut picked = None;
-        egui::ScrollArea::both().id_salt("side_changes").auto_shrink(false).show(ui, |ui| {
+        // Up and down only: the rows are cut with `…`, as VS Code's.
+        egui::ScrollArea::vertical().id_salt("side_changes").auto_shrink(false).show(ui, |ui| {
             let title = format!("{} ({})", i18n.t(I18nKey::SideChanges), self.scm.pending.changes.len());
             egui::CollapsingHeader::new(title).id_salt("side_pending").default_open(true).show(ui, |ui| {
                 if self.scm.pending.changes.is_empty() {
@@ -366,9 +367,8 @@ impl PatchTool {
                     revision.message,
                     local_time(revision.time)
                 );
-                let response = ui.add(egui::Button::selectable(false, egui::RichText::new(&text).monospace()));
-                // Cut off at the side bar's edge: the whole row on hover.
-                let response = egui_widgets::CutHover::new().show_text(ui, response, &text);
+                // Cut with `…` to the width left, the whole on hover when cut, as VS Code's.
+                let response = super::object_list::fitted_button(ui, false, &text);
                 if response.clicked() {
                     let parent = self.workspace.history.parent_number(revision.number);
                     picked = Some(ChangeAction::Compare(self.active, id.to_owned(), parent, Some(revision.number)));
@@ -465,7 +465,8 @@ fn change_row(
         ui.label(egui::RichText::new(change.kind.mark()).monospace().strong().color(color));
         let (class, label) = object.map_or(("", ""), |object| (object.class, object.name));
         let text = format!("{name}  {}  {class}  {label}", change.id);
-        let response = ui.add(egui::Button::selectable(false, egui::RichText::new(text).monospace()));
+        // Cut with `…` to the width left, the whole on hover when cut, as VS Code's.
+        let response = super::object_list::fitted_button(ui, false, &text);
         // As VS Code's Source Control: a change opens its object; a file of a revision, what that
         // revision changed of it.
         match (response.clicked(), behavior, revision) {

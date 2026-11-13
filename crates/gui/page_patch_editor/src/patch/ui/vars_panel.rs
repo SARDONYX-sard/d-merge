@@ -167,7 +167,8 @@ fn name_row(
     let buttons = if own { 2.0 * (ui.spacing().interact_size.y + ui.spacing().item_spacing.x) } else { 0.0 };
     let color = if own { ui.visuals().strong_text_color() } else { ui.visuals().text_color() };
     let fitted = egui_widgets::fit_text(ui, &names[index], color, ui.available_width() - buttons);
-    let label = ui.add(egui::Label::new(fitted.galley).sense(egui::Sense::hover()));
+    // Its own hover only: egui's label would show one more for a cut text.
+    let label = ui.add(egui::Label::new(fitted.galley).sense(egui::Sense::hover()).show_tooltip_when_elided(false));
     egui_widgets::CutHover::new().show_if(ui, label, fitted.elided, |ui| {
         ui.add(egui::Label::new(egui::RichText::new(&names[index]).monospace()).wrap());
     });
