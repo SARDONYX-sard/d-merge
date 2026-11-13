@@ -7,9 +7,11 @@
 //! ```
 //! The title's actions are the explorer's: what is done to one object is in its right-click menu.
 //! A window has the class list: nothing moves in the side bar when it is opened.
+mod title;
+
 use egui_widgets::{
     notify::Notification,
-    shadcn::{Button, Icon, TextEdit},
+    shadcn::{Button, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
@@ -31,12 +33,29 @@ impl PatchTool {
     pub(in crate::patch) fn object_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let anim = self.workspace.behaviors[self.active].is_anim_data();
         let mut open = !self.side.objects_closed;
-        egui_widgets::section_header(ui, &mut open, i18n.t(I18nKey::NemesisObjectsTab), |ui| {
-            // Right to left: VS Code's order is `[+] [≡] [⋯]`.
-            self.more_menu(ui, i18n, anim);
-            self.view_buttons(ui, i18n, anim);
-            self.new_button(ui, i18n, anim);
-        });
+        let asked = {
+            let behavior = &self.workspace.behaviors[self.active];
+            let selected = self.selected.as_ref();
+            let title = title::Title {
+                anim,
+                adsf: behavior.adsf,
+                tree_view: self.explorer.tree_view,
+                code_ok: is_existing_mod_code(self.place.mod_code.trim()),
+                selected,
+                selected_is_new: selected.is_some_and(|id| **id == *PANDORA_DOC || behavior.added.contains_key(&**id)),
+                selected_is_pandora_doc: selected.is_some_and(|id| **id == *PANDORA_DOC),
+                changed_only: &mut self.explorer.changed_only,
+                unlinked_only: &mut self.explorer.unlinked_only,
+            };
+            let mut asked = None;
+            egui_widgets::section_header(ui, &mut open, i18n.t(I18nKey::NemesisObjectsTab), |ui| {
+                asked = title::buttons(ui, i18n, title);
+            });
+            asked
+        };
+        if let Some(asked) = asked {
+            self.apply_title(asked);
+        }
         self.side.objects_closed = !open;
         if self.side.objects_closed {
             return;
@@ -66,77 +85,29 @@ impl PatchTool {
         }
     }
 
-    /// `[≡]`: a tree or a flat list. Animation data: collapse / expand all instead.
-    fn view_buttons(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, anim: bool) {
-        if anim {
-            let expand = Button::new("").icon(Icon::ChevronDown).small();
-            self.anim_tree.expand_all |= ui.add(expand).on_hover_text(i18n.t(I18nKey::ExpandAllButton)).clicked();
-            let collapse = Button::new("").icon(Icon::ChevronRight).small();
-            if ui.add(collapse).on_hover_text(i18n.t(I18nKey::CollapseAllButton)).clicked() {
-                self.anim_tree.open.clear();
-            }
-            return;
-        }
-        let tree = Button::selectable(self.explorer.tree_view, "").icon(Icon::ListTree).small();
-        if ui.add(tree).on_hover_text(i18n.t(I18nKey::NemesisTreeViewHover)).clicked() {
-            self.explorer.tree_view = !self.explorer.tree_view;
-        }
-    }
+    /// What a button of the title asked for.
+    fn apply_title(&mut self, asked: title::TitleAsk) {
+        use title::TitleAsk;
+        match asked {
+            TitleAsk::ToggleTreeView => self.explorer.tree_view = !self.explorer.tree_view,
+            TitleAsk::ExpandAll => self.anim_tree.expand_all = true,
+            TitleAsk::CollapseAll => self.anim_tree.open.clear(),
 
-    /// `[⋯]`, as VS Code's "More Actions": what is used less. The filters of the list, the Pandora patch
-    /// file, and duplicate / revert of the selected object (also in its right-click menu).
-    fn more_menu(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, anim: bool) {
-        ui.menu_button("⋯", |ui| {
-            ui.checkbox(&mut self.explorer.changed_only, i18n.t(I18nKey::NemesisChangedOnly));
-            if !anim {
-                ui.checkbox(&mut self.explorer.unlinked_only, i18n.t(I18nKey::NemesisUnlinkedOnly));
-                ui.separator();
-                if ui.button(i18n.t(I18nKey::NemesisPandoraDocHover)).clicked() {
-                    self.open_pandora_doc();
-                    ui.close();
-                }
-            }
-            let Some(selected) = self.selected.clone() else { return };
-            ui.separator();
-            let behavior = &self.workspace.behaviors[self.active];
-            let is_new = *selected == *PANDORA_DOC || behavior.added.contains_key(&*selected);
-            let can_copy = !anim && *selected != *PANDORA_DOC && is_existing_mod_code(self.place.mod_code.trim());
-            if ui.add_enabled(can_copy, Button::new(i18n.t(I18nKey::NemesisDuplicate))).clicked() {
-                self.new_object(Some(&selected));
-                ui.close();
-            }
-            let label = if is_new { I18nKey::NemesisDeleteObject } else { I18nKey::RevertButton };
-            if ui.add(Button::new(i18n.t(label)).destructive()).clicked() {
-                self.revert_or_delete(&selected);
-                ui.close();
-            }
-        });
-    }
+            TitleAsk::OpenPandoraDoc => self.open_pandora_doc(),
+            TitleAsk::Duplicate(id) => self.new_object(Some(&id)),
+            TitleAsk::RevertOrDelete(id) => self.revert_or_delete(&id),
 
-    /// `[+]`: a new object of a class to pick; for clip data, new clips ([`NewClipsForm`]). Anim sets
-    /// can only be edited.
-    fn new_button(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, anim: bool) {
-        let adsf = self.workspace.behaviors[self.active].adsf;
-        if anim && !adsf {
-            return;
-        }
-        let hover = if adsf { I18nKey::NemesisNewClipsHover } else { I18nKey::NemesisNewObject };
-        let button = Button::new("").icon(Icon::Plus).small();
-        if ui
-            .add_enabled(is_existing_mod_code(self.place.mod_code.trim()), button)
-            .on_hover_text(i18n.t(hover))
-            .on_disabled_hover_text(i18n.t(I18nKey::NemesisModCodeInvalid))
-            .clicked()
-        {
-            if adsf {
+            TitleAsk::New if self.workspace.behaviors[self.active].adsf => {
                 let projects = self.anim_projects();
                 self.panels.new_clips = Some(NewClipsForm::new(self.selected.as_deref(), projects));
-            } else {
+            }
+            TitleAsk::New => {
                 self.panels.class_picker = true;
                 self.panels.focus_quick_pick = true;
             }
         }
     }
+
     /// The tree, and its keys while it has the keyboard.
     fn tree_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, graph: &Graph, notify: &mut Notification) {
         let path = &self.workspace.behaviors[self.active].meshes_path;
