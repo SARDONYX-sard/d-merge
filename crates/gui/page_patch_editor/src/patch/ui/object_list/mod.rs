@@ -27,6 +27,7 @@ use super::anim_data::{DuplicateForm, NewClipsForm};
 use crate::patch::{
     PatchTool,
     anim::data,
+    tool::list::FileAction,
     tree::{Graph, Node},
     workspace::PANDORA_DOC,
 };
@@ -175,8 +176,8 @@ impl PatchTool {
             }
             RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
             RowAction::RevertOrDelete => self.revert_or_delete(id),
-            RowAction::CopyPath => self.copy_object_path(ui.ctx(), id),
-            RowAction::Reveal => self.reveal_object(id, notify),
+            RowAction::CopyPath => self.file_action(ui.ctx(), (FileAction::CopyPath, id), notify),
+            RowAction::Reveal => self.file_action(ui.ctx(), (FileAction::Reveal, id), notify),
         }
     }
 }
@@ -193,7 +194,7 @@ pub(super) enum RowAction {
     CopyId,
     /// The path of the file the object is in: see [`PatchTool::object_file`].
     CopyPath,
-    /// The file selected in the file manager: see [`PatchTool::reveal_object`].
+    /// The file selected in the file manager: see [`PatchTool::file_action`].
     Reveal,
     RevertOrDelete,
 }

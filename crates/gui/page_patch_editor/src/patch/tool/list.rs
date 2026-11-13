@@ -140,16 +140,24 @@ impl PatchTool {
         }
     }
 
-    /// VS Code's "Copy Path": the path of the file object `id` is in, see [`Self::object_file`].
-    pub(in crate::patch) fn copy_object_path(&self, ctx: &egui::Context, id: &str) {
-        ctx.copy_text(self.object_file(id).display().to_string());
-    }
-
-    /// VS Code's "Reveal in File Explorer": the file object `id` is in, selected in its folder; what
-    /// exists of the folder if it isn't written yet.
-    pub(in crate::patch) fn reveal_object(&self, id: &str, notify: &mut egui_widgets::notify::Notification) {
-        if let Err(err) = gui_shared::fs::reveal_file(&self.object_file(id)) {
-            notify.error(err);
+    /// VS Code's "Copy Path" / "Reveal in File Explorer" of the file object `id` is in (see
+    /// [`object_file`]): its path to the clipboard, or the file selected in its folder (what exists
+    /// of the folder if it isn't written yet).
+    pub(in crate::patch) fn file_action(
+        &self,
+        ctx: &egui::Context,
+        (action, id): (FileAction, &str),
+        notify: &mut egui_widgets::notify::Notification,
+    ) {
+        let behavior = &self.workspace.behaviors[self.active];
+        let file = object_file((behavior, id), &self.place, self.workspace.export_format);
+        match action {
+            FileAction::CopyPath => ctx.copy_text(file.display().to_string()),
+            FileAction::Reveal => {
+                if let Err(err) = gui_shared::fs::reveal_file(&file) {
+                    notify.error(err);
+                }
+            }
         }
     }
 
@@ -163,10 +171,7 @@ impl PatchTool {
             .into_iter()
             .filter_map(|(on, action)| on.then_some(action).zip(selected.clone()));
         for (action, id) in asked.chain(self.file_asked.take()) {
-            match action {
-                FileAction::CopyPath => self.copy_object_path(ctx, &id),
-                FileAction::Reveal => self.reveal_object(&id, notify),
-            }
+            self.file_action(ctx, (action, &id), notify);
         }
     }
 
@@ -187,31 +192,6 @@ impl PatchTool {
         self.problems.cursor.focused = true;
         self.explorer.tree_focus = false;
         ui.memory_mut(|m| m.surrender_focus(editor));
-    }
-
-    /// The file object `id` of the active behavior is in, to find it on disk: its patch file in the
-    /// mod if this work has one for it (as the export writes it, whether written yet or not), else
-    /// the template it is read from.
-    ///
-    /// e.g. `D:/mods/My/Nemesis_Engine/mod/mymod/0_master/#0106.txt`,
-    /// `D:/mods/My/Pandora_Engine/mod/mymod/patches/defaultmale~0_master.xml`,
-    /// `<templates>/meshes/actors/character/behaviors/0_master.xml`
-    pub(in crate::patch) fn object_file(&self, id: &str) -> std::path::PathBuf {
-        let behavior = &self.workspace.behaviors[self.active];
-        let patched = behavior.edits.contains_key(id) || behavior.added.contains_key(id);
-        let (output, code) = (self.place.output.trim(), self.place.mod_code.trim());
-        if !patched || output.is_empty() || code.is_empty() {
-            return behavior.template_path.clone();
-        }
-        let output = std::path::Path::new(output);
-        let format = self.workspace.export_format;
-        if format == crate::patch::workspace::ExportFormat::PandoraV5
-            && !behavior.is_anim_data()
-            && let Some(file) = behavior.pandora_patch_path(output, code)
-        {
-            return file;
-        }
-        output.join(behavior.patch_dir(code, format.is_ext())).join(behavior.patch_file(id))
     }
 
     /// The keyboard goes back to the editor.
@@ -244,6 +224,34 @@ impl PatchTool {
     }
 }
 
+/// The file object `id` of `behavior` is in, to find it on disk: its patch file in the mod if this
+/// work has one for it (as the export, in `format`, writes it, whether written yet or not), else the
+/// template it is read from.
+///
+/// e.g. `D:/mods/My/Nemesis_Engine/mod/mymod/0_master/#0106.txt`,
+/// `D:/mods/My/Pandora_Engine/mod/mymod/patches/defaultmale~0_master.xml`,
+/// `<templates>/meshes/actors/character/behaviors/0_master.xml`
+pub(in crate::patch) fn object_file(
+    (behavior, id): (&crate::patch::workspace::Behavior, &str),
+    place: &crate::patch::tool::place::WorkPlace,
+    format: crate::patch::workspace::ExportFormat,
+) -> std::path::PathBuf {
+    let patched = behavior.edits.contains_key(id) || behavior.added.contains_key(id);
+    let (output, code) = (place.output.trim(), place.mod_code.trim());
+    if !patched || output.is_empty() || code.is_empty() {
+        return behavior.template_path.clone();
+    }
+
+    let output = std::path::Path::new(output);
+    if format == crate::patch::workspace::ExportFormat::PandoraV5
+        && !behavior.is_anim_data()
+        && let Some(file) = behavior.pandora_patch_path(output, code)
+    {
+        return file;
+    }
+    output.join(behavior.patch_dir(code, format.is_ext())).join(behavior.patch_file(id))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -267,11 +275,22 @@ mod tests {
         tool.workspace.behaviors.push(clips);
 
         let patch = Path::new("D:/mods/My").join("Nemesis_Engine/mod/mymod").join(ADSF).join("Male~1/m$0.txt");
-        assert_eq!(tool.object_file("Male~1/m$0.txt"), patch);
+        assert_eq!(
+            object_file((&tool.workspace.behaviors[0], "Male~1/m$0.txt"), &tool.place, tool.workspace.export_format),
+            patch
+        );
         let template = tool.workspace.behaviors[0].template_path.clone();
-        assert_eq!(tool.object_file("Male~1/other.txt"), template, "not patched");
+        assert_eq!(
+            object_file((&tool.workspace.behaviors[0], "Male~1/other.txt"), &tool.place, tool.workspace.export_format),
+            template,
+            "not patched"
+        );
         tool.place.output.clear();
-        assert_eq!(tool.object_file("Male~1/m$0.txt"), template, "no mod to be in");
+        assert_eq!(
+            object_file((&tool.workspace.behaviors[0], "Male~1/m$0.txt"), &tool.place, tool.workspace.export_format),
+            template,
+            "no mod to be in"
+        );
     }
 
     #[test]
