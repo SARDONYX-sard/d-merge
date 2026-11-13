@@ -102,6 +102,7 @@ skyrim_esp           = { path = "./crates/core/skyrim_esp" }
 stdx                 = { path = "./crates/core/stdx" }
 
 egui_code_editor  = { path = "./crates/gui/egui_code_editor" }
+egui_tree         = { path = "./crates/gui/egui_tree" }
 egui_widgets      = { path = "./crates/gui/egui_widgets" }
 gh_issue_link     = { path = "./crates/gui/gh_issue_link" }
 gui_shared        = { path = "./crates/gui/gui_shared" }

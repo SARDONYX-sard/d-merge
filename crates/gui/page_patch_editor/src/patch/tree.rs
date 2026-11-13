@@ -447,6 +447,13 @@ pub(super) struct Row {
     pub(super) guides: u64,
 }
 
+impl Row {
+    /// What the keys need of it: how deep, and whether it opens.
+    fn nav(&self) -> egui_tree::NavRow {
+        egui_tree::NavRow { depth: usize::from(self.depth), open: self.expandable.then_some(self.open) }
+    }
+}
+
 /// How a row connects to the rows around it. See [`Row`].
 #[derive(Debug, Clone, Copy)]
 struct RowLines {
@@ -465,81 +472,10 @@ pub(super) const fn has_guide(guides: u64, level: u16) -> bool {
     guides & guide_bit(level) != 0
 }
 
+pub(super) use egui_tree::TreeKey;
+
 /// How many ancestors are pinned over the tree at most. See [`TreeState::sticky_rows`].
 pub(super) const MAX_STICKY: usize = 5;
-
-/// A tree command, whichever key asked for it. The keys are in [`super::ui::tree::read_keys`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum TreeInput {
-    /// `j`, Down
-    Next,
-    /// `k`, Up
-    Previous,
-    /// `g`
-    First,
-    /// `G`
-    Last,
-    /// `h`, Left: close the node, or (already closed) go to its parent.
-    Close,
-    /// `l`, Right: open the node, or (already open) go into it.
-    Open,
-    /// `o`: open the node, or close it if it is open. The cursor stays.
-    Toggle,
-    /// `Enter`, `Esc`, `Space e`: back to the editor.
-    Leave,
-}
-
-impl TreeInput {
-    /// The row a movement leads to in a list of `len` rows (`None`: not a movement).
-    ///
-    /// e.g., `Next` on the last row stays there.
-    pub(super) const fn step(self, current: usize, len: usize) -> Option<usize> {
-        let last = len.saturating_sub(1);
-        match self {
-            Self::Next => Some(if current < last { current + 1 } else { last }),
-            Self::Previous => Some(current.saturating_sub(1)),
-            Self::First => Some(0),
-            Self::Last => Some(last),
-            Self::Close | Self::Open | Self::Toggle | Self::Leave => None,
-        }
-    }
-}
-
-/// What a [`TreeInput`] leads to. See [`apply_input`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Effect {
-    Cursor(usize),
-    SetOpen(Node, bool),
-    Leave,
-    None,
-}
-
-/// The effect of `input` with the cursor on row `cursor`.
-fn apply_input(input: TreeInput, rows: &[Row], cursor: usize) -> Effect {
-    let cursor = cursor.min(rows.len().saturating_sub(1));
-    if let Some(row) = input.step(cursor, rows.len()) {
-        return Effect::Cursor(row);
-    }
-    let row = rows.get(cursor);
-    match input {
-        TreeInput::Close => match row {
-            Some(row) if row.open => Effect::SetOpen(row.node, false),
-            Some(row) => rows[..cursor].iter().rposition(|r| r.depth < row.depth).map_or(Effect::None, Effect::Cursor),
-            None => Effect::None,
-        },
-        TreeInput::Open => match row {
-            Some(row) if row.open => Effect::Cursor(TreeInput::Next.step(cursor, rows.len()).unwrap_or(cursor)),
-            Some(row) if row.expandable => Effect::SetOpen(row.node, true),
-            _ => Effect::None,
-        },
-        TreeInput::Toggle => match row {
-            Some(row) if row.expandable => Effect::SetOpen(row.node, !row.open),
-            _ => Effect::None,
-        },
-        TreeInput::Leave => Effect::Leave,
-        TreeInput::Next | TreeInput::Previous | TreeInput::First | TreeInput::Last => Effect::None,
-    }
-}
 
 /// Tree state kept between frames.
 #[derive(Debug, Default)]
@@ -707,7 +643,7 @@ impl TreeState {
     /// Runs the keys of this frame. Returns `true` if the keyboard goes back to the editor.
     pub(super) fn apply_inputs(
         &mut self,
-        inputs: &[TreeInput],
+        inputs: &[TreeKey],
         graph: &Graph,
         selected: &mut Option<Rc<str>>,
         changed_only: bool,
@@ -716,14 +652,16 @@ impl TreeState {
         let previous = self.cursor;
         let mut leave = false;
         for &input in inputs {
-            match apply_input(input, &self.rows, self.cursor) {
-                Effect::Cursor(cursor) => self.cursor = cursor,
-                Effect::SetOpen(node, open) => {
+            let rows: Vec<egui_tree::NavRow> = self.rows.iter().map(Row::nav).collect();
+            match egui_tree::navigate(input, &rows, self.cursor) {
+                egui_tree::Nav::Cursor(cursor) => self.cursor = cursor,
+                egui_tree::Nav::SetOpen(at, open) => {
+                    let node = self.rows[at].node;
                     self.set_open(graph, node, open);
                     self.rebuild_rows(graph, changed_only);
                 }
-                Effect::Leave => leave = true,
-                Effect::None => {}
+                egui_tree::Nav::Leave => leave = true,
+                egui_tree::Nav::None => {}
             }
         }
         if self.cursor != previous {
@@ -1111,43 +1049,9 @@ mod tests {
         let graph = sample();
         let mut state = TreeState::default();
         let mut selected = None;
-        let leave = state.apply_inputs(&[TreeInput::Next, TreeInput::Next], &graph, &mut selected, false);
+        let leave = state.apply_inputs(&[TreeKey::Next, TreeKey::Next], &graph, &mut selected, false);
         assert!(!leave);
         assert_eq!(selected.as_deref(), Some("#b"));
-        assert!(state.apply_inputs(&[TreeInput::Leave], &graph, &mut selected, false));
-    }
-
-    #[test]
-    fn input_effects() {
-        let row = |node, depth, open, expandable| Row {
-            node,
-            depth,
-            expandable,
-            open,
-            dimmed: false,
-            last_child: false,
-            parent_row: None,
-            guides: 0,
-        };
-        // 0 (open) > 1 (closed, has children), 2 (leaf)
-        let rows = [row(0, 0, true, true), row(1, 1, false, true), row(2, 1, false, false)];
-
-        assert_eq!(apply_input(TreeInput::Next, &rows, 0), Effect::Cursor(1));
-        assert_eq!(apply_input(TreeInput::Next, &rows, 2), Effect::Cursor(2)); // stops at the end
-        assert_eq!(apply_input(TreeInput::Previous, &rows, 0), Effect::Cursor(0));
-        assert_eq!(apply_input(TreeInput::Last, &rows, 0), Effect::Cursor(2));
-
-        assert_eq!(apply_input(TreeInput::Open, &rows, 1), Effect::SetOpen(1, true));
-        assert_eq!(apply_input(TreeInput::Open, &rows, 0), Effect::Cursor(1)); // already open: go in
-        assert_eq!(apply_input(TreeInput::Open, &rows, 2), Effect::None); // a leaf
-        assert_eq!(apply_input(TreeInput::Close, &rows, 0), Effect::SetOpen(0, false));
-        assert_eq!(apply_input(TreeInput::Close, &rows, 2), Effect::Cursor(0)); // to the parent
-
-        assert_eq!(apply_input(TreeInput::Toggle, &rows, 0), Effect::SetOpen(0, false));
-        assert_eq!(apply_input(TreeInput::Toggle, &rows, 1), Effect::SetOpen(1, true));
-        assert_eq!(apply_input(TreeInput::Toggle, &rows, 2), Effect::None); // a leaf
-
-        assert_eq!(apply_input(TreeInput::Next, &[], 0), Effect::Cursor(0)); // nothing to show
-        assert_eq!(apply_input(TreeInput::Close, &[], 0), Effect::None);
+        assert!(state.apply_inputs(&[TreeKey::Leave], &graph, &mut selected, false));
     }
 }

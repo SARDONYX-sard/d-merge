@@ -1593,6 +1593,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui_tree"
+version = "0.0.0"
+dependencies = [
+ "egui",
+]
+
+[[package]]
 name = "egui_widgets"
 version = "0.0.0"
 dependencies = [
@@ -4062,6 +4069,7 @@ dependencies = [
  "chrono",
  "egui",
  "egui_code_editor",
+ "egui_tree",
  "egui_widgets",
  "fast_hash",
  "gui_shared",

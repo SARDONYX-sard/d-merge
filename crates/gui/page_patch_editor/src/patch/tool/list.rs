@@ -63,76 +63,7 @@ pub(in crate::patch) enum FileAction {
     Reveal,
 }
 
-/// Where a list of rows (`ScrollArea::show_rows`) was scrolled when last drawn.
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub(in crate::patch) struct ListScroll {
-    /// The vertical offset, e.g. `120.0`.
-    pub(in crate::patch) offset: f32,
-    /// The height of what is seen of the list.
-    pub(in crate::patch) view: f32,
-}
-
-impl ListScroll {
-    /// Notes where the list is now.
-    #[inline]
-    pub(in crate::patch) fn note<R>(&mut self, output: &egui::scroll_area::ScrollAreaOutput<R>) {
-        (self.offset, self.view) = (output.state.clamped_offset().y, output.inner_rect.height());
-    }
-}
-
-/// The height of a row of the tree and of the lists: each row is drawn exactly that high
-/// ([`fixed_row`]), or `show_rows` would place them, and scroll to them, wrongly.
-pub(in crate::patch) fn row_height(ui: &egui::Ui) -> f32 {
-    ui.spacing().interact_size.y.max(ui.text_style_height(&egui::TextStyle::Monospace) + 4.0)
-}
-
-/// Draws a row of `height` and the view's width exactly, whatever is in it: the rows of a `show_rows`
-/// list must all be of the height it was given, and a list must not widen its side bar.
-pub(in crate::patch) fn fixed_row<R>(ui: &mut egui::Ui, height: f32, add: impl FnOnce(&mut egui::Ui) -> R) -> R {
-    let top_left = ui.cursor().min;
-    let max_rect = egui::Rect::from_min_size(top_left, egui::vec2(ui.available_width().max(1.0), height));
-    let layout = egui::Layout::left_to_right(egui::Align::Center);
-    let mut row = ui.new_child(egui::UiBuilder::new().max_rect(max_rect).layout(layout));
-    let clip = ui.clip_rect();
-    // As wide as the view, whatever is in it: what goes past is cut (the rows are fitted with `…`).
-    // Taking a wider row's width made the side bar wider, which made the rows wider, and so on.
-    row.set_clip_rect(max_rect.intersect(clip));
-    let inner = add(&mut row);
-    ui.allocate_rect(max_rect, egui::Sense::hover());
-    inner
-}
-
-/// The offset that shows `row` whole, as VS Code's explorer reveals a file: scrolled only as much as
-/// it needs, below the `covered` rows pinned over the top (the tree's sticky parents), and never past
-/// the ends, where the list would spring back and shake. `None`: it is shown already.
-///
-/// `(row_height, spacing)`: as given to `show_rows`; `rows`: how many there are.
-///
-/// e.g. rows of 20 px (no spacing), 100 px seen, at 0: row 7 -> `Some(60.0)` (rows 3..=7 seen); row 2
-/// -> `None`; with 2 rows covering the top at 60: row 4 -> `Some(40.0)`.
-pub(in crate::patch) fn offset_to_show(
-    row: usize,
-    (row_height, spacing): (f32, f32),
-    rows: usize,
-    scroll: ListScroll,
-    covered: usize,
-) -> Option<f32> {
-    #[expect(clippy::cast_precision_loss, reason = "far fewer rows than f32 can count")]
-    let (row, rows, covered) = (row as f32, rows as f32, covered as f32);
-    let step = row_height + spacing;
-    let (top, pinned) = (row * step, covered * step);
-    let wanted = if top - pinned < scroll.offset {
-        top - pinned
-    } else if top + row_height > scroll.offset + scroll.view {
-        top + row_height - scroll.view
-    } else {
-        return None;
-    };
-    // As `show_rows` makes the content: no spacing after the last row.
-    let max = rows.mul_add(step, -spacing).max(0.0) - scroll.view;
-    let wanted = wanted.min(max).max(0.0);
-    ((wanted - scroll.offset).abs() >= 0.5).then_some(wanted)
-}
+pub(in crate::patch) use egui_tree::list::{ListScroll, fixed_row, offset_to_show, row_height};
 
 impl PatchTool {
     /// Notes whether the editor `has_focus` this frame. Getting it asks the side bar to show the
@@ -301,7 +232,7 @@ impl PatchTool {
         let mut leave = false;
         let before = current;
         for input in keybinding::host::take_mapped(&mut self.key_commands, ui::tree::tree_input) {
-            leave |= input == tree::TreeInput::Leave;
+            leave |= input == tree::TreeKey::Leave;
             current = input.step(current, rows.len()).unwrap_or(current);
         }
         if let Some(&node) = rows.get(current) {
@@ -406,20 +337,6 @@ mod tests {
         assert!(!take_reveal(Some(&a), false), "a selection alone");
         assert!(take_reveal(Some(&a), true), "the editor got the keyboard");
         assert!(!take_reveal(None, true), "nothing to show");
-    }
-
-    /// Only as much as the row needs, below what is pinned, and never past the ends.
-    #[test]
-    fn a_row_is_scrolled_into_view() {
-        let at = |offset| ListScroll { offset, view: 100.0 };
-        assert_eq!(offset_to_show(7, (20.0, 0.0), 50, at(0.0), 0), Some(60.0), "below: it comes to the bottom");
-        assert_eq!(offset_to_show(2, (20.0, 0.0), 50, at(0.0), 0), None, "seen already");
-        assert_eq!(offset_to_show(1, (20.0, 0.0), 50, at(60.0), 0), Some(20.0), "above: it comes to the top");
-        assert_eq!(offset_to_show(4, (20.0, 0.0), 50, at(60.0), 2), Some(40.0), "under the pinned rows");
-        assert_eq!(offset_to_show(0, (20.0, 0.0), 50, at(60.0), 2), Some(0.0), "not above the start");
-        // 10 rows of 20 px with 4 px between: 236 px, 136 px at most.
-        assert_eq!(offset_to_show(9, (20.0, 4.0), 10, at(0.0), 0), Some(136.0), "not past the end");
-        assert_eq!(offset_to_show(9, (20.0, 4.0), 10, at(136.0), 0), None, "at the end already");
     }
 
     /// Only getting the keyboard asks: keeping it does not, or the side bar could not be scrolled.

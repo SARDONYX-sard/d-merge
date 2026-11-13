@@ -53,40 +53,15 @@ pub(super) fn scm_rows(
     rows
 }
 
-/// What a key of the explorer does in the Changes view.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum ScmKeyEffect {
-    Cursor(usize),
-    /// This revision opens or closes.
-    Toggle(u32),
-    Leave,
-    None,
-}
-
-/// `input` on `rows` with the keyboard on `cursor`, as in a tree: `j` / `k` / `g` / `G` move, `l` opens
-/// a revision (or goes into it), `h` closes it (or goes up to it from a change of it), `o` toggles.
-pub(super) fn scm_key(
-    input: super::tree::TreeInput,
-    rows: &[ScmRow],
-    cursor: usize,
-    open: &std::collections::BTreeSet<u32>,
-) -> ScmKeyEffect {
-    use super::tree::TreeInput;
-    if let Some(next) = input.step(cursor, rows.len()) {
-        return ScmKeyEffect::Cursor(next);
-    }
-    let Some(&row) = rows.get(cursor) else { return ScmKeyEffect::None };
-    match (input, row) {
-        (TreeInput::Leave, _) => ScmKeyEffect::Leave,
-        (TreeInput::Toggle, ScmRow::Revision(number)) => ScmKeyEffect::Toggle(number),
-        (TreeInput::Open, ScmRow::Revision(number)) if !open.contains(&number) => ScmKeyEffect::Toggle(number),
-        (TreeInput::Open, ScmRow::Revision(_)) => ScmKeyEffect::Cursor((cursor + 1).min(rows.len() - 1)),
-        (TreeInput::Close, ScmRow::Revision(number)) if open.contains(&number) => ScmKeyEffect::Toggle(number),
-        (TreeInput::Close, ScmRow::RevisionChange(number, _)) => rows
-            .iter()
-            .position(|row| *row == ScmRow::Revision(number))
-            .map_or(ScmKeyEffect::None, ScmKeyEffect::Cursor),
-        _ => ScmKeyEffect::None,
+impl ScmRow {
+    /// What the keys need of it: a revision opens (if it is in `open`), its changes are in it.
+    pub(super) fn nav(self, open: &std::collections::BTreeSet<u32>) -> egui_tree::NavRow {
+        let (depth, open) = match self {
+            Self::Change(_) => (0, None),
+            Self::Revision(number) => (0, Some(open.contains(&number))),
+            Self::RevisionChange(..) => (1, None),
+        };
+        egui_tree::NavRow { depth, open }
     }
 }
 
@@ -114,23 +89,21 @@ impl Pending {
 mod tests {
     use super::*;
 
-    /// The keys go through the changes, then the history, into a revision open, as in a tree.
+    /// The changes, then the history, with the changes of a revision open under it.
     #[test]
-    fn keys_go_through_the_changes_and_the_history() {
-        use crate::patch::tree::TreeInput;
-        let mut open = std::collections::BTreeSet::new();
+    fn the_rows_are_the_changes_then_the_history() {
+        let open = std::collections::BTreeSet::from([3]);
         let rows = scm_rows(1, &[(3, 2), (2, 1)], &open);
-        assert_eq!(rows, [ScmRow::Change(0), ScmRow::Revision(3), ScmRow::Revision(2)]);
-        assert_eq!(scm_key(TreeInput::Next, &rows, 0, &open), ScmKeyEffect::Cursor(1));
-        assert_eq!(scm_key(TreeInput::Open, &rows, 1, &open), ScmKeyEffect::Toggle(3), "`l` opens #3");
-        open.insert(3);
-        let rows = scm_rows(1, &[(3, 2), (2, 1)], &open);
-        assert_eq!(rows[2], ScmRow::RevisionChange(3, 0));
-        assert_eq!(scm_key(TreeInput::Open, &rows, 1, &open), ScmKeyEffect::Cursor(2), "into it");
-        assert_eq!(scm_key(TreeInput::Close, &rows, 3, &open), ScmKeyEffect::Cursor(1), "`h`: up to #3");
-        assert_eq!(scm_key(TreeInput::Close, &rows, 1, &open), ScmKeyEffect::Toggle(3));
-        assert_eq!(scm_key(TreeInput::Leave, &rows, 0, &open), ScmKeyEffect::Leave);
+        let expected = [
+            ScmRow::Change(0),
+            ScmRow::Revision(3),
+            ScmRow::RevisionChange(3, 0),
+            ScmRow::RevisionChange(3, 1),
+            ScmRow::Revision(2),
+        ];
+        assert_eq!(rows, expected);
     }
+
     use crate::patch::workspace::{ADSF, Behavior};
 
     #[test]

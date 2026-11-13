@@ -7,27 +7,27 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use super::object_list::{RowAction, row_menu};
 use crate::patch::{
     tool::list::{fixed_row, row_height},
-    tree::{Graph, MAX_STICKY, Node, Row, TreeInput, TreeState, has_guide},
+    tree::{Graph, MAX_STICKY, Node, Row, TreeKey, TreeState, has_guide},
 };
 
 /// Pixels of indent per tree level.
 const INDENT: f32 = 12.0;
 
 /// The explorer's command of a key binding command. e.g. `explorer.down` -> `Next`
-pub(in crate::patch) fn tree_input(command: &str) -> Option<TreeInput> {
+pub(in crate::patch) fn tree_input(command: &str) -> Option<TreeKey> {
     use keybinding::commands::{
         EXPLORER_COLLAPSE, EXPLORER_DOWN, EXPLORER_EXPAND, EXPLORER_FIRST, EXPLORER_LAST, EXPLORER_LEAVE,
         EXPLORER_TOGGLE, EXPLORER_UP,
     };
     Some(match command {
-        EXPLORER_DOWN => TreeInput::Next,
-        EXPLORER_UP => TreeInput::Previous,
-        EXPLORER_FIRST => TreeInput::First,
-        EXPLORER_LAST => TreeInput::Last,
-        EXPLORER_COLLAPSE => TreeInput::Close,
-        EXPLORER_EXPAND => TreeInput::Open,
-        EXPLORER_TOGGLE => TreeInput::Toggle,
-        EXPLORER_LEAVE => TreeInput::Leave,
+        EXPLORER_DOWN => TreeKey::Next,
+        EXPLORER_UP => TreeKey::Previous,
+        EXPLORER_FIRST => TreeKey::First,
+        EXPLORER_LAST => TreeKey::Last,
+        EXPLORER_COLLAPSE => TreeKey::Close,
+        EXPLORER_EXPAND => TreeKey::Open,
+        EXPLORER_TOGGLE => TreeKey::Toggle,
+        EXPLORER_LEAVE => TreeKey::Leave,
         _ => return None,
     })
 }
@@ -163,8 +163,7 @@ fn row_ui(
             event = Some(RowEvent::Menu(index, RowAction::KeepOpen));
         }
         if focused && is_selected {
-            let stroke = ui.visuals().selection.stroke;
-            ui.painter().rect_stroke(response.rect, 2.0, stroke, egui::StrokeKind::Outside);
+            egui_tree::list::cursor_frame(ui, response.rect);
         }
         response.context_menu(|ui| {
             // The same as the flat list's, then what only a tree has.

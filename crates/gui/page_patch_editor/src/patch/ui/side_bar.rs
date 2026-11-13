@@ -269,9 +269,7 @@ impl PatchTool {
                             toggled = Some(number);
                         }
                         if cursor == Some(ScmRow::Revision(number)) {
-                            let stroke = ui.visuals().selection.stroke;
-                            let rect = shown.header_response.rect;
-                            ui.painter().rect_stroke(rect, 2.0, stroke, egui::StrokeKind::Outside);
+                            egui_tree::list::cursor_frame(ui, shown.header_response.rect);
                             if moved {
                                 shown.header_response.scroll_to_me(None);
                             }
@@ -432,10 +430,10 @@ impl PatchTool {
         picked
     }
 
-    /// The keys of the Changes view: see [`crate::patch::changes::scm_key`]. Returns the row the
+    /// The keys of the Changes view, as in a tree (see [`egui_tree::navigate`]). Returns the row the
     /// keyboard is on (`None`: the side bar does not have it) and whether it moved this frame.
     fn scm_keys(&mut self, picked: &mut Option<ChangeAction>) -> (Option<ScmRow>, bool) {
-        use crate::patch::changes::{ScmKeyEffect, scm_key, scm_rows};
+        use crate::patch::changes::scm_rows;
         let log: Vec<(u32, usize)> =
             self.workspace.history.log().iter().map(|revision| (revision.number, revision.changes.len())).collect();
         let mut rows = scm_rows(self.scm.pending.changes.len(), &log, &self.scm.open_revisions);
@@ -445,19 +443,24 @@ impl PatchTool {
         }
         let mut moved = false;
         for input in keybinding::host::take_mapped(&mut self.key_commands, super::tree::tree_input) {
-            match scm_key(input, &rows, self.scm.cursor, &self.scm.open_revisions) {
-                ScmKeyEffect::Cursor(at) => {
+            let nav: Vec<_> = rows.iter().map(|row| row.nav(&self.scm.open_revisions)).collect();
+            match egui_tree::navigate(input, &nav, self.scm.cursor) {
+                egui_tree::Nav::Cursor(at) => {
                     moved |= at != self.scm.cursor;
                     self.scm.cursor = at;
                 }
-                ScmKeyEffect::Toggle(number) => {
-                    if !self.scm.open_revisions.remove(&number) {
-                        self.scm.open_revisions.insert(number);
+                egui_tree::Nav::SetOpen(at, open) => {
+                    if let ScmRow::Revision(number) = rows[at] {
+                        if open {
+                            self.scm.open_revisions.insert(number);
+                        } else {
+                            self.scm.open_revisions.remove(&number);
+                        }
                     }
                     rows = scm_rows(self.scm.pending.changes.len(), &log, &self.scm.open_revisions);
                 }
-                ScmKeyEffect::Leave => self.leave_tree(),
-                ScmKeyEffect::None => {}
+                egui_tree::Nav::Leave => self.leave_tree(),
+                egui_tree::Nav::None => {}
             }
         }
         let row = rows.get(self.scm.cursor).copied();
@@ -555,8 +558,7 @@ fn change_row(
         // Cut with `…` to the width left, the whole on hover when cut, as VS Code's.
         let response = super::object_list::fitted_button(ui, false, &text);
         if under_cursor {
-            let stroke = ui.visuals().selection.stroke;
-            ui.painter().rect_stroke(response.rect, 2.0, stroke, egui::StrokeKind::Outside);
+            egui_tree::list::cursor_frame(ui, response.rect);
             if moved {
                 response.scroll_to_me(None);
             }

@@ -186,17 +186,18 @@ impl PatchTool {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
             let inputs = keybinding::host::take_mapped(&mut self.key_commands, super::tree::tree_input);
             for input in inputs {
-                match anim_tree::apply_key(input, &rows, self.anim_tree.cursor) {
-                    anim_tree::AnimKeyEffect::Cursor(at) => {
+                let nav: Vec<_> = rows.iter().map(AnimRow::nav).collect();
+                match egui_tree::navigate(input, &nav, self.anim_tree.cursor) {
+                    egui_tree::Nav::Cursor(at) => {
                         self.anim_tree.cursor = at;
                         cursor_moved = true;
                     }
-                    anim_tree::AnimKeyEffect::Toggle(key) => {
-                        anim_tree::toggle(&mut self.anim_tree.open, &key);
+                    egui_tree::Nav::SetOpen(at, _) => {
+                        anim_tree::toggle(&mut self.anim_tree.open, rows[at].open_key());
                         rows = anim_tree::rows(&files, &self.anim_tree.open, is_adsf, filtering);
                     }
-                    anim_tree::AnimKeyEffect::Leave => self.leave_tree(),
-                    anim_tree::AnimKeyEffect::None => {}
+                    egui_tree::Nav::Leave => self.leave_tree(),
+                    egui_tree::Nav::None => {}
                 }
             }
             if cursor_moved && let Some(AnimRow::File { node, .. }) = rows.get(self.anim_tree.cursor) {
@@ -233,7 +234,7 @@ impl PatchTool {
                 // The keyboard's row has a frame, as in the object tree.
                 if focused_row == Some(first + offset) {
                     let rect = egui::Rect::from_min_size(ui.cursor().min, egui::vec2(ui.available_width(), row_height));
-                    ui.painter().rect_stroke(rect, 2.0, ui.visuals().selection.stroke, egui::StrokeKind::Inside);
+                    egui_tree::list::cursor_frame(ui, rect);
                 }
                 fixed_row(ui, row_height, |ui| match row {
                     AnimRow::Folder { name, files, changed, open } => {

@@ -104,70 +104,23 @@ pub(super) enum AnimRow<'a> {
 }
 
 impl AnimRow<'_> {
-    /// How deep it is: a folder 0, a group of files 1, a file 2.
-    const fn depth(&self) -> usize {
+    /// What the keys need of it: a folder at depth 0, a group of files 1, a file 2.
+    pub(super) const fn nav(&self) -> egui_tree::NavRow {
+        let (depth, open) = match self {
+            Self::Folder { open, .. } => (0, Some(*open)),
+            Self::Group { open, .. } => (1, Some(*open)),
+            Self::File { .. } => (2, None),
+        };
+        egui_tree::NavRow { depth, open }
+    }
+
+    /// What opens and closes it: a folder's name, a group's key; a file: `""`.
+    pub(super) fn open_key(&self) -> &str {
         match self {
-            Self::Folder { .. } => 0,
-            Self::Group { .. } => 1,
-            Self::File { .. } => 2,
+            Self::Folder { name, .. } => name,
+            Self::Group { key, .. } => key,
+            Self::File { .. } => "",
         }
-    }
-
-    /// What opens and closes it, if it does: a folder's name, a group's key.
-    fn open_key(&self) -> Option<(&str, bool)> {
-        match self {
-            Self::Folder { name, open, .. } => Some((name, *open)),
-            Self::Group { key, open, .. } => Some((key, *open)),
-            Self::File { .. } => None,
-        }
-    }
-}
-
-/// What a key of the explorer does to the tree of animation data, as it does to the object tree.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) enum AnimKeyEffect {
-    /// The keyboard goes to this row.
-    Cursor(usize),
-    /// This folder / group opens or closes (its key).
-    Toggle(String),
-    /// Back to the editor.
-    Leave,
-    None,
-}
-
-/// `input` on `rows` with the keyboard on row `cursor`:
-///
-/// | key        | does                                                              |
-/// | ---------- | ----------------------------------------------------------------- |
-/// | `j` `k` `g` `G` | the next / previous / first / last row                       |
-/// | `l`        | opens a closed folder / group; on an open one, its first row      |
-/// | `h`        | closes an open folder / group; else to the row it is in           |
-/// | `o`        | opens or closes a folder / group                                  |
-/// | `Enter`    | back to the editor                                                |
-pub(super) fn apply_key(input: crate::patch::tree::TreeInput, rows: &[AnimRow<'_>], cursor: usize) -> AnimKeyEffect {
-    use crate::patch::tree::TreeInput;
-    if let Some(next) = input.step(cursor, rows.len()) {
-        return AnimKeyEffect::Cursor(next);
-    }
-    let Some(row) = rows.get(cursor) else { return AnimKeyEffect::None };
-    let toggle = |key: &str| AnimKeyEffect::Toggle(key.to_owned());
-    match (input, row.open_key()) {
-        (TreeInput::Leave, _) => AnimKeyEffect::Leave,
-        // `o`; `l` on a closed one opens it; `h` on an open one closes it.
-        (TreeInput::Toggle, Some((key, _)))
-        | (TreeInput::Open, Some((key, false)))
-        | (TreeInput::Close, Some((key, true))) => toggle(key),
-        // `l` on an open one: into it.
-        (TreeInput::Open, Some((_, true))) => {
-            AnimKeyEffect::Cursor(if cursor + 1 < rows.len() { cursor + 1 } else { cursor })
-        }
-        // `h` on a closed one or a file: up to the row it is in.
-        (TreeInput::Close, _) => {
-            let depth = row.depth();
-            let parent = rows[..cursor].iter().rposition(|above| above.depth() < depth);
-            parent.map_or(AnimKeyEffect::None, AnimKeyEffect::Cursor)
-        }
-        _ => AnimKeyEffect::None,
     }
 }
 
@@ -275,24 +228,6 @@ mod tests {
 
     fn count_files(rows: &[AnimRow<'_>]) -> usize {
         rows.iter().filter(|row| matches!(row, AnimRow::File { .. })).count()
-    }
-
-    /// The keys go as in the object tree: through the rows, opening and closing, up to a parent.
-    #[test]
-    fn keys_go_through_the_tree() {
-        use crate::patch::tree::TreeInput;
-        let open = HashSet::from_iter(["A~1".to_owned(), "A~1/Clip".to_owned()]);
-        let list = rows(&FILES, &open, true, false);
-        // 0 A~1, 1 Header, 2 Clip, 3 Idle~m$0.txt, 4 Motion, 5 B~1
-        assert_eq!(apply_key(TreeInput::Next, &list, 0), AnimKeyEffect::Cursor(1));
-        assert_eq!(apply_key(TreeInput::Last, &list, 0), AnimKeyEffect::Cursor(5));
-        assert_eq!(apply_key(TreeInput::Close, &list, 3), AnimKeyEffect::Cursor(2), "`h` on a file: its group");
-        assert_eq!(apply_key(TreeInput::Close, &list, 2), AnimKeyEffect::Toggle("A~1/Clip".to_owned()));
-        assert_eq!(apply_key(TreeInput::Open, &list, 1), AnimKeyEffect::Toggle("A~1/Header".to_owned()), "closed");
-        assert_eq!(apply_key(TreeInput::Open, &list, 2), AnimKeyEffect::Cursor(3), "open: into it");
-        assert_eq!(apply_key(TreeInput::Toggle, &list, 5), AnimKeyEffect::Toggle("B~1".to_owned()));
-        assert_eq!(apply_key(TreeInput::Close, &list, 1), AnimKeyEffect::Cursor(0), "a closed group: its folder");
-        assert_eq!(apply_key(TreeInput::Leave, &list, 3), AnimKeyEffect::Leave);
     }
 
     #[test]
