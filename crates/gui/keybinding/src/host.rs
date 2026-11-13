@@ -80,6 +80,12 @@ pub fn editor_request(command: &str) -> Option<egui_code_editor::EditorRequest> 
     })
 }
 
+/// The command of an editor's request: the other way of [`editor_request`].
+#[must_use]
+pub fn command_of_request(request: egui_code_editor::EditorRequest) -> Option<&'static str> {
+    crate::COMMANDS.iter().map(|command| command.id).find(|id| editor_request(id) == Some(request))
+}
+
 /// The Problems panel's key of a command. e.g. `problems.down` -> `Next`
 #[must_use]
 pub fn problems_key(command: &str) -> Option<egui_code_editor::ProblemsKey> {
@@ -125,7 +131,18 @@ fn which_key(ctx: &egui::Context, bindings: &Keybindings, context: &KeyContext) 
     if bindings.pending().is_empty() {
         return;
     }
-    let next = bindings.continuations(context);
+    let mut next: Vec<(std::borrow::Cow<'_, str>, &str)> = bindings
+        .continuations(context)
+        .into_iter()
+        .map(|(rest, command)| (std::borrow::Cow::Owned(rest), command.description))
+        .collect();
+    // `g` held for `g t` ...: Vim's own keys after it come too, as its which-key had them.
+    if context.vim && crate::keys_text(bindings.pending()) == "g" {
+        next.extend(
+            egui_code_editor::keymap::vim_own_g_keys().map(|(rest, text)| (std::borrow::Cow::Borrowed(rest), text)),
+        );
+        next.sort_by(|a, b| a.0.cmp(&b.0));
+    }
     if next.is_empty() {
         return;
     }
@@ -137,9 +154,9 @@ fn which_key(ctx: &egui::Context, bindings: &Keybindings, context: &KeyContext) 
             egui::Frame::popup(ui.style()).show(ui, |ui| {
                 ui.strong(crate::keys_text(bindings.pending()));
                 egui::Grid::new("keybinding_which_key_rows").num_columns(2).spacing([16.0, 2.0]).show(ui, |ui| {
-                    for (rest, command) in next {
-                        ui.monospace(rest);
-                        ui.label(command.description);
+                    for (rest, text) in next {
+                        ui.monospace(rest.as_ref());
+                        ui.label(text);
                         ui.end_row();
                     }
                 });
@@ -161,6 +178,8 @@ pub struct KeyUi {
     recorder: KeyRecorder,
     /// The keys of [`EDITOR_ACTIONS`] as the palette shows them, for `cached_for`.
     palette: Vec<(&'static str, String)>,
+    /// The keys of the editor's own commands, for its palette. See `egui_code_editor::CodeEditor::request_keys`.
+    request_keys: Vec<(egui_code_editor::EditorRequest, String)>,
     /// The bindings and the context the palette's keys are of: computed again only when they change.
     cached_for: Option<(u64, KeyContext)>,
     /// The context the recorder was opened in: the binding it replaces is the one working there.
@@ -216,6 +235,13 @@ impl KeyUi {
                 .iter()
                 .map(|(action, command)| (*action, bindings.keys_of(command, &editor).unwrap_or_default()))
                 .collect();
+            self.request_keys = crate::COMMANDS
+                .iter()
+                .filter_map(|command| {
+                    let request = editor_request(command.id)?;
+                    Some((request, bindings.keys_of(command.id, &editor).unwrap_or_default()))
+                })
+                .collect();
             self.record_context = editor;
         }
         out
@@ -259,6 +285,19 @@ impl KeyUi {
     /// The `⚙` of palette action `action`: the recorder opens for its command.
     pub fn configure(&mut self, action: &str) {
         if let Some(command) = command_of_action(action) {
+            self.configure_command(command);
+        }
+    }
+
+    /// The keys of the editor's own commands, for `CodeEditor::request_keys`.
+    #[must_use]
+    pub fn request_keys(&self) -> &[(egui_code_editor::EditorRequest, String)] {
+        &self.request_keys
+    }
+
+    /// The `⚙` of one of the editor's own commands in its palette: the recorder opens for it.
+    pub fn configure_request(&mut self, request: egui_code_editor::EditorRequest) {
+        if let Some(command) = command_of_request(request) {
             self.configure_command(command);
         }
     }

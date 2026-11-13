@@ -331,12 +331,12 @@ impl Keybindings {
                     }
                     Lookup::None if self.pending.is_empty() => at += 1,
                     Lookup::None => {
-                        // The held keys start nothing with this one: back to the widgets, and this key
-                        // is looked at again alone.
+                        // The held keys start nothing with this one: back to the widgets with it, as
+                        // they came (Vim's `gg` after a held `g`).
                         let held = give_back(&self.pending);
                         let count = held.len();
                         input.events.splice(at..at, held);
-                        at += count;
+                        at += count + 1;
                         self.pending.clear();
                     }
                 }

@@ -332,7 +332,14 @@ pub(in crate::patch) fn hover_if_cut(
     graph: &Graph,
     node: Node,
 ) -> egui::Response {
-    if response.rect.right() <= ui.clip_rect().right() + 0.5 {
+    /// Seconds the pointer rests on the row before it shows: moving over the tree shows nothing.
+    const DELAY: f64 = 0.7;
+    if response.rect.right() <= ui.clip_rect().right() + 0.5 || !response.hovered() {
+        return response;
+    }
+    let still = ui.input(|i| i.pointer.time_since_last_movement());
+    if f64::from(still) < DELAY {
+        ui.ctx().request_repaint_after(std::time::Duration::from_secs_f64(DELAY - f64::from(still)));
         return response;
     }
     response.on_hover_ui(|ui| {

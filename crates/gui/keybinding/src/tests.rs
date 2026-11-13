@@ -125,8 +125,10 @@ fn what_of_the_file_cannot_be_taken_is_told() {
 fn the_keys_of_a_command_are_shown_as_written() {
     let keys = Keybindings::default();
     assert_eq!(keys.keys_of(commands::PROBLEMS_TOGGLE, &EDITOR).as_deref(), Some("ctrl+shift+l"));
-    // The last binding of it: `alt+l` comes after `ctrl+pagedown`.
-    assert_eq!(keys.keys_of(commands::TABS_NEXT, &EDITOR).as_deref(), Some("alt+l"));
+    // The last binding of it that works: Vim's `g t` comes after `alt+l`; the Normal keymap has no `g t`.
+    assert_eq!(keys.keys_of(commands::TABS_NEXT, &EDITOR).as_deref(), Some("g t"));
+    let normal = KeyContext { vim: false, vim_mode: None, ..EDITOR };
+    assert_eq!(keys.keys_of(commands::TABS_NEXT, &normal).as_deref(), Some("alt+l"));
 }
 
 #[test]
@@ -147,4 +149,21 @@ fn the_user_file_is_made_and_read_again_when_it_changes() {
     let ctx = egui::Context::default();
     assert_eq!(frame(&ctx, &mut keys, &EDITOR, press("f9"), 11.0).0, [commands::TABS_CLOSE]);
     std::fs::remove_dir_all(&dir).unwrap();
+}
+
+/// Vim's `gt` / `gd` are key bindings: `g` waits; what starts nothing (`gg`) goes on to Vim.
+#[test]
+fn vim_g_keys_are_bindings_and_the_rest_is_vims() {
+    let (ctx, mut keys) = (egui::Context::default(), Keybindings::default());
+    assert!(frame(&ctx, &mut keys, &EDITOR, press("g"), 0.0).1.is_empty(), "held");
+    assert_eq!(frame(&ctx, &mut keys, &EDITOR, press("t"), 0.1).0, [commands::TABS_NEXT]);
+    frame(&ctx, &mut keys, &EDITOR, press("g"), 0.2);
+    let (commands, left) = frame(&ctx, &mut keys, &EDITOR, press("g"), 0.3);
+    assert!(commands.is_empty());
+    // (egui takes the second press of a key not let go of for a repeat: its text is what counts.)
+    let typed: Vec<&egui::Event> = left.iter().filter(|event| matches!(event, egui::Event::Text(_))).collect();
+    assert_eq!(typed, [&egui::Event::Text("g".to_owned()), &egui::Event::Text("g".to_owned())], "Vim's `gg`");
+    let insert = KeyContext { vim_mode: Some("insert"), ..EDITOR };
+    let left = frame(&ctx, &mut keys, &insert, press("g"), 0.4).1;
+    assert!(left.contains(&egui::Event::Text("g".to_owned())), "typed in Insert mode");
 }

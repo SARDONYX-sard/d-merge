@@ -32,6 +32,8 @@ pub const EDITOR_FORMAT_AND_SAVE: &str = "editor.formatAndSave";
 pub const EDITOR_TOGGLE_PREVIEW: &str = "editor.togglePreview";
 pub const EDITOR_TOGGLE_INLINE_DIFF: &str = "editor.toggleInlineDiff";
 pub const EXPLORER_FOCUS: &str = "explorer.focus";
+pub const EDITOR_NEXT_CHANGE: &str = "editor.nextChange";
+pub const EDITOR_PREVIOUS_CHANGE: &str = "editor.previousChange";
 pub const FILE_COPY_PATH: &str = "file.copyPath";
 pub const FILE_REVEAL: &str = "file.reveal";
 pub const KEYBINDINGS_OPEN_JSON: &str = "keybindings.openJson";
@@ -74,13 +76,33 @@ const EXPLORER: Option<&str> = Some("explorerFocus && !inputFocus");
 const EDITOR: Option<&str> = Some("editorFocus");
 /// Vim's leader keys (`Space ...`): in Normal mode, with no command being typed.
 const VIM_NORMAL: Option<&str> = Some("editorFocus && vim.mode == 'normal'");
+/// The same, in the patch editor: what only it has (the tree, the inline diff).
+const VIM_NORMAL_PATCH: Option<&str> = Some("editorFocus && vim.mode == 'normal' && page == 'patchEditor'");
 /// The Problems panel has the keyboard.
 const PROBLEMS: Option<&str> = Some("problemsFocus");
 
 /// Every command, in the order of the settings.
 pub const COMMANDS: &[Command] = &[
-    Command { id: TABS_NEXT, description: "Next tab", defaults: &[("ctrl+pagedown", None), ("alt+l", None)] },
-    Command { id: TABS_PREVIOUS, description: "Previous tab", defaults: &[("ctrl+pageup", None), ("alt+h", None)] },
+    Command {
+        id: TABS_NEXT,
+        description: "Next tab",
+        defaults: &[("ctrl+pagedown", None), ("alt+l", None), ("g t", VIM_NORMAL)],
+    },
+    Command {
+        id: TABS_PREVIOUS,
+        description: "Previous tab",
+        defaults: &[("ctrl+pageup", None), ("alt+h", None), ("g shift+t", VIM_NORMAL)],
+    },
+    Command {
+        id: EDITOR_NEXT_CHANGE,
+        description: "The next change (of the inline diff, or the preview)",
+        defaults: &[("] c", VIM_NORMAL_PATCH)],
+    },
+    Command {
+        id: EDITOR_PREVIOUS_CHANGE,
+        description: "The previous change (of the inline diff, or the preview)",
+        defaults: &[("[ c", VIM_NORMAL_PATCH)],
+    },
     Command {
         id: TABS_CLOSE,
         description: "Close the tab",
@@ -89,7 +111,7 @@ pub const COMMANDS: &[Command] = &[
     Command {
         id: EXPLORER_FOCUS,
         description: "Move the keyboard to the object tree / list",
-        defaults: &[("space e", Some("editorFocus && vim.mode == 'normal' && page == 'patchEditor'"))],
+        defaults: &[("space e", VIM_NORMAL_PATCH)],
     },
     Command {
         id: EDITOR_TOGGLE_PREVIEW,
@@ -99,7 +121,7 @@ pub const COMMANDS: &[Command] = &[
     Command {
         id: EDITOR_TOGGLE_INLINE_DIFF,
         description: "Show or hide the changes inside the editor",
-        defaults: &[("space d", Some("editorFocus && vim.mode == 'normal' && page == 'patchEditor'"))],
+        defaults: &[("space d", VIM_NORMAL_PATCH)],
     },
     Command {
         id: EDITOR_FORMAT_AND_SAVE,
@@ -194,8 +216,16 @@ pub const COMMANDS: &[Command] = &[
         description: "The editor's command palette",
         defaults: &[("ctrl+shift+p", EDITOR)],
     },
-    Command { id: EDITOR_GO_TO_DEFINITION, description: "Go to the definition", defaults: &[("f12", EDITOR)] },
-    Command { id: EDITOR_FIND_REFERENCES, description: "Find the references", defaults: &[("shift+f12", EDITOR)] },
+    Command {
+        id: EDITOR_GO_TO_DEFINITION,
+        description: "Go to the definition",
+        defaults: &[("f12", EDITOR), ("g d", VIM_NORMAL)],
+    },
+    Command {
+        id: EDITOR_FIND_REFERENCES,
+        description: "Find the references",
+        defaults: &[("shift+f12", EDITOR), ("g shift+d", VIM_NORMAL)],
+    },
     Command {
         id: EDITOR_FIND,
         description: "The find bar (Normal keymap; Vim has /)",

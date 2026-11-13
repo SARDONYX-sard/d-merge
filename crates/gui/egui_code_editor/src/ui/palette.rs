@@ -17,6 +17,8 @@ pub(crate) struct PaletteInput<'a, 'b> {
     pub(crate) actions: &'a [EditorAction<'a>],
     /// See [`crate::CodeEditor::requests`].
     pub(crate) requests: Option<&'b [crate::EditorRequest]>,
+    /// See [`crate::CodeEditor::request_keys`].
+    pub(crate) request_keys: Option<&'a [(crate::EditorRequest, String)]>,
 }
 
 /// Opens on `Ctrl+Shift+P`; while open, handles its keys and draws. Call before the keymap
@@ -32,7 +34,7 @@ pub(crate) fn show<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput
     if !palette.open {
         return None;
     }
-    let commands = commands(&palette.query, input.context, input.labels, input.actions);
+    let commands = commands(&palette.query, input.context, input.labels, (input.actions, input.request_keys));
     let keys = read_keys(ui);
     let from_keys = palette.on_keys(keys, &commands);
     let clicked = draw(palette, ui, input, &commands);
@@ -146,14 +148,18 @@ fn draw<'a>(
                         if ui.add_sized([ui.available_width() - gear, 0.0], button).clicked() {
                             clicked = Some(command.picked);
                         }
-                        let Picked::Host(id) = command.picked else { return };
+                        let configure = match command.picked {
+                            Picked::Host(id) => Picked::Configure(id),
+                            Picked::Builtin(builtin) => Picked::ConfigureBuiltin(builtin),
+                            _ => return,
+                        };
                         if command.configurable
                             && ui
                                 .add(egui::Button::new("⚙").small().frame(false))
                                 .on_hover_text(input.labels.configure_keybinding)
                                 .clicked()
                         {
-                            clicked = Some(Picked::Configure(id));
+                            clicked = Some(configure);
                         }
                     });
                 }

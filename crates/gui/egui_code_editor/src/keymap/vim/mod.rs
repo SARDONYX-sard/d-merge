@@ -273,6 +273,12 @@ impl VimState {
             if host_keys && leader {
                 continue; // a binding of the host's that was not completed: it means nothing to Vim
             }
+            // `gt`, `gd`, `]c` ... (no count) are the host's key bindings then: given back to Vim
+            // only when the user took them away, so they do nothing here.
+            if host_keys && host_owned(&self.pending, key) {
+                self.pending.clear();
+                continue;
+            }
             self.feed(key, &mut exec);
         }
 
@@ -390,6 +396,17 @@ impl VimState {
     }
 }
 
+/// The keys the host's key bindings have when it has the keys (see `VimState::handle`): `gt` `gT`
+/// `gd` `gD` `]c` `[c`, without a count or a register before them.
+///
+/// e.g. pending `[g]` + `t` -> `true`; pending `[3, g]` + `t` -> `false` (Vim's `3gt`)
+const fn host_owned(pending: &[VimKey], key: VimKey) -> bool {
+    matches!(
+        (pending, key),
+        ([VimKey::Char('g')], VimKey::Char('t' | 'T' | 'd' | 'D')) | ([VimKey::Char(']' | '[')], VimKey::Char('c'))
+    )
+}
+
 /// `Ctrl+C` with a selection (Visual mode, or one made with the mouse) copies it, as VSCodeVim's
 /// `overrideCopy`; it still leaves the mode as `Esc` does (see [`keys::take`]). Without one it is only
 /// that `Esc`.
@@ -409,6 +426,16 @@ fn copy_selection(ui: &egui::Ui, id: egui::Id, text: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// With the host's keys, `gt` ... are the host's; with a count they are Vim's (`3gt`).
+    #[test]
+    fn the_host_has_g_keys_without_a_count() {
+        let g = [VimKey::Char('g')];
+        assert!(host_owned(&g, VimKey::Char('t')) && host_owned(&g, VimKey::Char('D')));
+        assert!(host_owned(&[VimKey::Char(']')], VimKey::Char('c')));
+        assert!(!host_owned(&g, VimKey::Char('g')), "`gg` is Vim's");
+        assert!(!host_owned(&[VimKey::Char('3'), VimKey::Char('g')], VimKey::Char('t')), "`3gt` is Vim's");
+    }
 
     fn exec(text: &str) -> exec::Exec {
         exec::Exec {

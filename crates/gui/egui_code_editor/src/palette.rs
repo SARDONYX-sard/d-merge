@@ -198,6 +198,22 @@ impl Builtin {
         }
     }
 
+    /// The host's request of it (see [`crate::CodeEditor::request_keys`]). `None`: Hover, by the
+    /// keymap's own key (Vim `K`).
+    pub(crate) const fn request(self) -> Option<crate::EditorRequest> {
+        use crate::EditorRequest as Request;
+        Some(match self {
+            Self::GoToDefinition => Request::GoToDefinition,
+            Self::FindReferences => Request::FindReferences,
+            Self::Find => Request::Find,
+            Self::GoToLine => Request::GoToLine,
+            Self::QuickFix => Request::QuickFix,
+            Self::Format => Request::Format,
+            Self::Completion => Request::Completion,
+            Self::ShowHover => return None,
+        })
+    }
+
     /// Whether the command makes sense now. e.g., Vim has its own `/`, so no find bar there.
     const fn available(self, context: PaletteContext) -> bool {
         match self {
@@ -217,6 +233,8 @@ pub(crate) enum Picked<'a> {
     Host(&'a str),
     /// The `⚙` of a host action: change its keys.
     Configure(&'a str),
+    /// The `⚙` of one of the editor's commands whose keys are the host's: change them.
+    ConfigureBuiltin(Builtin),
 }
 
 impl<'a> Picked<'a> {
@@ -224,7 +242,15 @@ impl<'a> Picked<'a> {
     pub(crate) const fn host_action(self) -> Option<&'a str> {
         match self {
             Self::Host(action) => Some(action),
-            Self::Builtin(_) | Self::Configure(_) => None,
+            Self::Builtin(_) | Self::Configure(_) | Self::ConfigureBuiltin(_) => None,
+        }
+    }
+
+    /// The editor's command whose keys are to be changed, as the host asks for it.
+    pub(crate) const fn configure_request(self) -> Option<crate::EditorRequest> {
+        match self {
+            Self::ConfigureBuiltin(command) => command.request(),
+            _ => None,
         }
     }
 
@@ -232,7 +258,7 @@ impl<'a> Picked<'a> {
     pub(crate) const fn configure(self) -> Option<&'a str> {
         match self {
             Self::Configure(action) => Some(action),
-            Self::Builtin(_) | Self::Host(_) => None,
+            Self::Builtin(_) | Self::Host(_) | Self::ConfigureBuiltin(_) => None,
         }
     }
 }
@@ -259,13 +285,23 @@ pub(crate) struct Command<'a> {
     pub(crate) aliases: [&'a str; 3],
 }
 
+/// A request of the host with its keys, e.g. `(Format, "shift+alt+f")`: see
+/// [`crate::CodeEditor::request_keys`].
+pub(crate) type RequestKeys = (crate::EditorRequest, String);
+
 /// The commands available now that match `query`: the host's first.
 pub(crate) fn commands<'a>(
     query: &str,
     context: PaletteContext,
     labels: &EditorLabels<'a>,
-    actions: &'a [EditorAction<'a>],
+    (actions, request_keys): (&'a [EditorAction<'a>], Option<&'a [RequestKeys]>),
 ) -> Vec<Command<'a>> {
+    // The editor's commands with the host's keys, if it has them: those, and a `⚙`.
+    let host_keys = |command: Builtin| {
+        let request = command.request()?;
+        let keys = request_keys?.iter().find(|(known, _)| *known == request).map_or("", |(_, keys)| keys.as_str());
+        Some(keys)
+    };
     let host = actions.iter().map(|action| Command {
         picked: Picked::Host(action.id),
         label: action.label,
@@ -276,8 +312,8 @@ pub(crate) fn commands<'a>(
     let builtin = Builtin::ALL.into_iter().filter(|command| command.available(context)).map(|command| Command {
         picked: Picked::Builtin(command),
         label: command.label(labels),
-        shortcut: command.shortcut(),
-        configurable: false,
+        shortcut: host_keys(command).unwrap_or_else(|| command.shortcut()),
+        configurable: host_keys(command).is_some(),
         aliases: [command.label(&EditorLabels::ENGLISH), "", ""],
     });
     // As VS Code's: by the label shown, or the English one, or the id.
@@ -377,8 +413,9 @@ mod tests {
         let context = PaletteContext { keymap: Keymap::Normal, features: EditorFeatures::default(), inserting: true };
         let japanese = EditorLabels { format: "ドキュメントのフォーマット", ..EditorLabels::ENGLISH };
         let actions = [EditorAction::new("close_tab", "タブを閉じる").with_aliases(["Close the tab", "tabs.close"])];
-        let found =
-            |query: &str| commands(query, context, &japanese, &actions).iter().map(|c| c.label).collect::<Vec<_>>();
+        let found = |query: &str| {
+            commands(query, context, &japanese, (&actions, None)).iter().map(|c| c.label).collect::<Vec<_>>()
+        };
         for query in ["タブ", "close the", "tabs.close", "close_tab"] {
             assert_eq!(found(query), ["タブを閉じる"], "{query}");
         }
@@ -413,12 +450,12 @@ mod tests {
         let actions = [EditorAction::new("save", "Save")];
         let vim_normal = PaletteContext { keymap: Keymap::Vim, features: EditorFeatures::default(), inserting: false };
 
-        let listed = commands("", vim_normal, &labels, &actions);
+        let listed = commands("", vim_normal, &labels, (&actions, None));
         assert_eq!(listed[0].picked, Picked::Host("save"));
         // Vim has its own search, and suggestions need Insert mode.
         assert!(!listed.iter().any(|c| c.picked == Picked::Builtin(Builtin::Find)));
         assert!(!listed.iter().any(|c| c.picked == Picked::Builtin(Builtin::Completion)));
-        assert_eq!(commands("save", vim_normal, &labels, &actions).len(), 1);
+        assert_eq!(commands("save", vim_normal, &labels, (&actions, None)).len(), 1);
     }
 
     #[test]

@@ -100,6 +100,13 @@ const G: &[WhichKey] = &[
     own("g~", "Toggle the case (then a motion)"),
 ];
 
+/// Vim's own keys after `g` that the host's key bindings do not have, with what they do: for a
+/// host whose bindings hold `g` (to list them with its own). e.g. `("g", "First line")`
+pub fn own_g_keys() -> impl Iterator<Item = (&'static str, &'static str)> {
+    const HOSTS: [&str; 4] = ["gd", "gD", "gt", "gT"];
+    G.iter().filter(|key| key.needs.is_none() && !HOSTS.contains(&key.keys)).map(|key| (key.key(), key.text))
+}
+
 /// The prefix the pending keys wait on, with what may come before it: `Space`, `3g`, `"ag`.
 pub(super) fn waiting_prefix(keys: &[VimKey]) -> Option<Prefix> {
     let keys = match keys {

@@ -230,27 +230,32 @@ impl HkannoPage {
         }
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
 
-        let CodeEditorOutput { changed, cursor, command, configure, action, .. } = egui::ScrollArea::both()
-            .id_salt("hkanno_editor_scroll")
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                CodeEditor::new(tab.settings.input_path.as_str(), &mut tab.text)
-                    .language(&language)
-                    .diagnostics(&tab.editor_diagnostics)
-                    .features(features)
-                    .keymap(keymap)
-                    .labels(egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)))
-                    .actions(&actions)
-                    .host_commands(&HOST_COMMANDS)
-                    .requests(&requests)
-                    .show(ui, &mut tab.editor)
-            })
-            .inner;
+        let CodeEditorOutput { changed, cursor, command, configure, configure_request, action, .. } =
+            egui::ScrollArea::both()
+                .id_salt("hkanno_editor_scroll")
+                .auto_shrink(false)
+                .show(ui, |ui| {
+                    CodeEditor::new(tab.settings.input_path.as_str(), &mut tab.text)
+                        .language(&language)
+                        .diagnostics(&tab.editor_diagnostics)
+                        .features(features)
+                        .keymap(keymap)
+                        .labels(egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)))
+                        .actions(&actions)
+                        .host_commands(&HOST_COMMANDS)
+                        .requests(&requests)
+                        .request_keys(self.key_ui.request_keys())
+                        .show(ui, &mut tab.editor)
+                })
+                .inner;
 
         // Both borrow the palette's keys: what they ask for is taken before it is done.
         let open_json = action.is_some_and(|action| action == keybinding::host::OPEN_JSON_ACTION);
         if let Some(command) = configure.and_then(keybinding::host::command_of_action) {
             self.key_ui.configure_command(command);
+        }
+        if let Some(request) = configure_request {
+            self.key_ui.configure_request(request);
         }
         if open_json {
             self.key_ui.run_action(keybinding::host::OPEN_JSON_ACTION);

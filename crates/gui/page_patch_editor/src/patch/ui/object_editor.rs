@@ -252,6 +252,13 @@ impl PatchTool {
             self.pane.show_inline_diff = !self.pane.show_inline_diff;
         }
         let format_and_save = self.key_command(commands::EDITOR_FORMAT_AND_SAVE);
+        // Vim's `]c` / `[c` (key bindings).
+        if self.key_command(commands::EDITOR_NEXT_CHANGE) {
+            self.step_change(true);
+        }
+        if self.key_command(commands::EDITOR_PREVIOUS_CHANGE) {
+            self.step_change(false);
+        }
         let names = self.names();
         let values = self.field_values();
         // The class (and fields) around the cursor line of last frame: field names / hover.
@@ -409,6 +416,7 @@ impl PatchTool {
                     .labels(labels)
                     .host_commands(&HOST_COMMANDS)
                     .requests(&requests)
+                    .request_keys(self.key_ui.request_keys())
                     .actions(&actions)
                     .inline_diff(self.pane.show_inline_diff.then_some(&self.pane.inline_diff))
                     .show(ui, &mut self.pane.state);
@@ -419,6 +427,9 @@ impl PatchTool {
                 result.inline_revert = output.inline_revert;
                 result.command = output.command;
                 result.configure = output.configure.and_then(keybinding::host::command_of_action);
+                if let Some(request) = output.configure_request {
+                    result.configure = keybinding::host::command_of_request(request);
+                }
                 if output.action.is_some_and(|action| action == keybinding::host::OPEN_JSON_ACTION) {
                     result.configure = Some(keybinding::host::OPEN_JSON_ACTION);
                 }

@@ -58,6 +58,8 @@ pub struct CodeEditorOutput<'a> {
     /// The id of the [`EditorAction`] whose `⚙` was clicked in the palette: the host lets its keys
     /// be changed, as VS Code's palette does.
     pub configure: Option<&'a str>,
+    /// The editor's own command whose `⚙` was clicked: see [`CodeEditor::request_keys`].
+    pub configure_request: Option<EditorRequest>,
     /// The `↶` of this [`InlineDiff::hunks`] entry was clicked: the host puts it back.
     pub inline_revert: Option<usize>,
 }
@@ -85,6 +87,7 @@ pub struct CodeEditor<'a> {
     read_only: bool,
     host_commands: &'a [EditorCommand],
     requests: Option<&'a [EditorRequest]>,
+    request_keys: Option<&'a [(EditorRequest, String)]>,
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -112,7 +115,17 @@ impl<'a> CodeEditor<'a> {
             read_only: false,
             host_commands: &[],
             requests: None,
+            request_keys: None,
         }
+    }
+
+    /// The host's keys of the editor's commands, as its palette shows them (e.g.
+    /// `(Format, "shift+alt+f")`; `""`: none), each with a `⚙` that asks the host to change them
+    /// ([`CodeEditorOutput::configure_request`]). For a host that gives its [`Self::requests`].
+    #[inline]
+    pub const fn request_keys(mut self, keys: &'a [(EditorRequest, String)]) -> Self {
+        self.request_keys = Some(keys);
+        self
     }
 
     /// The editor's commands the host's keys asked for this frame (see [`EditorRequest`]): the
@@ -226,6 +239,7 @@ impl<'a> CodeEditor<'a> {
             read_only,
             host_commands,
             requests,
+            request_keys,
         } = self;
         if read_only {
             // In a buffer that stays: this is every frame.
@@ -239,6 +253,7 @@ impl<'a> CodeEditor<'a> {
             keymap,
             inline_diff,
             requests,
+            request_keys,
         };
 
         state.indent = language.indent();
@@ -346,6 +361,7 @@ impl<'a> CodeEditor<'a> {
             navigation,
             action: input.picked.and_then(palette::Picked::host_action),
             configure: input.picked.and_then(palette::Picked::configure),
+            configure_request: input.picked.and_then(palette::Picked::configure_request),
             inline_revert,
         }
     }
@@ -363,6 +379,8 @@ struct EditorFrame<'a> {
     inline_diff: Option<&'a InlineDiff>,
     /// See [`CodeEditor::requests`].
     requests: Option<&'a [EditorRequest]>,
+    /// See [`CodeEditor::request_keys`].
+    request_keys: Option<&'a [(EditorRequest, String)]>,
 }
 
 #[cfg(test)]
