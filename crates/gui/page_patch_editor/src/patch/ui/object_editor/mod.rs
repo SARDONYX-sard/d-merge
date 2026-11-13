@@ -39,13 +39,13 @@ impl PatchTool {
 
         self.open_in_editor(&id);
         let editor_id = egui_code_editor::editor_id(("nemesis_object", self.is_user_patch, &id));
-        self.apply_focus_request(ui.ctx(), editor_id);
+        self.pane.apply_focus_request(ui.ctx(), editor_id);
         self.focus_keys(ui, editor_id);
         if self.leaving_keys(ui, &id) {
             return;
         }
 
-        self.expire_preview(ui.ctx());
+        self.pane.expire_preview(ui.ctx());
         self.refresh_preview(&id);
 
         let preview_event = self.side_panel(ui, i18n, &id);

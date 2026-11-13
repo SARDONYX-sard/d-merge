@@ -125,7 +125,7 @@ impl PatchTool {
         requests: &[EditorRequest],
         result: &mut EditorResult,
     ) {
-        let values = self.field_values();
+        let values = self.pane.field_values(self.active, &self.workspace.behaviors[self.active]);
         let behavior = &self.workspace.behaviors[self.active];
         let is_pandora_doc = id == PANDORA_DOC;
 

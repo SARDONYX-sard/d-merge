@@ -1,14 +1,12 @@
 //! The open object: its tabs, what it shows beside the text, and what the editor asked for.
 
-use std::{borrow::Cow, path::Path, rc::Rc, time::Instant};
+use std::{path::Path, rc::Rc, time::Instant};
 
 use egui_code_editor::{CodeEditorState, Diagnostic, EditorCommand, InlineDiff};
 use egui_widgets::TabAction;
 use gui_shared::settings::ui::editor::{EditorMode, LspOptions};
 
-use crate::patch::{
-    EditorResult, FocusAt, PatchTool, REFRESH_DELAY, TabEvent, anim, editor, workspace, workspace::PANDORA_DOC,
-};
+use crate::patch::{EditorResult, FocusAt, PatchTool, TabEvent, anim, editor, workspace, workspace::PANDORA_DOC};
 
 /// The editor of the open object, and what is shown beside it.
 ///
@@ -175,7 +173,8 @@ impl PatchTool {
         let current = left.as_ref().filter(|(behavior, _)| *behavior == self.active).map(|(_, id)| id.as_str());
         self.tabs.open(self.active, id, current);
         self.pane.state = self.tabs.take_state(self.active, id);
-        self.refresh_trigger_names();
+        let template_dir = Path::new(&self.place.template_dir);
+        self.pane.refresh_trigger_names(&self.workspace.behaviors[self.active], template_dir);
 
         let text = self.workspace.behaviors[self.active].text(id).unwrap_or_default();
         text.clone_into(&mut self.pane.text);
@@ -183,103 +182,21 @@ impl PatchTool {
         self.pane.opened = Some((self.active, id.to_owned()));
     }
 
-    /// In a clip data file, trigger lines complete with the known names.
-    fn refresh_trigger_names(&mut self) {
-        let behavior = &self.workspace.behaviors[self.active];
-        if !behavior.adsf {
-            return;
-        }
-        let template_dir = Path::new(&self.place.template_dir);
-        let template =
-            self.pane.template_triggers.get_or_insert_with(|| anim::data::template_trigger_names(template_dir));
-        self.pane.trigger_names = anim::data::trigger_names(template, behavior);
-    }
-
-    /// Gives the editor the keyboard and moves its cursor, if that was asked for.
-    pub(in crate::patch) fn apply_focus_request(&mut self, ctx: &egui::Context, editor: egui::Id) {
-        let Some(at) = self.pane.focus.take() else { return };
-        let index = match at {
-            FocusAt::Line(line) => {
-                egui_code_editor::text_pos::LinePos { line, column: 0 }.to_char_index(&self.pane.text)
-            }
-            FocusAt::Keep => egui::TextEdit::load_state(ctx, editor)
-                .and_then(|state| state.cursor.char_range())
-                .map_or(0, |range| range.primary.index.0),
-        };
-        egui_code_editor::set_cursor(ctx, editor, index);
-    }
-
-    /// The pause after typing is over: `preview` goes, for [`Self::refresh_preview`] to compute it.
-    /// Until then the last results stay on screen, as in VS Code.
-    pub(in crate::patch) fn expire_preview(&mut self, ctx: &egui::Context) {
-        let Some(typed_at) = self.pane.typed_at else { return };
-        let left = REFRESH_DELAY.saturating_sub(typed_at.elapsed());
-        if left.is_zero() {
-            self.pane.typed_at = None;
-            self.pane.preview = None;
-        } else {
-            ctx.request_repaint_after(left);
-        }
-    }
-
-    /// Recomputes the patch, its check and the underlines after the text changed.
+    /// Recomputes the preview of `id` if it is due, and then the work's problems of it. See
+    /// [`EditorPane::refresh_preview`].
     pub(in crate::patch) fn refresh_preview(&mut self, id: &str) {
         if self.pane.preview.is_some() {
             return;
         }
         self.sync_pandora_doc();
-        let behavior = &self.workspace.behaviors[self.active];
-        let patch = behavior.patch(self.place.mod_code.trim(), id);
-        let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(id, patch, self.parser_mode));
-        self.pane.problems = if id == PANDORA_DOC {
-            editor::pandora::diagnostics(&self.pane.text, behavior)
-        } else if behavior.is_anim_data() {
-            self.pane.anim_roles = anim::lines::roles(behavior.adsf, id, &self.pane.text);
-            Vec::new() // Only the parser's, below: see `anim_lines`.
-        } else if behavior.is_ref(id) {
-            Vec::new() // not this mod's to fix
-        } else {
-            let is_new = behavior.added.contains_key(id);
-            editor::diagnostics::field_diagnostics(&self.pane.text, behavior, is_new, self.place.mod_code.trim())
+        let settings = super::pane::PreviewSettings {
+            code: self.place.mod_code.trim(),
+            parser_mode: self.parser_mode,
+            export_format: self.workspace.export_format,
         };
-        // Keep the ▲ / ▼ position across edits.
-        let current = self.pane.preview_view.as_ref().map_or(0, |view| view.current);
-        let nemesis_view = patch.as_deref().map(editor::preview::Preview::new);
-        // The parser reads the patch, whose lines are the Nemesis preview's: back to the editor's.
-        if let Err(error) = &check {
-            let view = nemesis_view.as_ref();
-            let to_editor_line = |line| view.and_then(|view| view.editor_line_of(line, &self.pane.text));
-            editor::diagnostics::add_parser_error(&mut self.pane.problems, &self.pane.text, error, to_editor_line);
+        if self.pane.refresh_preview(&self.workspace.behaviors[self.active], id, settings) {
+            self.refresh_problems(id);
         }
-        // What the export would write. Animation data stays lines: Pandora's export doesn't write it.
-        let as_pandora = self.workspace.export_format == workspace::ExportFormat::PandoraV5 && !behavior.is_anim_data();
-        let (view, check) = if as_pandora {
-            match editor::pandora::op_preview(behavior, id) {
-                Ok(view) => (Some(view), Ok(())),
-                Err(problem) => (None, Err(problem)),
-            }
-        } else {
-            (nemesis_view, check)
-        };
-        self.pane.preview_view = view;
-        if let Some(view) = &mut self.pane.preview_view {
-            view.keep_current(current);
-        }
-        self.pane.preview = Some((patch.map(Cow::into_owned), check));
-        self.pane.inline_diff = behavior
-            .template_object(id)
-            .map_or_else(InlineDiff::default, |template| InlineDiff::between(&template.text, &self.pane.text));
-        self.refresh_problems(id);
-    }
-
-    /// Enum / flag values only depend on the template: computed once per behavior.
-    pub(in crate::patch) fn field_values(&mut self) -> Rc<editor::language::FieldValues> {
-        let active = self.active;
-        let cached = self.pane.field_values.take().filter(|(cached, _)| *cached == active);
-        let (_, values) = cached
-            .unwrap_or_else(|| (active, Rc::new(editor::language::field_values(&self.workspace.behaviors[active]))));
-        self.pane.field_values = Some((active, Rc::clone(&values)));
-        values
     }
 
     /// Does what the tab bar asked for. `current`: the object shown now.
