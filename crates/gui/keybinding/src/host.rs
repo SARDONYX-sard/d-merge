@@ -121,6 +121,24 @@ impl KeyUi {
         out
     }
 
+    /// `action` as the palette lists it: its keys and `⚙` if it is a command here, and found by
+    /// its English name (`english`, when the label is translated) and its command id too.
+    ///
+    /// e.g. `close_tab` "タブを閉じる" -> keys `ctrl+w`, found by `Close the tab` and `tabs.close`
+    #[must_use]
+    pub fn palette_action<'a>(
+        &'a self,
+        action: egui_code_editor::EditorAction<'a>,
+        english: &'a str,
+    ) -> egui_code_editor::EditorAction<'a> {
+        let command = command_of_action(action.id).unwrap_or_default();
+        let action = action.with_aliases([english, command]);
+        match self.palette_keys(action.id) {
+            Some(keys) => action.with_keys(keys),
+            None => action,
+        }
+    }
+
     /// The keys a palette action shows (`""`: none yet). `None`: it is no command, so it has no `⚙`.
     #[must_use]
     pub fn palette_keys(&self, action: &str) -> Option<&str> {

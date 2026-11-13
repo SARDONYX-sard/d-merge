@@ -24,12 +24,23 @@ pub struct EditorAction<'a> {
     /// Its keys as the host's key bindings have them, e.g. `ctrl+w`; `""` for none. `Some`: they can
     /// be changed, as in VS Code's palette: its `⚙` comes back as [`crate::CodeEditorOutput::configure`].
     pub keys: Option<&'a str>,
+    /// More it is found by in the palette, besides its label and id: e.g. its English name when the
+    /// label is translated, and the host's command id. `""`: none.
+    pub aliases: [&'a str; 2],
 }
 
 impl<'a> EditorAction<'a> {
     #[inline]
     pub const fn new(id: &'a str, label: &'a str) -> Self {
-        Self { id, label, keys: None }
+        Self { id, label, keys: None, aliases: ["", ""] }
+    }
+
+    /// More it is found by. See [`Self::aliases`]. e.g. `["Close the tab", "tabs.close"]`
+    #[inline]
+    #[must_use]
+    pub const fn with_aliases(mut self, aliases: [&'a str; 2]) -> Self {
+        self.aliases = aliases;
+        self
     }
 
     /// Its keys, and that they can be changed. See [`Self::keys`].
@@ -108,26 +119,32 @@ impl<'a> EditorLabels<'a> {
 }
 
 impl Default for EditorLabels<'_> {
+    #[inline]
     fn default() -> Self {
-        Self {
-            go_to_definition: "Go to Definition",
-            find_references: "Find References",
-            find: "Find",
-            go_to_line: "Go to Line",
-            quick_fix: "Quick Fix",
-            format: "Format Document",
-            show_hover: "Show Hover",
-            completion: "Trigger Suggest",
-            cut: "Cut",
-            copy: "Copy",
-            paste: "Paste",
-            select_all: "Select All",
-            command_palette: "Command Palette",
-            revert_change: "Revert this change",
-            palette_hint: "Type a command",
-            configure_keybinding: "Configure Keybinding",
-        }
+        Self::ENGLISH
     }
+}
+
+impl EditorLabels<'_> {
+    /// The English texts, the default: also what the palette finds a translated command by.
+    pub const ENGLISH: EditorLabels<'static> = EditorLabels {
+        go_to_definition: "Go to Definition",
+        find_references: "Find References",
+        find: "Find",
+        go_to_line: "Go to Line",
+        quick_fix: "Quick Fix",
+        format: "Format Document",
+        show_hover: "Show Hover",
+        completion: "Trigger Suggest",
+        cut: "Cut",
+        copy: "Copy",
+        paste: "Paste",
+        select_all: "Select All",
+        command_palette: "Command Palette",
+        revert_change: "Revert this change",
+        palette_hint: "Type a command",
+        configure_keybinding: "Configure Keybinding",
+    };
 }
 
 /// The editor's own commands.
@@ -238,6 +255,8 @@ pub(crate) struct Command<'a> {
     pub(crate) shortcut: &'a str,
     /// Its keys can be changed: a `⚙` on its row.
     pub(crate) configurable: bool,
+    /// What else it is found by: e.g. its id, its English name. See [`EditorAction::aliases`].
+    pub(crate) aliases: [&'a str; 3],
 }
 
 /// The commands available now that match `query`: the host's first.
@@ -252,14 +271,20 @@ pub(crate) fn commands<'a>(
         label: action.label,
         shortcut: action.keys.unwrap_or_default(),
         configurable: action.keys.is_some(),
+        aliases: [action.id, action.aliases[0], action.aliases[1]],
     });
     let builtin = Builtin::ALL.into_iter().filter(|command| command.available(context)).map(|command| Command {
         picked: Picked::Builtin(command),
         label: command.label(labels),
         shortcut: command.shortcut(),
         configurable: false,
+        aliases: [command.label(&EditorLabels::ENGLISH), "", ""],
     });
-    host.chain(builtin).filter(|command| matches_query(query, command.label)).collect()
+    // As VS Code's: by the label shown, or the English one, or the id.
+    let found = |command: &Command<'_>| {
+        std::iter::once(command.label).chain(command.aliases).any(|text| !text.is_empty() && matches_query(query, text))
+    };
+    host.chain(builtin).filter(|command| query.trim().is_empty() || found(command)).collect()
 }
 
 /// Do the chars of `query` appear in `label`, in order? (ASCII case ignored.)
@@ -287,11 +312,14 @@ pub(crate) struct Palette {
     pub(crate) selected: usize,
     /// The palette's rect last frame: a click outside it closes it.
     pub(crate) rect: Option<egui::Rect>,
+    /// Just opened: its field takes the keyboard when it is drawn. (A focus asked for by id before
+    /// the field exists is lost: the field's own response asks, as the find bar's does.)
+    pub(crate) focus_field: bool,
 }
 
 impl Palette {
     pub(crate) fn reopen(&mut self) {
-        *self = Self { open: true, ..Self::default() };
+        *self = Self { open: true, focus_field: true, ..Self::default() };
     }
 
     /// Moves the selection (wrapping around); `Enter` returns the selected command.
@@ -343,9 +371,23 @@ impl Triggers {
 mod tests {
     use super::*;
 
+    /// A translated command is also found by its English name and its ids, as in VS Code.
+    #[test]
+    fn a_command_is_found_by_its_english_name_and_ids() {
+        let context = PaletteContext { keymap: Keymap::Normal, features: EditorFeatures::default(), inserting: true };
+        let japanese = EditorLabels { format: "ドキュメントのフォーマット", ..EditorLabels::ENGLISH };
+        let actions = [EditorAction::new("close_tab", "タブを閉じる").with_aliases(["Close the tab", "tabs.close"])];
+        let found =
+            |query: &str| commands(query, context, &japanese, &actions).iter().map(|c| c.label).collect::<Vec<_>>();
+        for query in ["タブ", "close the", "tabs.close", "close_tab"] {
+            assert_eq!(found(query), ["タブを閉じる"], "{query}");
+        }
+        assert_eq!(found("format doc"), ["ドキュメントのフォーマット"], "a builtin by its English name");
+    }
+
     const COMMANDS: [Command<'_>; 2] = [
-        Command { picked: Picked::Host("a"), label: "A", shortcut: "", configurable: false },
-        Command { picked: Picked::Host("b"), label: "B", shortcut: "", configurable: false },
+        Command { picked: Picked::Host("a"), label: "A", shortcut: "", configurable: false, aliases: ["", "", ""] },
+        Command { picked: Picked::Host("b"), label: "B", shortcut: "", configurable: false, aliases: ["", "", ""] },
     ];
 
     #[test]

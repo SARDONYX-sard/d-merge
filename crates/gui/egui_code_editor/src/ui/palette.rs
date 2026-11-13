@@ -35,10 +35,11 @@ pub(crate) fn show<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput
     picked
 }
 
-/// Opens the palette with the keyboard in its field. `editor`: the editor it belongs to.
+/// Opens the palette with the keyboard in its field (when it is drawn). `editor`: the editor it
+/// belongs to; the keyboard leaves it now, so that it takes no key meanwhile.
 pub(crate) fn open(palette: &mut Palette, ui: &egui::Ui, editor: egui::Id) {
     palette.reopen();
-    ui.memory_mut(|m| m.request_focus(field_id(editor)));
+    ui.memory_mut(|m| m.surrender_focus(editor));
 }
 
 /// The keys the editor takes in any keymap, whether or not the palette is open.
@@ -107,7 +108,11 @@ fn draw<'a>(
                     .id(field_id(input.id))
                     .hint_text(input.labels.palette_hint)
                     .desired_width(f32::INFINITY);
-                if ui.add(field).changed() {
+                let field = ui.add(field);
+                if std::mem::take(&mut palette.focus_field) {
+                    field.request_focus();
+                }
+                if field.changed() {
                     palette.selected = 0;
                 }
                 for (i, command) in commands.iter().enumerate() {

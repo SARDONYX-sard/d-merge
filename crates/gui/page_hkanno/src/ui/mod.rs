@@ -161,17 +161,22 @@ impl HkannoPage {
 
         let i18n = ctx.i18n;
         // With their keys as the key bindings have them, and a `⚙` to change them, as VS Code's.
-        let keyed = |action| with_palette_keys(&self.key_ui, action);
+        // With their keys as the key bindings have them and a `⚙` to change them, and found by their
+        // English names and command ids too, as VS Code's.
+        let key_ui = &self.key_ui;
+        let act = |action: egui_code_editor::EditorAction<'static>, key: I18nKey| {
+            key_ui.palette_action(egui_code_editor::EditorAction { label: i18n.t(key), ..action }, key.default_eng())
+        };
         let actions = [
-            keyed(EditorCommand::NextTab.action(i18n.t(I18nKey::EditorNextTab))),
-            keyed(EditorCommand::PreviousTab.action(i18n.t(I18nKey::EditorPreviousTab))),
-            keyed(EditorCommand::CloseTab.action(i18n.t(I18nKey::EditorCloseTab))),
-            EditorCommand::TogglePreview.action(i18n.t(I18nKey::EditorTogglePreview)),
-            keyed(EditorCommand::RevealFile.action(i18n.t(gui_shared::i18n::REVEAL_IN_FILE_MANAGER))),
-            keyed(egui_code_editor::EditorAction::new(
-                keybinding::host::OPEN_JSON_ACTION,
-                i18n.t(I18nKey::KeybindingOpenJson),
-            )),
+            act(EditorCommand::NextTab.action(""), I18nKey::EditorNextTab),
+            act(EditorCommand::PreviousTab.action(""), I18nKey::EditorPreviousTab),
+            act(EditorCommand::CloseTab.action(""), I18nKey::EditorCloseTab),
+            act(EditorCommand::TogglePreview.action(""), I18nKey::EditorTogglePreview),
+            act(EditorCommand::RevealFile.action(""), gui_shared::i18n::REVEAL_IN_FILE_MANAGER),
+            act(
+                egui_code_editor::EditorAction::new(keybinding::host::OPEN_JSON_ACTION, ""),
+                I18nKey::KeybindingOpenJson,
+            ),
         ];
         let lsp = &ctx.lsp_settings;
         let language = HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
@@ -450,17 +455,6 @@ impl HkannoPage {
             input_focus: !editor_focus && egui_ctx.egui_wants_keyboard_input(),
             ..Default::default()
         }
-    }
-}
-
-/// `action` with its keys and its `⚙`, if it is a command of the key bindings.
-fn with_palette_keys<'a>(
-    key_ui: &'a keybinding::KeyUi,
-    action: egui_code_editor::EditorAction<'a>,
-) -> egui_code_editor::EditorAction<'a> {
-    match key_ui.palette_keys(action.id) {
-        Some(keys) => action.with_keys(keys),
-        None => action,
     }
 }
 

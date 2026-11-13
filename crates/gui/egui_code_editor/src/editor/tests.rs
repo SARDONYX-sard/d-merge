@@ -391,3 +391,23 @@ second line",
     assert_eq!(frames.copied(vec![egui::Event::Copy]).as_deref(), Some("abc"));
     assert!(frames.selection().is_empty(), "back to Normal mode");
 }
+
+/// `Ctrl+Shift+P`: the palette opens with the keyboard in its field, as VS Code's.
+#[test]
+fn the_palette_takes_the_keyboard() {
+    for keymap in [Keymap::Normal, Keymap::Vim] {
+        let mut frames = Frames::new("abc");
+        frames.keymap = keymap;
+        frames.frame(Vec::new());
+        let modifiers = egui::Modifiers { ctrl: true, command: true, shift: true, ..Default::default() };
+        let key =
+            |pressed| egui::Event::Key { key: egui::Key::P, physical_key: None, pressed, repeat: false, modifiers };
+        frames.frame(vec![key(true), key(false)]);
+        frames.frame(Vec::new());
+        assert!(frames.state.palette.open, "{keymap:?}");
+        let field = frames.id.with("palette_field");
+        assert_eq!(frames.ctx.memory(|m| m.focused()), Some(field), "{keymap:?}");
+        frames.frame(vec![egui::Event::Text("fmt".to_owned())]);
+        assert_eq!(frames.state.palette.query, "fmt", "{keymap:?}: typed into the field");
+    }
+}
