@@ -318,6 +318,8 @@ impl PatchTool {
         let mut left_problems = false;
         // `j` / `k` / `Enter` ... of the key bindings, while the panel has the keyboard.
         let problem_keys = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::problems_key);
+        // The editor's own commands, by the key bindings' keys: it reads none of its keys itself then.
+        let requests = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::editor_request);
 
         // The status bar counts the whole work's problems, of which the open object's are a part.
         self.pane.state.set_status_problems(counts);
@@ -391,6 +393,7 @@ impl PatchTool {
                     .keymap(keymap)
                     .labels(labels)
                     .host_commands(&HOST_COMMANDS)
+                    .requests(&requests)
                     .actions(&actions)
                     .inline_diff(self.pane.show_inline_diff.then_some(&self.pane.inline_diff))
                     .show(ui, &mut self.pane.state);

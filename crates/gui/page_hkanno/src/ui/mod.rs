@@ -200,6 +200,8 @@ impl HkannoPage {
         // Status line first (bottom of the area), so it stays visible while the text scrolls.
         let mut toggle_problems = false;
         let options_hover = ctx.i18n.t(I18nKey::LspOptionsTitle);
+        // The editor's own commands, by the key bindings' keys: it reads none of its keys itself then.
+        let requests = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::editor_request);
         egui::Panel::bottom("hkanno_status_bar").show(ui, |ui| {
             // Its counts show or hide the Problems panel; `Vim ▾` and `⚙` at its right end, as VS Code's.
             let mut chosen = keymap;
@@ -232,6 +234,7 @@ impl HkannoPage {
                     .labels(egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)))
                     .actions(&actions)
                     .host_commands(&HOST_COMMANDS)
+                    .requests(&requests)
                     .show(ui, &mut tab.editor)
             })
             .inner;

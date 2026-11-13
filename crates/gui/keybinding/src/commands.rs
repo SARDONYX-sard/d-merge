@@ -31,6 +31,22 @@ pub const EDITOR_SAVE: &str = "editor.save";
 pub const FILE_COPY_PATH: &str = "file.copyPath";
 pub const FILE_REVEAL: &str = "file.reveal";
 pub const KEYBINDINGS_OPEN_JSON: &str = "keybindings.openJson";
+pub const EDITOR_TRIGGER_SUGGEST: &str = "editor.triggerSuggest";
+pub const EDITOR_FORMAT: &str = "editor.format";
+pub const EDITOR_QUICK_FIX: &str = "editor.quickFix";
+pub const EDITOR_COMMAND_PALETTE: &str = "editor.commandPalette";
+pub const EDITOR_GO_TO_DEFINITION: &str = "editor.goToDefinition";
+pub const EDITOR_FIND_REFERENCES: &str = "editor.findReferences";
+pub const EDITOR_FIND: &str = "editor.find";
+pub const EDITOR_GO_TO_LINE: &str = "editor.goToLine";
+pub const EDITOR_DELETE_LINES: &str = "editor.deleteLines";
+pub const EDITOR_MOVE_LINES_UP: &str = "editor.moveLinesUp";
+pub const EDITOR_MOVE_LINES_DOWN: &str = "editor.moveLinesDown";
+pub const EDITOR_COPY_LINES_UP: &str = "editor.copyLinesUp";
+pub const EDITOR_COPY_LINES_DOWN: &str = "editor.copyLinesDown";
+pub const EDITOR_INSERT_LINE_BELOW: &str = "editor.insertLineBelow";
+pub const EDITOR_INSERT_LINE_ABOVE: &str = "editor.insertLineAbove";
+pub const EDITOR_TOGGLE_COMMENT: &str = "editor.toggleComment";
 pub const EXPLORER_DOWN: &str = "explorer.down";
 pub const EXPLORER_UP: &str = "explorer.up";
 pub const EXPLORER_FIRST: &str = "explorer.first";
@@ -50,6 +66,8 @@ pub const PROBLEMS_LEAVE: &str = "problems.leave";
 const NORMAL_EDITOR: Option<&str> = Some("editorFocus && !vim");
 /// The explorer has the keyboard, not a text field.
 const EXPLORER: Option<&str> = Some("explorerFocus && !inputFocus");
+/// The code editor has the keyboard.
+const EDITOR: Option<&str> = Some("editorFocus");
 /// The Problems panel has the keyboard.
 const PROBLEMS: Option<&str> = Some("problemsFocus");
 
@@ -130,6 +148,62 @@ pub const COMMANDS: &[Command] = &[
     },
     Command { id: PROBLEMS_LEAVE, description: "Problems: back to the editor", defaults: &[("escape", PROBLEMS)] },
     Command { id: EDITOR_SAVE, description: "Save", defaults: &[("ctrl+s", None)] },
+    Command {
+        id: EDITOR_TRIGGER_SUGGEST,
+        description: "Open the completion list",
+        defaults: &[("ctrl+space", EDITOR)],
+    },
+    Command { id: EDITOR_FORMAT, description: "Format the document", defaults: &[("shift+alt+f", EDITOR)] },
+    Command { id: EDITOR_QUICK_FIX, description: "The quick fixes at the cursor", defaults: &[("ctrl+.", EDITOR)] },
+    Command {
+        id: EDITOR_COMMAND_PALETTE,
+        description: "The editor's command palette",
+        defaults: &[("ctrl+shift+p", EDITOR)],
+    },
+    Command { id: EDITOR_GO_TO_DEFINITION, description: "Go to the definition", defaults: &[("f12", EDITOR)] },
+    Command { id: EDITOR_FIND_REFERENCES, description: "Find the references", defaults: &[("shift+f12", EDITOR)] },
+    Command {
+        id: EDITOR_FIND,
+        description: "The find bar (Normal keymap; Vim has /)",
+        defaults: &[("ctrl+f", NORMAL_EDITOR)],
+    },
+    Command {
+        id: EDITOR_GO_TO_LINE,
+        description: "Go to a line (Normal keymap; Vim has :42)",
+        defaults: &[("ctrl+g", NORMAL_EDITOR)],
+    },
+    Command { id: EDITOR_DELETE_LINES, description: "Delete the lines", defaults: &[("ctrl+shift+k", NORMAL_EDITOR)] },
+    Command { id: EDITOR_MOVE_LINES_UP, description: "Move the lines up", defaults: &[("alt+up", NORMAL_EDITOR)] },
+    Command {
+        id: EDITOR_MOVE_LINES_DOWN,
+        description: "Move the lines down",
+        defaults: &[("alt+down", NORMAL_EDITOR)],
+    },
+    Command {
+        id: EDITOR_COPY_LINES_UP,
+        description: "Copy the lines up",
+        defaults: &[("shift+alt+up", NORMAL_EDITOR)],
+    },
+    Command {
+        id: EDITOR_COPY_LINES_DOWN,
+        description: "Copy the lines down",
+        defaults: &[("shift+alt+down", NORMAL_EDITOR)],
+    },
+    Command {
+        id: EDITOR_INSERT_LINE_BELOW,
+        description: "Insert a line below",
+        defaults: &[("ctrl+enter", NORMAL_EDITOR)],
+    },
+    Command {
+        id: EDITOR_INSERT_LINE_ABOVE,
+        description: "Insert a line above",
+        defaults: &[("ctrl+shift+enter", NORMAL_EDITOR)],
+    },
+    Command {
+        id: EDITOR_TOGGLE_COMMENT,
+        description: "Comment the lines out, or back in",
+        defaults: &[("ctrl+/", EDITOR)],
+    },
     Command {
         id: FILE_COPY_PATH,
         description: "Copy the path of the selected object's file (VS Code's Copy Path)",

@@ -47,6 +47,39 @@ pub fn take_mapped<T>(commands: &mut Vec<&'static str>, map: impl Fn(&str) -> Op
     taken
 }
 
+/// The code editor's request of a command (see `egui_code_editor::EditorRequest`): the editor's
+/// own keys are the key bindings' then. e.g. `editor.toggleComment` -> `ToggleComment`
+#[must_use]
+pub fn editor_request(command: &str) -> Option<egui_code_editor::EditorRequest> {
+    use egui_code_editor::EditorRequest as Request;
+
+    use crate::commands::{
+        EDITOR_COMMAND_PALETTE, EDITOR_COPY_LINES_DOWN, EDITOR_COPY_LINES_UP, EDITOR_DELETE_LINES, EDITOR_FIND,
+        EDITOR_FIND_REFERENCES, EDITOR_FORMAT, EDITOR_GO_TO_DEFINITION, EDITOR_GO_TO_LINE, EDITOR_INSERT_LINE_ABOVE,
+        EDITOR_INSERT_LINE_BELOW, EDITOR_MOVE_LINES_DOWN, EDITOR_MOVE_LINES_UP, EDITOR_QUICK_FIX,
+        EDITOR_TOGGLE_COMMENT, EDITOR_TRIGGER_SUGGEST,
+    };
+    Some(match command {
+        EDITOR_TRIGGER_SUGGEST => Request::Completion,
+        EDITOR_FORMAT => Request::Format,
+        EDITOR_QUICK_FIX => Request::QuickFix,
+        EDITOR_COMMAND_PALETTE => Request::CommandPalette,
+        EDITOR_GO_TO_DEFINITION => Request::GoToDefinition,
+        EDITOR_FIND_REFERENCES => Request::FindReferences,
+        EDITOR_FIND => Request::Find,
+        EDITOR_GO_TO_LINE => Request::GoToLine,
+        EDITOR_DELETE_LINES => Request::DeleteLines,
+        EDITOR_MOVE_LINES_UP => Request::MoveLinesUp,
+        EDITOR_MOVE_LINES_DOWN => Request::MoveLinesDown,
+        EDITOR_COPY_LINES_UP => Request::CopyLinesUp,
+        EDITOR_COPY_LINES_DOWN => Request::CopyLinesDown,
+        EDITOR_INSERT_LINE_BELOW => Request::InsertLineBelow,
+        EDITOR_INSERT_LINE_ABOVE => Request::InsertLineAbove,
+        EDITOR_TOGGLE_COMMENT => Request::ToggleComment,
+        _ => return None,
+    })
+}
+
 /// The Problems panel's key of a command. e.g. `problems.down` -> `Next`
 #[must_use]
 pub fn problems_key(command: &str) -> Option<egui_code_editor::ProblemsKey> {
