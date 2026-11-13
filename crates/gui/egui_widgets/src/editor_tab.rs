@@ -28,6 +28,7 @@ pub struct EditorTab {
     read_only: bool,
     height: f32,
     padding: f32,
+    max_text_width: f32,
 }
 
 /// What happened to an [`EditorTab`] this frame.
@@ -37,6 +38,8 @@ pub struct EditorTabOutput {
     pub response: egui::Response,
     /// Its `✖` was clicked, or it was middle clicked.
     pub close: bool,
+    /// Its text was cut with `…` to [`EditorTab::max_text_width`]: the host may show the whole on hover.
+    pub elided: bool,
 }
 
 impl EditorTab {
@@ -44,6 +47,8 @@ impl EditorTab {
     const HEIGHT: f32 = 26.0;
     /// Default of [`Self::padding`].
     const PADDING: f32 = 10.0;
+    /// Default of [`Self::max_text_width`].
+    const MAX_TEXT_WIDTH: f32 = 240.0;
     /// The square of `✖` / `●`.
     const CLOSE_SIZE: f32 = 16.0;
     /// The line on top of the shown tab.
@@ -62,6 +67,7 @@ impl EditorTab {
             read_only: false,
             height: Self::HEIGHT,
             padding: Self::PADDING,
+            max_text_width: Self::MAX_TEXT_WIDTH,
         }
     }
 
@@ -100,6 +106,13 @@ impl EditorTab {
         self
     }
 
+    /// The widest its text gets, cut with `…` past it, so that `✖` stays in reach (default 240).
+    #[inline]
+    pub const fn max_text_width(mut self, width: f32) -> Self {
+        self.max_text_width = width;
+        self
+    }
+
     /// Its height (default 26).
     #[inline]
     pub const fn height(mut self, height: f32) -> Self {
@@ -125,7 +138,9 @@ impl EditorTab {
             }
             text => text,
         };
-        let galley = text.into_galley(ui, Some(egui::TextWrapMode::Extend), f32::INFINITY, egui::TextStyle::Body);
+        let galley =
+            text.into_galley(ui, Some(egui::TextWrapMode::Truncate), self.max_text_width, egui::TextStyle::Body);
+        let elided = galley.elided;
         let lock = if self.read_only { Self::CLOSE_SIZE + 2.0 } else { 0.0 };
         let width = self.padding + galley.size().x + 6.0 + lock + Self::CLOSE_SIZE + self.padding;
         let (rect, response) = ui.allocate_exact_size(egui::vec2(width, self.height), egui::Sense::click());
@@ -136,7 +151,7 @@ impl EditorTab {
         let close_response = ui.interact(close_rect, response.id.with("close"), egui::Sense::click());
         let close = close_response.clicked() || response.middle_clicked();
         if !ui.is_rect_visible(rect) {
-            return EditorTabOutput { response, close };
+            return EditorTabOutput { response, close, elided };
         }
 
         let visuals = ui.visuals();
@@ -177,6 +192,6 @@ impl EditorTab {
             let font = egui::FontId::proportional(Self::CLOSE_SIZE * 0.75);
             painter.text(close_rect.center(), egui::Align2::CENTER_CENTER, mark, font, color);
         }
-        EditorTabOutput { response, close }
+        EditorTabOutput { response, close, elided }
     }
 }

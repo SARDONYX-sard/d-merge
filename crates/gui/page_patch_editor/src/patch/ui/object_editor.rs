@@ -680,6 +680,11 @@ pub(in crate::patch) fn tab_bar(
                     .preview(!view.pinned)
                     .show(ui);
                 let at = view.at;
+                // Cut with `…` (the `✖` stays in reach): the whole title on hover.
+                let tab = egui_widgets::EditorTabOutput {
+                    response: if tab.elided { tab.response.on_hover_text(view.title) } else { tab.response },
+                    ..tab
+                };
                 if tab.response.clicked() {
                     event = Some(TabEvent::ShowView(at));
                 }
