@@ -44,6 +44,11 @@ fn sample() -> Graph {
     Graph::from_objects(&objects, Some("#root"))
 }
 
+/// The tree of `graph` as the page shows it.
+const fn source(graph: &Graph, changed_only: bool) -> ObjectTree<'_> {
+    ObjectTree { graph, changed_only }
+}
+
 fn ids<'a>(graph: &'a Graph, state: &TreeState) -> Vec<&'a str> {
     state.rows().iter().map(|row| graph.id(row.node)).collect()
 }
@@ -55,11 +60,11 @@ fn unlinked(graph: &Graph) -> Vec<&str> {
 /// Everything open: the whole tree as `(id, dimmed)`.
 fn whole_tree(graph: &Graph) -> Vec<(String, bool)> {
     let mut state = TreeState::default();
-    state.prepare(graph, None, false);
+    state.prepare(&source(graph, false), None);
     if let Some(root) = graph.root {
-        state.set_open_below(graph, root, true);
+        state.set_open_below(&source(graph, false), root, true);
     }
-    state.prepare(graph, None, false);
+    state.prepare(&source(graph, false), None);
     state.rows().iter().map(|row| (graph.id(row.node).to_owned(), row.dimmed)).collect()
 }
 
@@ -76,7 +81,7 @@ fn unlinked_does_not_depend_on_open_nodes() {
     assert_eq!(unlinked(&graph), ["#new1"]);
 
     let mut state = TreeState::default();
-    state.prepare(&graph, None, false);
+    state.prepare(&source(&graph, false), None);
     assert_eq!(ids(&graph, &state), ["#root", "#a", "#b"]); // only the root starts open
     assert_eq!(unlinked(&graph), ["#new1"]);
 }
@@ -174,41 +179,18 @@ fn changed_only_shows_the_way_to_changes() {
     graph.update("#c", Some(edited));
     graph.finish_updates();
     let mut state = TreeState::default();
-    state.prepare(&graph, None, true);
+    state.prepare(&source(&graph, true), None);
     // `#new0` is new, `#c` edited; `#a`, `#b` lead to them.
     assert_eq!(ids(&graph, &state), ["#root", "#a", "#c", "#b", "#c", "#new0"]);
-}
-
-/// ```text
-/// #root
-/// ├ #a
-/// │ └ #c
-/// └ #b
-///   ├ #c (dimmed)
-///   └ #new0
-/// ```
-#[test]
-fn open_nodes_can_be_saved_and_restored() {
-    let graph = sample();
-    let mut state = TreeState::default();
-    assert_eq!(state.take_open_changes(), None);
-    state.set_open(&graph, graph.node_of("#b").unwrap(), true);
-
-    let saved = state.take_open_changes().unwrap();
-    assert_eq!(state.take_open_changes(), None); // reported once
-
-    let mut restored = TreeState::restored(&saved);
-    restored.prepare(&graph, None, false);
-    assert_eq!(ids(&graph, &restored), ["#root", "#a", "#b", "#c", "#new0"]);
 }
 
 #[test]
 fn knows_the_way_to_a_row() {
     let graph = sample();
     let mut state = TreeState::default();
-    state.prepare(&graph, None, false);
-    state.set_open_below(&graph, graph.node_of("#root").unwrap(), true);
-    state.prepare(&graph, None, false);
+    state.prepare(&source(&graph, false), None);
+    state.set_open_below(&source(&graph, false), graph.node_of("#root").unwrap(), true);
+    state.prepare(&source(&graph, false), None);
     // 0 #root, 1 #a, 2 #c, 3 #b, 4 #c (dimmed), 5 #new0
     assert_eq!(state.ancestors(5), [0, 3]);
     assert_eq!(state.ancestors(4), [0, 3]);
@@ -219,29 +201,20 @@ fn knows_the_way_to_a_row() {
     assert_eq!(state.active_guides(), [Some(1..=3), Some(4..=5)]);
 
     // Scrolled so that `#new0` is the top row: its parents get pinned.
-    state.scroll_offset = 50.0;
+    state.scroll.offset = 50.0;
     assert_eq!(state.sticky_rows(10.0, 5), [0, 3]);
     assert_eq!(state.sticky_rows(10.0, 1), [3]); // only the nearest fit
-    state.scroll_offset = 0.0;
+    state.scroll.offset = 0.0;
     assert_eq!(state.sticky_rows(10.0, 5), Vec::<usize>::new());
-}
-
-#[test]
-fn horizontal_scroll_only_when_the_indent_is_out_of_view() {
-    let mut state = TreeState::default();
-    (state.scroll_x, state.view_width) = (100.0, 200.0);
-    assert_eq!(state.offset_x_for(150.0), None);
-    assert_eq!(state.offset_x_for(500.0), Some(476.0));
-    assert_eq!(state.offset_x_for(10.0), Some(0.0));
 }
 
 #[test]
 fn rows_know_their_connecting_lines() {
     let graph = sample();
     let mut state = TreeState::default();
-    state.prepare(&graph, None, false);
-    state.set_open_below(&graph, graph.node_of("#root").unwrap(), true);
-    state.prepare(&graph, None, false);
+    state.prepare(&source(&graph, false), None);
+    state.set_open_below(&source(&graph, false), graph.node_of("#root").unwrap(), true);
+    state.prepare(&source(&graph, false), None);
     let rows = state.rows();
 
     assert_eq!(rows.iter().map(|row| row.last_child).collect::<Vec<_>>(), [true, false, true, true, false, true]);
@@ -250,39 +223,4 @@ fn rows_know_their_connecting_lines() {
     // `#c` under `#b`: `#b` is the last child, so level 0 has ended; level 1 goes on to `#new0`.
     assert!(!egui_tree::guides::has(rows[4].guides, 0));
     assert!(egui_tree::guides::has(rows[4].guides, 1));
-}
-
-/// A selection alone moves nothing: a tree being used must stay as it is.
-#[test]
-fn selecting_alone_does_not_open_or_scroll() {
-    let graph = sample();
-    let mut state = TreeState::default();
-    state.prepare(&graph, Some("#new0"), false);
-    assert_eq!(ids(&graph, &state), ["#root", "#a", "#b"], "only the root starts open");
-    assert_eq!(state.scroll_to, None);
-}
-
-/// The editor got the keyboard: the way to the selection opens, and it is scrolled to.
-#[test]
-fn revealing_opens_the_parents_and_scrolls() {
-    let graph = sample();
-    let mut state = TreeState::default();
-    state.reveal_again();
-    state.prepare(&graph, Some("#new0"), false);
-    assert_eq!(ids(&graph, &state), ["#root", "#a", "#b", "#c", "#new0"]);
-    assert_eq!(state.cursor, 4);
-    assert_eq!(state.scroll_to, Some(4));
-    state.prepare(&graph, Some("#new0"), false);
-    assert_eq!(state.scroll_to, Some(4), "asked once: nothing more");
-}
-
-#[test]
-fn keys_move_and_select() {
-    let graph = sample();
-    let mut state = TreeState::default();
-    let mut selected = None;
-    let leave = state.apply_inputs(&[TreeKey::Next, TreeKey::Next], &graph, &mut selected, false);
-    assert!(!leave);
-    assert_eq!(selected.as_deref(), Some("#b"));
-    assert!(state.apply_inputs(&[TreeKey::Leave], &graph, &mut selected, false));
 }

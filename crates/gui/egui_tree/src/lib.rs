@@ -16,9 +16,11 @@
 //! - [`list`]: rows of one height in a list that scrolls only up and down (`ScrollArea::show_rows`),
 //!   scrolled just enough to show a row, never widening its panel.
 //! - [`guides`]: the lines joining the rows, as VS Code's indent guides.
+//! - [`view`]: a tree's state on screen (open nodes, rows, cursor, scrolling) over the host's nodes.
 
 pub mod guides;
 pub mod list;
+pub mod view;
 
 /// A key of a tree or a list, whatever key binding asked for it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -7,7 +7,7 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use super::object_list::{RowAction, row_menu};
 use crate::patch::{
     tool::list::{fixed_row, row_height},
-    tree::{Graph, MAX_STICKY, Node, Row, TreeState},
+    tree::{Graph, MAX_STICKY, Node, ObjectTree, Row, TreeState},
 };
 
 /// Pixels of indent per tree level.
@@ -40,7 +40,8 @@ pub(super) fn tree_ui(
     (changed_only, focused): (bool, bool),
     i18n: &I18nMap,
 ) -> Option<(Node, RowAction)> {
-    state.prepare(graph, selected.as_deref(), changed_only);
+    let source = ObjectTree { graph, changed_only };
+    state.prepare(&source, selected.as_deref());
     unlinked_section(ui, graph, selected, i18n);
     let mut event = breadcrumb(ui, graph, state, selected.as_deref(), i18n);
 
@@ -49,7 +50,7 @@ pub(super) fn tree_ui(
     let mut scroll = egui::ScrollArea::vertical().id_salt("nemesis_tree").auto_shrink(false);
     let row_with_spacing = row_height + ui.spacing().item_spacing.y;
     if let Some(row) = state.scroll_to.take() {
-        if let Some(offset) = state.offset_for(row, (row_height, ui.spacing().item_spacing.y)) {
+        if let Some(offset) = state.offset_for(row, (row_height, ui.spacing().item_spacing.y), MAX_STICKY) {
             scroll = scroll.vertical_scroll_offset(offset);
         }
         let indent = state.rows().get(row).map_or(0.0, |row| f32::from(row.depth) * INDENT);
@@ -62,15 +63,12 @@ pub(super) fn tree_ui(
     let output = scroll.show_rows(ui, row_height, state.rows().len(), |ui, range| {
         for (i, row) in state.rows()[range.clone()].iter().enumerate() {
             let is_selected = selected.as_deref() == Some(graph.id(row.node));
-            let lines =
-                egui_tree::guides::GuideRow { depth: row.depth, last_child: row.last_child, guides: row.guides };
-            egui_tree::guides::paint(ui, lines, range.start + i, (row_height, INDENT), &guides);
+            egui_tree::guides::paint(ui, row.lines(), range.start + i, (row_height, INDENT), &guides);
             let row_event = row_ui(ui, graph, *row, row_height, (is_selected, focused), range.start + i, i18n);
             event = row_event.or(event);
         }
     });
-    state.scroll_offset = output.state.clamped_offset().y;
-    state.view_height = output.inner_rect.height();
+    state.scroll.note(&output);
     state.scroll_x = output.state.clamped_offset().x;
     state.view_width = output.inner_rect.width();
     event = sticky_rows_ui(ui, graph, state, output.inner_rect, row_with_spacing).or(event);
@@ -86,8 +84,8 @@ pub(super) fn tree_ui(
             let id = graph.id(state.rows()[row].node);
             *selected = Some(id.into());
         }
-        Some(RowEvent::SetOpen(node, open)) => state.set_open(graph, node, open),
-        Some(RowEvent::SetOpenBelow(node, open)) => state.set_open_below(graph, node, open),
+        Some(RowEvent::SetOpen(node, open)) => state.set_open(&source, node, open),
+        Some(RowEvent::SetOpenBelow(node, open)) => state.set_open_below(&source, node, open),
         Some(RowEvent::Locate) => state.scroll_to = Some(state.cursor),
         None => {}
     }

@@ -18,6 +18,7 @@ use crate::patch::{
     PatchTool,
     workspace::{self, Workspace},
 };
+
 /// Why `new` can not be the work's code instead of `old`, if so. `exists`: is there a work with it?
 ///
 /// e.g. `oldc` -> `newc`: none. -> `ab`: invalid (4-6 letters or digits). -> `OLDC`: the same code.
@@ -47,6 +48,7 @@ impl PatchTool {
             Done::Renamed { work, old, new }
         }));
     }
+
     pub(super) fn finish_rename(
         &mut self,
         work: Workspace,

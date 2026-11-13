@@ -150,7 +150,13 @@ impl PatchTool {
         if self.explorer.tree_focus {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
             let inputs = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key);
-            if tree.apply_inputs(&inputs, graph, &mut self.selected, self.explorer.changed_only) {
+            let source = super::super::tree::ObjectTree { graph, changed_only: self.explorer.changed_only };
+            tree.prepare(&source, self.selected.as_deref());
+            let keys = tree.apply_keys(&source, &inputs);
+            if let Some(node) = keys.selected {
+                self.selected = Some(graph.id(node).into());
+            }
+            if keys.leave {
                 self.leave_tree();
                 return;
             }

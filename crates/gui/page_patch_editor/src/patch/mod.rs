@@ -321,8 +321,14 @@ impl PatchTool {
             // What is set once stays out of the way, unless it still has to be set.
             self.project_open = false;
             self.behaviors_open = true;
-            self.explorer.trees =
-                settings.tree_open.iter().map(|(path, open)| (path.clone(), tree::TreeState::restored(open))).collect();
+            self.explorer.trees = settings
+                .tree_open
+                .iter()
+                .map(|(path, open)| {
+                    let open = open.iter().map(|(id, open)| (id.as_str(), *open));
+                    (path.clone(), tree::TreeState::restored(open))
+                })
+                .collect();
         }
         self.read_view_settings(settings);
         self.explorer.changed_only = settings.changed_only;
@@ -347,6 +353,7 @@ impl PatchTool {
         settings.changed_only = self.explorer.changed_only;
         for (path, tree) in &mut self.explorer.trees {
             if let Some(open) = tree.take_open_changes() {
+                let open = open.map(|(id, open)| (id.to_owned(), open)).collect();
                 settings.tree_open.insert(path.clone(), open);
             }
         }
@@ -463,7 +470,7 @@ mod tests {
         time!("fixed: names", names.apply_changes(&behavior, std::slice::from_ref(&id)));
         time!("fixed: graph rows", {
             let mut state = tree::TreeState::default();
-            state.prepare(&names.graph, Some(&id), false);
+            state.prepare(&tree::ObjectTree { graph: &names.graph, changed_only: false }, Some(&id));
             state.rows().len()
         });
     }

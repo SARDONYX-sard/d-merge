@@ -42,7 +42,7 @@ mod state;
 #[cfg(test)]
 mod tests;
 
-pub(super) use state::{MAX_STICKY, Row, TreeKey, TreeState};
+pub(super) use state::{MAX_STICKY, ObjectTree, Row, TreeKey, TreeState};
 
 /// Index of an object in [`Graph`]. Stable for the life of the graph, also across edits.
 pub(super) type Node = u32;
