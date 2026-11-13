@@ -3,12 +3,13 @@
 //! - [`shadcn`]: shadcn/ui-styled drop-ins for egui widgets (`Button`, `ComboBox`, ...)
 //! - [`markdown`]: tiny Markdown renderer for tooltips
 //! - [`notify`]: colored one-line notification state
-//! - [`EditorTab`]: a tab of an editor, as VS Code draws them
+//! - [`EditorTab`]: a tab of an editor, as VS Code draws them; [`preview_tabs`]: the tabs it keeps
 //!
 //! This crate depends only on `egui` (no app logic), so it stays fast to compile.
 
 pub mod markdown;
 pub mod notify;
+pub mod preview_tabs;
 pub mod shadcn;
 
 mod cut_hover;

@@ -76,7 +76,7 @@ impl PatchTool {
         }
         let mut order: Vec<Tab> = self.tabs.of(self.active).map(|tab| Tab::Object(tab.id.clone())).collect();
         order.extend(self.views.tabs_of(self.active).into_iter().map(|tab| Tab::View(tab.at)));
-        let here = order.iter().position(|tab| match (tab, self.views.shown) {
+        let here = order.iter().position(|tab| match (tab, self.views.list.active) {
             (Tab::View(at), Some(shown)) => *at == shown,
             (Tab::Object(id), None) => id == current,
             _ => false,
@@ -85,7 +85,7 @@ impl PatchTool {
         let next = if forward { (here + 1) % len } else { (here + len - 1) % len };
         match order[next].clone() {
             Tab::Object(id) => {
-                self.views.shown = None;
+                self.views.list.active = None;
                 self.selected = Some(id.into());
             }
             Tab::View(at) => {
@@ -287,7 +287,7 @@ impl PatchTool {
         let active = self.active;
         match event {
             Some(TabEvent::Show(id)) => {
-                self.views.shown = None;
+                self.views.list.active = None;
                 self.selected = Some(id.into());
             }
             Some(TabEvent::ShowView(at)) => {
@@ -296,19 +296,17 @@ impl PatchTool {
                     self.views.show(at);
                 }
             }
-            Some(TabEvent::CloseView(at)) => self.views.close(at),
+            Some(TabEvent::CloseView(at)) => _ = self.views.list.close(at),
             Some(TabEvent::CloseOthersOfView(at)) => {
                 self.tabs.close_all(active);
                 self.views.close_others(at);
-                if let Some(view) = self.views.shown.and_then(|shown| self.views.list.get(shown)) {
+                if let Some(view) = self.views.list.active.and_then(|shown| self.views.list.get(shown)) {
                     self.selected = Some(view.id.as_str().into());
                 }
             }
-            Some(TabEvent::CloseViewsRight(at)) => self.views.close_to_the_right(at),
+            Some(TabEvent::CloseViewsRight(at)) => self.views.list.close_to_the_right(at),
             Some(TabEvent::KeepView(at)) => {
-                if let Some(view) = self.views.list.get_mut(at) {
-                    view.pinned = true;
-                }
+                self.views.list.pin(at);
             }
             Some(TabEvent::KeepOpen(id)) => self.tabs.pin(active, &id),
             Some(TabEvent::CloseToTheRight(id)) => {
@@ -319,7 +317,7 @@ impl PatchTool {
             }
             Some(TabEvent::CloseAll) => {
                 self.tabs.close_all(active);
-                self.views.close_all(active);
+                self.views.list.close_all(active);
                 self.selected = None;
                 self.pane.opened = None;
             }

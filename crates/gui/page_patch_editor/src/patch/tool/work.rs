@@ -208,7 +208,7 @@ impl PatchTool {
             tabs: self
                 .tabs
                 .all()
-                .map(|tab| SessionTab { behavior: name_of(tab.behavior), id: tab.id.clone(), pinned: tab.pinned })
+                .map(|tab| SessionTab { behavior: name_of(tab.group), id: tab.id.clone(), pinned: tab.pinned })
                 .collect(),
         }
     }

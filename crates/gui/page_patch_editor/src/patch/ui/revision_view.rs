@@ -14,6 +14,7 @@
 //! objects'; `Space c` / `:q` close it.
 
 use egui_code_editor::{DiffView, EditorCommand, Keymap, languages::Xml};
+use egui_widgets::preview_tabs::PreviewTabs;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::ui::editor::EditorMode,
@@ -25,18 +26,13 @@ use crate::patch::{
 };
 
 /// A diff or a blame of an object, in a tab of the editor as VS Code opens a diff:
-/// `GetUpModList (#2) ↔ GetUpModList (working) 🔒 ✖`. Read only.
+/// `GetUpModList (#2) ↔ GetUpModList (working) 🔒 ✖`. Read only. Its tab's group is its behavior.
 #[derive(Debug)]
 pub(in crate::patch) struct RevisionView {
-    /// Its behavior: its tab is with that behavior's.
-    pub(in crate::patch) behavior: usize,
     /// The object, e.g. `#0106`.
     pub(in crate::patch) id: String,
     /// What its tab says. e.g. `GetUpModList (#2) ↔ GetUpModList (working)`
     pub(in crate::patch) title: String,
-    /// `false`: the preview tab of the views, which the next one opened replaces (italic), as an
-    /// object's. A double click on it keeps it.
-    pub(in crate::patch) pinned: bool,
     body: Box<DiffView>,
 }
 
@@ -52,96 +48,38 @@ pub(in crate::patch) struct ViewTab<'a> {
     pub(in crate::patch) pinned: bool,
 }
 
-/// The views open, as tabs after the objects'.
+/// The views open, as tabs after the objects'. The one shown in the editor's place is
+/// `list.active`; `None`: the object of the tab selected.
 #[derive(Debug, Default)]
 pub(in crate::patch) struct Views {
-    pub(in crate::patch) list: Vec<RevisionView>,
-    /// The one shown in the editor's place. `None`: the object of the tab selected.
-    pub(in crate::patch) shown: Option<usize>,
+    pub(in crate::patch) list: PreviewTabs<RevisionView>,
 }
 
 impl Views {
     /// The tabs of `behavior`, in order: see [`ViewTab`].
     pub(in crate::patch) fn tabs_of(&self, behavior: usize) -> Vec<ViewTab<'_>> {
-        let of = self.list.iter().enumerate().filter(|(_, view)| view.behavior == behavior);
+        let of = self.list.of(behavior);
         of.map(|(at, view)| ViewTab {
             at,
             title: &view.title,
             id: &view.id,
-            shown: self.shown == Some(at),
+            shown: self.list.active == Some(at),
             pinned: view.pinned,
         })
         .collect()
-    }
-
-    /// Opens `view` in a tab: the one of the same title if open, else the preview tab of its behavior
-    /// (replaced), else a new one. Returns its index.
-    fn open(&mut self, view: RevisionView) -> usize {
-        let same = |known: &RevisionView| known.behavior == view.behavior && known.title == view.title;
-        if let Some(at) = self.list.iter().position(same) {
-            return at;
-        }
-        let preview = self.list.iter().position(|known| known.behavior == view.behavior && !known.pinned);
-        if let Some(at) = preview {
-            self.list[at] = view;
-            return at;
-        }
-        self.list.push(view);
-        self.list.len() - 1
     }
 
     /// Shows view `at`, its editor with the keyboard.
     pub(in crate::patch) fn show(&mut self, at: usize) {
         if let Some(view) = self.list.get_mut(at) {
             view.body.focus();
-            self.shown = Some(at);
+            self.list.active = Some(at);
         }
     }
 
-    /// Keeps only `at` of the views of its behavior.
+    /// Keeps only `at` of the views of its behavior, and shows it.
     pub(in crate::patch) fn close_others(&mut self, at: usize) {
-        let Some(behavior) = self.list.get(at).map(|view| view.behavior) else { return };
-        let mut index = 0;
-        self.list.retain(|view| {
-            let keep = view.behavior != behavior || index == at;
-            index += 1;
-            keep
-        });
-        let kept = self.list.iter().position(|view| view.behavior == behavior);
-        self.shown = kept;
-    }
-
-    /// Closes the views of `at`'s behavior to its right.
-    pub(in crate::patch) fn close_to_the_right(&mut self, at: usize) {
-        let Some(behavior) = self.list.get(at).map(|view| view.behavior) else { return };
-        // The last first: what is closed does not move those left to close.
-        for index in (at + 1..self.list.len()).rev() {
-            if self.list[index].behavior == behavior {
-                self.close(index);
-            }
-        }
-    }
-
-    /// Closes every view of `behavior`.
-    pub(in crate::patch) fn close_all(&mut self, behavior: usize) {
-        for index in (0..self.list.len()).rev() {
-            if self.list[index].behavior == behavior {
-                self.close(index);
-            }
-        }
-    }
-
-    /// Closes view `at`; the one shown stays the one shown.
-    pub(in crate::patch) fn close(&mut self, at: usize) {
-        if at >= self.list.len() {
-            return;
-        }
-        self.list.remove(at);
-        self.shown = match self.shown {
-            Some(shown) if shown == at => None,
-            Some(shown) if shown > at => Some(shown - 1),
-            shown => shown,
-        };
+        self.list.active = self.list.close_others(at);
     }
 }
 
@@ -186,7 +124,10 @@ impl PatchTool {
             self.tabs.clear();
         }
         self.selected = Some(id.into());
-        let at = self.views.open(RevisionView { behavior, id: id.to_owned(), title, pinned: false, body });
+        let at = match self.views.list.find(behavior, |known| known.title == title) {
+            Some(at) => at,
+            None => self.views.list.open(behavior, RevisionView { id: id.to_owned(), title, body }, |_| false, None),
+        };
         self.views.show(at);
     }
 
@@ -217,10 +158,10 @@ impl PatchTool {
     pub(in crate::patch) fn views_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> bool {
         // Another object selected (the tree, the list): its editor, the view's tab stays.
         let selected = self.selected.as_deref();
-        let shown = self.views.shown.filter(|&at| {
-            self.views.list.get(at).is_some_and(|v| v.behavior == self.active && selected == Some(v.id.as_str()))
+        let shown = self.views.list.active.filter(|&at| {
+            self.views.list.get(at).is_some_and(|v| v.group == self.active && selected == Some(v.id.as_str()))
         });
-        self.views.shown = shown;
+        self.views.list.active = shown;
         let Some(at) = shown else { return false };
         let keymap = if self.pane.mode == EditorMode::Vim { Keymap::Vim } else { Keymap::Normal };
         let names = self.names();
@@ -247,7 +188,7 @@ impl PatchTool {
                     });
                 });
             });
-            let view = &mut self.views.list[at];
+            let view = &mut *self.views.list[at];
             if let Some(line) = go_to {
                 view.body.go_to(line);
             }
@@ -265,7 +206,7 @@ impl PatchTool {
         let previous =
             self.key_command(keybinding::commands::TABS_PREVIOUS) || command == Some(EditorCommand::PreviousTab);
         if close {
-            self.views.close(at);
+            self.views.list.close(at);
         } else if next || previous {
             let current = self.selected.as_deref().unwrap_or_default().to_owned();
             self.step_tab(&current, next);
@@ -280,10 +221,13 @@ impl PatchTool {
 
 #[cfg(test)]
 mod tests {
+    use egui_widgets::preview_tabs::Tab;
+
     use super::*;
 
-    fn blank_view(title: &str) -> RevisionView {
-        RevisionView { behavior: 0, id: "#1".to_owned(), title: title.to_owned(), pinned: true, body: Box::default() }
+    fn blank_view(title: &str) -> Tab<RevisionView> {
+        let item = RevisionView { id: "#1".to_owned(), title: title.to_owned(), body: Box::default() };
+        Tab { group: 0, pinned: true, item }
     }
 
     #[test]
@@ -299,36 +243,23 @@ mod tests {
         tool.selected = Some("#b".into());
 
         tool.step_tab("#b", true);
-        assert_eq!((tool.views.shown, tool.selected.as_deref()), (Some(0), Some("#a")), "the view after `#b`");
+        assert_eq!((tool.views.list.active, tool.selected.as_deref()), (Some(0), Some("#a")), "the view after `#b`");
         tool.step_tab("#a", true);
-        assert_eq!((tool.views.shown, tool.selected.as_deref()), (None, Some("#a")), "around the end");
+        assert_eq!((tool.views.list.active, tool.selected.as_deref()), (None, Some("#a")), "around the end");
         tool.step_tab("#a", false);
-        assert_eq!(tool.views.shown, Some(0), "back around the start");
+        assert_eq!(tool.views.list.active, Some(0), "back around the start");
     }
 
-    /// Closing a tab keeps the one shown, wherever it moved.
+    /// The views' tabs are `PreviewTabs`: `Close Others` shows the one kept.
     #[test]
-    fn a_view_closed_keeps_the_one_shown() {
-        let view = blank_view;
-        let mut views = Views { list: vec![view("a"), view("b"), view("c")], shown: Some(2) };
-        views.close(0);
-        assert_eq!((views.list.len(), views.shown), (2, Some(1)));
-        views.close(1);
-        assert_eq!(views.shown, None, "the one shown closed");
-
-        let mut more = Views { list: vec![view("a"), view("b"), view("c")], shown: None };
-        more.close_to_the_right(0);
-        assert_eq!(more.list.len(), 1, "right of `a`");
-        more.list.extend([view("b"), view("c")]);
-        more.close_others(1);
-        assert_eq!((more.list.len(), more.list[0].title.as_str(), more.shown), (1, "b", Some(0)));
-        more.close_all(0);
-        assert!(more.list.is_empty());
-        assert_eq!(views.tabs_of(0), [ViewTab { at: 0, title: "b", id: "#1", shown: false, pinned: true }]);
-        // A new view takes the place of the preview one, as an object's tab does.
-        views.list[0].pinned = false;
-        let at = views.open(view("d"));
-        assert_eq!((at, views.list.len(), views.list[0].title.as_str()), (0, 1, "d"));
+    fn closing_the_others_shows_the_one_kept() {
+        let mut views = Views::default();
+        for title in ["a", "b", "c"] {
+            views.list.push(blank_view(title));
+        }
+        views.close_others(1);
+        assert_eq!((views.list.len(), views.list[0].title.as_str(), views.list.active), (1, "b", Some(0)));
+        assert_eq!(views.tabs_of(0), [ViewTab { at: 0, title: "b", id: "#1", shown: true, pinned: true }]);
     }
 
     /// The diff is the newer text with the older lines in it, as the editor's inline diff has them.
