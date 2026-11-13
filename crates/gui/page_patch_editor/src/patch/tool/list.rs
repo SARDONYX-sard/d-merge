@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use crate::patch::{FocusAt, PatchTool, workspace::PANDORA_DOC};
+use crate::patch::{FocusAt, PatchTool, tool::editing::EditorPane, workspace::PANDORA_DOC};
 
 /// The state of the objects in the explorer.
 ///
@@ -105,7 +105,7 @@ impl PatchTool {
     ) {
         self.key_commands.clear();
         let Some(keys) = keys else { return };
-        let context = self.key_context(ctx);
+        let context = key_context(ctx, (&self.pane, &self.explorer, &self.problems), self.is_user_patch);
         let frame = self.key_ui.frame(ctx, keys, &context, recorder_texts(i18n));
         self.key_commands = frame.commands;
         match frame.saved {
@@ -120,24 +120,6 @@ impl PatchTool {
     /// e.g. `self.key_command(keybinding::commands::TABS_CLOSE)`
     pub(in crate::patch) fn key_command(&mut self, command: &str) -> bool {
         keybinding::host::take(&mut self.key_commands, command)
-    }
-
-    /// Who has the keyboard: what a binding's `when` sees.
-    fn key_context(&self, ctx: &egui::Context) -> keybinding::KeyContext {
-        let keymap = egui_code_editor::Keymap::from_vim(self.pane.mode.is_vim());
-        let editor_focus = self.pane.had_focus;
-        keybinding::KeyContext {
-            page: "patchEditor",
-            editor_focus,
-            vim: keymap.is_vim(),
-            vim_mode: self.pane.state.keymap.vim_mode(keymap),
-            explorer_focus: self.explorer.tree_focus,
-            explorer_view: Some(if self.explorer.tree_view { "tree" } else { "list" }),
-            problems_focus: self.problems.cursor.focused,
-            problems_visible: self.problems.open,
-            input_focus: !editor_focus && ctx.egui_wants_keyboard_input(),
-            user_patch: self.is_user_patch,
-        }
     }
 
     /// VS Code's "Copy Path" / "Reveal in File Explorer" of the file object `id` is in (see
@@ -221,6 +203,28 @@ impl PatchTool {
         let id = self.workspace.behaviors[self.active].add_object(&code, from);
         self.object_changed(&id);
         self.selected = Some(id.into());
+    }
+}
+
+/// Who has the keyboard: what a binding's `when` sees. `user_patch`: the user patch's window.
+fn key_context(
+    ctx: &egui::Context,
+    (pane, explorer, problems): (&EditorPane, &Explorer, &crate::patch::problems::Problems),
+    user_patch: bool,
+) -> keybinding::KeyContext {
+    let keymap = egui_code_editor::Keymap::from_vim(pane.mode.is_vim());
+    let editor_focus = pane.had_focus;
+    keybinding::KeyContext {
+        page: "patchEditor",
+        editor_focus,
+        vim: keymap.is_vim(),
+        vim_mode: pane.state.keymap.vim_mode(keymap),
+        explorer_focus: explorer.tree_focus,
+        explorer_view: Some(if explorer.tree_view { "tree" } else { "list" }),
+        problems_focus: problems.cursor.focused,
+        problems_visible: problems.open,
+        input_focus: !editor_focus && ctx.egui_wants_keyboard_input(),
+        user_patch,
     }
 }
 
