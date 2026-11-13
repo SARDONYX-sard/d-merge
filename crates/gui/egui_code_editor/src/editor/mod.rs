@@ -9,7 +9,8 @@ mod text;
 use egui::text::CCursor;
 
 use crate::{
-    Diagnostic, EditorAction, EditorLabels, InlineDiff, Keymap, Language, Location, References, Severity,
+    Diagnostic, EditorAction, EditorLabels, EditorRequest, InlineDiff, Keymap, Language, Location, References,
+    Severity,
     command::{EditorCommand, EditorFeatures},
     cursor::editor_id,
     editor::{
@@ -83,6 +84,7 @@ pub struct CodeEditor<'a> {
     inline_diff: Option<&'a InlineDiff>,
     read_only: bool,
     host_commands: &'a [EditorCommand],
+    requests: Option<&'a [EditorRequest]>,
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -109,7 +111,16 @@ impl<'a> CodeEditor<'a> {
             inline_diff: None,
             read_only: false,
             host_commands: &[],
+            requests: None,
         }
+    }
+
+    /// The editor's commands the host's keys asked for this frame (see [`EditorRequest`]): the
+    /// editor then reads none of its own keys for them, so that the host's key bindings decide.
+    #[inline]
+    pub const fn requests(mut self, requests: &'a [EditorRequest]) -> Self {
+        self.requests = Some(requests);
+        self
     }
 
     /// What the host acts on, so Vim's list of keys offers them. e.g., a host without a tree has no
@@ -214,6 +225,7 @@ impl<'a> CodeEditor<'a> {
             inline_diff,
             read_only,
             host_commands,
+            requests,
         } = self;
         if read_only {
             // In a buffer that stays: this is every frame.
@@ -226,6 +238,7 @@ impl<'a> CodeEditor<'a> {
             features,
             keymap,
             inline_diff,
+            requests,
         };
 
         state.indent = language.indent();
@@ -348,6 +361,8 @@ struct EditorFrame<'a> {
     features: EditorFeatures,
     keymap: Keymap,
     inline_diff: Option<&'a InlineDiff>,
+    /// See [`CodeEditor::requests`].
+    requests: Option<&'a [EditorRequest]>,
 }
 
 #[cfg(test)]

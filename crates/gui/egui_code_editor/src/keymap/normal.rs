@@ -37,7 +37,17 @@ enum LineOp {
 }
 
 /// Runs the line commands. Call before the `TextEdit` (only while the editor has the focus).
-pub(crate) fn handle(ui: &egui::Ui, id: egui::Id, text: &mut String, comment: Option<crate::Comment>) -> KeymapOutput {
+pub(crate) fn handle(
+    ui: &egui::Ui,
+    id: egui::Id,
+    text: &mut String,
+    (comment, requests): (Option<crate::Comment>, Option<&[crate::EditorRequest]>),
+) -> KeymapOutput {
+    // The host's keys: what it asked for.
+    if let Some(requests) = requests {
+        let op = requests.iter().find_map(|request| line_op(*request));
+        return op.map_or_else(KeymapOutput::default, |op| run(ui, id, text, op, comment));
+    }
     let shift_alt = Modifiers::SHIFT | Modifiers::ALT;
     let ctrl_shift = Modifiers::COMMAND | Modifiers::SHIFT;
     let op = ui.input_mut(|i| {
@@ -65,10 +75,29 @@ pub(crate) fn comment_key(
     ui: &egui::Ui,
     id: egui::Id,
     text: &mut String,
-    comment: Option<crate::Comment>,
+    (comment, requests): (Option<crate::Comment>, Option<&[crate::EditorRequest]>),
 ) -> Option<KeymapOutput> {
-    let pressed = ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Slash));
+    let pressed = match requests {
+        Some(_) => crate::request::asked(requests, crate::EditorRequest::ToggleComment),
+        None => ui.input_mut(|i| i.consume_key(Modifiers::COMMAND, Key::Slash)),
+    };
     pressed.then(|| run(ui, id, text, LineOp::ToggleComment, comment))
+}
+
+/// The line command of a host's request. e.g. `MoveLinesUp` -> `Move { up: true }`
+const fn line_op(request: crate::EditorRequest) -> Option<LineOp> {
+    use crate::EditorRequest as Request;
+    Some(match request {
+        Request::DeleteLines => LineOp::Delete,
+        Request::MoveLinesUp => LineOp::Move { up: true },
+        Request::MoveLinesDown => LineOp::Move { up: false },
+        Request::CopyLinesUp => LineOp::Copy { up: true },
+        Request::CopyLinesDown => LineOp::Copy { up: false },
+        Request::InsertLineBelow => LineOp::Insert { above: false },
+        Request::InsertLineAbove => LineOp::Insert { above: true },
+        Request::ToggleComment => LineOp::ToggleComment,
+        _ => return None,
+    })
 }
 
 /// Does `op` on the lines of the selection.

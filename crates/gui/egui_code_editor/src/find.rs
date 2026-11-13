@@ -82,7 +82,17 @@ impl FindBar {
     /// Global keys. Call before the `TextEdit`. `editor_focus`: the editor has the keyboard.
     ///
     /// Only for [`Keymap::Normal`]: Vim uses these keys itself (e.g., `Ctrl+F` = page down).
-    pub(crate) fn handle_keys(&mut self, keymap: Keymap, ui: &egui::Ui, id: egui::Id, text: &str, editor_focus: bool) {
+    ///
+    /// With `requests` (see [`crate::CodeEditor::requests`]) `Ctrl+F` / `Ctrl+G` are the host's: what it
+    /// asked for. `F3` and its variants stay the find bar's.
+    pub(crate) fn handle_keys(
+        &mut self,
+        keymap: Keymap,
+        ui: &egui::Ui,
+        id: egui::Id,
+        text: &str,
+        (editor_focus, requests): (bool, Option<&[crate::EditorRequest]>),
+    ) {
         if keymap != Keymap::Normal {
             self.open = None; // e.g., switched to Vim while the bar was open
             return;
@@ -91,10 +101,19 @@ impl FindBar {
             return;
         }
         // NOTE: `consume_key` ignores extra Shift/Alt: the Shift variant must be tried first.
+        let own = requests.is_none();
         let (find, goto, word, prev, next, escape) = ui.input_mut(|i| {
             (
-                i.consume_key(Modifiers::COMMAND, Key::F),
-                i.consume_key(Modifiers::COMMAND, Key::G),
+                if own {
+                    i.consume_key(Modifiers::COMMAND, Key::F)
+                } else {
+                    crate::request::asked(requests, crate::EditorRequest::Find)
+                },
+                if own {
+                    i.consume_key(Modifiers::COMMAND, Key::G)
+                } else {
+                    crate::request::asked(requests, crate::EditorRequest::GoToLine)
+                },
                 i.consume_key(Modifiers::COMMAND, Key::F3),
                 i.consume_key(Modifiers::SHIFT, Key::F3),
                 i.consume_key(Modifiers::NONE, Key::F3),

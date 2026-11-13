@@ -15,12 +15,18 @@ pub(crate) struct PaletteInput<'a, 'b> {
     pub(crate) context: PaletteContext,
     pub(crate) labels: &'b EditorLabels<'a>,
     pub(crate) actions: &'a [EditorAction<'a>],
+    /// See [`crate::CodeEditor::requests`].
+    pub(crate) requests: Option<&'b [crate::EditorRequest]>,
 }
 
 /// Opens on `Ctrl+Shift+P`; while open, handles its keys and draws. Call before the keymap
 /// (Vim uses `Ctrl+P` itself) and the `TextEdit`. Returns the command that was run.
 pub(crate) fn show<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput<'a, '_>) -> Option<Picked<'a>> {
-    if input.has_focus && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::P)) {
+    let asked = match input.requests {
+        Some(_) => crate::request::asked(input.requests, crate::EditorRequest::CommandPalette),
+        None => input.has_focus && ui.input_mut(|i| i.consume_key(Modifiers::COMMAND | Modifiers::SHIFT, Key::P)),
+    };
+    if asked {
         open(palette, ui, input.id);
     }
     if !palette.open {
@@ -46,7 +52,23 @@ pub(crate) fn open(palette: &mut Palette, ui: &egui::Ui, editor: egui::Id) {
 ///
 /// Only with `has_focus`, and before the keymap, which would swallow them. `Shift+F12` is tried
 /// before `F12`: `consume_key` ignores extra Shift / Alt.
-pub(crate) fn read_triggers(ui: &egui::Ui, has_focus: bool) -> Triggers {
+/// With `requests` (see [`crate::CodeEditor::requests`]) the keys are the host's: what it asked for.
+pub(crate) fn read_triggers(ui: &egui::Ui, has_focus: bool, requests: Option<&[crate::EditorRequest]>) -> Triggers {
+    use crate::{EditorRequest as Request, request::asked};
+    if requests.is_some() {
+        let navigate = if asked(requests, Request::FindReferences) {
+            Some(true)
+        } else {
+            asked(requests, Request::GoToDefinition).then_some(false)
+        };
+        return Triggers {
+            quick_fix: asked(requests, Request::QuickFix),
+            navigate,
+            format: asked(requests, Request::Format),
+            completion: asked(requests, Request::Completion),
+            ..Triggers::default()
+        };
+    }
     if !has_focus {
         return Triggers::default();
     }

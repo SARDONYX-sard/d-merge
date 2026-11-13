@@ -44,6 +44,7 @@ mod layout;
 mod palette;
 pub mod problems;
 mod quick_fix;
+mod request;
 mod search;
 mod state;
 mod status;
@@ -64,6 +65,7 @@ pub use self::{
     layout::line_job,
     palette::{EditorAction, EditorLabels},
     problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
+    request::EditorRequest,
     state::CodeEditorState,
     status::status_line,
 };

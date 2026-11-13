@@ -144,11 +144,11 @@ impl KeymapState {
         ui: &egui::Ui,
         id: egui::Id,
         text: &mut String,
-        view: View,
+        (view, requests): (View, Option<&[crate::EditorRequest]>),
     ) -> KeymapOutput {
         match keymap {
-            Keymap::Normal => normal::handle(ui, id, text, self.comment),
-            Keymap::Vim => match normal::comment_key(ui, id, text, self.comment) {
+            Keymap::Normal => normal::handle(ui, id, text, (self.comment, requests)),
+            Keymap::Vim => match normal::comment_key(ui, id, text, (self.comment, requests)) {
                 Some(output) => output,
                 None => self.vim.handle(ui, id, text, view),
             },

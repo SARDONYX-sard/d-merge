@@ -38,22 +38,22 @@ pub(crate) fn read_input<'a>(
     labels: &EditorLabels<'a>,
     actions: &'a [EditorAction<'a>],
 ) -> FrameInput<'a> {
-    let EditorFrame { id, language, features, keymap, .. } = frame;
+    let EditorFrame { id, language, features, keymap, requests, .. } = frame;
     let has_focus = current_focus(ui, id, keymap, state.had_focus);
 
     state.hover.handle_input(ui, id); // before the keymap swallows the key events
     let context = PaletteContext { keymap, features, inserting: state.keymap.is_inserting(keymap) };
-    let palette_input = PaletteInput { id, has_focus, context, labels, actions };
+    let palette_input = PaletteInput { id, has_focus, context, labels, actions, requests };
     let picked = ui::palette::show(&mut state.palette, ui, palette_input);
-    let triggers = ui::palette::read_triggers(ui, has_focus).with_picked(picked);
+    let triggers = ui::palette::read_triggers(ui, has_focus, requests).with_picked(picked);
     state.open_requested_menus(ui.ctx(), id, text, language, triggers);
     // While the quick fix menu is open it owns the arrow keys.
     let fix = state.quick_fix.handle_keys(ui);
-    state.find.handle_keys(keymap, ui, id, text, has_focus);
+    state.find.handle_keys(keymap, ui, id, text, (has_focus, requests));
     let accept_key = state.completion.handle_keys(ui);
     let pasted = take_requested_paste(ui, id, state, text);
     let keys = if has_focus && !state.quick_fix.is_open() {
-        state.keymap.handle(keymap, ui, id, text, state.view)
+        state.keymap.handle(keymap, ui, id, text, (state.view, requests))
     } else {
         KeymapOutput::default()
     };
