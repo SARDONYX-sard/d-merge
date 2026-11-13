@@ -36,6 +36,10 @@ pub struct JsonEditor {
     cursor: Option<usize>,
     /// Its `x` was clicked with changes: "Save / Don't Save / Cancel" shows, as VS Code's.
     asking: bool,
+    /// Just opened: its editor takes the keyboard when shown next.
+    focus: bool,
+    /// What had the keyboard when it was opened: it gets it back when it is closed, as in VS Code.
+    return_to: Option<egui::Id>,
 }
 
 /// What the question on closing with changes was answered. See [`JsonEditor::asking`].
@@ -55,7 +59,7 @@ impl JsonEditor {
         (self.dirty, self.asking) = (false, false);
         self.cursor = command.map(|command| self.entry_of(command));
         self.problems = diagnose(&self.text);
-        self.open = true;
+        (self.open, self.focus) = (true, true);
     }
 
     /// The char index of `command`'s entry: its `"key"` value. An uncommented entry first, then a
@@ -122,8 +126,10 @@ impl JsonEditor {
             return None;
         }
         let id = egui_code_editor::editor_id(EDITOR_SALT);
-        if let Some(cursor) = self.cursor.take() {
-            egui_code_editor::set_cursor(ctx, id, cursor);
+        let focus = std::mem::take(&mut self.focus);
+        if focus {
+            self.return_to = ctx.memory(|m| m.focused()).filter(|focused| *focused != id);
+            egui_code_editor::set_cursor(ctx, id, self.cursor.take().unwrap_or(0));
             ctx.memory_mut(|m| m.request_focus(id));
         }
         // `Ctrl+S` as in any editor; Vim's `:w` comes as its command.
@@ -160,6 +166,10 @@ impl JsonEditor {
                             .show(ui, &mut self.state)
                     })
                     .inner;
+                // Asked again of the editor drawn: a focus asked for by id before it was is lost.
+                if focus {
+                    output.response.request_focus();
+                }
                 let (changed, command) = (output.changed, output.command);
                 if changed {
                     self.dirty = true;
@@ -172,6 +182,11 @@ impl JsonEditor {
         self.asking |= closed && self.dirty;
         let answer = if self.asking { ask(ctx, texts) } else { None };
         save |= self.on_close(closed, answer);
+        if !self.open
+            && let Some(back) = self.return_to.take()
+        {
+            ctx.memory_mut(|m| m.request_focus(back));
+        }
         if !save {
             return None;
         }
@@ -252,6 +267,51 @@ mod tests {
         let mut editor = JsonEditor { open: true, dirty: true, asking: true, ..Default::default() };
         assert!(!editor.on_close(false, Some(Answer::DontSave)));
         assert!(!editor.open && !editor.dirty);
+    }
+
+    /// Opened, its editor has the keyboard; closed (`Ctrl+W`), what had it before has it again.
+    #[test]
+    fn the_keyboard_goes_in_and_back() {
+        let dir = std::env::temp_dir().join(format!("d_merge_json_focus_{}", std::process::id()));
+        let mut bindings = Keybindings::load(&dir.join("keybindings.json"));
+        let ctx = egui::Context::default();
+        let page = egui::Id::NULL.with("page_editor");
+        let texts = RecorderTexts {
+            hint: "",
+            also_bound: "",
+            edit_json: "",
+            labels: egui_code_editor::EditorLabels::ENGLISH,
+            unsaved: "",
+            save: "",
+            dont_save: "",
+            cancel: "",
+        };
+        let mut editor = JsonEditor::default();
+        let mut page_text = String::new();
+        let mut frame = |editor: &mut JsonEditor, bindings: &mut Keybindings, events: Vec<egui::Event>| {
+            let raw = egui::RawInput { events, ..Default::default() };
+            let mut output = ctx.run_ui(raw, |ui| {
+                ui.add(egui::TextEdit::multiline(&mut page_text).id(page));
+                editor.show(ui.ctx(), bindings, Keymap::Normal, &texts);
+            });
+            output.textures_delta.clear();
+        };
+        ctx.memory_mut(|m| m.request_focus(page));
+        frame(&mut editor, &mut bindings, Vec::new());
+        assert_eq!(ctx.memory(|m| m.focused()), Some(page));
+
+        editor.open(&dir.join("keybindings.json"), None);
+        frame(&mut editor, &mut bindings, Vec::new());
+        frame(&mut editor, &mut bindings, Vec::new());
+        assert_eq!(ctx.memory(|m| m.focused()), Some(egui_code_editor::editor_id(EDITOR_SALT)), "in the JSON");
+
+        let modifiers = egui::Modifiers { ctrl: true, command: true, ..Default::default() };
+        let key = egui::Event::Key { key: egui::Key::W, physical_key: None, pressed: true, repeat: false, modifiers };
+        frame(&mut editor, &mut bindings, vec![key]);
+        frame(&mut editor, &mut bindings, Vec::new());
+        assert!(!editor.is_open());
+        assert_eq!(ctx.memory(|m| m.focused()), Some(page), "back where it was");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
