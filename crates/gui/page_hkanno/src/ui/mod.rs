@@ -158,128 +158,74 @@ impl HkannoPage {
         }
     }
 
-    /// The text editor of the active tab (+ the keymap status line, e.g., `-- INSERT --`).
+    /// The text editor of the active tab, with its status bar below (e.g. `-- INSERT --`).
     fn editor(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
         ui.label(egui::RichText::new(ctx.i18n.t(I18nKey::HkannoAnnotationLabel)).weak());
+        let format_and_save = self.editor_keys(ui, ctx);
+        let requests = {
+            let mut requests = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::editor_request);
+            if format_and_save {
+                requests.push(egui_code_editor::EditorRequest::Format);
+            }
+            requests
+        };
+
+        let keymap = Keymap::from_vim(ctx.lsp_settings.editor_mode.is_vim());
+        let Some(tab) = self.tabs.get_mut(self.active) else { return };
+        // The saved cursor, once, when the tab is first shown.
+        if std::mem::take(&mut tab.restore_cursor) {
+            egui_code_editor::set_cursor(ui.ctx(), tab.editor_id(), tab.settings.cursor);
+        }
+
+        // The status bar first (the bottom of the area): it stays in view while the text scrolls.
+        let status = status_bar(ui, ctx.i18n, (tab, keymap), &mut self.show_lsp_options);
+        if status.toggle_problems {
+            self.problems_hidden = !self.problems_hidden;
+        }
+        if let Some(chosen) = status.keymap {
+            ctx.lsp_settings.editor_mode = EditorMode::from_vim(chosen.is_vim());
+        }
+
+        let Some(tab) = self.tabs.get_mut(self.active) else { return };
+        let input =
+            EditorInput { i18n: ctx.i18n, lsp: ctx.lsp_settings, keymap, key_ui: &self.key_ui, requests: &requests };
+        let output = code_editor(ui, tab, &input);
+        if let Some(cursor) = output.cursor
+            && ctx.settings.show_preview
+        {
+            tab.preview.jump_from_editor_line(cursor.line);
+        }
+
+        // The `⚙` of a palette action or an editor command: record its keys.
+        if let Some(command) = output.configure {
+            self.key_ui.configure_command(command);
+        }
+        if let Some(request) = output.configure_request {
+            self.key_ui.configure_request(request);
+        }
+        if output.open_json {
+            self.key_ui.run_action(keybinding::host::OPEN_JSON_ACTION);
+        }
+
+        // After the format of this frame.
+        let command = if format_and_save { Some(EditorCommand::Save) } else { output.command };
+        if let Some(command) = command {
+            self.apply_command(command, ui, ctx);
+        }
+    }
+
+    /// `Ctrl+PageDown` / `Ctrl+PageUp`, Vim's `Space p`, `Space w` (key bindings). Returns whether
+    /// `Space w` (format and save) was pressed.
+    fn editor_keys(&mut self, ui: &egui::Ui, ctx: &mut HkannoPageCtx<'_>) -> bool {
         if self.key_command(commands::TABS_NEXT) {
             self.step_tab(ui, true);
         } else if self.key_command(commands::TABS_PREVIOUS) {
             self.step_tab(ui, false);
         }
-        // Vim's `Space p` / `Space w` (key bindings).
         if self.key_command(commands::EDITOR_TOGGLE_PREVIEW) {
             ctx.settings.show_preview = !ctx.settings.show_preview;
         }
-        let format_and_save = self.key_command(commands::EDITOR_FORMAT_AND_SAVE);
-
-        let i18n = ctx.i18n;
-        // With their keys as the key bindings have them and a `⚙` to change them, and found by their
-        // English names and command ids too, as VS Code's.
-        let key_ui = &self.key_ui;
-        let act = |action: egui_code_editor::EditorAction<'static>, key: I18nKey| {
-            key_ui.palette_action(egui_code_editor::EditorAction { label: i18n.t(key), ..action }, key.default_eng())
-        };
-        let actions = [
-            act(EditorCommand::NextTab.action(""), I18nKey::EditorNextTab),
-            act(EditorCommand::PreviousTab.action(""), I18nKey::EditorPreviousTab),
-            act(EditorCommand::CloseTab.action(""), I18nKey::EditorCloseTab),
-            act(EditorCommand::TogglePreview.action(""), I18nKey::EditorTogglePreview),
-            act(EditorCommand::RevealFile.action(""), gui_shared::i18n::REVEAL_IN_FILE_MANAGER),
-            act(
-                egui_code_editor::EditorAction::new(keybinding::host::OPEN_JSON_ACTION, ""),
-                I18nKey::KeybindingOpenJson,
-            ),
-        ];
-        let lsp = &ctx.lsp_settings;
-        let language = HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
-        let features = EditorFeatures {
-            completion: lsp.completion,
-            hover: lsp.hover,
-            diagnostics: lsp.diagnostics,
-            format: lsp.formatter,
-            inlay_hints: lsp.inlay_hints,
-            signature_help: lsp.signature_help,
-        };
-        let keymap = Keymap::from_vim(ctx.lsp_settings.editor_mode.is_vim());
-        let show_preview = ctx.settings.show_preview;
-        let Some(tab) = self.tabs.get_mut(self.active) else { return };
-
-        // Restore the saved cursor once, when the tab is first shown.
-        if std::mem::take(&mut tab.restore_cursor) {
-            egui_code_editor::set_cursor(ui.ctx(), tab.editor_id(), tab.settings.cursor);
-        }
-
-        // Status line first (bottom of the area), so it stays visible while the text scrolls.
-        let mut toggle_problems = false;
-        let options_hover = ctx.i18n.t(I18nKey::LspOptionsTitle);
-        // The editor's own commands, by the key bindings' keys: it reads none of its keys itself then.
-        let mut requests = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::editor_request);
-        if format_and_save {
-            requests.push(egui_code_editor::EditorRequest::Format);
-        }
-        egui::Panel::bottom("hkanno_status_bar").show(ui, |ui| {
-            // Its counts show or hide the Problems panel; `Vim ▾` and `⚙` at its right end, as VS Code's.
-            let mut chosen = keymap;
-            let status = egui_code_editor::StatusBar::new(&tab.editor, keymap, &tab.text)
-                .keymap_select(&mut chosen)
-                .options(&mut self.show_lsp_options, options_hover)
-                .show(ui);
-            toggle_problems = status.problems.clicked();
-            if status.keymap_changed {
-                ctx.lsp_settings.editor_mode = EditorMode::from_vim(chosen.is_vim());
-            }
-        });
-        if toggle_problems {
-            self.problems_hidden = !self.problems_hidden;
-        }
-        let Some(tab) = self.tabs.get_mut(self.active) else { return };
-
-        let CodeEditorOutput { changed, cursor, command, configure, configure_request, action, .. } =
-            egui::ScrollArea::both()
-                .id_salt("hkanno_editor_scroll")
-                .auto_shrink(false)
-                .show(ui, |ui| {
-                    CodeEditor::new(tab.settings.input_path.as_str(), &mut tab.text)
-                        .language(&language)
-                        .diagnostics(&tab.editor_diagnostics)
-                        .features(features)
-                        .keymap(keymap)
-                        .labels(egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)))
-                        .actions(&actions)
-                        .host_commands(&HOST_COMMANDS)
-                        .requests(&requests)
-                        .request_keys(self.key_ui.request_keys())
-                        .show(ui, &mut tab.editor)
-                })
-                .inner;
-
-        // Both borrow the palette's keys: what they ask for is taken before it is done.
-        let open_json = action.is_some_and(|action| action == keybinding::host::OPEN_JSON_ACTION);
-        if let Some(command) = configure.and_then(keybinding::host::command_of_action) {
-            self.key_ui.configure_command(command);
-        }
-        if let Some(request) = configure_request {
-            self.key_ui.configure_request(request);
-        }
-        if open_json {
-            self.key_ui.run_action(keybinding::host::OPEN_JSON_ACTION);
-        }
-        let Some(tab) = self.tabs.get_mut(self.active) else { return };
-        if changed {
-            tab.dirty = true;
-            tab.text_changed();
-        }
-        if let Some(cursor) = cursor {
-            tab.settings.cursor = cursor.to_char_index(&tab.text);
-            if show_preview {
-                tab.preview.jump_from_editor_line(cursor.line);
-            }
-        }
-        // After the format of this frame.
-        let command = if format_and_save { Some(EditorCommand::Save) } else { command };
-        if let Some(command) = command {
-            self.apply_command(command, ui, ctx);
-        }
+        self.key_command(commands::EDITOR_FORMAT_AND_SAVE)
     }
 
     /// Does what the editor asked for. e.g., Vim `:w`, `<Space>l`, or the palette.
@@ -507,4 +453,125 @@ fn drop_overlay(ctx: &egui::Context, i18n: &I18nMap) {
         egui::FontId::proportional(24.0),
         blue,
     );
+}
+
+/// What the status bar asked for.
+struct StatusAsk {
+    /// Its counts were clicked: the Problems panel shows / hides.
+    toggle_problems: bool,
+    /// `Vim ▾` picked another keymap.
+    keymap: Option<Keymap>,
+}
+
+/// The status bar of `tab`: its counts, `Vim ▾` and `⚙` at its right end, as VS Code's.
+fn status_bar(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    (tab, keymap): (&HkannoTab, Keymap),
+    show_options: &mut bool,
+) -> StatusAsk {
+    egui::Panel::bottom("hkanno_status_bar")
+        .show(ui, |ui| {
+            let mut chosen = keymap;
+            let status = egui_code_editor::StatusBar::new(&tab.editor, keymap, &tab.text)
+                .keymap_select(&mut chosen)
+                .options(show_options, i18n.t(I18nKey::LspOptionsTitle))
+                .show(ui);
+            StatusAsk { toggle_problems: status.problems.clicked(), keymap: status.keymap_changed.then_some(chosen) }
+        })
+        .inner
+}
+
+/// What the code editor is drawn with.
+struct EditorInput<'a> {
+    i18n: &'a I18nMap,
+    lsp: &'a gui_shared::settings::ui::editor::LspOptions,
+    keymap: Keymap,
+    /// The keys of the palette's actions, and the `⚙` to change them.
+    key_ui: &'a keybinding::KeyUi,
+    /// The editor's own commands asked for by the key bindings this frame.
+    requests: &'a [egui_code_editor::EditorRequest],
+}
+
+/// What the code editor asked for, owned past its borrows.
+struct EditorAsk {
+    cursor: Option<LinePos>,
+    command: Option<EditorCommand>,
+    /// The `⚙` of a palette action / of an editor command.
+    configure: Option<&'static str>,
+    configure_request: Option<egui_code_editor::EditorRequest>,
+    /// The palette's "Open Keyboard Shortcuts (JSON)".
+    open_json: bool,
+}
+
+/// The editor of `tab`: its text, problems, keys and palette. An edit marks the tab unsaved.
+fn code_editor(ui: &mut egui::Ui, tab: &mut HkannoTab, input: &EditorInput<'_>) -> EditorAsk {
+    let EditorInput { i18n, lsp, keymap, key_ui, requests } = *input;
+    let language = HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
+    let actions = palette_actions(key_ui, i18n);
+
+    let output = egui::ScrollArea::both()
+        .id_salt("hkanno_editor_scroll")
+        .auto_shrink(false)
+        .show(ui, |ui| {
+            CodeEditor::new(tab.settings.input_path.as_str(), &mut tab.text)
+                .language(&language)
+                .diagnostics(&tab.editor_diagnostics)
+                .features(features(lsp))
+                .keymap(keymap)
+                .labels(egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)))
+                .actions(&actions)
+                .host_commands(&HOST_COMMANDS)
+                .requests(requests)
+                .request_keys(key_ui.request_keys())
+                .show(ui, &mut tab.editor)
+        })
+        .inner;
+
+    // Owned first: the output borrows the tab's text.
+    let CodeEditorOutput { changed, cursor, command, configure, configure_request, action, .. } = output;
+    let ask = EditorAsk {
+        cursor,
+        command,
+        configure: configure.and_then(keybinding::host::command_of_action),
+        configure_request,
+        open_json: action == Some(keybinding::host::OPEN_JSON_ACTION),
+    };
+
+    if changed {
+        tab.dirty = true;
+        tab.text_changed();
+    }
+    if let Some(cursor) = ask.cursor {
+        tab.settings.cursor = cursor.to_char_index(&tab.text);
+    }
+    ask
+}
+
+/// The palette's own actions, with their keys as the key bindings have them and a `⚙` to change
+/// them, found by their English names and command ids too, as VS Code's.
+fn palette_actions<'a>(key_ui: &'a keybinding::KeyUi, i18n: &'a I18nMap) -> [egui_code_editor::EditorAction<'a>; 6] {
+    let act = |action: egui_code_editor::EditorAction<'static>, key: I18nKey| {
+        key_ui.palette_action(egui_code_editor::EditorAction { label: i18n.t(key), ..action }, key.default_eng())
+    };
+    [
+        act(EditorCommand::NextTab.action(""), I18nKey::EditorNextTab),
+        act(EditorCommand::PreviousTab.action(""), I18nKey::EditorPreviousTab),
+        act(EditorCommand::CloseTab.action(""), I18nKey::EditorCloseTab),
+        act(EditorCommand::TogglePreview.action(""), I18nKey::EditorTogglePreview),
+        act(EditorCommand::RevealFile.action(""), gui_shared::i18n::REVEAL_IN_FILE_MANAGER),
+        act(egui_code_editor::EditorAction::new(keybinding::host::OPEN_JSON_ACTION, ""), I18nKey::KeybindingOpenJson),
+    ]
+}
+
+/// The language features the settings turn on.
+const fn features(lsp: &gui_shared::settings::ui::editor::LspOptions) -> EditorFeatures {
+    EditorFeatures {
+        completion: lsp.completion,
+        hover: lsp.hover,
+        diagnostics: lsp.diagnostics,
+        format: lsp.formatter,
+        inlay_hints: lsp.inlay_hints,
+        signature_help: lsp.signature_help,
+    }
 }
