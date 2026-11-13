@@ -42,25 +42,15 @@ enum AddEvent {
     AnimData,
 }
 
-/// `▼ TITLE ........ actions`: a side bar section's header. A click on the title folds it.
-pub(super) fn section_header(ui: &mut egui::Ui, open: &mut bool, title: &str, actions: impl FnOnce(&mut egui::Ui)) {
-    ui.horizontal(|ui| {
-        let glyph = if *open { "▼" } else { "▶" };
-        let text = egui::RichText::new(format!("{glyph} {}", title.to_uppercase())).small().strong();
-        if ui.add(egui::Label::new(text).sense(egui::Sense::click())).clicked() {
-            *open = !*open;
-        }
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), actions);
-    });
-}
-
 impl PatchTool {
     /// See the module docs.
     pub(in crate::patch) fn behaviors_section(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let mut add = None;
         let mut open = self.behaviors_open;
         let scope = self.workspace.scope;
-        section_header(ui, &mut open, i18n.t(I18nKey::NemesisBehaviorsSection), |ui| add = add_menu(ui, scope, i18n));
+        egui_widgets::section_header(ui, &mut open, i18n.t(I18nKey::NemesisBehaviorsSection), |ui| {
+            add = add_menu(ui, scope, i18n);
+        });
         self.behaviors_open = open;
         match add {
             Some(AddEvent::Template) => {
@@ -155,7 +145,7 @@ impl PatchTool {
         }
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let mut picked = None;
-        quick_pick_window(ctx, i18n.t(I18nKey::NemesisAddBehavior)).open(&mut open).show(ctx, |ui| {
+        egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisAddBehavior)).open(&mut open).show(ctx, |ui| {
             picked = self.template_picker_ui(ui, i18n);
         });
         self.picker.open = open && picked.is_none();
@@ -188,11 +178,6 @@ impl PatchTool {
         };
         clicked.map(Path::to_path_buf)
     }
-}
-
-/// A small window of one filter and its list.
-pub(super) fn quick_pick_window<'a>(ctx: &egui::Context, title: &str) -> egui::Window<'a> {
-    egui_widgets::window_near_pointer(ctx, title).collapsible(false).resizable(false).default_width(460.0)
 }
 
 /// `[+]` and its menu. A template file of your own

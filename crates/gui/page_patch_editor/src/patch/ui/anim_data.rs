@@ -22,6 +22,7 @@
 use std::path::{Path, PathBuf};
 
 use egui_widgets::{
+    checklist::{Checklist, ChecklistLabels},
     notify::Notification,
     shadcn::{Button, ComboBox, TextEdit},
 };
@@ -30,13 +31,10 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use crate::patch::{
     PatchTool,
     anim::data::{self, AnimSetPush, ClipSource, Generate, HkxInfo},
-    checklist::Checklist,
     workspace::{ADSF, ASDSF},
 };
 
 /// The height of one row of the hkx and txt lists.
-const ROW_HEIGHT: f32 = 20.0;
-/// The height of the hkx and txt lists.
 const LIST_HEIGHT: f32 = 220.0;
 
 /// A clip in the list.
@@ -256,14 +254,19 @@ fn anim_sets_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) 
         .on_hover_text(i18n.t(I18nKey::NemesisAnimNamesToCharactersHover));
     project_combo(ui, i18n, dialog);
     let AnimDataDialog { hkx, projects, project, .. } = dialog;
+    let labels = ChecklistLabels {
+        all: i18n.t(I18nKey::FilterTextAll),
+        none: i18n.t(I18nKey::NemesisAnimDataNone),
+        filter: i18n.t(I18nKey::FilterLabel),
+    };
     ui.columns(2, |columns| {
-        if hkx.len() == 0 {
+        if hkx.is_empty() {
             columns[0].colored_label(columns[0].visuals().warn_fg_color, i18n.t(I18nKey::NemesisAnimDataNoHkx));
         } else {
-            checklist_ui(&mut columns[0], i18n, "hkx", hkx);
+            hkx.show(&mut columns[0], "hkx", &labels, LIST_HEIGHT);
         }
         if let Some(project) = projects.get_mut(*project) {
-            checklist_ui(&mut columns[1], i18n, "txt", &mut project.files);
+            project.files.show(&mut columns[1], "txt", &labels, LIST_HEIGHT);
         }
     });
 }
@@ -282,48 +285,6 @@ fn project_combo(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog)
             .search_hint(i18n.t(I18nKey::SearchLabel))
             .height(320.0)
             .show_index(ui, &mut dialog.project, projects.len(), |i| title(&projects[i]));
-    });
-}
-
-/// `hkx  1 / 12  [All] [None]`, the filter, and only the rows on screen: the list can be long.
-fn checklist_ui(ui: &mut egui::Ui, i18n: &I18nMap, title: &str, list: &mut Checklist) {
-    ui.push_id(title, |ui| {
-        ui.horizontal(|ui| {
-            ui.strong(title);
-            ui.weak(format!("{} / {}", list.checked_count(), list.len()));
-            if ui.small_button(i18n.t(I18nKey::FilterTextAll)).clicked() {
-                list.set_visible(true);
-            }
-            if ui.small_button(i18n.t(I18nKey::NemesisAnimDataNone)).clicked() {
-                list.set_visible(false);
-            }
-        });
-        let filter = egui::TextEdit::singleline(&mut list.query).hint_text(i18n.t(I18nKey::FilterLabel));
-        if ui.add(filter.desired_width(f32::INFINITY)).changed() {
-            list.refilter();
-        }
-        let scroll = egui::ScrollArea::both().max_height(LIST_HEIGHT).auto_shrink([false, false]);
-        scroll.show_rows(ui, ROW_HEIGHT, list.visible().len(), |ui, range| {
-            for at in range {
-                checklist_row(ui, list, list.visible()[at]);
-            }
-        });
-    });
-}
-
-/// One row. The name can be clicked too; a long one is cut, and is whole on hover.
-fn checklist_row(ui: &mut egui::Ui, list: &mut Checklist, index: usize) {
-    ui.horizontal(|ui| {
-        ui.set_height(ROW_HEIGHT);
-        let mut on = list.is_checked(index);
-        let box_clicked = ui.add(egui::Checkbox::without_text(&mut on)).changed();
-        let label = egui::Label::new(list.item(index)).truncate().sense(egui::Sense::click());
-        if ui.add(label).clicked() {
-            on = !on;
-        }
-        if box_clicked || on != list.is_checked(index) {
-            list.set(index, on);
-        }
     });
 }
 

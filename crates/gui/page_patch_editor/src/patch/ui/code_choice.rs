@@ -12,7 +12,6 @@ use std::path::PathBuf;
 use egui_widgets::notify::Notification;
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use super::behaviors::quick_pick_window;
 use crate::patch::{PatchTool, workspace::ModCode};
 
 /// The list stops growing at this height, and scrolls.
@@ -42,7 +41,7 @@ impl PatchTool {
 
         let mut open = true;
         let mut picked = None;
-        quick_pick_window(ctx, i18n.t(I18nKey::NemesisChooseModCode)).open(&mut open).show(ctx, |ui| {
+        egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisChooseModCode)).open(&mut open).show(ctx, |ui| {
             ui.weak(choice.root.display().to_string());
             ui.add_space(4.0);
             egui::ScrollArea::vertical().max_height(MAX_LIST_HEIGHT).show(ui, |ui| {

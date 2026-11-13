@@ -126,6 +126,17 @@ fn is_cut(rect: egui::Rect, visible: egui::Rect) -> bool {
     rect.right() > visible.right() + 0.5
 }
 
+/// A selectable button of `text` cut with `…` to the width left, the whole (monospace, wrapped) on a
+/// delayed hover when it was: a row of a list that scrolls only up and down, as VS Code's.
+pub fn fitted_button(ui: &mut egui::Ui, selected: bool, text: &str) -> egui::Response {
+    let width = ui.spacing().button_padding.x.mul_add(-2.0, ui.available_width());
+    let fitted = fit_text(ui, text, ui.visuals().text_color(), width);
+    let response = ui.add(egui::Button::selectable(selected, fitted.galley));
+    CutHover::new().show_if(ui, response, fitted.elided, |ui| {
+        ui.add(egui::Label::new(egui::RichText::new(text.trim()).monospace()).wrap());
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

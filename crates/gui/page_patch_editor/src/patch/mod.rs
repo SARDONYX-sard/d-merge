@@ -17,7 +17,6 @@
 
 mod anim;
 mod changes;
-mod checklist;
 mod editor;
 mod new_work;
 mod problems;

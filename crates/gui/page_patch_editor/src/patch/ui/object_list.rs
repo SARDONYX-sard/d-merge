@@ -18,7 +18,6 @@ use stdx::text::contains_ignore_case;
 use super::{
     anim_data::{DuplicateForm, NewClipsForm},
     anim_tree::{self, AnimFile, AnimRow, FileKind},
-    behaviors::quick_pick_window,
 };
 use crate::patch::{
     PatchTool,
@@ -32,7 +31,7 @@ impl PatchTool {
     pub(in crate::patch) fn object_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let anim = self.workspace.behaviors[self.active].is_anim_data();
         let mut open = !self.side.objects_closed;
-        super::behaviors::section_header(ui, &mut open, i18n.t(I18nKey::NemesisObjectsTab), |ui| {
+        egui_widgets::section_header(ui, &mut open, i18n.t(I18nKey::NemesisObjectsTab), |ui| {
             // Right to left: VS Code's order is `[+] [≡] [⋯]`.
             self.more_menu(ui, i18n, anim);
             self.view_buttons(ui, i18n, anim);
@@ -310,7 +309,7 @@ impl PatchTool {
         let mut action = None;
         let is_selected = self.selected.as_deref() == Some(graph.id(node));
         let marker = if graph.is_changed(node) { "● " } else { "" };
-        let response = fitted_button(ui, is_selected, &format!("    {marker}{name}"));
+        let response = egui_widgets::fitted_button(ui, is_selected, &format!("    {marker}{name}"));
         if response.clicked() {
             self.selected = Some(graph.id(node).into());
         }
@@ -408,7 +407,7 @@ impl PatchTool {
             return;
         }
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
-        quick_pick_window(ctx, i18n.t(I18nKey::NemesisNewObject))
+        egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisNewObject))
             .open(&mut open)
             .show(ctx, |ui| self.class_picker_ui(ui, i18n));
         self.class_picker &= open; // a picked class has turned it off already
@@ -497,18 +496,7 @@ fn anim_group_row(
     let glyph = if open { "▼" } else { "▶" };
     let marker = if changed { " ●" } else { "" };
     let indent = "  ".repeat(depth);
-    fitted_button(ui, false, &format!("{indent}{glyph} {label} ({files}){marker}"))
-}
-
-/// A button of `text` cut with `…` to the width left, the whole on hover when it was: a row of a
-/// list that scrolls only up and down, as VS Code's.
-pub(in crate::patch) fn fitted_button(ui: &mut egui::Ui, selected: bool, text: &str) -> egui::Response {
-    let width = ui.spacing().button_padding.x.mul_add(-2.0, ui.available_width());
-    let fitted = egui_widgets::fit_text(ui, text, ui.visuals().text_color(), width);
-    let response = ui.add(egui::Button::selectable(selected, fitted.galley));
-    egui_widgets::CutHover::new().show_if(ui, response, fitted.elided, |ui| {
-        ui.add(egui::Label::new(egui::RichText::new(text.trim()).monospace()).wrap());
-    })
+    egui_widgets::fitted_button(ui, false, &format!("{indent}{glyph} {label} ({files}){marker}"))
 }
 
 const fn anim_kind_label(kind: FileKind) -> I18nKey {

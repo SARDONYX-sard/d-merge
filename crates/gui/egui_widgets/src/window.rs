@@ -257,6 +257,11 @@ fn just_opened(last_drawn: Option<u64>, frame: u64) -> bool {
     last_drawn.is_none_or(|last| last + 1 < frame)
 }
 
+/// A small window of one filter and its list near the pointer, as VS Code's quick pick.
+pub fn quick_pick_window<'a>(ctx: &egui::Context, title: impl Into<egui::WidgetText>) -> egui::Window<'a> {
+    window_near_pointer(ctx, title).collapsible(false).resizable(false).default_width(460.0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

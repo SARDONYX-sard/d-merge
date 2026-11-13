@@ -384,7 +384,7 @@ impl PatchTool {
                     local_time(revision.time)
                 );
                 // Cut with `…` to the width left, the whole on hover when cut, as VS Code's.
-                let response = super::object_list::fitted_button(ui, false, &text);
+                let response = egui_widgets::fitted_button(ui, false, &text);
                 if response.clicked() {
                     let parent = self.workspace.history.parent_number(revision.number);
                     picked = Some(ChangeAction::Compare(self.active, id.to_owned(), parent, Some(revision.number)));
@@ -539,7 +539,7 @@ fn change_row(
         let (class, label) = object.map_or(("", ""), |object| (object.class, object.name));
         let text = format!("{name}  {}  {class}  {label}", change.id);
         // Cut with `…` to the width left, the whole on hover when cut, as VS Code's.
-        let response = super::object_list::fitted_button(ui, false, &text);
+        let response = egui_widgets::fitted_button(ui, false, &text);
         if under_cursor {
             egui_tree::list::cursor_frame(ui, response.rect);
             if moved {

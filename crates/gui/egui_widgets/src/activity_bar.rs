@@ -113,3 +113,16 @@ pub fn side_bar_title(ui: &mut egui::Ui, title: &str) {
     ui.label(egui::RichText::new(title.to_uppercase()).small().strong());
     ui.add_space(2.0);
 }
+
+/// `▼ TITLE ........ actions`: a side bar section's header, as VS Code's. A click on the title folds
+/// it (`open`); `actions` (e.g. `[+]`) are drawn right to left at its end.
+pub fn section_header(ui: &mut egui::Ui, open: &mut bool, title: &str, actions: impl FnOnce(&mut egui::Ui)) {
+    ui.horizontal(|ui| {
+        let glyph = if *open { "▼" } else { "▶" };
+        let text = egui::RichText::new(format!("{glyph} {}", title.to_uppercase())).small().strong();
+        if ui.add(egui::Label::new(text).sense(egui::Sense::click())).clicked() {
+            *open = !*open;
+        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), actions);
+    });
+}

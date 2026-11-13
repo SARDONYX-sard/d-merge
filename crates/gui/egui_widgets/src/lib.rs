@@ -7,6 +7,7 @@
 //!
 //! This crate depends only on `egui` (no app logic), so it stays fast to compile.
 
+pub mod checklist;
 pub mod markdown;
 pub mod notify;
 pub mod preview_tabs;
@@ -19,9 +20,9 @@ mod path_row;
 mod window;
 
 pub use self::{
-    activity_bar::{ActivityBar, ActivityItem, side_bar_title},
-    cut_hover::{CutHover, Fitted, fit, fit_text},
+    activity_bar::{ActivityBar, ActivityItem, section_header, side_bar_title},
+    cut_hover::{CutHover, Fitted, fit, fit_text, fitted_button},
     editor_tab::{EditorTab, EditorTabOutput, TabAction, TabMenu},
     path_row::{PathActions, PathRow, PathRowOutput},
-    window::{Modal, NearPointer, show_modal, vertical_splitter, window_near_pointer},
+    window::{Modal, NearPointer, quick_pick_window, show_modal, vertical_splitter, window_near_pointer},
 };
