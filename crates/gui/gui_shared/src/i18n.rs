@@ -359,7 +359,7 @@ pub enum I18nKey {
     /// Next tab (Alt+L, Ctrl+PageDown; Vim: gt, :tabn)
     EditorNextTab,
 
-    /// Type a command
+    /// Search the text (> for commands, : to go to a line)
     EditorPaletteHint,
 
     /// Paste

@@ -43,7 +43,8 @@ pub(crate) fn read_input<'a>(
 
     state.hover.handle_input(ui, id); // before the keymap swallows the key events
     let context = PaletteContext { keymap, features, inserting: state.keymap.is_inserting(keymap) };
-    let palette_input = PaletteInput { id, has_focus, context, labels, actions, requests, request_keys };
+    let palette_input =
+        PaletteInput { id, has_focus, context, labels, actions, requests, request_keys, text: text.as_str() };
     let picked = ui::palette::show(&mut state.palette, ui, palette_input);
     let triggers = ui::palette::read_triggers(ui, has_focus, requests).with_picked(picked);
     state.open_requested_menus(ui.ctx(), id, text, language, triggers);

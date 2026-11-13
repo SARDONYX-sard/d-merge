@@ -408,7 +408,7 @@ fn the_palette_takes_the_keyboard() {
         let field = frames.id.with("palette_field");
         assert_eq!(frames.ctx.memory(|m| m.focused()), Some(field), "{keymap:?}");
         frames.frame(vec![egui::Event::Text("fmt".to_owned())]);
-        assert_eq!(frames.state.palette.query, "fmt", "{keymap:?}: typed into the field");
+        assert_eq!(frames.state.palette.query, ">fmt", "{keymap:?}: typed after the `>` it opens with");
     }
 }
 
@@ -445,4 +445,28 @@ fn comments_are_toggled() {
         frames.frame(vec![egui::Event::Text(key.to_owned())]);
     }
     assert_eq!(frames.text, "\t<a/>\n\t<!-- <b/> -->", "gcc: the line");
+}
+
+/// The palette without `>` searches the text: `Enter` goes to the line found, as VS Code's.
+#[test]
+fn the_palette_finds_a_line() {
+    let mut frames = Frames::new(
+        "first
+  second line
+third",
+    );
+    frames.select(0, 0);
+    frames.state.palette.reopen();
+    frames.state.palette.query = "SECOND".to_owned();
+    let enter = |pressed| egui::Event::Key {
+        key: egui::Key::Enter,
+        physical_key: None,
+        pressed,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    };
+    frames.frame(vec![enter(true), enter(false)]);
+    frames.frame(Vec::new());
+    assert!(!frames.state.palette.open);
+    assert_eq!(frames.selection(), 8..8, "at `second` of line 2");
 }

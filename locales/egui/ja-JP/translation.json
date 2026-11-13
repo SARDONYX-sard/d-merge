@@ -92,7 +92,7 @@
   "editor_go_to_line": "指定行へ移動",
   "editor_hide_preview": "プレビューを隠す",
   "editor_next_tab": "次のタブ(Alt+L、Ctrl+PageDown。Vim: gt, :tabn)",
-  "editor_palette_hint": "コマンドを入力",
+  "editor_palette_hint": "テキストを検索(>でコマンド、:で行へ移動)",
   "editor_paste": "貼り付け",
   "editor_previous_tab": "前のタブ(Alt+H、Ctrl+PageUp。Vim: gT, :tabp)",
   "editor_quick_fix": "クイックフィックス",

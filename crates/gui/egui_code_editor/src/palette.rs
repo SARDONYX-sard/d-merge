@@ -142,7 +142,7 @@ impl EditorLabels<'_> {
         select_all: "Select All",
         command_palette: "Command Palette",
         revert_change: "Revert this change",
-        palette_hint: "Type a command",
+        palette_hint: "Search the text (> for commands, : to go to a line)",
         configure_keybinding: "Configure Keybinding",
     };
 }
@@ -235,6 +235,11 @@ pub(crate) enum Picked<'a> {
     Configure(&'a str),
     /// The `⚙` of one of the editor's commands whose keys are the host's: change them.
     ConfigureBuiltin(Builtin),
+    /// A place of the text: a line found, or `:42`. 0-based, the column in chars.
+    Jump {
+        line: usize,
+        column: usize,
+    },
 }
 
 impl<'a> Picked<'a> {
@@ -242,7 +247,7 @@ impl<'a> Picked<'a> {
     pub(crate) const fn host_action(self) -> Option<&'a str> {
         match self {
             Self::Host(action) => Some(action),
-            Self::Builtin(_) | Self::Configure(_) | Self::ConfigureBuiltin(_) => None,
+            _ => None,
         }
     }
 
@@ -258,7 +263,7 @@ impl<'a> Picked<'a> {
     pub(crate) const fn configure(self) -> Option<&'a str> {
         match self {
             Self::Configure(action) => Some(action),
-            Self::Builtin(_) | Self::Host(_) | Self::ConfigureBuiltin(_) => None,
+            _ => None,
         }
     }
 }
@@ -283,6 +288,62 @@ pub(crate) struct Command<'a> {
     pub(crate) configurable: bool,
     /// What else it is found by: e.g. its id, its English name. See [`EditorAction::aliases`].
     pub(crate) aliases: [&'a str; 3],
+}
+
+/// What the palette lists, by what its query starts with, as VS Code's quick open.
+///
+/// | query   | lists                                     |
+/// | ------- | ----------------------------------------- |
+/// | `>fmt`  | the commands matching `fmt`               |
+/// | `:42`   | line 42, to go to                         |
+/// | `speed` | the lines of the text with `speed` in it  |
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Mode {
+    Commands,
+    Line,
+    Find,
+}
+
+/// The mode of `query` and what follows its mark. e.g. `>fmt` -> `(Commands, "fmt")`
+pub(crate) fn mode(query: &str) -> (Mode, &str) {
+    if let Some(rest) = query.strip_prefix('>') {
+        (Mode::Commands, rest)
+    } else if let Some(rest) = query.strip_prefix(':') {
+        (Mode::Line, rest)
+    } else {
+        (Mode::Find, query)
+    }
+}
+
+/// The 0-based line of `:42`'s `42`, kept in the text. `None`: not a number.
+pub(crate) fn line_of(rest: &str, text: &str) -> Option<usize> {
+    let line: usize = rest.trim().parse().ok()?;
+    Some(line.saturating_sub(1).min(text.split('\n').count().saturating_sub(1)))
+}
+
+/// The most lines the find mode lists.
+const MAX_FOUND: usize = 200;
+
+/// The lines of `text` with `query` in them (ASCII case ignored), as `(line, column, the line)`, the
+/// first [`MAX_FOUND`]. Nothing for an empty query.
+///
+/// e.g. `a\n  Speed\nb`, `speed` -> `[(1, 2, "  Speed")]`
+pub(crate) fn find_lines<'t>(text: &'t str, query: &str) -> Vec<(usize, usize, &'t str)> {
+    if query.trim().is_empty() {
+        return Vec::new();
+    }
+    let needle = query.to_ascii_lowercase();
+    let mut found = Vec::new();
+    for (line_no, line) in text.split('\n').enumerate() {
+        let lower = line.to_ascii_lowercase();
+        if let Some(at) = lower.find(&needle) {
+            found.push((line_no, line[..at].chars().count(), line));
+            if found.len() == MAX_FOUND {
+                break;
+            }
+        }
+    }
+    found
 }
 
 /// A request of the host with its keys, e.g. `(Format, "shift+alt+f")`: see
@@ -355,11 +416,12 @@ pub(crate) struct Palette {
 
 impl Palette {
     pub(crate) fn reopen(&mut self) {
-        *self = Self { open: true, focus_field: true, ..Self::default() };
+        // As VS Code's `Ctrl+Shift+P`: `>` there, the commands. Taken away, the text is searched.
+        *self = Self { open: true, focus_field: true, query: ">".to_owned(), ..Self::default() };
     }
 
     /// Moves the selection (wrapping around); `Enter` returns the selected command.
-    pub(crate) fn on_keys<'a>(&mut self, keys: PaletteKeys, commands: &[Command<'a>]) -> Option<Picked<'a>> {
+    pub(crate) fn on_keys<'a>(&mut self, keys: PaletteKeys, commands: &[Picked<'a>]) -> Option<Picked<'a>> {
         let last = commands.len().saturating_sub(1);
         self.selected = self.selected.min(last);
         if keys.up {
@@ -368,7 +430,7 @@ impl Palette {
         if keys.down {
             self.selected = if self.selected >= last { 0 } else { self.selected + 1 };
         }
-        if keys.enter { commands.get(self.selected).map(|command| command.picked) } else { None }
+        if keys.enter { commands.get(self.selected).copied() } else { None }
     }
 }
 
@@ -407,6 +469,20 @@ impl Triggers {
 mod tests {
     use super::*;
 
+    /// As VS Code's quick open: `>` the commands, `:` a line, else the text searched.
+    #[test]
+    fn the_query_chooses_what_is_listed() {
+        assert_eq!(mode(">fmt"), (Mode::Commands, "fmt"));
+        assert_eq!(mode(":42"), (Mode::Line, "42"));
+        assert_eq!(mode("speed"), (Mode::Find, "speed"));
+        let text = "a\n  Speed\nb speed";
+        assert_eq!(find_lines(text, "speed"), [(1, 2, "  Speed"), (2, 2, "b speed")]);
+        assert!(find_lines(text, " ").is_empty(), "nothing to look for");
+        assert_eq!(line_of("2", text), Some(1));
+        assert_eq!(line_of("99", text), Some(2), "kept in the text");
+        assert_eq!(line_of("x", text), None);
+    }
+
     /// A translated command is also found by its English name and its ids, as in VS Code.
     #[test]
     fn a_command_is_found_by_its_english_name_and_ids() {
@@ -434,12 +510,12 @@ mod tests {
         let up = PaletteKeys { up: true, ..PaletteKeys::default() };
         let enter = PaletteKeys { enter: true, ..PaletteKeys::default() };
 
-        assert_eq!(palette.on_keys(down, &COMMANDS), None);
+        assert_eq!(palette.on_keys(down, &COMMANDS.map(|c| c.picked)), None);
         assert_eq!(palette.selected, 1);
-        assert_eq!(palette.on_keys(enter, &COMMANDS), Some(Picked::Host("b")));
-        palette.on_keys(down, &COMMANDS); // wraps around
+        assert_eq!(palette.on_keys(enter, &COMMANDS.map(|c| c.picked)), Some(Picked::Host("b")));
+        palette.on_keys(down, &COMMANDS.map(|c| c.picked)); // wraps around
         assert_eq!(palette.selected, 0);
-        palette.on_keys(up, &COMMANDS);
+        palette.on_keys(up, &COMMANDS.map(|c| c.picked));
         assert_eq!(palette.selected, 1);
         assert_eq!(palette.on_keys(enter, &[]), None); // nothing matches the query
     }

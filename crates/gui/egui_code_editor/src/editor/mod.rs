@@ -260,6 +260,11 @@ impl<'a> CodeEditor<'a> {
         state.keymap.vim_options_mut().indent = state.indent;
         state.keymap.set_comment(language.comment());
         let input = read_input(frame, ui, state, text, &labels, actions);
+        // A line found in the palette, or `:42`: the cursor goes there.
+        if let Some(palette::Picked::Jump { line, column }) = input.picked {
+            let at = crate::text_pos::LinePos { line, column }.to_char_index(text);
+            crate::cursor::set_cursor(ui.ctx(), id, at);
+        }
         tab_key_follows_indent(ui, id, state.indent);
         let mut changed = input.keys.changed | input.pasted | {
             let asked = input.triggers.format || input.keys.format;
