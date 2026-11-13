@@ -40,7 +40,7 @@ the keyboard works it too:
 
 | Key                          | Action                                        |
 | ---------------------------- | --------------------------------------------- |
-| `Ctrl+Shift+L`               | Keyboard to the panel / back to the editor    |
+| `Ctrl+Shift+L`               | Show the panel with the keyboard / hide it    |
 | `j` `k`, `↓` `↑`             | Next / previous problem                       |
 | `g` `G`, `Home` `End`        | First / last problem                          |
 | `Enter`                      | Go to the problem (the editor gets the keys)  |

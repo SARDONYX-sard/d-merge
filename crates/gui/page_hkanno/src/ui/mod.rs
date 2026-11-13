@@ -261,10 +261,11 @@ impl HkannoPage {
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
         let id = tab.editor_id();
         let cursor = &mut self.problems_cursor;
-        // `Ctrl+Shift+L`: the keyboard to the panel (shown if hidden), or back to the editor.
+        // `Ctrl+Shift+L`, as VS Code's `Ctrl+Shift+M`: the panel shows and gets the keyboard; if it
+        // has it, it hides and the editor gets it back.
         if egui_code_editor::ProblemsCursor::toggle_key(ui.ctx()) {
             if cursor.focused {
-                cursor.focused = false;
+                (cursor.focused, self.problems_hidden) = (false, true);
                 ui.memory_mut(|m| m.request_focus(id));
             } else if show_diagnostics && !tab.diagnostics.is_empty() {
                 (cursor.focused, self.problems_hidden) = (true, false);

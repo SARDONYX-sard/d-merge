@@ -10,8 +10,8 @@
 //!     ⚠ `#0002` does not exist.     Ln 9, Col 5
 //! ```
 //!
-//! The keyboard, as in a Vim file tree: `Ctrl+Shift+L` ([`ProblemsCursor::toggle_key`]) moves it
-//! between the editor and the panel; there `j` / `k` / `↓` / `↑` / `g` / `G` move the cursor,
+//! The keyboard, as in a Vim file tree: `Ctrl+Shift+L` ([`ProblemsCursor::toggle_key`]) shows the
+//! panel with it, or hides the panel that has it; there `j` / `k` / `↓` / `↑` / `g` / `G` move the cursor,
 //! `Enter` goes to the problem and `Esc` back to the editor.
 
 use std::borrow::Cow;

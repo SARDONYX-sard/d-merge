@@ -72,12 +72,13 @@ impl PatchTool {
         ui.memory_mut(|m| m.surrender_focus(editor));
     }
 
-    /// `Ctrl+Shift+L`: the keyboard goes to the Problems panel (shown if hidden), or from it back to
-    /// the editor. See [`egui_code_editor::problems`].
+    /// `Ctrl+Shift+L`, as VS Code's `Ctrl+Shift+M`: the Problems panel shows and gets the keyboard;
+    /// if it has it, it hides and the editor gets it back. See [`egui_code_editor::problems`].
     pub(in crate::patch) fn toggle_problems_focus(&mut self, ui: &egui::Ui, editor: egui::Id) {
         let cursor = &mut self.problems.cursor;
         if cursor.focused {
             cursor.focused = false;
+            self.problems.open = false;
             self.pane.focus = Some(FocusAt::Keep);
             return;
         }
