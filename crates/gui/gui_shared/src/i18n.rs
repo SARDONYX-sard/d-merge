@@ -1138,7 +1138,7 @@ pub enum I18nKey {
     /// Show or hide the inline diff (Vim: Space d, :diff)
     NemesisToggleInlineDiff,
 
-    /// j / k: move, h / l: fold, o: open / close, Enter: back to the editor
+    /// j / k: move, h / l: fold, o: open / close, t: tree / list, c: changed only, u: unlinked only, Enter: back to the editor
     NemesisTreeKeysHint,
 
     /// Tree

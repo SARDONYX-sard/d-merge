@@ -336,7 +336,7 @@
   "nemesis_start_hint": "新しいパッチmodを作るか、既存のmodを開いて編集します。",
   "nemesis_templates_label": "template (設定のtemplate_dir):",
   "nemesis_toggle_inline_diff": "インライン差分を切り替え(Vim: Space d, :diff)",
-  "nemesis_tree_keys_hint": "j / k:移動、h / l:開閉、o:開閉の切り替え、Enter:エディタへ戻る",
+  "nemesis_tree_keys_hint": "j / k:移動、h / l:開閉、o:開閉の切り替え、t:ツリー / 一覧、c:変更のみ、u:リンクなしのみ、Enter:エディタへ戻る",
   "nemesis_tree_view": "ツリー",
   "nemesis_tree_view_hover": "hkRootLevelContainerから#ポインタをたどってツリー表示します。(絞り込み中は一覧表示)",
   "nemesis_unlinked_only": "どこからもリンクされていない新規オブジェクトのみ(Nemesisには無視されます)",

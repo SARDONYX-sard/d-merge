@@ -61,14 +61,14 @@ impl PatchTool {
         self.pane.had_focus = has_focus;
     }
 
-    /// The keyboard goes to the object tree (Vim `Space e`, or the palette).
+    /// The keyboard goes to the object tree or list, as it shows, its filter kept (Vim `Space e`, or
+    /// the palette).
     pub(in crate::patch) fn enter_tree(&mut self, ui: &egui::Ui, editor: egui::Id) {
+        // The tree or the list, as it shows: the keys are the same in both.
         self.explorer.tree_focus = true;
-        self.explorer.tree_view = true;
         self.side.view = crate::patch::ui::side_bar::SideView::Explorer;
         self.side.hidden = false;
         self.side.objects_closed = false;
-        self.explorer.filter.clear();
         ui.memory_mut(|m| m.surrender_focus(editor));
     }
 

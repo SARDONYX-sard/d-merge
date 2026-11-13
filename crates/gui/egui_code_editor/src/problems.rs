@@ -86,14 +86,15 @@ impl ProblemsCursor {
 /// The keys of the panel pressed this frame, consumed so the editor does not get them.
 fn read_keys(ctx: &egui::Context) -> Vec<ProblemsKey> {
     use egui::{Key, Modifiers};
+    // `G` before `g`: `consume_key` without modifiers also takes the Shift variant.
     const BINDINGS: [(Modifiers, Key, ProblemsKey); 10] = [
+        (Modifiers::SHIFT, Key::G, ProblemsKey::Last),
         (Modifiers::NONE, Key::J, ProblemsKey::Next),
         (Modifiers::NONE, Key::ArrowDown, ProblemsKey::Next),
         (Modifiers::NONE, Key::K, ProblemsKey::Previous),
         (Modifiers::NONE, Key::ArrowUp, ProblemsKey::Previous),
         (Modifiers::NONE, Key::G, ProblemsKey::First),
         (Modifiers::NONE, Key::Home, ProblemsKey::First),
-        (Modifiers::SHIFT, Key::G, ProblemsKey::Last),
         (Modifiers::NONE, Key::End, ProblemsKey::Last),
         (Modifiers::NONE, Key::Enter, ProblemsKey::Go),
         (Modifiers::NONE, Key::Escape, ProblemsKey::Leave),
