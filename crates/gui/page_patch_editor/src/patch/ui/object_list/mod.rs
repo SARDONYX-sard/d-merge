@@ -8,6 +8,7 @@
 //! The title's actions are the explorer's: what is done to one object is in its right-click menu.
 //! A window has the class list: nothing moves in the side bar when it is opened.
 mod anim_list;
+mod flat;
 mod title;
 
 use egui_widgets::{
@@ -24,7 +25,7 @@ use super::{
 use crate::patch::{
     PatchTool,
     anim::data,
-    tool::list::{fixed_row, offset_to_show, row_height, take_reveal},
+    tool::list::take_reveal,
     tree::{Graph, Node, TreeState},
     workspace::PANDORA_DOC,
 };
@@ -267,43 +268,24 @@ impl PatchTool {
             ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
             self.list_keys(graph);
         }
+
         let rows = self.explorer.list.as_ref().map_or(&[][..], |list| list.rows.as_slice());
-        let mut menu_action = None;
-        let row_height = row_height(ui);
-        // Up and down only, as VS Code's: the rows are cut with `…`. (Sideways, its width changed with the
-        // rows drawn, and the scroll bars came and went.)
-        let mut scroll = egui::ScrollArea::vertical().auto_shrink(false);
+        // Only when the editor gets the keyboard: else where it is scrolled is the user's.
         let forced = std::mem::take(&mut self.explorer.reveal);
         if take_reveal(self.selected.as_ref(), forced) {
             let selected = self.selected.as_deref().and_then(|id| graph.node_of(id));
             self.explorer.list_scroll_to = selected.and_then(|node| rows.iter().position(|&row| row == node));
         }
-        let sizes = (row_height, ui.spacing().item_spacing.y);
-        let to = self.explorer.list_scroll_to.take();
-        if let Some(offset) = to.and_then(|at| offset_to_show(at, sizes, rows.len(), self.explorer.list_scroll, 0)) {
-            scroll = scroll.vertical_scroll_offset(offset);
+
+        let scroll = (self.explorer.list_scroll_to.take(), self.explorer.list_scroll);
+        let (event, scroll) = flat::show(ui, i18n, (graph, rows), self.selected.as_deref(), scroll);
+        self.explorer.list_scroll = scroll;
+
+        match event {
+            Some(flat::FlatEvent::Select(node)) => self.selected = Some(graph.id(node).into()),
+            Some(flat::FlatEvent::Menu(node, action)) => self.apply_row_action(ui, graph, Some((node, action)), notify),
+            None => {}
         }
-        let output = scroll.show_rows(ui, row_height, rows.len(), |ui, range| {
-            for &node in &rows[range] {
-                let id = graph.id(node);
-                let selected = self.selected.as_deref() == Some(id);
-                let response =
-                    fixed_row(ui, row_height, |ui| super::tree::object_button(ui, graph, node, (selected, false)));
-                if response.clicked() {
-                    self.selected = Some(id.into());
-                }
-                if response.double_clicked() {
-                    menu_action = Some((node, RowAction::KeepOpen));
-                }
-                response.context_menu(|ui| {
-                    if let Some(action) = row_menu(ui, i18n, graph.is_new(node), graph.is_changed(node)) {
-                        menu_action = Some((node, action));
-                    }
-                });
-            }
-        });
-        self.explorer.list_scroll.note(&output);
-        self.apply_row_action(ui, graph, menu_action, notify);
     }
 
     fn apply_row_action(
