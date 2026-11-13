@@ -204,7 +204,7 @@ impl PatchTool {
             Origin::Working => "working (not committed)".to_owned(),
             Origin::Revision(number) => history.revision(number).map_or_else(
                 || format!("#{number}"),
-                |revision| format!("{}  #{number} {}", ago(at, revision.time), revision.message),
+                |revision| format!("{}  #{number} {}", stdx::time::ago(at, revision.time), revision.message),
             ),
         };
         let notes = origins.into_iter().map(label).collect();
@@ -278,21 +278,6 @@ impl PatchTool {
     }
 }
 
-/// How long ago `time` was at `now` (seconds since the Unix epoch), as GitLens says it.
-///
-/// e.g. 90 s -> `1 minute ago`, 3 days -> `3 days ago`
-fn ago(now: u64, time: u64) -> String {
-    const STEPS: [(u64, &str); 6] =
-        [(60, "minute"), (3600, "hour"), (86_400, "day"), (2_592_000, "month"), (31_536_000, "year"), (u64::MAX, "")];
-    let seconds = now.saturating_sub(time);
-    if seconds < 60 {
-        return "just now".to_owned();
-    }
-    let (unit, name) = STEPS.windows(2).find(|pair| seconds < pair[1].0).map_or(STEPS[4], |pair| pair[0]);
-    let count = seconds / unit;
-    format!("{count} {name}{} ago", if count == 1 { "" } else { "s" })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -301,16 +286,6 @@ mod tests {
         RevisionView { behavior: 0, id: "#1".to_owned(), title: title.to_owned(), pinned: true, body: Box::default() }
     }
 
-    #[test]
-    fn how_long_ago_as_gitlens_says_it() {
-        assert_eq!(ago(100, 90), "just now");
-        assert_eq!(ago(200, 100), "1 minute ago");
-        assert_eq!(ago(3 * 86_400 + 5, 5), "3 days ago");
-        assert_eq!(ago(2 * 2_592_000, 0), "2 months ago");
-        assert_eq!(ago(31_536_000, 0), "1 year ago");
-    }
-
-    /// The tabs go around the objects' then the views', within the behavior, as the keys go.
     #[test]
     fn the_next_tab_goes_through_the_views_too() {
         let mut tool = PatchTool::default();

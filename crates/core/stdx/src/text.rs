@@ -31,6 +31,29 @@ pub const fn ends_with_ignore_case(text: &str, suffix: &str) -> bool {
     text.len() >= suffix.len() && text.split_at(text.len() - suffix.len()).1.eq_ignore_ascii_case(suffix)
 }
 
+/// Where `needle` is in `haystack`, ignoring ASCII case: byte ranges, not overlapping. Nothing for
+/// an empty `needle`.
+///
+/// e.g., `ab Ab` and `ab` -> `0..2`, `3..5`
+pub fn find_ignore_case<'a>(haystack: &'a str, needle: &'a str) -> impl Iterator<Item = core::ops::Range<usize>> + 'a {
+    let (bytes, needle) = (haystack.as_bytes(), needle.as_bytes());
+    let mut at = 0;
+    core::iter::from_fn(move || {
+        if needle.is_empty() {
+            return None;
+        }
+        while at + needle.len() <= bytes.len() {
+            let start = at;
+            if bytes[start..start + needle.len()].eq_ignore_ascii_case(needle) {
+                at += needle.len();
+                return Some(start..at);
+            }
+            at += 1;
+        }
+        None
+    })
+}
+
 /// The two texts in order, ignoring ASCII case.
 #[must_use]
 #[inline]
@@ -54,6 +77,13 @@ pub fn push_joined<'a>(out: &mut String, items: impl IntoIterator<Item = &'a str
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn finds_every_place_ignoring_ascii_case() {
+        assert!(find_ignore_case("ab Ab", "ab").eq([0..2, 3..5]));
+        assert!(find_ignore_case("aaa", "aa").eq(std::iter::once(0..2)), "not overlapping");
+        assert_eq!(find_ignore_case("abc", "").count(), 0);
+    }
 
     #[test]
     fn contains_ignores_ascii_case() {

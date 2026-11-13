@@ -42,6 +42,7 @@ pub mod keymap;
 pub mod language;
 pub mod languages;
 mod layout;
+mod nav_history;
 mod palette;
 pub mod problems;
 mod quick_fix;
@@ -65,6 +66,7 @@ pub use self::{
         Severity, SignatureHelp,
     },
     layout::line_job,
+    nav_history::NavHistory,
     palette::{EditorAction, EditorLabels},
     problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
     request::EditorRequest,

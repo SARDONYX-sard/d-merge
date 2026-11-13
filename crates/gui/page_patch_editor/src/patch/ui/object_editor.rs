@@ -128,7 +128,7 @@ impl PatchTool {
         }
         if let Some((document, line)) = references_window(ui.ctx(), &mut self.pane.references) {
             if *document != *id {
-                self.pane.history.visit(&id);
+                self.pane.history.visit(&*id);
                 self.selected = Some(document.into());
             }
             self.pane.focus = Some(FocusAt::Line(line));
@@ -564,11 +564,7 @@ fn history_buttons_of_mouse(ui: &egui::Ui) -> Option<bool> {
 /// `<-` `->` at the left of the tabs, which scroll without them. Returns `Some(true)` to go back,
 /// `Some(false)` to go forward. They are for those who don't know `Alt+Left` / `Alt+Right`, so their
 /// hovers tell.
-fn history_buttons(
-    ui: &mut egui::Ui,
-    i18n: &I18nMap,
-    history: &crate::patch::editor::navigate::History,
-) -> Option<bool> {
+fn history_buttons(ui: &mut egui::Ui, i18n: &I18nMap, history: &egui_code_editor::NavHistory<String>) -> Option<bool> {
     let buttons = [
         (true, Icon::ArrowLeft, I18nKey::NemesisGoBack, "Alt+←"),
         (false, Icon::ArrowRight, I18nKey::NemesisGoForward, "Alt+→"),

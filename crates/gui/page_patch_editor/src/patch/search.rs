@@ -56,7 +56,7 @@ impl Search {
                     |regex| find(objects, query, |line| regex.find_iter(line).map(|found| found.range()).collect()),
                 )
             } else {
-                find(objects, query, |line| text_matches(line, query))
+                find(objects, query, |line| stdx::text::find_ignore_case(line, query).collect())
             };
             self.searched = Some((self.query.clone(), self.regex, behavior, generation));
         }
@@ -103,24 +103,6 @@ pub(super) enum SearchRow {
     Object { first: usize, count: usize },
     /// `hits[index]`.
     Hit(usize),
-}
-
-/// Where `query` is in `line`, ignoring ASCII case (byte ranges, not overlapping).
-///
-/// e.g. `ab Ab`, `ab` -> `0..2`, `3..5`
-fn text_matches(line: &str, query: &str) -> Vec<Range<usize>> {
-    let (bytes, query) = (line.as_bytes(), query.as_bytes());
-    let mut found = Vec::new();
-    let mut at = 0;
-    while !query.is_empty() && at + query.len() <= bytes.len() {
-        if bytes[at..at + query.len()].eq_ignore_ascii_case(query) {
-            found.push(at..at + query.len());
-            at += query.len();
-        } else {
-            at += 1;
-        }
-    }
-    found
 }
 
 /// The lines where `matches` finds something (none for an empty `query`), with what it found.
@@ -201,7 +183,6 @@ mod tests {
         assert_eq!(search.object_count(), 2);
         search.toggle("#1");
         assert_eq!(search.rows(), [object(0, 2), object(2, 1), SearchRow::Hit(2)]);
-        assert_eq!(text_matches("ab Ab", "ab"), [0..2, 3..5]);
     }
 
     #[test]

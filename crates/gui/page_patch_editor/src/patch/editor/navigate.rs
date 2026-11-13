@@ -12,36 +12,6 @@
 
 use egui_code_editor::References;
 
-/// Visited objects, for `Ctrl+O` / `Ctrl+I`.
-#[derive(Debug, Default)]
-pub(in crate::patch) struct History {
-    back: Vec<String>,
-    forward: Vec<String>,
-}
-
-impl History {
-    /// Leaving `from` for another object.
-    pub(in crate::patch) fn visit(&mut self, from: &str) {
-        if self.back.last().map(String::as_str) != Some(from) {
-            self.back.push(from.to_owned());
-        }
-        self.forward.clear();
-    }
-
-    /// Is there an object to go back (`older`) / forward to?
-    pub(in crate::patch) const fn can_walk(&self, older: bool) -> bool {
-        !(if older { &self.back } else { &self.forward }).is_empty()
-    }
-
-    /// The object to go back (`older`) / forward to, from `current`.
-    pub(in crate::patch) fn walk(&mut self, older: bool, current: &str) -> Option<String> {
-        let (from, to) = if older { (&mut self.back, &mut self.forward) } else { (&mut self.forward, &mut self.back) };
-        let target = from.pop()?;
-        to.push(current.to_owned());
-        Some(target)
-    }
-}
-
 /// One line of the references window.
 #[derive(Debug)]
 struct ReferenceRow {
@@ -97,22 +67,6 @@ mod tests {
     use egui_code_editor::Location;
 
     use super::*;
-
-    #[test]
-    fn history_goes_back_and_forward() {
-        let mut history = History::default();
-        assert!(!history.can_walk(true) && !history.can_walk(false), "nowhere to go at the start");
-        history.visit("#a"); // a -> b
-        assert!(history.can_walk(true) && !history.can_walk(false));
-        history.visit("#b"); // b -> c
-        assert_eq!(history.walk(true, "#c").as_deref(), Some("#b"));
-        assert_eq!(history.walk(true, "#b").as_deref(), Some("#a"));
-        assert_eq!(history.walk(true, "#a"), None);
-        assert_eq!(history.walk(false, "#a").as_deref(), Some("#b"));
-
-        history.visit("#b"); // a new jump drops the forward list
-        assert_eq!(history.walk(false, "#z"), None);
-    }
 
     #[test]
     fn reference_rows_are_one_based_for_people() {

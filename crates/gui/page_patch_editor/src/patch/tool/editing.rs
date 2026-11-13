@@ -52,7 +52,7 @@ pub(in crate::patch) struct EditorPane {
     /// The window of the references of an object.
     pub(in crate::patch) references: Option<editor::navigate::ReferenceList>,
     /// Back and forward, as `Alt+←` / `Alt+→`.
-    pub(in crate::patch) history: editor::navigate::History,
+    pub(in crate::patch) history: egui_code_editor::NavHistory<String>,
     pub(in crate::patch) mode: EditorMode,
     pub(in crate::patch) lsp: LspOptions,
     pub(in crate::patch) show_lsp_options: bool,
