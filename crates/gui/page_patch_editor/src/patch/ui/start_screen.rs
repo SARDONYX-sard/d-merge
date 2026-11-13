@@ -28,7 +28,7 @@ impl PatchTool {
         ui.heading(i18n.t(I18nKey::PagePatchEditor));
         ui.weak(i18n.t(I18nKey::NemesisStartHint));
         ui.add_space(8.0);
-        let has_output = !self.patch_output.is_empty();
+        let has_output = !self.place.patch_output.is_empty();
         if !has_output {
             ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNeedPatchOutput));
             ui.add_space(8.0);
@@ -78,7 +78,7 @@ impl PatchTool {
         }
         scope_box(ui, &mut form.scope, i18n);
 
-        let problem = form.problem(|code| Workspace::exists(&self.cache_root, code));
+        let problem = form.problem(|code| Workspace::exists(&self.place.cache_root, code));
         let (mut create, mut cancel) = (false, false);
         ui.horizontal(|ui| {
             create = ui.add_enabled(problem.is_none(), Button::new(i18n.t(I18nKey::NemesisCreate)).primary()).clicked();

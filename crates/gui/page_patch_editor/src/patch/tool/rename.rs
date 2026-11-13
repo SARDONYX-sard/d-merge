@@ -31,8 +31,8 @@ pub(in crate::patch) fn rename_problem(old: &str, new: &str, exists: impl FnOnce
 impl PatchTool {
     /// Starts renaming the open work to `new`, saved first. See the module docs.
     pub(in crate::patch) fn start_rename(&mut self, new: &str, notify: &mut Notification, i18n: &I18nMap) {
-        let Some(old) = self.loaded_for.clone() else { return };
-        if rename_problem(&old, new, |code| Workspace::exists(&self.cache_root, code)).is_some() {
+        let Some(old) = self.place.loaded_for.clone() else { return };
+        if rename_problem(&old, new, |code| Workspace::exists(&self.place.cache_root, code)).is_some() {
             return;
         }
         self.mark_dirty();
@@ -56,8 +56,8 @@ impl PatchTool {
         i18n: &I18nMap,
     ) {
         self.workspace = work;
-        new.clone_into(&mut self.mod_code);
-        self.loaded_for = Some(new.to_owned());
+        new.clone_into(&mut self.place.mod_code);
+        self.place.loaded_for = Some(new.to_owned());
         self.reset_names();
         self.tabs.clear();
         self.selected = None;
@@ -67,10 +67,10 @@ impl PatchTool {
         self.mark_dirty();
         self.save_now(notify, i18n);
         // Only once it is saved under the new code does the old one go.
-        if Workspace::exists(&self.cache_root, new)
-            && let Err(err) = std::fs::remove_dir_all(Workspace::cache_dir(&self.cache_root, old))
+        if Workspace::exists(&self.place.cache_root, new)
+            && let Err(err) = std::fs::remove_dir_all(Workspace::cache_dir(&self.place.cache_root, old))
         {
-            notify.warn(format!("{}: {err}", Workspace::cache_dir(&self.cache_root, old).display()));
+            notify.warn(format!("{}: {err}", Workspace::cache_dir(&self.place.cache_root, old).display()));
         }
         for work in self.recent.iter_mut().filter(|work| work.mod_code.eq_ignore_ascii_case(old)) {
             new.clone_into(&mut work.mod_code);
@@ -98,14 +98,15 @@ mod tests {
     #[test]
     fn a_work_is_renamed_and_saved_under_the_new_code() {
         let dir = std::env::temp_dir().join(format!("d_merge_rename_{}", std::process::id()));
-        let mut tool = PatchTool { cache_root: dir.clone(), ..PatchTool::default() };
+        let mut tool = PatchTool::default();
+        tool.place.cache_root.clone_from(&dir);
         let mut behavior =
             workspace::Behavior::open(&std::path::Path::new("meshes").join(format!("{}.bin", workspace::ADSF)))
                 .unwrap();
         behavior.added.insert("M~1/Idle~oldc$0.txt".to_owned(), "Idle\noldc$0\n1\n0\n0\n0\n".to_owned());
         tool.workspace.behaviors.push(behavior);
-        tool.mod_code = "oldc".to_owned();
-        tool.loaded_for = Some("oldc".to_owned());
+        tool.place.mod_code = "oldc".to_owned();
+        tool.place.loaded_for = Some("oldc".to_owned());
         let (mut notify, i18n) = (Notification::default(), I18nMap::default());
         tool.mark_dirty();
         tool.save_now(&mut notify, &i18n);
@@ -118,7 +119,7 @@ mod tests {
         let (old_gone, new_there) = (!Workspace::exists(&dir, "oldc"), Workspace::exists(&dir, "newc"));
         std::fs::remove_dir_all(&dir).unwrap();
 
-        assert_eq!(tool.mod_code, "newc");
+        assert_eq!(tool.place.mod_code, "newc");
         assert!(renamed && old_gone && new_there);
     }
 }

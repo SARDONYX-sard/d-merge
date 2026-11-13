@@ -98,7 +98,7 @@ impl PatchTool {
         match action {
             Some(FileAction::New) => {
                 // Usually next to the one that was open.
-                let output = self.output.clone();
+                let output = self.place.output.clone();
                 self.close_work(notify, i18n);
                 self.new_work = Some(NewWork { code: String::new(), output, ..NewWork::default() });
             }
@@ -110,7 +110,7 @@ impl PatchTool {
     }
 
     fn export_button(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let ready = !self.output.trim().is_empty() && !self.workspace.behaviors.is_empty();
+        let ready = !self.place.output.trim().is_empty() && !self.workspace.behaviors.is_empty();
         if ui
             .add_enabled(ready, Button::new(i18n.t(I18nKey::NemesisExport)).primary())
             .on_disabled_hover_text(i18n.t(I18nKey::NemesisExportDisabledHover))
@@ -142,9 +142,9 @@ impl PatchTool {
 
     /// `mymod  D:/mods/out`. Returns whether it was clicked.
     fn project_summary(&self, ui: &mut egui::Ui) -> bool {
-        let name = egui::RichText::new(self.mod_code.trim()).strong();
+        let name = egui::RichText::new(self.place.mod_code.trim()).strong();
         let mut clicked = ui.add(egui::Label::new(name).sense(egui::Sense::click())).clicked();
-        let output = egui::RichText::new(self.output.trim()).weak();
+        let output = egui::RichText::new(self.place.output.trim()).weak();
         clicked |= ui.add(egui::Label::new(output).truncate().sense(egui::Sense::click())).clicked();
         clicked
     }
@@ -153,7 +153,7 @@ impl PatchTool {
     fn project_form(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let output = PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
             .help(i18n.t(I18nKey::NemesisOutputHover))
-            .show(ui, &mut self.output);
+            .show(ui, &mut self.place.output);
         if let Some(err) = output.open_error {
             notify.error(err);
         }
@@ -167,7 +167,7 @@ impl PatchTool {
             // It is in the ids of the new objects and the names of the folders: renamed, not typed over.
             let hover = i18n.t(I18nKey::NemesisModCodeHover);
             ui.label(i18n.t(I18nKey::NemesisModCodeLabel)).on_hover_text(hover);
-            ui.strong(self.mod_code.trim()).on_hover_text(hover);
+            ui.strong(self.place.mod_code.trim()).on_hover_text(hover);
             if !self.is_user_patch {
                 self.rename_form(ui, i18n, notify);
             }
@@ -203,8 +203,8 @@ impl PatchTool {
             return;
         };
         ui.add(TextEdit::singleline(new).hint_text(i18n.t(I18nKey::NemesisModCodeHint)).desired_width(90.0));
-        let old = self.loaded_for.as_deref().unwrap_or_default();
-        let problem = rename_problem(old, new, |code| Workspace::exists(&self.cache_root, code));
+        let old = self.place.loaded_for.as_deref().unwrap_or_default();
+        let problem = rename_problem(old, new, |code| Workspace::exists(&self.place.cache_root, code));
         let rename =
             ui.add_enabled(problem.is_none(), Button::new(i18n.t(I18nKey::NemesisRenameCode)).small().primary());
         let cancel = ui.add(Button::new(i18n.t(I18nKey::CancelButton)).small()).clicked();
@@ -222,13 +222,13 @@ impl PatchTool {
 
     /// `[Read from] D:/mods/Paraglider  [Reload]`, if the work was read from a mod.
     fn source_row(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        if self.mod_dir.trim().is_empty() {
+        if self.place.mod_dir.trim().is_empty() {
             return;
         }
         let mut reload = false;
         let error = PathRow::new(i18n.t(I18nKey::NemesisModDirLabel), "", PATH_ACTIONS)
             .hover(i18n.t(I18nKey::NemesisSourceHover))
-            .show_read_only(ui, self.mod_dir.trim(), |ui| {
+            .show_read_only(ui, self.place.mod_dir.trim(), |ui| {
                 let button = Button::new(i18n.t(I18nKey::NemesisReload)).icon(Icon::RefreshCcw);
                 reload = ui.add(button).on_hover_text(i18n.t(I18nKey::NemesisReloadHover)).clicked();
             });
@@ -258,8 +258,9 @@ impl PatchTool {
 
     /// The directory of the open work, or of all the works if none is open.
     fn cache_dir(&self) -> std::path::PathBuf {
-        let root = &self.cache_root;
-        let dir = self.loaded_for.as_deref().map_or_else(|| root.clone(), |code| Workspace::cache_dir(root, code));
+        let root = &self.place.cache_root;
+        let dir =
+            self.place.loaded_for.as_deref().map_or_else(|| root.clone(), |code| Workspace::cache_dir(root, code));
         std::path::absolute(&dir).unwrap_or(dir)
     }
 
@@ -285,7 +286,7 @@ impl PatchTool {
             self.workspace.ref_mods.remove(at);
             self.workspace.reload_refs();
         } else if add && let Some(dir) = gui_shared::rfd::FileDialog::new().pick_folder() {
-            let code = self.mod_code.trim().to_owned();
+            let code = self.place.mod_code.trim().to_owned();
             self.workspace.add_ref(&dir, &code);
         } else {
             return;

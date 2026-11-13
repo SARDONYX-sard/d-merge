@@ -70,14 +70,14 @@ impl PatchTool {
 
     fn add_custom_template(&mut self, notify: &mut Notification, i18n: &I18nMap) {
         let dialog = gui_shared::rfd::FileDialog::new().add_filter("Template", &["xml", "bin"]);
-        if let Some(path) = dialog.set_directory(&self.template_dir).pick_file() {
+        if let Some(path) = dialog.set_directory(&self.place.template_dir).pick_file() {
             self.add_behavior(&path, notify, i18n);
         }
     }
 
     /// The mod the work was read from, or else the one it makes, or else asks for one.
     fn open_anim_data_for_mod(&mut self) {
-        let dirs = [self.mod_dir.trim(), self.output.trim()];
+        let dirs = [self.place.mod_dir.trim(), self.place.output.trim()];
         let chosen = dirs.into_iter().find(|dir| !dir.is_empty()).map(PathBuf::from);
         if let Some(root) = chosen.or_else(|| gui_shared::rfd::FileDialog::new().pick_folder()) {
             self.open_anim_data_dialog(&root);
@@ -90,7 +90,7 @@ impl PatchTool {
             ui.weak(i18n.t(I18nKey::NemesisNoBehavior));
             return None;
         }
-        let code = if is_existing_mod_code(self.mod_code.trim()) { self.mod_code.trim() } else { "<code>" };
+        let code = if is_existing_mod_code(self.place.mod_code.trim()) { self.place.mod_code.trim() } else { "<code>" };
         let ext = self.workspace.export_format.is_ext();
         let mut event = None;
         egui::ScrollArea::both().id_salt("nemesis_behaviors").max_height(LIST_HEIGHT).show(ui, |ui| {
@@ -138,10 +138,11 @@ impl PatchTool {
             return;
         }
         let scope = self.workspace.scope;
-        let fresh = self.picker.catalog_for.as_ref().is_some_and(|(dir, of)| *dir == self.template_dir && *of == scope);
+        let fresh =
+            self.picker.catalog_for.as_ref().is_some_and(|(dir, of)| *dir == self.place.template_dir && *of == scope);
         if !fresh {
-            self.picker.catalog = crate::patch::workspace::catalog(Path::new(&self.template_dir), scope);
-            self.picker.catalog_for = Some((self.template_dir.clone(), scope));
+            self.picker.catalog = crate::patch::workspace::catalog(Path::new(&self.place.template_dir), scope);
+            self.picker.catalog_for = Some((self.place.template_dir.clone(), scope));
         }
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let mut picked = None;
@@ -162,7 +163,7 @@ impl PatchTool {
         if std::mem::take(&mut self.focus_quick_pick) {
             field.request_focus();
         }
-        ui.weak(format!("{} ({})", self.template_dir, self.picker.catalog.len()));
+        ui.weak(format!("{} ({})", self.place.template_dir, self.picker.catalog.len()));
         if self.workspace.scope == TemplateScope::Nemesis {
             ui.weak(i18n.t(I18nKey::NemesisScopeNemesisOnly));
         }

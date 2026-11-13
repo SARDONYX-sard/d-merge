@@ -88,7 +88,7 @@ impl PatchTool {
                     self.mod_export.open = true;
                 }
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    let output = egui::RichText::new(self.output.trim()).weak();
+                    let output = egui::RichText::new(self.place.output.trim()).weak();
                     ui.add(egui::Label::new(output).truncate()).on_hover_text(i18n.t(I18nKey::UserPatchOutputHover));
                 });
             });

@@ -148,7 +148,7 @@ impl PatchTool {
     /// Opens the Pandora patch file of the active behavior. The first time, it is written from what
     /// the work has changed so far.
     pub(in crate::patch) fn open_pandora_doc(&mut self) {
-        let code = self.mod_code.trim().to_owned();
+        let code = self.place.mod_code.trim().to_owned();
         let behavior = &mut self.workspace.behaviors[self.active];
         if behavior.pandora_doc.is_none() {
             let doc = workspace::pandora::draft_doc(behavior, &code);
@@ -189,7 +189,7 @@ impl PatchTool {
         if !behavior.adsf {
             return;
         }
-        let template_dir = Path::new(&self.template_dir);
+        let template_dir = Path::new(&self.place.template_dir);
         let template =
             self.pane.template_triggers.get_or_insert_with(|| anim::data::template_trigger_names(template_dir));
         self.pane.trigger_names = anim::data::trigger_names(template, behavior);
@@ -229,7 +229,7 @@ impl PatchTool {
         }
         self.sync_pandora_doc();
         let behavior = &self.workspace.behaviors[self.active];
-        let patch = behavior.patch(self.mod_code.trim(), id);
+        let patch = behavior.patch(self.place.mod_code.trim(), id);
         let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(id, patch, self.parser_mode));
         self.pane.problems = if id == PANDORA_DOC {
             editor::pandora::diagnostics(&self.pane.text, behavior)
@@ -240,7 +240,7 @@ impl PatchTool {
             Vec::new() // not this mod's to fix
         } else {
             let is_new = behavior.added.contains_key(id);
-            editor::diagnostics::field_diagnostics(&self.pane.text, behavior, is_new, self.mod_code.trim())
+            editor::diagnostics::field_diagnostics(&self.pane.text, behavior, is_new, self.place.mod_code.trim())
         };
         // Keep the ▲ / ▼ position across edits.
         let current = self.pane.preview_view.as_ref().map_or(0, |view| view.current);

@@ -100,7 +100,7 @@ impl PatchTool {
             ui.separator();
             let behavior = &self.workspace.behaviors[self.active];
             let is_new = *selected == *PANDORA_DOC || behavior.added.contains_key(&*selected);
-            let can_copy = !anim && *selected != *PANDORA_DOC && is_existing_mod_code(self.mod_code.trim());
+            let can_copy = !anim && *selected != *PANDORA_DOC && is_existing_mod_code(self.place.mod_code.trim());
             if ui.add_enabled(can_copy, Button::new(i18n.t(I18nKey::NemesisDuplicate))).clicked() {
                 self.new_object(Some(&selected));
                 ui.close();
@@ -123,7 +123,7 @@ impl PatchTool {
         let hover = if adsf { I18nKey::NemesisNewClipsHover } else { I18nKey::NemesisNewObject };
         let button = Button::new("").icon(Icon::Plus).small();
         if ui
-            .add_enabled(is_existing_mod_code(self.mod_code.trim()), button)
+            .add_enabled(is_existing_mod_code(self.place.mod_code.trim()), button)
             .on_hover_text(i18n.t(hover))
             .on_disabled_hover_text(i18n.t(I18nKey::NemesisModCodeInvalid))
             .clicked()
@@ -454,7 +454,7 @@ impl PatchTool {
             },
         );
         if let Some(class) = picked {
-            let code = self.mod_code.trim().to_string();
+            let code = self.place.mod_code.trim().to_string();
             if let Some(id) = self.workspace.behaviors[self.active].add_class(&code, &class) {
                 self.object_changed(&id);
                 self.selected = Some(id.into());

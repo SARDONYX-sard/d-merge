@@ -29,7 +29,7 @@ mod user_patch;
 mod vars_edit;
 mod workspace;
 
-use std::{path::PathBuf, rc::Rc};
+use std::rc::Rc;
 
 use egui_code_editor::EditorCommand;
 use egui_widgets::notify::Notification;
@@ -74,10 +74,8 @@ pub struct PatchPaths<'a> {
 
 #[derive(Debug, Default)]
 pub(crate) struct PatchTool {
-    /// The patch page's output directory, see [`PatchPaths`].
-    patch_output: String,
-    /// Where the works are: see [`workspace::cache_root_of`].
-    cache_root: PathBuf,
+    /// Which work is open, and where its files are.
+    place: tool::place::WorkPlace,
     /// This tool is the user patch's, in its window: see [`user_patch`].
     is_user_patch: bool,
     /// The commands this frame's keys asked for: see [`Self::key_command`].
@@ -93,10 +91,6 @@ pub(crate) struct PatchTool {
     draft: Option<user_patch::Draft>,
     /// Its bulk delete asks once more.
     confirm_clear: bool,
-    /// Where this work is exported to.
-    output: String,
-    /// The root of the mod the work was read from. Empty: it was made here.
-    mod_dir: String,
     /// See [`Self::take_mod_written`].
     mod_written: bool,
     /// What was edited of the active behavior since [`Self::sync_pandora_doc`].
@@ -105,9 +99,6 @@ pub(crate) struct PatchTool {
     code_choice: Option<ui::code_choice::ModCodeChoice>,
     /// See [`new_work`]. `Some`: its form is shown on the start screen.
     new_work: Option<new_work::NewWork>,
-    mod_code: String,
-    /// `settings.behavior.template_dir` (`.bin` or `.xml` templates under `meshes/`).
-    template_dir: String,
     /// The window of the templates to add. See [`ui::template_picker`].
     picker: ui::template_picker::TemplatePicker,
     /// The next quick pick window drawn takes the keyboard.
@@ -119,8 +110,6 @@ pub(crate) struct PatchTool {
     /// `output` / `code` were taken from the settings.
     restored: bool,
     workspace: Workspace,
-    /// The code of the work the workspace belongs to (`None` = no work is open).
-    loaded_for: Option<String>,
     /// When the work is saved next.
     autosave: tool::autosave::Autosave,
 
@@ -292,24 +281,24 @@ impl PatchTool {
         keys: &mut keybinding::Keybindings,
     ) {
         self.read_editor_options(editor);
-        if self.template_dir != paths.template_dir {
-            paths.template_dir.clone_into(&mut self.template_dir);
+        if self.place.template_dir != paths.template_dir {
+            paths.template_dir.clone_into(&mut self.place.template_dir);
         }
         self.set_patch_output(paths.patch_output_dir, notify, i18n);
         // The first frame reopens the last work (its cache is found from these two).
         if !self.restored {
             self.restored = true;
-            self.output.clone_from(&settings.output);
-            self.mod_dir.clone_from(&settings.mod_dir);
-            self.mod_code.clone_from(&settings.mod_code);
+            self.place.output.clone_from(&settings.output);
+            self.place.mod_dir.clone_from(&settings.mod_dir);
+            self.place.mod_code.clone_from(&settings.mod_code);
             self.recent.clone_from(&settings.recent);
             // It has a window of its own.
             self.recent.retain(|work| !work.mod_code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE));
             // A work that is gone: the start screen rather than an empty work.
-            let code_is_free = self.mod_code.trim().eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE);
-            if self.patch_output.is_empty()
+            let code_is_free = self.place.mod_code.trim().eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE);
+            if self.place.patch_output.is_empty()
                 || code_is_free
-                || !Workspace::exists(&self.cache_root, self.mod_code.trim())
+                || !Workspace::exists(&self.place.cache_root, self.place.mod_code.trim())
             {
                 self.close_work(notify, i18n);
             }
@@ -338,8 +327,8 @@ impl PatchTool {
         self.draw(ui, i18n, notify);
 
         self.write_editor_options(editor);
-        if settings.mod_dir != self.mod_dir {
-            settings.mod_dir.clone_from(&self.mod_dir);
+        if settings.mod_dir != self.place.mod_dir {
+            settings.mod_dir.clone_from(&self.place.mod_dir);
         }
         if settings.recent != self.recent {
             settings.recent.clone_from(&self.recent);
@@ -352,9 +341,9 @@ impl PatchTool {
                 settings.tree_open.insert(path.clone(), open);
             }
         }
-        if settings.output != self.output || settings.mod_code != self.mod_code {
-            settings.output.clone_from(&self.output);
-            settings.mod_code.clone_from(&self.mod_code);
+        if settings.output != self.place.output || settings.mod_code != self.place.mod_code {
+            settings.output.clone_from(&self.place.output);
+            settings.mod_code.clone_from(&self.place.mod_code);
         }
     }
 
@@ -374,7 +363,7 @@ impl PatchTool {
         self.code_choice_window(ui.ctx(), i18n, notify);
         if self.is_user_patch {
             self.user_patch_bar(ui, i18n, notify);
-        } else if self.loaded_for.is_none() {
+        } else if !self.place.is_open() {
             self.start_screen(ui, i18n, notify);
             return;
         } else {
@@ -479,7 +468,12 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../resource/assets/templates");
         let (workspace, code, _) = Workspace::import(Path::new(&selected), &root).unwrap();
         let explorer = tool::list::Explorer { tree_view: true, ..Default::default() };
-        let mut tool = PatchTool { workspace, mod_code: code, explorer, ..PatchTool::default() };
+        let mut tool = PatchTool {
+            workspace,
+            explorer,
+            place: tool::place::WorkPlace { mod_code: code, ..Default::default() },
+            ..PatchTool::default()
+        };
         let i18n = I18nMap::new();
 
         for active in 0..tool.workspace.behaviors.len() {
@@ -530,18 +524,18 @@ mod work_tests {
         tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        assert_eq!(tool.loaded_for.as_deref(), Some("aaaa"));
+        assert_eq!(tool.place.loaded_for.as_deref(), Some("aaaa"));
         tool.workspace.info.name = "first".to_owned();
         tool.mark_dirty();
         tool.save_now(&mut notify, &i18n);
 
         // `File > New`: the first one goes away, and the second one starts empty.
         tool.close_work(&mut notify, &i18n);
-        assert_eq!(tool.loaded_for, None);
+        assert_eq!(tool.place.loaded_for, None);
         tool.create_work("bbbb".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        assert_eq!(tool.loaded_for.as_deref(), Some("bbbb"));
+        assert_eq!(tool.place.loaded_for.as_deref(), Some("bbbb"));
         assert_eq!(tool.workspace.info.name, "");
         tool.save_now(&mut notify, &i18n);
 
@@ -570,7 +564,7 @@ mod work_tests {
         tool.wait_job(&mut notify, &i18n);
 
         tool.set_patch_output(&dir.join("two").display().to_string(), &mut notify, &i18n);
-        assert_eq!(tool.loaded_for, None);
+        assert_eq!(tool.place.loaded_for, None);
         let in_one = Workspace::exists(&workspace::cache_root_of(&dir.join("one").display().to_string()), "aaaa");
         std::fs::remove_dir_all(&dir).unwrap();
         assert!(in_one);
@@ -594,7 +588,7 @@ mod work_tests {
         tool.open_mod(&root, &mut notify, &i18n);
 
         tool.wait_job(&mut notify, &i18n);
-        let opened_at_once = tool.loaded_for.clone();
+        let opened_at_once = tool.place.loaded_for.clone();
         let choice = tool
             .code_choice
             .as_ref()
@@ -602,7 +596,7 @@ mod work_tests {
 
         tool.open_chosen_code("ecnpc", &mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        let opened = tool.loaded_for.clone();
+        let opened = tool.place.loaded_for.clone();
         let asked_again = tool.code_choice.is_some();
         std::fs::remove_dir_all(&dir).unwrap();
 
@@ -624,12 +618,12 @@ mod work_tests {
         tool.open_mod(&one, &mut notify, &i18n);
 
         tool.wait_job(&mut notify, &i18n);
-        let of_one = (tool.loaded_for.clone(), tool.code_choice.is_some());
+        let of_one = (tool.place.loaded_for.clone(), tool.code_choice.is_some());
 
         // The code of 7 letters, as Nemesis' own mod has it.
         tool.open_mod(&several.join("Nemesis_Engine/mod/nemesis"), &mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        let of_patch_dir = (tool.loaded_for.clone(), tool.code_choice.is_some());
+        let of_patch_dir = (tool.place.loaded_for.clone(), tool.code_choice.is_some());
         std::fs::remove_dir_all(&dir).unwrap();
 
         assert_eq!(of_one, (Some("para".to_owned()), false));
@@ -660,7 +654,7 @@ mod work_tests {
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let open = |notify: &mut Notification| {
             let mut tool = tool_in(&dir.join("out"));
-            tool.template_dir = dir.join("templates").display().to_string();
+            tool.place.template_dir = dir.join("templates").display().to_string();
             tool.open_mod(&mod_dir, notify, &i18n);
             tool.wait_job(notify, &i18n);
             tool.sync_workspace(notify, &i18n);
@@ -675,7 +669,7 @@ mod work_tests {
         first.save_now(&mut notify, &i18n);
 
         // What an old build left: the file, no edits, and no format.
-        let cache = first.cache_root.join("pandora");
+        let cache = first.place.cache_root.join("pandora");
         let behavior_dir =
             std::fs::read_dir(&cache).unwrap().flatten().map(|entry| entry.path()).find(|path| path.is_dir()).unwrap();
         for file in std::fs::read_dir(&behavior_dir).unwrap().flatten() {
@@ -760,7 +754,7 @@ mod work_tests {
         .unwrap();
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir.join("out"));
-        tool.template_dir = dir.join("templates").display().to_string();
+        tool.place.template_dir = dir.join("templates").display().to_string();
         tool.open_mod(&mod_dir, &mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
         tool.sync_workspace(&mut notify, &i18n);

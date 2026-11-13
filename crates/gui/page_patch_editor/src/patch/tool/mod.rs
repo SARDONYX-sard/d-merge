@@ -4,5 +4,6 @@ pub(super) mod autosave;
 pub(super) mod editing;
 pub(super) mod job;
 pub(super) mod list;
+pub(super) mod place;
 pub(super) mod rename;
 mod work;

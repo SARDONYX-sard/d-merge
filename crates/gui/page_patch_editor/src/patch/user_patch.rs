@@ -143,11 +143,14 @@ impl PatchTool {
             workspace,
             is_user_patch: true,
             restored: true,
-            patch_output: output.to_owned(),
-            cache_root: workspace::cache_root_of(output),
-            output: user_patch_output(output).display().to_string(),
-            mod_code: USER_PATCH_CODE.to_owned(),
-            template_dir: paths.template_dir.to_owned(),
+            place: super::tool::place::WorkPlace {
+                patch_output: output.to_owned(),
+                cache_root: workspace::cache_root_of(output),
+                output: user_patch_output(output).display().to_string(),
+                mod_code: USER_PATCH_CODE.to_owned(),
+                template_dir: paths.template_dir.to_owned(),
+                ..Default::default()
+            },
             parser_mode: paths.parser_mode,
             behaviors_open: true,
             explorer: super::tool::list::Explorer { changed_only: true, ..Default::default() },
@@ -170,7 +173,7 @@ impl PatchTool {
         i18n: &I18nMap,
     ) -> &mut Self {
         let output = paths.patch_output_dir.trim();
-        if let Some(tool) = self.user_patch.tool.as_mut().filter(|tool| tool.patch_output != output) {
+        if let Some(tool) = self.user_patch.tool.as_mut().filter(|tool| tool.place.patch_output != output) {
             tool.undo_unedited_draft();
             tool.save_now(notify, i18n);
             self.mod_written |= tool.mod_written;
@@ -178,8 +181,8 @@ impl PatchTool {
         }
         let tool = self.user_patch.tool.get_or_insert_with(|| Box::new(Self::for_user_patch(paths)));
         tool.set_parser_mode(paths.parser_mode);
-        if tool.template_dir != paths.template_dir {
-            paths.template_dir.clone_into(&mut tool.template_dir);
+        if tool.place.template_dir != paths.template_dir {
+            paths.template_dir.clone_into(&mut tool.place.template_dir);
         }
         tool.sync_workspace(notify, i18n);
         // Small, and what comes next uses it at once.
@@ -190,9 +193,9 @@ impl PatchTool {
     /// Writes the user patch now. Saved again after: what the export wrote is part of the work.
     /// Returns the patches d-merge's parser rejects.
     pub(super) fn write_user_patch(&mut self) -> Result<Vec<String>, String> {
-        self.workspace.save(&self.cache_root, USER_PATCH_CODE)?;
-        let invalid = self.workspace.export(Path::new(&self.output), USER_PATCH_CODE, self.parser_mode)?.1;
-        self.workspace.save(&self.cache_root, USER_PATCH_CODE)?;
+        self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
+        let invalid = self.workspace.export(Path::new(&self.place.output), USER_PATCH_CODE, self.parser_mode)?.1;
+        self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
         self.autosave.take();
         Ok(invalid)
     }
@@ -355,9 +358,9 @@ mod tests {
     #[test]
     fn its_place_is_decided_by_the_patch_pages_output() {
         let tool = PatchTool::for_user_patch(paths("D:/out"));
-        assert_eq!(Path::new(&tool.output), Path::new("D:/out/.d_merge/user_patch"));
-        assert_eq!(tool.mod_code, USER_PATCH_CODE);
-        assert!(tool.cache_root.starts_with("D:/out/.d_merge/caches"));
+        assert_eq!(Path::new(&tool.place.output), Path::new("D:/out/.d_merge/user_patch"));
+        assert_eq!(tool.place.mod_code, USER_PATCH_CODE);
+        assert!(tool.place.cache_root.starts_with("D:/out/.d_merge/caches"));
     }
 
     #[test]
@@ -490,7 +493,7 @@ mod tests {
             drawn.textures_delta.clear();
         }
         let tool = main.user_patch.tool.as_mut().unwrap();
-        assert_eq!(tool.loaded_for.as_deref(), Some(USER_PATCH_CODE));
+        assert_eq!(tool.place.loaded_for.as_deref(), Some(USER_PATCH_CODE));
 
         tool.clear_user_patch(&mut notify, &i18n);
         let cache = workspace::cache_root_of(&output).join(USER_PATCH_CODE);

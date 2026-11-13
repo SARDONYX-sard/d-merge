@@ -199,7 +199,7 @@ impl PatchTool {
     pub(in crate::patch) fn object_file(&self, id: &str) -> std::path::PathBuf {
         let behavior = &self.workspace.behaviors[self.active];
         let patched = behavior.edits.contains_key(id) || behavior.added.contains_key(id);
-        let (output, code) = (self.output.trim(), self.mod_code.trim());
+        let (output, code) = (self.place.output.trim(), self.place.mod_code.trim());
         if !patched || output.is_empty() || code.is_empty() {
             return behavior.template_path.clone();
         }
@@ -296,7 +296,7 @@ impl PatchTool {
     }
 
     pub(in crate::patch) fn new_object(&mut self, from: Option<&str>) {
-        let code = self.mod_code.trim().to_string();
+        let code = self.place.mod_code.trim().to_string();
         let id = self.workspace.behaviors[self.active].add_object(&code, from);
         self.object_changed(&id);
         self.selected = Some(id.into());
@@ -315,15 +315,21 @@ mod tests {
         use crate::patch::workspace::{ADSF, Behavior};
         let mut clips = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
         clips.added.insert("Male~1/m$0.txt".to_owned(), String::new());
-        let mut tool =
-            PatchTool { mod_code: "mymod".to_owned(), output: "D:/mods/My".to_owned(), ..Default::default() };
+        let mut tool = PatchTool {
+            place: crate::patch::tool::place::WorkPlace {
+                mod_code: "mymod".to_owned(),
+                output: "D:/mods/My".to_owned(),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
         tool.workspace.behaviors.push(clips);
 
         let patch = Path::new("D:/mods/My").join("Nemesis_Engine/mod/mymod").join(ADSF).join("Male~1/m$0.txt");
         assert_eq!(tool.object_file("Male~1/m$0.txt"), patch);
         let template = tool.workspace.behaviors[0].template_path.clone();
         assert_eq!(tool.object_file("Male~1/other.txt"), template, "not patched");
-        tool.output.clear();
+        tool.place.output.clear();
         assert_eq!(tool.object_file("Male~1/m$0.txt"), template, "no mod to be in");
     }
 

@@ -101,12 +101,12 @@ impl PatchTool {
     /// What checks the objects of behavior `index`.
     fn checker(&self, index: usize) -> Checker<'_> {
         let behavior = &self.workspace.behaviors[index];
-        Checker { index, behavior, code: self.mod_code.trim(), mode: self.parser_mode }
+        Checker { index, behavior, code: self.place.mod_code.trim(), mode: self.parser_mode }
     }
 
     /// Checks the whole work again if it changed as a whole (read, loaded, restored). Call each frame.
     pub(super) fn diagnose_work(&mut self) {
-        if !self.problems.stale || self.job.is_some() || self.loaded_for.is_none() {
+        if !self.problems.stale || self.job.is_some() || !self.place.is_open() {
             return;
         }
         let mut found: Vec<ObjectProblems> =
@@ -158,9 +158,9 @@ mod tests {
     fn tool(mode: ParserMode) -> PatchTool {
         let mut tool = PatchTool::default();
         tool.workspace.behaviors.push(clip_data());
-        tool.mod_code = "m".to_owned();
+        tool.place.mod_code = "m".to_owned();
         tool.parser_mode = mode;
-        tool.loaded_for = Some("m".to_owned());
+        tool.place.loaded_for = Some("m".to_owned());
         tool
     }
 

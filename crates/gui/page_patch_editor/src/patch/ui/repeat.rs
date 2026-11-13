@@ -51,7 +51,7 @@ impl PatchTool {
         let mut open = true;
         let mut create = false;
         let rows = values(&form.values).rows.len();
-        let code_ok = is_existing_mod_code(self.mod_code.trim());
+        let code_ok = is_existing_mod_code(self.place.mod_code.trim());
         egui_widgets::window_near_pointer(ctx, format!("{} {}", i18n.t(I18nKey::RepeatTitle), form.from))
             .open(&mut open)
             .default_size([640.0, 520.0])
@@ -86,7 +86,7 @@ impl PatchTool {
     /// Makes one new object per row of the values, and shows the first.
     fn create_repeated(&mut self) {
         let Some(form) = self.repeat.take() else { return };
-        let code = self.mod_code.trim().to_owned();
+        let code = self.place.mod_code.trim().to_owned();
         let read = values(&form.values);
         let Some(behavior) = self.workspace.behaviors.get_mut(form.behavior) else { return };
         let mut first = None;

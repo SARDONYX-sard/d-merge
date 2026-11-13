@@ -104,7 +104,7 @@ impl PatchTool {
             })
             .collect();
         let hkx = data::anim_hkx_files(root);
-        let sets = self.workspace.anim_set_projects(Path::new(&self.template_dir));
+        let sets = self.workspace.anim_set_projects(Path::new(&self.place.template_dir));
         let folders: Vec<&str> = sets.iter().map(|(folder, _)| folder.as_str()).collect();
         let project = data::default_project(&folders, hkx.first().map(String::as_str));
         let projects =
@@ -146,7 +146,7 @@ impl PatchTool {
 
     fn generate_anim_data(&mut self, i18n: &I18nMap, notify: &mut Notification) {
         let Some(dialog) = self.anim_data_dialog.take() else { return };
-        let code = self.mod_code.trim().to_owned();
+        let code = self.place.mod_code.trim().to_owned();
         let chosen: Vec<(&ClipSource, HkxInfo)> =
             dialog.rows.iter().filter(|row| row.checked).filter_map(chosen_clip).collect();
         let sets: Vec<String> = dialog.projects.iter().flat_map(project_set_ids).collect();
@@ -166,7 +166,7 @@ impl PatchTool {
             request.push.sets.len(),
         );
         let first_result = if request.clips.is_empty() { ASDSF } else { ADSF };
-        let root = PathBuf::from(&self.template_dir);
+        let root = PathBuf::from(&self.place.template_dir);
         if let Err(err) = data::generate(&mut self.workspace, &root, &request) {
             notify.error(err);
             return;
@@ -435,7 +435,7 @@ impl PatchTool {
     pub(in crate::patch) fn anim_projects(&mut self) -> Vec<String> {
         let is_adsf = self.workspace.behaviors[self.active].adsf;
         if is_adsf && self.template_projects.is_none() {
-            self.template_projects = Some(data::template_projects(Path::new(&self.template_dir)));
+            self.template_projects = Some(data::template_projects(Path::new(&self.place.template_dir)));
         }
         let template = if is_adsf { self.template_projects.as_deref().unwrap_or_default() } else { &[] };
         data::project_folders(&self.workspace.behaviors[self.active], template)
@@ -477,7 +477,7 @@ impl PatchTool {
 
     fn create_new_clips(&mut self) {
         let Some(form) = self.new_clips.take() else { return };
-        let code = self.mod_code.trim().to_owned();
+        let code = self.place.mod_code.trim().to_owned();
         let adsf = &mut self.workspace.behaviors[self.active];
         let added = data::add_numbered_clips(adsf, &code, form.folder.trim(), form.name.trim(), form.count);
         if let Some(first) = added.first() {
