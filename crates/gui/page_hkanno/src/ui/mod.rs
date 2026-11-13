@@ -4,8 +4,6 @@
 mod preview;
 mod toolbar;
 
-use std::borrow::Cow;
-
 use egui_code_editor::{
     CodeEditor, CodeEditorOutput, EditorCommand, EditorFeatures, Keymap, ProblemGroup, ProblemsPanel, text_pos::LinePos,
 };
@@ -62,23 +60,29 @@ impl HkannoPage {
         drop_overlay(ui.ctx(), ctx.i18n);
     }
 
-    /// `[attack.hkx ✖] [idle.hkx* ✖] ...  [Open]`
+    /// `│ attack.hkx ✖ │ idle.hkx ● │ ...  [Open]`: VS Code's tabs ([`egui_widgets::EditorTab`]).
+    /// `●`: unsaved edits; red / yellow: the file has errors / warnings.
     fn tab_bar(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
         let mut close = None;
         let mut open = None;
         ui.horizontal(|ui| {
             egui::ScrollArea::horizontal().id_salt("hkanno_tab_scroll").show(ui, |ui| {
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 0.0; // the tabs touch, with a line between them
                     for (i, tab) in self.tabs.iter().enumerate() {
-                        // `*` marks unsaved edits.
-                        let title = if tab.dirty {
-                            Cow::Owned(format!("{}*", tab.title()))
-                        } else {
-                            Cow::Borrowed(tab.title())
+                        let (errors, warnings) = egui_code_editor::problems::counts(&tab.editor_diagnostics);
+                        let tone = match (errors, warnings) {
+                            (0, 0) => None,
+                            (0, _) => Some(egui_code_editor::Severity::Warning.color(ui.visuals())),
+                            _ => Some(egui_code_editor::Severity::Error.color(ui.visuals())),
                         };
-                        let response = ui
-                            .add(Button::selectable(i == self.active, title.as_ref()))
-                            .on_hover_text(&tab.settings.input_path);
+                        let focused = ui.memory(|m| m.has_focus(tab.editor_id()));
+                        let shown = egui_widgets::EditorTab::new(tab.title(), i == self.active)
+                            .focused(focused)
+                            .modified(tab.dirty)
+                            .tone(tone)
+                            .show(ui);
+                        let response = shown.response.on_hover_text(&tab.settings.input_path);
                         if response.clicked() {
                             self.active = i;
                         }
@@ -87,10 +91,9 @@ impl HkannoPage {
                                 close = Some(i);
                             }
                         });
-                        if ui.small_button("✖").clicked() {
+                        if shown.close {
                             close = Some(i);
                         }
-                        ui.add_space(6.0);
                     }
                 });
             });

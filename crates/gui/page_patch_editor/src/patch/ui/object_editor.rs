@@ -287,6 +287,9 @@ impl PatchTool {
         ];
 
         let mut result = EditorResult::default();
+        // The shown tab's line takes the accent color while its editor has the keyboard, as VS Code's.
+        let editor_id = egui_code_editor::editor_id(("nemesis_object", self.is_user_patch, id));
+        let editor_focused = ui.memory(|m| m.has_focus(editor_id));
         // Read before the panel borrows the work; what a click asks for is done after it.
         let (counts, mut toggle_problems, mut go_to_problem) = (self.problem_counts(), false, None);
         let mut left_problems = false;
@@ -315,7 +318,8 @@ impl PatchTool {
                     }
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         result.walk_history = history_buttons(ui, i18n, &self.pane.history);
-                        result.tab_event = tab_bar(ui, i18n, &self.tabs, self.active, id, &names.graph);
+                        let marks = TabMarks { focused: editor_focused, problems: self.problems.list.as_deref() };
+                        result.tab_event = tab_bar(ui, i18n, &self.tabs, (self.active, id), &names.graph, marks);
                     });
                 });
             });
@@ -519,37 +523,66 @@ fn history_buttons(
     walk
 }
 
-/// `[ GetUpModList ✖ ] [ ● Root ✖ ]`. See [`crate::patch::editor::tabs`].
+/// What the tabs show of the editor and the work, besides the tabs themselves.
+struct TabMarks<'a> {
+    /// The editor has the keyboard: the shown tab's line is the accent color.
+    focused: bool,
+    /// The work's problems: a tab of an object with some is red (errors) or yellow (warnings only).
+    problems: Option<&'a [crate::patch::problems::ObjectProblems]>,
+}
+
+impl TabMarks<'_> {
+    /// The worst problem of object `id` of `behavior`, if it has any.
+    fn severity(&self, behavior: usize, id: &str) -> Option<egui_code_editor::Severity> {
+        let group = self.problems?.iter().find(|group| group.behavior == behavior && group.id == id)?;
+        let error = group.problems.iter().any(|problem| problem.severity == egui_code_editor::Severity::Error);
+        if error {
+            Some(egui_code_editor::Severity::Error)
+        } else {
+            group.problems.first().map(|problem| problem.severity)
+        }
+    }
+}
+
+/// `▔▔▔▔▔▔▔▔▔▔▔▔▔`
+/// `│ Root     ✖ │ GetUpModList ● │`: VS Code's tabs ([`egui_widgets::EditorTab`]). See
+/// [`crate::patch::editor::tabs`].
 ///
 /// Only the name, to keep the tabs short: the hover has the whole label, and the tree follows the tab.
-/// A click shows a tab, a double click pins it, a middle click or `✖` closes it.
+/// A click shows a tab, a double click pins it, a middle click or `✖` closes it. `●`: the object is
+/// changed; italic: the preview tab; red / yellow: it has problems.
 fn tab_bar(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
     tabs: &EditorTabs,
-    behavior: usize,
-    current: &str,
+    (behavior, current): (usize, &str),
     graph: &Graph,
+    marks: TabMarks<'_>,
 ) -> Option<TabEvent> {
     let mut event = None;
     egui::ScrollArea::horizontal().id_salt("nemesis_editor_tabs").show(ui, |ui| {
         ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0; // the tabs touch, with a line between them
             for tab in tabs.of(behavior) {
                 let node = graph.node_of(&tab.id);
-                let marker = if node.is_some_and(|node| graph.is_changed(node)) { "● " } else { "" };
+                let changed = node.is_some_and(|node| graph.is_changed(node));
                 let name = tab_name(node.map_or("", |node| graph.short_name(node)), &tab.id);
-                let text = egui::RichText::new(format!("{marker}{name}")).small();
-                // Italic: the preview tab, which the next opened object replaces.
-                let text = if tab.pinned { text } else { text.italics() };
+                let tone = marks.severity(behavior, &tab.id).map(|severity| severity.color(ui.visuals()));
                 let hover = node.map_or(tab.id.as_str(), |node| graph.label(node));
-                let response = ui.add(Button::selectable(tab.id == current, text)).on_hover_text(hover);
+                let shown = egui_widgets::EditorTab::new(egui::RichText::new(name), tab.id == current)
+                    .focused(marks.focused)
+                    .modified(changed)
+                    .preview(!tab.pinned)
+                    .tone(tone)
+                    .show(ui);
+                let response = shown.response.on_hover_text(hover);
                 if response.clicked() {
                     event = Some(TabEvent::Show(tab.id.clone()));
                 }
                 if response.double_clicked() {
                     event = Some(TabEvent::KeepOpen(tab.id.clone()));
                 }
-                if response.middle_clicked() || ui.small_button("✖").clicked() {
+                if shown.close {
                     event = Some(TabEvent::Close(tab.id.clone()));
                 }
                 response.context_menu(|ui| event = tab_menu(ui, i18n, &tab.id, tab.pinned).or_else(|| event.take()));
