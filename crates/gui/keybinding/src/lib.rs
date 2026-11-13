@@ -15,6 +15,7 @@
 //!   as they came.
 
 pub mod commands;
+pub mod docs;
 pub mod file;
 pub mod host;
 pub mod json;

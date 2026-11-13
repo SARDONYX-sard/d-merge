@@ -160,20 +160,20 @@ pub fn schema() -> String {
         "properties": {
             "key": {
                 "type": "string",
-                "description": "Modifiers (ctrl, shift, alt) and a key joined by `+`; a sequence split by spaces. e.g. `ctrl+shift+l`, `space e`",
+                "description": crate::docs::ENTRY_FIELDS[0].1,
                 "pattern": r"^\s*((ctrl|cmd|control|shift|alt|option)\+)*[^\s+]+\+?(\s+((ctrl|cmd|control|shift|alt|option)\+)*[^\s+]+\+?)*\s*$"
             },
             "command": {
                 "type": "string",
-                "description": "The command; `-` before it takes that default away.",
+                "description": crate::docs::ENTRY_FIELDS[1].1,
                 "enum": ids,
                 "enumDescriptions": descriptions,
             },
             "when": {
                 "type": "string",
-                "description": "Where it works. Names: page, editorFocus, vim, vim.mode, explorerFocus, explorer.view, problemsFocus, problemsVisible, inputFocus, userPatch. e.g. `editorFocus && vim.mode == 'normal'`",
+                "description": crate::docs::when_description(),
             },
-            "args": { "description": "For the command, if it takes any." },
+            "args": { "description": crate::docs::ENTRY_FIELDS[3].1 },
         },
     });
     let schema = serde_json::json!({
@@ -184,8 +184,12 @@ pub fn schema() -> String {
             {
                 "type": "object",
                 "properties": {
-                    "$schema": { "type": "string" },
-                    "bindings": { "type": "array", "items": { "$ref": "#/definitions/entry" } },
+                    "$schema": { "type": "string", "description": crate::docs::FILE_FIELDS[0].1 },
+                    "bindings": {
+                        "type": "array",
+                        "description": crate::docs::FILE_FIELDS[1].1,
+                        "items": { "$ref": "#/definitions/entry" },
+                    },
                 },
             },
             { "type": "array", "items": { "$ref": "#/definitions/entry" } },

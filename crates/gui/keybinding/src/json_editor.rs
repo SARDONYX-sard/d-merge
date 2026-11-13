@@ -40,6 +40,8 @@ pub struct JsonEditor {
     focus: bool,
     /// What had the keyboard when it was opened: it gets it back when it is closed, as in VS Code.
     return_to: Option<egui::Id>,
+    /// The question on closing was cancelled: the editor takes the keyboard back.
+    refocus: bool,
 }
 
 /// What the question on closing with changes was answered. See [`JsonEditor::asking`].
@@ -106,7 +108,7 @@ impl JsonEditor {
                 false
             }
             Some(Answer::Cancel) => {
-                self.asking = false;
+                (self.asking, self.refocus) = (false, true);
                 false
             }
             None => false,
@@ -167,7 +169,7 @@ impl JsonEditor {
                     })
                     .inner;
                 // Asked again of the editor drawn: a focus asked for by id before it was is lost.
-                if focus {
+                if focus || std::mem::take(&mut self.refocus) {
                     output.response.request_focus();
                 }
                 let (changed, command) = (output.changed, output.command);
@@ -260,6 +262,7 @@ mod tests {
         assert!(editor.open && editor.asking, "kept while it asks");
         assert!(!editor.on_close(false, Some(Answer::Cancel)));
         assert!(editor.open && !editor.asking && editor.dirty);
+        assert!(editor.refocus, "the editor takes the keyboard back");
         editor.on_close(true, None);
         assert!(editor.on_close(false, Some(Answer::Save)), "saved");
         assert!(!editor.open);

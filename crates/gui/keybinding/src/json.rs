@@ -18,39 +18,11 @@ use std::{borrow::Cow, ops::Range};
 use egui::Color32;
 use egui_code_editor::{CompletionItem, CompletionList, Diagnostic, Language, Severity};
 
-use crate::{COMMANDS, Keybindings, When, commands, file, key, keys_text, parse_keys};
-
-/// The names of [`crate::KeyContext`], with what they mean and the values they take.
-const CONTEXT_NAMES: [(&str, &str, &[&str]); 10] = [
-    ("page", "The page shown.", &["patchEditor", "hkanno"]),
-    ("editorFocus", "The code editor has the keyboard.", &[]),
-    ("vim", "The Vim keymap is on.", &[]),
-    (
-        "vim.mode",
-        "Vim's mode. `pending`: a command is being typed (`2d`); `command`: the `:` / `/` line.",
-        &["normal", "insert", "visual", "visualLine", "visualBlock", "pending", "command"],
-    ),
-    ("explorerFocus", "The object tree / list has the keyboard.", &[]),
-    ("explorer.view", "What the explorer shows.", &["tree", "list"]),
-    ("problemsFocus", "The Problems panel has the keyboard.", &[]),
-    ("problemsVisible", "The Problems panel shows.", &[]),
-    ("inputFocus", "A text field that is not the editor has the keyboard.", &[]),
-    ("userPatch", "In the user patch window.", &[]),
-];
-
-/// The names an entry has.
-const ENTRY_NAMES: [(&str, &str); 4] = [
-    (
-        "key",
-        "Modifiers (ctrl, shift, alt) and a key joined by `+`; a sequence split by spaces. e.g. `ctrl+shift+l`, `space e`",
-    ),
-    ("command", "The command; `-` before it takes that default away. e.g. `tabs.close`, `-tabs.close`"),
-    ("when", "Where it works. e.g. `editorFocus && vim.mode == 'normal'`"),
-    ("args", "For the command, if it takes any."),
-];
-
-/// The names of the file itself.
-const FILE_NAMES: [&str; 2] = ["$schema", "bindings"];
+use crate::{
+    COMMANDS, Keybindings, When, commands,
+    docs::{CONTEXT as CONTEXT_NAMES, ENTRY_FIELDS as ENTRY_NAMES},
+    file, key, keys_text, parse_keys,
+};
 
 /// The language. `bindings`: the table in force, for the hover of a key.
 #[derive(Debug, Clone, Copy)]
@@ -224,6 +196,13 @@ impl Language for KeybindingsJson<'_> {
     fn hover(&self, line: &str, column: usize) -> Option<String> {
         let chars: Vec<char> = line.chars().collect();
         let tokens = tokens(&chars);
+        // A name (`"key"`): what it is.
+        if let Some(token) =
+            tokens.iter().find(|t| t.kind == Kind::Name && t.range.start < column && column <= t.range.end)
+        {
+            let name: String = chars[inside(&chars, &token.range)].iter().collect();
+            return crate::docs::field(&name).map(|doc| format!("**{name}**\n\n{doc}"));
+        }
         let (name, inner) = value_at(&chars, &tokens, column)?;
         let value: String = chars[inner.clone()].iter().collect();
         match name.as_str() {
@@ -382,7 +361,7 @@ pub fn diagnose(text: &str) -> Vec<Diagnostic> {
                 continue;
             }
             let name: String = chars[inside(&chars, &token.range)].iter().collect();
-            if !ENTRY_NAMES.iter().any(|(known, _)| *known == name) && !FILE_NAMES.contains(&name.as_str()) {
+            if crate::docs::field(&name).is_none() {
                 let message = format!("`{name}` is not a name of this file: key, command, when, args");
                 out.push(Diagnostic {
                     line: line_no,
@@ -468,6 +447,18 @@ mod tests {
         let line = r#"{ "key": "a", "com" }"#;
         let list = KeybindingsJson { bindings: &keys }.complete(line, column_of(line, r#"" }"#));
         assert!(list.items.iter().any(|item| item.label == "command"));
+    }
+
+    /// A name tells what it is, as VS Code's hover from the schema.
+    #[test]
+    fn a_name_hovers_its_description() {
+        let keys = Keybindings::default();
+        let language = KeybindingsJson { bindings: &keys };
+        let line = r#"{ "key": "f9", "command": "tabs.close" }"#;
+        let key = language.hover(line, column_of(line, r#"ey": "f9"#)).unwrap();
+        assert!(key.contains("**key**") && key.contains("Modifiers"), "{key}");
+        let bindings = language.hover(r#"  "bindings": ["#, 4).unwrap();
+        assert!(bindings.contains("entries"), "{bindings}");
     }
 
     #[test]
