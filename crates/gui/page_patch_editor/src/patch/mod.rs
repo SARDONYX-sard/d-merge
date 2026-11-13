@@ -368,9 +368,9 @@ impl PatchTool {
         if let Some(job) = &self.job {
             ui.add_space(12.0);
             ui.label(format!("{}: {}", i18n.t(job.label), job.detail));
-            let done = job.done.load(std::sync::atomic::Ordering::Relaxed);
-            let (ratio, text) = match job.progress() {
-                Some(ratio) => (ratio, format!("{done} / {}", job.total)),
+            let (done, total) = job.work.counts();
+            let (ratio, text) = match job.work.progress() {
+                Some(ratio) => (ratio, format!("{done} / {total}")),
                 None => (0.0, done.to_string()),
             };
             ui.add(egui::ProgressBar::new(ratio).text(text).animate(true));
