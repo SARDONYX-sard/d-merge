@@ -52,6 +52,8 @@ struct Compare {
     state: CodeEditorState,
     /// Where the cursor is: `▲ ▼` go from there.
     cursor_line: usize,
+    /// Just opened: the cursor goes to the first change, as VS Code's diff editor opens.
+    to_first: bool,
 }
 
 impl PatchTool {
@@ -75,7 +77,7 @@ impl PatchTool {
         let to_name = to.map_or_else(|| "working".to_owned(), |number| format!("#{number}"));
         let title = format!("{id}: #{from} -> {to_name}");
         let diff = inline_diff::changes(&old, &new);
-        let compare = Compare { text: new, diff, state: CodeEditorState::default(), cursor_line: 0 };
+        let compare = Compare { text: new, diff, state: CodeEditorState::default(), cursor_line: 0, to_first: true };
         self.show_in_editor(behavior, id, title, Body::Compare(Box::new(compare)));
     }
 
@@ -187,7 +189,8 @@ fn compare_ui(
         Some(EditorCommand::PreviousChange) => inline_diff::step(&compare.diff, compare.cursor_line, false),
         _ => None,
     };
-    if let Some(line) = go_to.or(step) {
+    let first = std::mem::take(&mut compare.to_first).then(|| inline_diff::first(&compare.diff)).flatten();
+    if let Some(line) = go_to.or(step).or(first) {
         let at = compare.text.split('\n').take(line).map(|line| line.chars().count() + 1).sum();
         egui_code_editor::set_cursor(ui.ctx(), editor_id, at);
         ui.memory_mut(|m| m.request_focus(editor_id));
@@ -222,5 +225,6 @@ mod tests {
         assert_eq!(diff.hunks[0].old_lines, ["b"]);
         assert_eq!(diff.hunks[0].new_lines, 1..2);
         assert_eq!(inline_diff::step(&diff, 1, true), Some(3), "`▼` / `]c`: to the next change");
+        assert_eq!(inline_diff::first(&diff), Some(1), "where it opens");
     }
 }

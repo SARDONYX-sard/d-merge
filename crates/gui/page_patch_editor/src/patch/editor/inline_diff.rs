@@ -36,6 +36,11 @@ pub(in crate::patch) fn position(diff: &InlineDiff, cursor_line: usize) -> Optio
     (count > 0).then(|| (at.unwrap_or(count - 1), count))
 }
 
+/// The line of the first change, where a diff opens. e.g. a change at lines 3 and 9: 3
+pub(in crate::patch) fn first(diff: &InlineDiff) -> Option<usize> {
+    diff.hunks.first().map(|hunk| hunk.new_lines.start)
+}
+
 /// The line to go to for the previous or next changed place from the cursor, around the ends.
 ///
 /// e.g., changes at lines 3 and 9: from line 5, next is 9 and previous is 3; from line 9, next is 3.
