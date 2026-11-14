@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0-alpha.1] - 2026-11-14
+### :sparkles: New Features
+- [`b8bcffa`](https://github.com/SARDONYX-sard/d-merge/commit/b8bcffa407f0fdb156e2f5c893d11d2c35c25fb1) - **core**: Pandora v5 patches; fixes of the patch and animation data parsers *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6d66f86`](https://github.com/SARDONYX-sard/d-merge/commit/6d66f865dedeb91282780bdd0746f1416a68feb7) - **editor**: VS Code's editor features in the code editor *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`7dcf77f`](https://github.com/SARDONYX-sard/d-merge/commit/7dcf77fa44047a509c579cf8604a7b62775eeeae) - **keybinding**: custom key bindings, as VS Code's keybindings.json *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`614178a`](https://github.com/SARDONYX-sard/d-merge/commit/614178aa81edbf62e93279e29be7909662a7bc05) - **widgets**: VS Code's tabs, activity bar and keyboard-driven trees as reusable widgets *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9d65a2c`](https://github.com/SARDONYX-sard/d-merge/commit/9d65a2c3dba7a650e2d2c30f0881e9bcac092d8a) - **patch_editor**: the Patch Editor as VS Code: explorer, history, merge editor, key bindings *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`2fad465`](https://github.com/SARDONYX-sard/d-merge/commit/2fad4652424fefd5308e9ad0dfae9a7a66cbe9da) - **gui**: VS Code's tabs in hkanno, one "Resolve by hand" for a conflict, the log view's background *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`11d3dcd`](https://github.com/SARDONYX-sard/d-merge/commit/11d3dcdfb79b6775632da247d15558001e059be1) - use `use` instead of `type` alias *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [3.0.0-alpha.0] - 2026-11-06
 ### :boom: BREAKING CHANGES
 - due to [`ea87c09`](https://github.com/SARDONYX-sard/d-merge/commit/ea87c099ddce9525b3c777929e1b124ba4fbc5c5) - separate crates *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*:
@@ -760,3 +773,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.7.5]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.4...2.7.5
 [2.8.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.5...2.8.0
 [3.0.0-alpha.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.8.0...3.0.0-alpha.0
+[3.0.0-alpha.1]: https://github.com/SARDONYX-sard/d-merge/compare/3.0.0-alpha.0...3.0.0-alpha.1
