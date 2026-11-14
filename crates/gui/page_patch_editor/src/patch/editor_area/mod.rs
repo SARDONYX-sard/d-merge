@@ -20,8 +20,8 @@ use crate::patch::{
     editor::{self, tabs::EditorTabs},
     problems::Problems,
     tool::{
+        file::FileAction,
         keys::Keys,
-        list::FileAction,
         selection::Selection,
         session::{Reshow, Shown},
         work_state::Work,

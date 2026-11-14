@@ -1,5 +1,5 @@
 //! Adding and removing events and variables of the active behavior (drawn by
-//! [`super::ui::vars_panel`]): the ones this mod added.
+//! [`super::side_area::vars_panel`]): the ones this mod added.
 //!
 //! Adding edits the string data, graph data (and value set) objects at once; see
 //! [`nemesis_diff::vars`]. Template entries cannot be removed (other mods index them).

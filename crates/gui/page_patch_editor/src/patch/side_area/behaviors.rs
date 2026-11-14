@@ -17,13 +17,10 @@ use egui_widgets::{
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
 
+use super::{SideArea, SideAsk};
 use crate::patch::{
     tool::{selection::Selection, work_state::Work},
-    ui::{
-        anim_data::AnimDataDialog,
-        panels::Panels,
-        side_bar::{SideArea, SideAsk},
-    },
+    ui::windows::WindowAsk,
     workspace::{Behavior, Target, TemplateScope},
 };
 
@@ -47,15 +44,15 @@ enum AddEvent {
 }
 
 impl SideArea {
-    /// See the module docs. What `[+]` asks for opens a window (`panels`), or adds a behavior now.
+    /// See the module docs. What `[+]` asks for opens a window, or adds a behavior now.
     pub(super) fn behaviors_section(
         &mut self,
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         (work, sel): (&mut Work, &mut Selection),
-        panels: &mut Panels,
         notify: &mut Notification,
-    ) -> Option<SideAsk> {
+    ) -> Vec<SideAsk> {
+        let mut asks = Vec::new();
         let mut add = None;
         let scope = work.workspace.scope;
         egui_widgets::section_header(
@@ -67,14 +64,16 @@ impl SideArea {
             },
         );
         match add {
-            Some(AddEvent::Template) => panels.picker.open(),
+            Some(AddEvent::Template) => asks.push(SideAsk::Window(WindowAsk::TemplatePicker)),
             Some(AddEvent::File) => add_custom_template((work, sel), notify, i18n),
-            Some(AddEvent::AnimData) => panels.anim_data_dialog = open_anim_data_for_mod(work),
+            Some(AddEvent::AnimData) => {
+                asks.extend(anim_data_root(work).map(|root| SideAsk::Window(WindowAsk::AnimData(root))));
+            }
             None => {}
         }
         if !self.bar.behaviors_open {
             ui.separator();
-            return None;
+            return asks;
         }
 
         let event = {
@@ -84,17 +83,19 @@ impl SideArea {
             behavior_rows(ui, i18n, (&work.workspace.behaviors, sel.active), (code, ext))
         };
         ui.separator();
-        match event? {
-            RowEvent::Select(at) => Some(SideAsk::ShowBehavior(at)),
-            RowEvent::Remove(at) => {
+        match event {
+            Some(RowEvent::Select(at)) => asks.push(SideAsk::ShowBehavior(at)),
+            Some(RowEvent::Remove(at)) => {
                 work.workspace.behaviors.remove(at);
                 work.reset_names(); // the numbers of the others shift
                 work.mark_dirty();
                 sel.active = sel.active.min(work.workspace.behaviors.len().saturating_sub(1));
                 sel.selected = None;
-                Some(SideAsk::BehaviorRemoved)
+                asks.push(SideAsk::BehaviorRemoved);
             }
+            None => {}
         }
+        asks
     }
 }
 
@@ -106,13 +107,12 @@ fn add_custom_template((work, sel): (&mut Work, &mut Selection), notify: &mut No
     }
 }
 
-/// The animation data window of the mod the work was read from, or else the one it makes, or else
-/// one asked for.
-fn open_anim_data_for_mod(work: &Work) -> Option<AnimDataDialog> {
+/// The mod the animation data window is of: the one the work was read from, or else the one it
+/// makes, or else one asked for.
+fn anim_data_root(work: &Work) -> Option<PathBuf> {
     let dirs = [work.place.mod_dir.trim(), work.place.output.trim()];
     let chosen = dirs.into_iter().find(|dir| !dir.is_empty()).map(PathBuf::from);
-    let root = chosen.or_else(|| gui_shared::rfd::FileDialog::new().pick_folder())?;
-    Some(AnimDataDialog::open(work, &root))
+    chosen.or_else(|| gui_shared::rfd::FileDialog::new().pick_folder())
 }
 
 /// `[+]` and its menu. A template file of your own

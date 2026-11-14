@@ -19,12 +19,26 @@
 //! | 📂   | Explorer           | `Ctrl+Shift+E` | Explorer         |
 //! | ▤    | Events / Variables |                | Outline          |
 
+mod anim_tree;
+mod behaviors;
+mod changes;
+mod changes_view;
+mod explorer;
+mod object_list;
+mod search;
+mod tree;
+mod vars_panel;
+
 use egui_widgets::shadcn::Icon;
-use gui_shared::i18n::{I18nKey, I18nMap};
+use gui_shared::{
+    i18n::{I18nKey, I18nMap},
+    settings::pages::patch_editor::PatchEditorSettings,
+};
 
 use crate::patch::{
-    tool::{keys::Keys, list::FileAction, selection::Selection, work_state::Work},
-    ui::panels::Panels,
+    tool::{file::FileAction, keys::Keys, selection::Selection, work_state::Work},
+    tree::TreeState,
+    ui::windows::WindowAsk,
 };
 
 /// The view of the side bar. See the module docs.
@@ -49,23 +63,98 @@ enum SideView {
 /// ```
 #[derive(Debug, Default)]
 pub(in crate::patch) struct SideArea {
-    pub(in crate::patch) bar: SideBar,
-    pub(in crate::patch) explorer: crate::patch::tool::list::Explorer,
-    pub(super) scm: crate::patch::changes::Scm,
-    pub(super) search: egui_code_editor::SearchView,
-    pub(super) vars: crate::patch::ui::vars_panel::VarsPanel,
+    bar: SideBar,
+    explorer: explorer::Explorer,
+    scm: changes::Scm,
+    search: egui_code_editor::SearchView,
+    vars: vars_panel::VarsPanel,
+}
+
+impl SideArea {
+    /// The user patch's: its behaviors listed, and only what it changes.
+    pub(in crate::patch) fn for_user_patch() -> Self {
+        let mut side = Self::default();
+        side.bar.behaviors_open = true;
+        side.explorer.changed_only = true;
+        side
+    }
+
+    /// The first frame: what the settings kept. The behaviors are listed.
+    pub(in crate::patch) fn restore(&mut self, settings: &PatchEditorSettings) {
+        self.bar.behaviors_open = true;
+        self.explorer.trees = settings
+            .tree_open
+            .iter()
+            .map(|(path, open)| {
+                let open = open.iter().map(|(id, open)| (id.as_str(), *open));
+                (path.clone(), TreeState::restored(open))
+            })
+            .collect();
+    }
+
+    /// A tree or a list, as the settings have it.
+    pub(in crate::patch) const fn read_view(&mut self, settings: &PatchEditorSettings) {
+        self.explorer.tree_view = settings.tree_view;
+    }
+
+    pub(in crate::patch) const fn write_view(&self, settings: &mut PatchEditorSettings) {
+        settings.tree_view = self.explorer.tree_view;
+    }
+
+    /// Only the changed objects, as the settings have it.
+    pub(in crate::patch) const fn read_filter(&mut self, settings: &PatchEditorSettings) {
+        self.explorer.changed_only = settings.changed_only;
+    }
+
+    /// The filter and what was opened or closed of the trees, into the settings.
+    pub(in crate::patch) fn write_settings(&mut self, settings: &mut PatchEditorSettings) {
+        settings.changed_only = self.explorer.changed_only;
+        for (path, tree) in &mut self.explorer.trees {
+            if let Some(open) = tree.take_open_changes() {
+                let open = open.map(|(id, open)| (id.to_owned(), open)).collect();
+                settings.tree_open.insert(path.clone(), open);
+            }
+        }
+    }
+
+    /// What the key bindings see of the side bar: `(it has the keyboard, "tree" or "list")`.
+    pub(in crate::patch) const fn key_state(&self) -> (bool, &'static str) {
+        (self.explorer.tree_focus, if self.explorer.tree_view { "tree" } else { "list" })
+    }
+
+    /// The editor got the keyboard: the selected object is shown again, as VS Code's explorer
+    /// follows the file being edited.
+    pub(in crate::patch) const fn reveal(&mut self) {
+        self.explorer.reveal = true;
+    }
+
+    /// Something else took the keyboard (the Problems panel).
+    pub(in crate::patch) const fn leave_tree(&mut self) {
+        self.explorer.tree_focus = false;
+    }
+
+    /// Files went to project `folder` of the animation data: it opens to show them.
+    pub(in crate::patch) fn show_project(&mut self, folder: String) {
+        self.explorer.anim_tree.show_project(folder);
+    }
+
+    /// The tree of the behavior at `path`, for the tests.
+    #[cfg(test)]
+    pub(in crate::patch) fn tree(&self, path: &str) -> Option<&TreeState> {
+        self.explorer.trees.get(path)
+    }
 }
 
 /// What the side bar shows.
 #[derive(Debug, Default)]
-pub(in crate::patch) struct SideBar {
+struct SideBar {
     view: SideView,
     /// Only the activity bar shows: the icon of the view shown was clicked.
     hidden: bool,
     /// The OBJECTS section of the explorer is folded.
     pub(super) objects_closed: bool,
     /// The BEHAVIORS section of the explorer is open.
-    pub(in crate::patch) behaviors_open: bool,
+    behaviors_open: bool,
 }
 
 impl SideBar {
@@ -125,6 +214,8 @@ pub(in crate::patch) enum SideAsk {
     FocusEditor,
     /// Objects changed under the editor: it loads the open one again.
     Reload,
+    /// A window to open.
+    Window(WindowAsk),
 }
 
 impl SideArea {
@@ -135,7 +226,6 @@ impl SideArea {
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         (work, sel, keys): (&mut Work, &mut Selection, &mut Keys),
-        panels: &mut Panels,
         notify: &mut egui_widgets::notify::Notification,
     ) -> Vec<SideAsk> {
         let mut asks = Vec::new();
@@ -166,9 +256,9 @@ impl SideArea {
             let has_behaviors = !work.workspace.behaviors.is_empty();
             match self.bar.view {
                 SideView::Explorer => {
-                    asks.extend(self.behaviors_section(ui, i18n, (work, sel), panels, notify));
+                    asks.extend(self.behaviors_section(ui, i18n, (work, sel), notify));
                     if has_behaviors {
-                        asks.extend(self.object_list(ui, i18n, (work, sel, keys), panels));
+                        asks.extend(self.object_list(ui, i18n, (work, sel, keys)));
                     }
                 }
                 SideView::Search if has_behaviors => asks.extend(self.search_panel(ui, i18n, work, sel)),

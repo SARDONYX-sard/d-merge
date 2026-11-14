@@ -18,7 +18,7 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::ChangeAction;
 use crate::patch::{
-    changes::{Scm, ScmRow},
+    side_area::changes::{Scm, ScmRow},
     workspace::{
         Workspace,
         history::{ChangeKind, ObjectChange, Revision},

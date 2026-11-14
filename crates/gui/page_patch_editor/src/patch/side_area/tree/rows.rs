@@ -10,9 +10,11 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::{INDENT, TreeEvent, label::object_button};
 use crate::patch::{
-    tool::list::{fixed_row, row_height},
+    side_area::{
+        explorer::{fixed_row, row_height},
+        object_list::{RowAction, row_menu},
+    },
     tree::{Graph, MAX_STICKY, Row, TreeState},
-    ui::object_list::{RowAction, row_menu},
 };
 
 /// What [`show`] drew.

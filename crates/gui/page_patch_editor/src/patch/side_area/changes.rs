@@ -5,7 +5,7 @@
 //! Comparing the work with the last revision goes through every changed object, so it is done again
 //! only after an edit or a commit, not each frame: see [`Pending::refresh`].
 
-use super::workspace::{Workspace, history::ObjectChange};
+use crate::patch::workspace::{Workspace, history::ObjectChange};
 
 /// The state of the Changes view, as VS Code's Source Control.
 #[derive(Debug, Default)]

@@ -19,7 +19,7 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
     editor_area::EditorArea,
-    tool::{keys::Keys, list::FileAction, selection::Selection, work_state::Work},
+    tool::{file::FileAction, keys::Keys, selection::Selection, work_state::Work},
     workspace::{
         Workspace,
         history::{ObjectKey, Origin},

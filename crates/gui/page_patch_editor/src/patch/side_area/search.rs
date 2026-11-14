@@ -11,8 +11,8 @@ use egui_code_editor::{SearchLabels, languages::Xml};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
+    side_area::{SideArea, SideAsk},
     tool::{selection::Selection, work_state::Work},
-    ui::side_bar::{SideArea, SideAsk},
 };
 
 impl SideArea {

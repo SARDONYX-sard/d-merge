@@ -30,12 +30,12 @@
 //! ```
 
 mod anim;
-mod changes;
 mod editor;
 mod editor_area;
 mod new_work;
 mod problems;
 mod repeat;
+mod side_area;
 mod template_tree;
 mod tool;
 mod tree;
@@ -61,8 +61,9 @@ use gui_shared::{
 };
 
 use self::{
+    side_area::SideAsk,
     tool::session::Reshow,
-    ui::{side_bar::SideAsk, top_bar::BarDone, windows::WindowDone},
+    ui::{top_bar::BarDone, windows::WindowDone},
     workspace::Workspace,
 };
 
@@ -101,8 +102,8 @@ pub(crate) struct PatchTool {
     sel: tool::selection::Selection,
     /// This frame's keys, and the palette's. See [`tool::keys`].
     keys: tool::keys::Keys,
-    /// The side bar and its views. See [`ui::side_bar::SideArea`].
-    side: ui::side_bar::SideArea,
+    /// The side bar and its views. See [`side_area::SideArea`].
+    side: side_area::SideArea,
     /// The tabs, the editor of the open object, the diffs. See [`editor_area::EditorArea`].
     editor: editor_area::EditorArea,
     /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
@@ -161,18 +162,7 @@ enum TabEvent {
     /// A diff's / blame's tab, by its index in [`editor_area::revision_view::Views`].
     View(egui_widgets::TabAction, usize),
     /// The object's file: its path to the clipboard, or shown in the file manager.
-    File(tool::list::FileAction, String),
-}
-
-/// See [`tool::list::Explorer::list`].
-#[derive(Debug)]
-struct ObjectList {
-    /// The state of the graph it was computed from.
-    generation: u64,
-    filter: String,
-    changed_only: bool,
-    unlinked_only: bool,
-    rows: Vec<tree::Node>,
+    File(tool::file::FileAction, String),
 }
 
 impl PatchTool {
@@ -209,7 +199,7 @@ impl PatchTool {
             self.restore_settings(settings, notify, i18n);
         }
         self.read_view_settings(settings);
-        self.side.explorer.changed_only = settings.changed_only;
+        self.side.read_filter(settings);
 
         self.poll_job(ui.ctx(), notify, i18n);
         let shown = self.editor.shown(&self.sel);
@@ -247,15 +237,7 @@ impl PatchTool {
 
         // What is set once stays out of the way, unless it still has to be set.
         self.panels.project_open = false;
-        self.side.bar.behaviors_open = true;
-        self.side.explorer.trees = settings
-            .tree_open
-            .iter()
-            .map(|(path, open)| {
-                let open = open.iter().map(|(id, open)| (id.as_str(), *open));
-                (path.clone(), tree::TreeState::restored(open))
-            })
-            .collect();
+        self.side.restore(settings);
     }
 
     /// What the page keeps in the settings: the work, the recent works, what is shown.
@@ -268,13 +250,7 @@ impl PatchTool {
             settings.recent.clone_from(&self.work.recent);
         }
         self.write_view_settings(settings);
-        settings.changed_only = self.side.explorer.changed_only;
-        for (path, tree) in &mut self.side.explorer.trees {
-            if let Some(open) = tree.take_open_changes() {
-                let open = open.map(|(id, open)| (id.to_owned(), open)).collect();
-                settings.tree_open.insert(path.clone(), open);
-            }
-        }
+        self.side.write_settings(settings);
         if settings.output != place.output || settings.mod_code != place.mod_code {
             settings.output.clone_from(&place.output);
             settings.mod_code.clone_from(&place.mod_code);
@@ -284,12 +260,12 @@ impl PatchTool {
     /// What is shown of the editor, kept in the settings.
     const fn read_view_settings(&mut self, settings: &PatchEditorSettings) {
         self.editor.read_view(settings);
-        self.side.explorer.tree_view = settings.tree_view;
+        self.side.read_view(settings);
     }
 
     const fn write_view_settings(&self, settings: &mut PatchEditorSettings) {
         self.editor.write_view(settings);
-        settings.tree_view = self.side.explorer.tree_view;
+        self.side.write_view(settings);
     }
 
     /// The patch page's output directory may have changed: see [`tool::work_state::Work::set_patch_output`].
@@ -337,8 +313,8 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut Notification,
     ) {
-        let parts = (&self.editor, &self.side.explorer, &self.problems);
-        let context = tool::list::key_context(ctx, parts, self.work.user_patch);
+        let parts = (&self.editor, &self.side, &self.problems);
+        let context = key_context(ctx, parts, self.work.user_patch);
         self.keys.frame(ctx, bindings, &context, (i18n, notify));
     }
 
@@ -376,7 +352,7 @@ impl PatchTool {
 
         // Like VS Code: the activity bar, the side bar, and the editor with what belongs to it.
         let parts = (&mut self.work, &mut self.sel, &mut self.keys);
-        let asks = self.side.show(ui, i18n, parts, &mut self.panels, notify);
+        let asks = self.side.show(ui, i18n, parts, notify);
         for ask in asks {
             self.apply_side(ask, ui.ctx(), notify);
         }
@@ -394,7 +370,7 @@ impl PatchTool {
     fn apply_window(&mut self, done: WindowDone, notify: &mut Notification, i18n: &I18nMap) {
         match done {
             WindowDone::Reload => self.editor.reload(),
-            WindowDone::Duplicated(to) => self.side.explorer.anim_tree.show_project(to),
+            WindowDone::Duplicated(to) => self.side.show_project(to),
             WindowDone::OpenCode(choice, code) => {
                 let shown = self.editor.shown(&self.sel);
                 self.work.open_chosen_code(shown, (&choice, &code), notify, i18n);
@@ -439,26 +415,27 @@ impl PatchTool {
                 self.work.make_pandora_doc(sel.active);
                 editor.open_pandora_doc(sel);
             }
-            SideAsk::File(action, id) => tool::list::file_action(ctx, (&self.work, sel.active), (action, &id), notify),
+            SideAsk::File(action, id) => tool::file::file_action(ctx, (&self.work, sel.active), (action, &id), notify),
 
             SideAsk::FocusEditor => editor.focus_editor(),
             SideAsk::Reload => editor.reload(),
+            SideAsk::Window(ask) => self.panels.open(ask, &self.work),
         }
     }
 
     /// What the editor asked for: see [`editor_area::EditorOut`].
     fn apply_editor_out(&mut self, ui: &egui::Ui, out: editor_area::EditorOut, notify: &mut Notification) {
         if out.reveal {
-            self.side.explorer.reveal = true;
+            self.side.reveal();
         }
         if out.leave_tree {
-            self.side.explorer.tree_focus = false;
+            self.side.leave_tree();
         }
         if let Some(editor_id) = out.enter_tree {
             self.side.enter_tree(ui, editor_id);
         }
         if let Some((action, id)) = out.file {
-            tool::list::file_action(ui.ctx(), (&self.work, self.sel.active), (action, &id), notify);
+            tool::file::file_action(ui.ctx(), (&self.work, self.sel.active), (action, &id), notify);
         }
     }
 
@@ -467,8 +444,7 @@ impl PatchTool {
     /// The user patch's tool, as it starts: see [`user_patch::work_of`].
     fn for_user_patch(paths: PatchPaths<'_>) -> Self {
         let mut tool = Self { work: user_patch::work_of(paths), ..Self::default() };
-        tool.side.bar.behaviors_open = true;
-        tool.side.explorer.changed_only = true;
+        tool.side = side_area::SideArea::for_user_patch();
         tool
     }
 
@@ -618,6 +594,28 @@ impl PatchTool {
     }
 }
 
+/// Who has the keyboard: what a binding's `when` sees. `user_patch`: the user patch's window.
+fn key_context(
+    ctx: &egui::Context,
+    (editor, side, problems): (&editor_area::EditorArea, &side_area::SideArea, &problems::Problems),
+    user_patch: bool,
+) -> keybinding::KeyContext {
+    let (editor_focus, vim, vim_mode) = editor.key_state();
+    let (explorer_focus, explorer_view) = side.key_state();
+    keybinding::KeyContext {
+        page: "patchEditor",
+        editor_focus,
+        vim,
+        vim_mode,
+        explorer_focus,
+        explorer_view: Some(explorer_view),
+        problems_focus: problems.cursor.focused,
+        problems_visible: problems.open,
+        input_focus: !editor_focus && ctx.egui_wants_keyboard_input(),
+        user_patch,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
@@ -696,7 +694,7 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../resource/assets/templates");
         let (workspace, code, _) = Workspace::import(Path::new(&selected), &root).unwrap();
         let mut tool = PatchTool::default();
-        tool.side.explorer.tree_view = true;
+        tool.side.read_view(&PatchEditorSettings { tree_view: true, ..PatchEditorSettings::default() });
         tool.work.place.loaded_for = Some(code.clone());
         (tool.work.workspace, tool.work.place.mod_code) = (workspace, code);
         let i18n = I18nMap::new();
@@ -714,7 +712,7 @@ mod tests {
                 }
                 let names = tool.work.names(active);
                 let path = &tool.work.workspace.behaviors[active].meshes_path;
-                let tree = &tool.side.explorer.trees[path];
+                let tree = tool.side.tree(path).unwrap();
                 let found = tree.rows().get(tree.cursor).map(|row| names.graph.id(row.node));
                 assert_eq!(found, Some(id.as_str()), "`{id}` is not selected in the tree");
                 let (opened, text) = tool.editor.opened().unwrap_or_default();

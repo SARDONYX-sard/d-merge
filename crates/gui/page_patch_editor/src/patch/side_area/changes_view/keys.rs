@@ -6,7 +6,7 @@ use egui_tree::{Nav, TreeKey};
 
 use super::ChangeAction;
 use crate::patch::{
-    changes::{Scm, ScmRow, scm_rows},
+    side_area::changes::{Scm, ScmRow, scm_rows},
     workspace::Workspace,
 };
 

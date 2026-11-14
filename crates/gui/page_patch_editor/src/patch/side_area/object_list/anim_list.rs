@@ -11,15 +11,14 @@
 use egui_tree::{Nav, TreeKey};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use super::RowAction;
+use super::{RowAction, row_menu};
 use crate::patch::{
     anim::data,
-    tool::list::{ListScroll, fixed_row, offset_to_show, row_height},
-    tree::{Graph, Node},
-    ui::{
+    side_area::{
         anim_tree::{AnimRow, AnimTreeState, FileKind},
-        object_list::row_menu,
+        explorer::{ListScroll, fixed_row, offset_to_show, row_height},
     },
+    tree::{Graph, Node},
 };
 
 /// What a row or a key asked for.
@@ -83,7 +82,7 @@ pub(super) fn keys<'a>(
                 done.moved = true;
             }
             Nav::SetOpen(at, _) => {
-                crate::patch::ui::anim_tree::toggle(&mut state.open, rows[at].open_key());
+                crate::patch::side_area::anim_tree::toggle(&mut state.open, rows[at].open_key());
                 *rows = rebuild(state);
             }
             Nav::Leave => done.leave = true,

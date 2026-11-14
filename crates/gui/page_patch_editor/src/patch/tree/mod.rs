@@ -1,4 +1,4 @@
-//! Object tree logic (drawn by [`super::ui::tree`]): from the root (`hkRootLevelContainer`) down
+//! Object tree logic (drawn by [`super::side_area::tree`]): from the root (`hkRootLevelContainer`) down
 //! the `#XXXX` pointers in each object.
 //!
 //! A behavior file is a graph of objects. Each object is an XML block whose text mentions other

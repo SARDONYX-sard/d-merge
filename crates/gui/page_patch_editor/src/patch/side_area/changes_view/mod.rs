@@ -21,8 +21,8 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 
 use self::header::BranchAsk;
 use crate::patch::{
+    side_area::{SideArea, SideAsk},
     tool::{keys::Keys, selection::Selection, work_state::Work},
-    ui::side_bar::{SideArea, SideAsk},
 };
 
 /// What a row of the Changes view asked for: `(behavior, id)`.

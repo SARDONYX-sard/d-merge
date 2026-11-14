@@ -17,10 +17,10 @@ use gui_shared::i18n::I18nMap;
 use crate::patch::{
     tool::{selection::Selection, work_state::Work},
     ui::{
-        anim_data::{self, FormAsk},
+        anim_data::{self, AnimDataDialog, DuplicateForm, FormAsk, NewClipsForm},
         code_choice::{ChoiceAsk, ModCodeChoice},
         panels::Panels,
-        repeat::RepeatAsk,
+        repeat::{RepeatAsk, RepeatForm},
     },
 };
 
@@ -35,7 +35,43 @@ pub(in crate::patch) enum WindowDone {
     OpenCode(ModCodeChoice, String),
 }
 
+/// A window to open, asked for by the side bar. See [`Panels::open`].
+#[derive(Debug)]
+pub(in crate::patch) enum WindowAsk {
+    /// The templates to add as a behavior.
+    TemplatePicker,
+    /// New object: a class to pick.
+    ClassPicker,
+    /// The animation data of the mod at this root.
+    AnimData(std::path::PathBuf),
+    /// New clips of the clip data. `(the object selected, the projects)`
+    NewClips(Option<String>, Vec<String>),
+    /// `files` of project `from` to another of `projects`. `(files, projects, from)`
+    Duplicate(Vec<String>, Vec<String>, String),
+    /// Many objects from object `id` of behavior `active`. `(active, id)`
+    Repeat(usize, String),
+}
+
 impl Panels {
+    /// Opens the window `ask` is for. `work`: what it shows.
+    pub(in crate::patch) fn open(&mut self, ask: WindowAsk, work: &Work) {
+        match ask {
+            WindowAsk::TemplatePicker => self.picker.open(),
+            WindowAsk::ClassPicker => self.class_picker.open(),
+            WindowAsk::AnimData(root) => self.anim_data_dialog = Some(AnimDataDialog::open(work, &root)),
+            WindowAsk::NewClips(selected, projects) => {
+                self.new_clips = Some(NewClipsForm::new(selected.as_deref(), projects));
+            }
+            WindowAsk::Duplicate(files, projects, from) => {
+                self.duplicate_form = Some(DuplicateForm::new(files, projects, &from));
+            }
+            WindowAsk::Repeat(active, id) => {
+                let Some(behavior) = work.workspace.behaviors.get(active) else { return };
+                self.repeat = RepeatForm::of(active, behavior, &id);
+            }
+        }
+    }
+
     /// Draws the windows that are open. See the module docs.
     pub(in crate::patch) fn windows(
         &mut self,

@@ -1,46 +1,6 @@
-//! The list of objects: the keyboard in it, what it shows, and its changes.
+//! The file an object is in, and what is done with it: VS Code's "Copy Path" / "Reveal in File Explorer".
 
-use std::rc::Rc;
-
-use crate::patch::{editor_area::EditorArea, tool::work_state::Work};
-
-/// The state of the objects in the explorer.
-///
-/// ```text
-/// [filter.......]  ⋯ changed only / unlinked only    [≡] tree_view
-/// tree (trees, by behavior) or flat list (list)       tree_focus: the keyboard is in it
-/// ```
-#[derive(Debug, Default)]
-pub(in crate::patch) struct Explorer {
-    pub(in crate::patch) filter: String,
-    /// Only the objects changed, and the way to them in the tree.
-    pub(in crate::patch) changed_only: bool,
-    /// Only the new objects nothing links to. See [`crate::patch::tree::Graph::unlinked`].
-    pub(in crate::patch) unlinked_only: bool,
-    /// A tree from the root container, else a flat list.
-    pub(in crate::patch) tree_view: bool,
-    /// The tree of each behavior, by template path.
-    pub(in crate::patch) trees: fast_hash::HashMap<String, crate::patch::tree::TreeState>,
-    /// The flat list, as it was computed. See `Explorer::refresh_list`.
-    pub(in crate::patch) list: Option<crate::patch::ObjectList>,
-
-    /// Where the flat list (or the animation data's tree) was scrolled. See [`offset_to_show`].
-    pub(in crate::patch) list_scroll: ListScroll,
-    /// The row of the flat list to scroll to: the keys moved to it, or the editor got the keyboard.
-    pub(in crate::patch) list_scroll_to: Option<usize>,
-    /// The keyboard is in the tree or the list (Vim `Space e`).
-    pub(in crate::patch) tree_focus: bool,
-    /// Show the selected object again, even if it was shown already: the editor got the keyboard.
-    pub(in crate::patch) reveal: bool,
-    /// What is open in the animation data's list, and its cursor.
-    pub(in crate::patch) anim_tree: crate::patch::ui::anim_tree::AnimTreeState,
-}
-
-/// Should a list scroll to the selection? Only when `forced`: the editor got the keyboard, as VS Code's
-/// explorer follows the file being edited. A selection alone moves nothing, or a list being used would.
-pub(in crate::patch) const fn take_reveal(selected: Option<&Rc<str>>, forced: bool) -> bool {
-    forced && selected.is_some()
-}
+use crate::patch::tool::work_state::Work;
 
 /// What is done with the file an object is in, as VS Code's "Copy Path" / "Reveal in File Explorer".
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,8 +8,6 @@ pub(in crate::patch) enum FileAction {
     CopyPath,
     Reveal,
 }
-
-pub(in crate::patch) use egui_tree::list::{ListScroll, fixed_row, offset_to_show, row_height};
 
 /// VS Code's "Copy Path" / "Reveal in File Explorer" of the file object `id` of the active behavior
 /// is in (see [`object_file`]): its path to the clipboard, or the file selected in its folder (what
@@ -69,27 +27,6 @@ pub(in crate::patch) fn file_action(
                 notify.error(err);
             }
         }
-    }
-}
-
-/// Who has the keyboard: what a binding's `when` sees. `user_patch`: the user patch's window.
-pub(in crate::patch) fn key_context(
-    ctx: &egui::Context,
-    (editor, explorer, problems): (&EditorArea, &Explorer, &crate::patch::problems::Problems),
-    user_patch: bool,
-) -> keybinding::KeyContext {
-    let (editor_focus, vim, vim_mode) = editor.key_state();
-    keybinding::KeyContext {
-        page: "patchEditor",
-        editor_focus,
-        vim,
-        vim_mode,
-        explorer_focus: explorer.tree_focus,
-        explorer_view: Some(if explorer.tree_view { "tree" } else { "list" }),
-        problems_focus: problems.cursor.focused,
-        problems_visible: problems.open,
-        input_focus: !editor_focus && ctx.egui_wants_keyboard_input(),
-        user_patch,
     }
 }
 
@@ -155,13 +92,5 @@ mod tests {
             template,
             "no mod to be in"
         );
-    }
-
-    #[test]
-    fn a_list_scrolls_only_when_the_editor_gets_the_keyboard() {
-        let a: Rc<str> = "#a".into();
-        assert!(!take_reveal(Some(&a), false), "a selection alone");
-        assert!(take_reveal(Some(&a), true), "the editor got the keyboard");
-        assert!(!take_reveal(None, true), "nothing to show");
     }
 }

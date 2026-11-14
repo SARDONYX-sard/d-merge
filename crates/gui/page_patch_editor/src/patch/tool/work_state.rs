@@ -36,7 +36,7 @@ pub(in crate::patch) struct Work {
     pub(in crate::patch) job: Option<Job>,
     /// The names of the events / variables panel and the completion.
     pub(in crate::patch) names: NamesCache,
-    /// Edits made, counted: what is found anew after one, e.g. [`crate::patch::changes::Pending`].
+    /// Edits made, counted: what is found anew after one, e.g. [`crate::patch::side_area::changes::Pending`].
     pub(in crate::patch) edits: u64,
     /// The work changed as a whole, counted: see [`Self::reset_names`].
     pub(in crate::patch) reloads: u64,

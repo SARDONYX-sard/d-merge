@@ -19,10 +19,11 @@ use super::{
     flat::{self, FlatEvent},
 };
 use crate::patch::{
-    ObjectList,
-    tool::list::{Explorer, take_reveal},
+    side_area::{
+        anim_tree::{self, AnimFile, AnimRow},
+        explorer::{Explorer, ObjectList, take_reveal},
+    },
     tree::{Graph, Node, ObjectTree, TreeKey},
-    ui::anim_tree::{self, AnimFile, AnimRow},
 };
 
 /// What the list asks of the tool.
@@ -68,7 +69,7 @@ impl Explorer {
         }
 
         let flags = (self.changed_only, self.tree_focus);
-        let menu = crate::patch::ui::tree::tree_ui(ui, graph, selected, tree, flags, i18n);
+        let menu = crate::patch::side_area::tree::tree_ui(ui, graph, selected, tree, flags, i18n);
         ListOutput { menu, ..ListOutput::default() }
     }
 

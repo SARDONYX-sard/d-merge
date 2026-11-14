@@ -20,26 +20,25 @@ use self::{
     anim_list::{DuplicatePick, Files},
     explorer::ListOutput,
 };
-use super::anim_data::{DuplicateForm, NewClipsForm, anim_projects, duplicate_files};
+use super::{SideArea, SideAsk};
 use crate::patch::{
     anim::data,
-    tool::{keys::Keys, list::FileAction, selection::Selection, work_state::Work},
+    tool::{file::FileAction, keys::Keys, selection::Selection, work_state::Work},
     tree::Graph,
     ui::{
-        panels::Panels,
-        side_bar::{SideArea, SideAsk},
+        anim_data::{anim_projects, duplicate_files},
+        windows::WindowAsk,
     },
     workspace::PANDORA_DOC,
 };
 
 impl SideArea {
-    /// See the module docs. Returns what it asked of the rest; a window it asked for is in `panels`.
+    /// See the module docs. Returns what it asked of the rest.
     pub(super) fn object_list(
         &mut self,
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         (work, sel, keys): (&mut Work, &mut Selection, &mut Keys),
-        panels: &mut Panels,
     ) -> Vec<SideAsk> {
         let mut asks = Vec::new();
         let anim = work.workspace.behaviors[sel.active].is_anim_data();
@@ -53,7 +52,7 @@ impl SideArea {
             asked
         };
         if let Some(asked) = asked {
-            asks.extend(self.apply_title((work, sel), panels, asked));
+            asks.extend(self.apply_title((work, sel), asked));
         }
         self.bar.objects_closed = !open;
         if self.bar.objects_closed {
@@ -87,7 +86,7 @@ impl SideArea {
         } else {
             self.explorer.flat(ui, i18n, graph, &tree_keys, &mut sel.selected)
         };
-        asks.extend(self.apply_list_output(ui, (work, sel), panels, graph, output));
+        asks.extend(self.apply_list_output(ui, (work, sel), graph, output));
         asks
     }
 
@@ -121,7 +120,6 @@ impl SideArea {
         &mut self,
         ui: &egui::Ui,
         (work, sel): (&mut Work, &mut Selection),
-        panels: &mut Panels,
         graph: &Graph,
         output: ListOutput,
     ) -> Vec<SideAsk> {
@@ -131,7 +129,7 @@ impl SideArea {
             asks.push(SideAsk::FocusEditor);
         }
         if let Some((node, action)) = output.menu {
-            asks.extend(row_action(ui, (work, sel), panels, (graph.id(node), action)));
+            asks.extend(row_action(ui, (work, sel), (graph.id(node), action)));
         }
 
         let Some((pick, files, from)) = output.duplicate else { return asks };
@@ -149,19 +147,14 @@ impl SideArea {
             }
             DuplicatePick::Choose => {
                 let projects = anim_projects(work, sel.active);
-                panels.duplicate_form = Some(DuplicateForm::new(files, projects, &from));
+                asks.push(SideAsk::Window(WindowAsk::Duplicate(files, projects, from)));
             }
         }
         asks
     }
 
     /// What a button of the title asked for.
-    fn apply_title(
-        &mut self,
-        (work, sel): (&mut Work, &mut Selection),
-        panels: &mut Panels,
-        asked: title::TitleAsk,
-    ) -> Option<SideAsk> {
+    fn apply_title(&mut self, (work, sel): (&mut Work, &mut Selection), asked: title::TitleAsk) -> Option<SideAsk> {
         use title::TitleAsk;
         match asked {
             TitleAsk::ToggleTreeView => self.explorer.tree_view = !self.explorer.tree_view,
@@ -174,9 +167,10 @@ impl SideArea {
 
             TitleAsk::New if work.workspace.behaviors[sel.active].adsf => {
                 let projects = anim_projects(work, sel.active);
-                panels.new_clips = Some(NewClipsForm::new(sel.selected.as_deref(), projects));
+                let selected = sel.selected.as_deref().map(str::to_owned);
+                return Some(SideAsk::Window(WindowAsk::NewClips(selected, projects)));
             }
-            TitleAsk::New => panels.class_picker.open(),
+            TitleAsk::New => return Some(SideAsk::Window(WindowAsk::ClassPicker)),
         }
         None
     }
@@ -186,17 +180,13 @@ impl SideArea {
 fn row_action(
     ui: &egui::Ui,
     (work, sel): (&mut Work, &mut Selection),
-    panels: &mut Panels,
     (id, action): (&str, RowAction),
 ) -> Option<SideAsk> {
     match action {
         RowAction::KeepOpen => return Some(SideAsk::KeepOpen(id.to_owned())),
-        RowAction::NewObject => panels.class_picker.open(),
+        RowAction::NewObject => return Some(SideAsk::Window(WindowAsk::ClassPicker)),
         RowAction::Duplicate => sel.selected = Some(work.new_object(sel.active, Some(id)).into()),
-        RowAction::Repeat => {
-            let behavior = &work.workspace.behaviors[sel.active];
-            panels.repeat = super::repeat::RepeatForm::of(sel.active, behavior, id);
-        }
+        RowAction::Repeat => return Some(SideAsk::Window(WindowAsk::Repeat(sel.active, id.to_owned()))),
         RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
         RowAction::RevertOrDelete => return Some(SideAsk::RevertOrDelete(id.to_owned())),
         RowAction::CopyPath => return Some(SideAsk::File(FileAction::CopyPath, id.to_owned())),
@@ -215,9 +205,9 @@ pub(super) enum RowAction {
     /// Many new objects from this one: see [`crate::patch::repeat`].
     Repeat,
     CopyId,
-    /// The path of the file the object is in: see [`crate::patch::tool::list::object_file`].
+    /// The path of the file the object is in: see [`crate::patch::tool::file::object_file`].
     CopyPath,
-    /// The file selected in the file manager: see [`crate::patch::tool::list::file_action`].
+    /// The file selected in the file manager: see [`crate::patch::tool::file::file_action`].
     Reveal,
     RevertOrDelete,
 }

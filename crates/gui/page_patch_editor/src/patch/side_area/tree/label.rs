@@ -10,7 +10,7 @@ use crate::patch::tree::{Graph, Node};
 
 /// The button of a row of `node`. `(selected, dimmed)`: it is selected; it opens under another
 /// parent.
-pub(in crate::patch::ui) fn object_button(
+pub(in crate::patch::side_area) fn object_button(
     ui: &mut egui::Ui,
     graph: &Graph,
     node: Node,

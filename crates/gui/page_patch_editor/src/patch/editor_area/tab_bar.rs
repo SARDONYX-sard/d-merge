@@ -97,8 +97,8 @@ fn object_items(ui: &mut egui::Ui, i18n: &I18nMap, id: &str) -> Option<TabEvent>
     // As the explorer's menu: the file the object is in.
     let hover = i18n.t(I18nKey::NemesisObjectFileHover);
     let files = [
-        (I18nKey::NemesisCopyPath, crate::patch::tool::list::FileAction::CopyPath),
-        (gui_shared::i18n::REVEAL_IN_FILE_MANAGER, crate::patch::tool::list::FileAction::Reveal),
+        (I18nKey::NemesisCopyPath, crate::patch::tool::file::FileAction::CopyPath),
+        (gui_shared::i18n::REVEAL_IN_FILE_MANAGER, crate::patch::tool::file::FileAction::Reveal),
     ];
     for (label, action) in files {
         if ui.button(i18n.t(label)).on_hover_text(hover).clicked() {

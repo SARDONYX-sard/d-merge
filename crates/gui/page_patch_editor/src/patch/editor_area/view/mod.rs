@@ -30,7 +30,7 @@ use crate::patch::{
     EditorResult, FocusAt, TabEvent,
     editor_area::EditorArea,
     problems::Problems,
-    tool::{keys::Keys, list::FileAction, selection::Selection, work_state::Work},
+    tool::{file::FileAction, keys::Keys, selection::Selection, work_state::Work},
     workspace::PANDORA_DOC,
 };
 

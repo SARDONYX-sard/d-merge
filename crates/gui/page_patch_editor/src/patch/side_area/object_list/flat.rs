@@ -10,9 +10,11 @@ use gui_shared::i18n::I18nMap;
 
 use super::{RowAction, row_menu};
 use crate::patch::{
-    tool::list::{ListScroll, fixed_row, offset_to_show, row_height},
+    side_area::{
+        explorer::{ListScroll, fixed_row, offset_to_show, row_height},
+        tree::object_button,
+    },
     tree::{Graph, Node},
-    ui::tree::object_button,
 };
 
 /// What a row asked for.
