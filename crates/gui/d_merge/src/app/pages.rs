@@ -59,8 +59,8 @@ impl App {
             &self.i18n,
             &mut self.notify,
             patch_paths(&self.settings.pages.patch),
-            &mut self.settings.pages.patch_editor,
-            &mut self.settings.ui.lsp,
+            (&mut self.settings.pages.patch_editor, &mut self.settings.ui.lsp),
+            &mut self.keys,
         );
     }
 
@@ -82,6 +82,7 @@ impl App {
             lsp_settings: &mut self.settings.ui.lsp,
             i18n: &self.i18n,
             notify: &mut self.notify,
+            keys: &mut self.keys,
         };
         self.hkanno.ui(ui, ctx);
     }
@@ -94,6 +95,7 @@ impl App {
             paths: patch_paths(&self.settings.pages.patch),
             settings: &mut self.settings.pages.patch_editor,
             editor: &mut self.settings.ui.lsp,
+            keys: &mut self.keys,
         };
         self.patch_editor.ui(ui, ctx);
     }

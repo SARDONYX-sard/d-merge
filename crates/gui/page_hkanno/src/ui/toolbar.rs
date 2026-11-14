@@ -6,10 +6,7 @@
 //! ```
 
 use egui_widgets::shadcn::{Button, Checkbox, ComboBox, TextEdit};
-use gui_shared::{
-    i18n::I18nKey,
-    settings::{pages::convert::OutputFormat, ui::editor::EditorMode},
-};
+use gui_shared::{i18n::I18nKey, settings::pages::convert::OutputFormat};
 
 use crate::{HkannoPage, HkannoPageCtx};
 
@@ -18,7 +15,7 @@ impl HkannoPage {
     pub(crate) fn file_bar(&mut self, ui: &mut egui::Ui, ctx: &HkannoPageCtx<'_>) {
         let Some(tab) = self.active_tab() else { return };
         ui.horizontal(|ui| {
-            ui.label(ctx.i18n.t(I18nKey::ConvertOutputLabel));
+            ui.label(ctx.i18n.t(I18nKey::OutputLabel));
 
             // Right-to-left: the format box takes its width first, the path gets the rest.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -30,7 +27,7 @@ impl HkannoPage {
                 {
                     tab.set_format(OutputFormat::ALL[index]); // also fixes the output extension
                 }
-                ui.label(ctx.i18n.t(I18nKey::ConvertOutputFormatLabel));
+                ui.label(ctx.i18n.t(I18nKey::OutputFormatLabel));
 
                 let width = ui.available_width();
                 ui.add(TextEdit::singleline(&mut tab.settings.output_path).desired_width(width));
@@ -75,16 +72,7 @@ impl HkannoPage {
                 self.export_txt(ctx);
             }
 
-            if ui
-                .add(Button::selectable(self.show_lsp_options, "⚙"))
-                .on_hover_text(i18n.t(I18nKey::HkannoLspOptionsTitle))
-                .clicked()
-            {
-                self.show_lsp_options = !self.show_lsp_options;
-            }
-
-            ui.separator();
-            editor_mode_select(ui, ctx);
+            // The keymap and the language features are in the editor's status bar, as in VS Code.
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let show = &mut ctx.settings.show_preview;
@@ -118,9 +106,9 @@ impl HkannoPage {
         }
     }
 
-    /// `Ctrl+S` saves (works in every keymap; Vim also has `:w`).
-    pub(crate) fn handle_shortcuts(&mut self, egui_ctx: &egui::Context, ctx: &mut HkannoPageCtx<'_>) {
-        if egui_ctx.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::S)) {
+    /// `Ctrl+S` (key bindings) saves, in every keymap; Vim also has `:w`.
+    pub(crate) fn handle_shortcuts(&mut self, ctx: &mut HkannoPageCtx<'_>) {
+        if self.key_command(keybinding::commands::EDITOR_SAVE) {
             self.save_active(ctx);
         }
     }
@@ -171,24 +159,9 @@ impl HkannoPage {
     }
 }
 
-/// `Keymap: [Normal ▼]`: plain editing or Vim.
-fn editor_mode_select(ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
-    ui.label(ctx.i18n.t(I18nKey::LspEditorMode)).on_hover_text(ctx.i18n.t(I18nKey::LspEditorModeHover));
-
-    let mode = &mut ctx.lsp_settings.editor_mode;
-    let mut index = EditorMode::ALL.iter().position(|m| m == mode).unwrap_or(0);
-    if ComboBox::from_id_salt("hkanno_editor_mode")
-        .width(90.0)
-        .show_index(ui, &mut index, EditorMode::ALL.len(), |i| EditorMode::ALL[i].label())
-        .changed()
-    {
-        *mode = EditorMode::ALL[index];
-    }
-}
-
 /// Window with one checkbox per language feature.
 fn lsp_options_window(egui_ctx: &egui::Context, ctx: &mut HkannoPageCtx<'_>, open: &mut bool) {
-    egui_widgets::window_near_pointer(egui_ctx, ctx.i18n.t(I18nKey::HkannoLspOptionsTitle))
+    egui_widgets::window_near_pointer(egui_ctx, ctx.i18n.t(I18nKey::LspOptionsTitle))
         .open(open)
         .resizable(false)
         .collapsible(false)

@@ -48,6 +48,7 @@ tracing     = { workspace = true }
 
 # workspace members
 egui_widgets      = { workspace = true }
+keybinding = { workspace = true }
 page_convert      = { workspace = true }
 page_patch_editor = { workspace = true }
 page_hkanno       = { workspace = true }

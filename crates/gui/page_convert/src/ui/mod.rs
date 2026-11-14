@@ -96,7 +96,7 @@ impl ConvertPage {
 
                     let tree = &mut self.tree;
                     let select_label =
-                        if tree.has_checked() { I18nKey::ConvertUnselectAll } else { I18nKey::ConvertSelectAll };
+                        if tree.has_checked() { I18nKey::ConvertUnselectAll } else { I18nKey::SelectAll };
                     if ui.add(Button::new(i18n.t(select_label))).clicked() {
                         tree.toggle_select_all();
                     }
@@ -109,7 +109,7 @@ impl ConvertPage {
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let clear = Button::new(i18n.t(I18nKey::ConvertClearButton)).icon(Icon::Trash);
+                let clear = Button::new(i18n.t(I18nKey::ClearButton)).icon(Icon::Trash);
                 if ui.add_enabled(self.input_count(settings) > 0, clear).clicked() {
                     self.clear_inputs(settings);
                 }
@@ -174,7 +174,7 @@ impl ConvertPage {
         let label = if running {
             ctx.i18n.t(I18nKey::ConvertingButton).to_string()
         } else {
-            format!("{} ({count}) → {}", ctx.i18n.t(I18nKey::ConvertButton), ctx.settings.format.label())
+            format!("{} ({count}) → {}", ctx.i18n.t(I18nKey::PageConvert), ctx.settings.format.label())
         };
         let button = Button::new(label).primary().full_width().min_size(egui::vec2(0.0, 40.0));
         let response = ui.add_enabled(!running && count > 0, button);
@@ -197,7 +197,7 @@ fn handle_drop(egui_ctx: &egui::Context, settings: &mut gui_shared::settings::pa
 }
 /// `Output format: [HKX SE (64-bit)] [HKX LE (32-bit)] [XML] [JSON]`
 fn format_row(ui: &mut egui::Ui, ctx: &mut ConvertPageCtx<'_>) {
-    ui.label(ctx.i18n.t(I18nKey::ConvertOutputFormatLabel));
+    ui.label(ctx.i18n.t(I18nKey::OutputFormatLabel));
     ui.horizontal(|ui| {
         let format = &mut ctx.settings.format;
         for kind in OutputFormat::ALL {
@@ -211,7 +211,7 @@ fn format_row(ui: &mut egui::Ui, ctx: &mut ConvertPageCtx<'_>) {
 
 /// `Output: [Next to each input] [Select] [📂]`
 fn output_row(ui: &mut egui::Ui, ctx: &mut ConvertPageCtx<'_>) {
-    ui.label(ctx.i18n.t(I18nKey::ConvertOutputLabel)).on_hover_text(ctx.i18n.t(I18nKey::ConvertOutputHover));
+    ui.label(ctx.i18n.t(I18nKey::OutputLabel)).on_hover_text(ctx.i18n.t(I18nKey::ConvertOutputHover));
 
     let output = &mut ctx.settings.output;
     // Right-to-left: the buttons take their width first, the text edit gets the rest.

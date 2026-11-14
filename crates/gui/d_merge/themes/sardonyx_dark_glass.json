@@ -1,10 +1,10 @@
 {
   "visuals": {
     "dark_mode": true,
-    "override_text_color": null,
+    "override_text_color": "#A3A3A3",
     "hyperlink_color": "#418BAED2",
-    "faint_bg_color": "#05050500",
-    "extreme_bg_color": "#0606068D",
+    "faint_bg_color": "#09080841",
+    "extreme_bg_color": "#1111118C",
     "text_edit_bg_color": null,
     "code_bg_color": "#404040",
     "warn_fg_color": "#FF8F00",
@@ -14,9 +14,9 @@
       "width": 1.0,
       "color": "#3C3C3C"
     },
-    "panel_fill": "#02020211",
-    "window_corner_radius": 6,
-    "menu_corner_radius": 6,
+    "panel_fill": "#0F0F0F80",
+    "window_corner_radius": 24,
+    "menu_corner_radius": 0,
     "button_frame": true,
     "striped": false,
     "slider_trailing_fill": false,
@@ -91,7 +91,7 @@
   },
   "shadcn": {
     "background": "#0D0D0D58",
-    "foreground": "#E5DBDB",
+    "foreground": "#DFDADA",
     "card": "#0E0E0E96",
     "card_foreground": "#FAFAFA",
     "popover": "#17181BF5",
@@ -109,6 +109,6 @@
     "border": "#1A1A1A1A",
     "input": "#26262626",
     "ring": "#737373",
-    "radius": 20.0
+    "radius": 12.728724
   }
 }

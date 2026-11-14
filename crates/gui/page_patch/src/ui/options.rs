@@ -66,7 +66,7 @@ impl PatchView<'_> {
         use skyrim_data_dir::Runtime;
 
         ui.horizontal_top(|ui| {
-            ui.add(Label::new(self.ctx.i18n.t(I18nKey::RuntimeTargetLabel)))
+            ui.add(Label::new(self.ctx.i18n.t(I18nKey::OutputFormatLabel)))
                 .on_hover_text(self.ctx.i18n.t(I18nKey::RuntimeTargetHover));
 
             const RUNTIMES: [(Runtime, &str); Runtime::ALL.len()] = {

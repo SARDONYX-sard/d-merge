@@ -50,7 +50,7 @@ impl PatchView<'_> {
             ui.label(i18n.t(I18nKey::PandoraTargetVersionLabel)).on_hover_text(hover);
             version_box(ui, &mut pandora.version, hover);
         });
-        let row = PathRow::new(i18n.t(I18nKey::PandoraOutputDirLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
+        let row = PathRow::new(i18n.t(I18nKey::OutputDirLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
             .help(i18n.t(I18nKey::PandoraDirHover))
             .show(ui, &mut pandora.output_dir);
         if let Some(err) = row.open_error {

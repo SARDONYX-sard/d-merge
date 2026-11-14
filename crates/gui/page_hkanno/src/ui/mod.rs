@@ -4,15 +4,16 @@
 mod preview;
 mod toolbar;
 
-use std::borrow::Cow;
-
-use egui_code_editor::{CodeEditor, CodeEditorOutput, EditorCommand, EditorFeatures, Keymap, text_pos::LinePos};
-use egui_widgets::shadcn::Button;
+use egui_code_editor::{
+    CodeEditor, CodeEditorOutput, EditorCommand, EditorFeatures, Keymap, ProblemGroup, ProblemsPanel, text_pos::LinePos,
+};
+use egui_widgets::{TabAction, shadcn::Button};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::ui::editor::EditorMode,
 };
 use hkanno_lsp::features::code_action::code_action;
+use keybinding::commands;
 
 use crate::{
     HkannoPage, HkannoPageCtx,
@@ -22,14 +23,45 @@ use crate::{
 };
 
 /// What this page's editor acts on: see [`HkannoPage::apply_command`].
-const HOST_COMMANDS: [EditorCommand; 4] =
-    [EditorCommand::NextTab, EditorCommand::PreviousTab, EditorCommand::CloseTab, EditorCommand::TogglePreview];
+const HOST_COMMANDS: [EditorCommand; 5] = [
+    EditorCommand::NextTab,
+    EditorCommand::PreviousTab,
+    EditorCommand::CloseTab,
+    EditorCommand::TogglePreview,
+    EditorCommand::RevealFile,
+];
 
 impl HkannoPage {
     /// Draws the page.
     pub fn ui(&mut self, ui: &mut egui::Ui, mut ctx: HkannoPageCtx<'_>) {
         self.handle_drop(ui.ctx(), &mut ctx);
-        self.handle_shortcuts(ui.ctx(), &mut ctx);
+        let context = self.key_context(ui.ctx(), &ctx);
+        let texts = keybinding::RecorderTexts {
+            hint: ctx.i18n.t(I18nKey::KeybindingRecordHint),
+            also_bound: ctx.i18n.t(I18nKey::KeybindingAlsoBound),
+            edit_json: ctx.i18n.t(I18nKey::KeybindingEditInJson),
+            labels: egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(ctx.i18n)),
+            unsaved: ctx.i18n.t(I18nKey::KeybindingUnsaved),
+            save: ctx.i18n.t(I18nKey::KeybindingSave),
+            dont_save: ctx.i18n.t(I18nKey::KeybindingDontSave),
+            cancel: ctx.i18n.t(I18nKey::CancelButton),
+        };
+        let frame = self.key_ui.frame(ui.ctx(), ctx.keys, &context, texts);
+        self.key_commands = frame.commands;
+        match frame.saved {
+            Some(Ok(())) => ctx.notify.success(ctx.i18n.t(I18nKey::KeybindingSaved)),
+            Some(Err(err)) => ctx.notify.error(err),
+            None => {}
+        }
+        self.handle_shortcuts(&mut ctx);
+        if self.key_command(commands::FILE_REVEAL) {
+            self.reveal_active(&mut ctx);
+        }
+        if self.key_command(commands::FILE_COPY_PATH)
+            && let Some(tab) = self.tabs.get(self.active)
+        {
+            ui.ctx().copy_text(tab.settings.input_path.clone());
+        }
 
         // egui's default scroll bars are thin until hovered, which hides where in the file
         // you are. Always-visible solid bars, like a code editor (only on this page).
@@ -60,35 +92,33 @@ impl HkannoPage {
         drop_overlay(ui.ctx(), ctx.i18n);
     }
 
-    /// `[attack.hkx ✖] [idle.hkx* ✖] ...  [Open]`
+    /// `│ attack.hkx ✖ │ idle.hkx ● │ ...  [Open]`: VS Code's tabs ([`egui_widgets::EditorTab`]).
+    /// `●`: unsaved edits; red / yellow: the file has errors / warnings.
     fn tab_bar(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
-        let mut close = None;
+        let menu = egui_widgets::TabMenu::from_texts(gui_shared::i18n::tab_menu_texts(ctx.i18n));
+        let mut picked = None;
         let mut open = None;
         ui.horizontal(|ui| {
             egui::ScrollArea::horizontal().id_salt("hkanno_tab_scroll").show(ui, |ui| {
                 ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 0.0; // the tabs touch, with a line between them
                     for (i, tab) in self.tabs.iter().enumerate() {
-                        // `*` marks unsaved edits.
-                        let title = if tab.dirty {
-                            Cow::Owned(format!("{}*", tab.title()))
-                        } else {
-                            Cow::Borrowed(tab.title())
+                        let worst = egui_code_editor::problems::worst(&tab.editor_diagnostics);
+                        let tone = worst.map(|severity| severity.color(ui.visuals()));
+                        let focused = ui.memory(|m| m.has_focus(tab.editor_id()));
+                        let shown = egui_widgets::EditorTab::new(tab.title(), i == self.active)
+                            .focused(focused)
+                            .modified(tab.dirty)
+                            .tone(tone)
+                            .hover(tab.settings.input_path.as_str())
+                            .show(ui);
+                        let more = |ui: &mut egui::Ui| {
+                            tab_menu(ui, tab, ctx.i18n);
+                            None
                         };
-                        let response = ui
-                            .add(Button::selectable(i == self.active, title.as_ref()))
-                            .on_hover_text(&tab.settings.input_path);
-                        if response.clicked() {
-                            self.active = i;
+                        if let Some(action) = shown.action(&menu, |action| (i, action), more) {
+                            picked = Some(action);
                         }
-                        response.context_menu(|ui| {
-                            if tab_menu(ui, tab, ctx.i18n) {
-                                close = Some(i);
-                            }
-                        });
-                        if ui.small_button("✖").clicked() {
-                            close = Some(i);
-                        }
-                        ui.add_space(6.0);
                     }
                 });
             });
@@ -108,78 +138,94 @@ impl HkannoPage {
         if let Some(files) = open {
             self.open(files.into_iter().map(|p| p.display().to_string()), ctx);
         }
-        if let Some(index) = close {
-            self.close(index);
+        let unsaved = match picked {
+            Some((at, TabAction::Show)) => {
+                self.active = at;
+                false
+            }
+            Some((at, TabAction::Close)) => {
+                self.close(at);
+                false
+            }
+            Some((at, TabAction::CloseOthers)) => self.close_where(|index| index != at),
+            Some((at, TabAction::CloseToTheRight)) => self.close_where(|index| index > at),
+            Some((_, TabAction::CloseAll)) => self.close_where(|_| true),
+            // No preview tabs here: every file opened stays.
+            Some((_, TabAction::KeepOpen)) | None => false,
+        };
+        if unsaved {
+            ctx.notify.error(ctx.i18n.t(I18nKey::HkannoTabUnsaved).to_owned());
         }
     }
 
-    /// The text editor of the active tab (+ the keymap status line, e.g., `-- INSERT --`).
+    /// The text editor of the active tab, with its status bar below (e.g. `-- INSERT --`).
     fn editor(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
         ui.label(egui::RichText::new(ctx.i18n.t(I18nKey::HkannoAnnotationLabel)).weak());
-        if let Some(forward) = egui_code_editor::tab_switch_keys(ui) {
-            self.step_tab(ui, forward);
-        }
-
-        let i18n = ctx.i18n;
-        let actions = [
-            EditorCommand::NextTab.action(i18n.t(I18nKey::EditorNextTab)),
-            EditorCommand::PreviousTab.action(i18n.t(I18nKey::EditorPreviousTab)),
-            EditorCommand::CloseTab.action(i18n.t(I18nKey::EditorCloseTab)),
-            EditorCommand::TogglePreview.action(i18n.t(I18nKey::EditorTogglePreview)),
-        ];
-        let lsp = &ctx.lsp_settings;
-        let language = HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
-        let features = EditorFeatures {
-            completion: lsp.completion,
-            hover: lsp.hover,
-            diagnostics: lsp.diagnostics,
-            format: lsp.formatter,
-            inlay_hints: lsp.inlay_hints,
-            signature_help: lsp.signature_help,
+        let format_and_save = self.editor_keys(ui, ctx);
+        let requests = {
+            let mut requests = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::editor_request);
+            if format_and_save {
+                requests.push(egui_code_editor::EditorRequest::Format);
+            }
+            requests
         };
-        let keymap = to_keymap(ctx.lsp_settings.editor_mode);
-        let show_preview = ctx.settings.show_preview;
-        let Some(tab) = self.tabs.get_mut(self.active) else { return };
 
-        // Restore the saved cursor once, when the tab is first shown.
+        let keymap = Keymap::from_vim(ctx.lsp_settings.editor_mode.is_vim());
+        let Some(tab) = self.tabs.get_mut(self.active) else { return };
+        // The saved cursor, once, when the tab is first shown.
         if std::mem::take(&mut tab.restore_cursor) {
             egui_code_editor::set_cursor(ui.ctx(), tab.editor_id(), tab.settings.cursor);
         }
 
-        // Status line first (bottom of the area), so it stays visible while the text scrolls.
-        egui::Panel::bottom("hkanno_status_bar").show(ui, |ui| {
-            egui_code_editor::status_line(ui, &tab.editor, keymap, &tab.text);
-        });
-
-        let CodeEditorOutput { changed, cursor, command, .. } = egui::ScrollArea::both()
-            .id_salt("hkanno_editor_scroll")
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                CodeEditor::new(tab.settings.input_path.as_str(), &mut tab.text)
-                    .language(&language)
-                    .diagnostics(&tab.editor_diagnostics)
-                    .features(features)
-                    .keymap(keymap)
-                    .labels(egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)))
-                    .actions(&actions)
-                    .host_commands(&HOST_COMMANDS)
-                    .show(ui, &mut tab.editor)
-            })
-            .inner;
-
-        if changed {
-            tab.dirty = true;
-            tab.text_changed();
+        // The status bar first (the bottom of the area): it stays in view while the text scrolls.
+        let status = status_bar(ui, ctx.i18n, (tab, keymap), &mut self.show_lsp_options);
+        if status.toggle_problems {
+            self.problems_hidden = !self.problems_hidden;
         }
-        if let Some(cursor) = cursor {
-            tab.settings.cursor = cursor.to_char_index(&tab.text);
-            if show_preview {
-                tab.preview.jump_from_editor_line(cursor.line);
-            }
+        if let Some(chosen) = status.keymap {
+            ctx.lsp_settings.editor_mode = EditorMode::from_vim(chosen.is_vim());
         }
+
+        let Some(tab) = self.tabs.get_mut(self.active) else { return };
+        let input =
+            EditorInput { i18n: ctx.i18n, lsp: ctx.lsp_settings, keymap, key_ui: &self.key_ui, requests: &requests };
+        let output = code_editor(ui, tab, &input);
+        if let Some(cursor) = output.cursor
+            && ctx.settings.show_preview
+        {
+            tab.preview.jump_from_editor_line(cursor.line);
+        }
+
+        // The `⚙` of a palette action or an editor command: record its keys.
+        if let Some(command) = output.configure {
+            self.key_ui.configure_command(command);
+        }
+        if let Some(request) = output.configure_request {
+            self.key_ui.configure_request(request);
+        }
+        if output.open_json {
+            self.key_ui.run_action(keybinding::host::OPEN_JSON_ACTION);
+        }
+
+        // After the format of this frame.
+        let command = if format_and_save { Some(EditorCommand::Save) } else { output.command };
         if let Some(command) = command {
             self.apply_command(command, ui, ctx);
         }
+    }
+
+    /// `Ctrl+PageDown` / `Ctrl+PageUp`, Vim's `Space p`, `Space w` (key bindings). Returns whether
+    /// `Space w` (format and save) was pressed.
+    fn editor_keys(&mut self, ui: &egui::Ui, ctx: &mut HkannoPageCtx<'_>) -> bool {
+        if self.key_command(commands::TABS_NEXT) {
+            self.step_tab(ui, true);
+        } else if self.key_command(commands::TABS_PREVIOUS) {
+            self.step_tab(ui, false);
+        }
+        if self.key_command(commands::EDITOR_TOGGLE_PREVIEW) {
+            ctx.settings.show_preview = !ctx.settings.show_preview;
+        }
+        self.key_command(commands::EDITOR_FORMAT_AND_SAVE)
     }
 
     /// Does what the editor asked for. e.g., Vim `:w`, `<Space>l`, or the palette.
@@ -190,12 +236,15 @@ impl HkannoPage {
             EditorCommand::PreviousTab => self.step_tab(ui, false),
             EditorCommand::CloseTab => self.close_active_from_keyboard(ui, ctx),
             EditorCommand::TogglePreview => ctx.settings.show_preview = !ctx.settings.show_preview,
+            EditorCommand::RevealFile => self.reveal_active(ctx),
             EditorCommand::GoToDefinition
             | EditorCommand::FindReferences
             | EditorCommand::JumpBack
             | EditorCommand::JumpForward
             | EditorCommand::ToggleExplorer
-            | EditorCommand::ToggleInlineDiff => {}
+            | EditorCommand::ToggleInlineDiff
+            | EditorCommand::NextChange
+            | EditorCommand::PreviousChange => {}
         }
     }
 
@@ -249,39 +298,54 @@ impl HkannoPage {
         let (show_diagnostics, show_fixes) = (ctx.lsp_settings.diagnostics, ctx.lsp_settings.code_action);
         let title = ctx.i18n.t(I18nKey::HkannoProblemsLabel);
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
-        if !show_diagnostics || tab.diagnostics.is_empty() {
+        let id = tab.editor_id();
+        let cursor = &mut self.problems_cursor;
+        // `Ctrl+Shift+L`, as VS Code's `Ctrl+Shift+M`: the panel shows and gets the keyboard; if it
+        // has it, it hides and the editor gets it back.
+        let toggle = self.key_commands.iter().position(|asked| *asked == commands::PROBLEMS_TOGGLE);
+        if let Some(at) = toggle {
+            self.key_commands.swap_remove(at);
+            if cursor.focused {
+                (cursor.focused, self.problems_hidden) = (false, true);
+                ui.memory_mut(|m| m.request_focus(id));
+            } else if show_diagnostics && !tab.diagnostics.is_empty() {
+                (cursor.focused, self.problems_hidden) = (true, false);
+                ui.memory_mut(|m| m.surrender_focus(id));
+            }
+        } else if ui.memory(|m| m.has_focus(id)) {
+            cursor.focused = false; // e.g. a click in the editor
+        }
+        if !show_diagnostics || self.problems_hidden || tab.diagnostics.is_empty() {
+            cursor.focused = false;
             return;
         }
-
-        let id = tab.editor_id();
         let mut fix = None;
 
-        egui::Panel::bottom("hkanno_problems").resizable(true).default_size(120.0).show(ui, |ui| {
-            ui.weak(format!("{title} ({})", tab.diagnostics.len()));
-            egui::ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
-                // Both lists are built from the same source, in the same order.
-                for (lsp_diag, diagnostic) in tab.diagnostics.iter().zip(&tab.editor_diagnostics) {
-                    ui.horizontal(|ui| {
-                        let severity = diagnostic.severity;
-                        ui.colored_label(severity.color(ui.visuals()), severity.icon());
-
-                        // e.g., `Ln 5, Col 1: Missing z value in animmotion.` -> click jumps there.
-                        let pos = LinePos { line: diagnostic.line, column: diagnostic.columns.start };
-                        let location = format!("Ln {}, Col {}: {}", pos.line + 1, pos.column + 1, diagnostic.message);
-                        if ui.link(location).clicked() {
-                            egui_code_editor::set_cursor(ui.ctx(), id, pos.to_char_index(&tab.text));
-                        }
-
-                        if show_fixes
-                            && let Some(action) = code_action(&tab.text, lsp_diag)
-                            && ui.add(Button::new(&action.title).small()).clicked()
-                        {
-                            fix = Some(action.edit);
-                        }
-                    });
-                }
-            });
+        // One file: its problems without a header, each with its quick fix if it has one.
+        let group = ProblemGroup { title: std::borrow::Cow::Borrowed(""), problems: &tab.editor_diagnostics };
+        let text = &tab.text;
+        let was_focused = cursor.focused;
+        let keys = keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::problems_key);
+        let panel = ProblemsPanel::new("hkanno_problems", title).default_height(120.0).cursor(cursor).keys(&keys);
+        let clicked = panel.show(ui, &[group], |ui, _, index| {
+            // Both lists are built from the same source, in the same order.
+            if show_fixes
+                && let Some(action) = tab.diagnostics.get(index).and_then(|lsp_diag| code_action(text, lsp_diag))
+                && ui.add(Button::new(&action.title).small()).clicked()
+            {
+                fix = Some(action.edit);
+            }
         });
+        if let Some((_, index)) = clicked
+            && let Some(diagnostic) = tab.editor_diagnostics.get(index)
+        {
+            let pos = LinePos { line: diagnostic.line, column: diagnostic.columns.start };
+            egui_code_editor::set_cursor(ui.ctx(), id, pos.to_char_index(&tab.text));
+        }
+        // `Enter` / `Esc` in the panel: the keyboard is the editor's again.
+        if was_focused && !self.problems_cursor.focused {
+            ui.memory_mut(|m| m.request_focus(id));
+        }
 
         if let Some(edit) = fix {
             replace_columns(&mut tab.text, edit.range.line, edit.range.span.start..edit.range.span.end, &edit.new_text);
@@ -314,12 +378,11 @@ impl HkannoPage {
 /// ───────────
 /// Close
 /// ```
-fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) -> bool {
-    // The parent: an existing file itself would be opened with its default app.
+fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) {
+    // The file selected in its folder, as VS Code's "Reveal in File Explorer"; the folder if the
+    // file isn't there.
     let open_dir = |path: &str| {
-        let path = std::path::Path::new(path);
-        let dir = path.parent().unwrap_or(path);
-        if let Err(err) = gui_shared::fs::open_existing_dir_or_ancestor(dir) {
+        if let Err(err) = gui_shared::fs::reveal_file(std::path::Path::new(path)) {
             tracing::error!("{err}");
         }
     };
@@ -338,15 +401,37 @@ fn tab_menu(ui: &mut egui::Ui, tab: &HkannoTab, i18n: &I18nMap) -> bool {
     if ui.button(i18n.t(I18nKey::HkannoTabCopyOutputPath)).clicked() {
         ui.ctx().copy_text(output.to_string());
     }
-    ui.separator();
-    ui.button(i18n.t(I18nKey::CloseButton)).clicked()
 }
 
-/// Settings enum -> editor enum.
-const fn to_keymap(mode: EditorMode) -> Keymap {
-    match mode {
-        EditorMode::Normal => Keymap::Normal,
-        EditorMode::Vim => Keymap::Vim,
+impl HkannoPage {
+    /// The active tab's file, selected in the file manager (`Shift+Alt+R`, Vim `<Space>V`).
+    fn reveal_active(&self, ctx: &mut HkannoPageCtx<'_>) {
+        let Some(tab) = self.tabs.get(self.active) else { return };
+        if let Err(err) = gui_shared::fs::reveal_file(std::path::Path::new(&tab.settings.input_path)) {
+            ctx.notify.error(err);
+        }
+    }
+
+    /// Was `command` asked for by this frame's keys? It is done then: asked again, `false`.
+    fn key_command(&mut self, command: &str) -> bool {
+        keybinding::host::take(&mut self.key_commands, command)
+    }
+
+    /// Who has the keyboard: what a binding's `when` sees.
+    fn key_context(&self, egui_ctx: &egui::Context, ctx: &HkannoPageCtx<'_>) -> keybinding::KeyContext {
+        let keymap = Keymap::from_vim(ctx.lsp_settings.editor_mode.is_vim());
+        let tab = self.tabs.get(self.active);
+        let editor_focus = tab.is_some_and(|tab| egui_ctx.memory(|m| m.has_focus(tab.editor_id())));
+        keybinding::KeyContext {
+            page: "hkanno",
+            editor_focus,
+            vim: keymap.is_vim(),
+            vim_mode: tab.and_then(|tab| tab.editor.keymap.vim_mode(keymap)),
+            problems_focus: self.problems_cursor.focused,
+            problems_visible: !self.problems_hidden,
+            input_focus: !editor_focus && egui_ctx.egui_wants_keyboard_input(),
+            ..Default::default()
+        }
     }
 }
 
@@ -368,4 +453,125 @@ fn drop_overlay(ctx: &egui::Context, i18n: &I18nMap) {
         egui::FontId::proportional(24.0),
         blue,
     );
+}
+
+/// What the status bar asked for.
+struct StatusAsk {
+    /// Its counts were clicked: the Problems panel shows / hides.
+    toggle_problems: bool,
+    /// `Vim ▾` picked another keymap.
+    keymap: Option<Keymap>,
+}
+
+/// The status bar of `tab`: its counts, `Vim ▾` and `⚙` at its right end, as VS Code's.
+fn status_bar(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    (tab, keymap): (&HkannoTab, Keymap),
+    show_options: &mut bool,
+) -> StatusAsk {
+    egui::Panel::bottom("hkanno_status_bar")
+        .show(ui, |ui| {
+            let mut chosen = keymap;
+            let status = egui_code_editor::StatusBar::new(&tab.editor, keymap, &tab.text)
+                .keymap_select(&mut chosen)
+                .options(show_options, i18n.t(I18nKey::LspOptionsTitle))
+                .show(ui);
+            StatusAsk { toggle_problems: status.problems.clicked(), keymap: status.keymap_changed.then_some(chosen) }
+        })
+        .inner
+}
+
+/// What the code editor is drawn with.
+struct EditorInput<'a> {
+    i18n: &'a I18nMap,
+    lsp: &'a gui_shared::settings::ui::editor::LspOptions,
+    keymap: Keymap,
+    /// The keys of the palette's actions, and the `⚙` to change them.
+    key_ui: &'a keybinding::KeyUi,
+    /// The editor's own commands asked for by the key bindings this frame.
+    requests: &'a [egui_code_editor::EditorRequest],
+}
+
+/// What the code editor asked for, owned past its borrows.
+struct EditorAsk {
+    cursor: Option<LinePos>,
+    command: Option<EditorCommand>,
+    /// The `⚙` of a palette action / of an editor command.
+    configure: Option<&'static str>,
+    configure_request: Option<egui_code_editor::EditorRequest>,
+    /// The palette's "Open Keyboard Shortcuts (JSON)".
+    open_json: bool,
+}
+
+/// The editor of `tab`: its text, problems, keys and palette. An edit marks the tab unsaved.
+fn code_editor(ui: &mut egui::Ui, tab: &mut HkannoTab, input: &EditorInput<'_>) -> EditorAsk {
+    let EditorInput { i18n, lsp, keymap, key_ui, requests } = *input;
+    let language = HkannoLanguage { semantic: lsp.semantic_tokens, code_action: lsp.code_action };
+    let actions = palette_actions(key_ui, i18n);
+
+    let output = egui::ScrollArea::both()
+        .id_salt("hkanno_editor_scroll")
+        .auto_shrink(false)
+        .show(ui, |ui| {
+            CodeEditor::new(tab.settings.input_path.as_str(), &mut tab.text)
+                .language(&language)
+                .diagnostics(&tab.editor_diagnostics)
+                .features(features(lsp))
+                .keymap(keymap)
+                .labels(egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)))
+                .actions(&actions)
+                .host_commands(&HOST_COMMANDS)
+                .requests(requests)
+                .request_keys(key_ui.request_keys())
+                .show(ui, &mut tab.editor)
+        })
+        .inner;
+
+    // Owned first: the output borrows the tab's text.
+    let CodeEditorOutput { changed, cursor, command, configure, configure_request, action, .. } = output;
+    let ask = EditorAsk {
+        cursor,
+        command,
+        configure: configure.and_then(keybinding::host::command_of_action),
+        configure_request,
+        open_json: action == Some(keybinding::host::OPEN_JSON_ACTION),
+    };
+
+    if changed {
+        tab.dirty = true;
+        tab.text_changed();
+    }
+    if let Some(cursor) = ask.cursor {
+        tab.settings.cursor = cursor.to_char_index(&tab.text);
+    }
+    ask
+}
+
+/// The palette's own actions, with their keys as the key bindings have them and a `⚙` to change
+/// them, found by their English names and command ids too, as VS Code's.
+fn palette_actions<'a>(key_ui: &'a keybinding::KeyUi, i18n: &'a I18nMap) -> [egui_code_editor::EditorAction<'a>; 6] {
+    let act = |action: egui_code_editor::EditorAction<'static>, key: I18nKey| {
+        key_ui.palette_action(egui_code_editor::EditorAction { label: i18n.t(key), ..action }, key.default_eng())
+    };
+    [
+        act(EditorCommand::NextTab.action(""), I18nKey::EditorNextTab),
+        act(EditorCommand::PreviousTab.action(""), I18nKey::EditorPreviousTab),
+        act(EditorCommand::CloseTab.action(""), I18nKey::EditorCloseTab),
+        act(EditorCommand::TogglePreview.action(""), I18nKey::EditorTogglePreview),
+        act(EditorCommand::RevealFile.action(""), gui_shared::i18n::REVEAL_IN_FILE_MANAGER),
+        act(egui_code_editor::EditorAction::new(keybinding::host::OPEN_JSON_ACTION, ""), I18nKey::KeybindingOpenJson),
+    ]
+}
+
+/// The language features the settings turn on.
+const fn features(lsp: &gui_shared::settings::ui::editor::LspOptions) -> EditorFeatures {
+    EditorFeatures {
+        completion: lsp.completion,
+        hover: lsp.hover,
+        diagnostics: lsp.diagnostics,
+        format: lsp.formatter,
+        inlay_hints: lsp.inlay_hints,
+        signature_help: lsp.signature_help,
+    }
 }

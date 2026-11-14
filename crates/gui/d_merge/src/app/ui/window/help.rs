@@ -135,7 +135,7 @@ impl App {
             let modes = [
                 (FontMode::Default, self.i18n.t(I18nKey::FontModeDefault)),
                 (FontMode::System, self.i18n.t(I18nKey::FontModeSystem)),
-                (FontMode::File, self.i18n.t(I18nKey::FontModeFile)),
+                (FontMode::File, self.i18n.t(I18nKey::FileLabel)),
             ];
             let font_mode = &mut self.settings.ui.font.mode; // disjoint field from `self.i18n`
             let mut index = modes.iter().position(|(m, _)| m == font_mode).unwrap_or(0);
