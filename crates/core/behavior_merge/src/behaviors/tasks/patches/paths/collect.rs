@@ -62,17 +62,15 @@ fn is_nemesis_file(path: impl AsRef<Path>) -> bool {
     path.as_ref().file_stem().is_some_and(|name| name.to_str().is_some_and(|name| name.starts_with('#')))
 }
 
-/// It is a valid path, but the patch itself targeting it is invalid.(HorsePower - Modernized Horse Riding (Total Riding Overhaul v1.2.0)
+/// It is a valid path, but the patch itself targeting it is invalid: a mistake of the mod's author.
+/// (HorsePower - Modernized Horse Riding (Total Riding Overhaul v1.2.0))
 ///
 /// e.g. `animationsetdatasinglefile/HorseProjectData~HorseProject/horseproject.txt`
 fn is_manifest_patch(path: &Path) -> bool {
-    let name_eq = |path: Option<&Path>, expected: &str| {
-        path.and_then(Path::file_name)
-            .and_then(|name| name.to_str())
-            .is_some_and(|name| name.eq_ignore_ascii_case(expected))
-    };
-
-    name_eq(Some(path), "horseproject.txt") && name_eq(path.parent(), "HorseProjectData~HorseProject")
+    let name = path.file_name().and_then(|name| name.to_str());
+    let project = path.parent().and_then(Path::file_name).and_then(|name| name.to_str());
+    let (Some(project), Some(file)) = (project, name) else { return false };
+    skyrim_anim_data::projects::is_project_set_list(project, file)
 }
 
 #[cfg(test)]
@@ -122,5 +120,19 @@ mod tests {
 
         // It is a valid path, but the patch itself targeting it is invalid.(HorsePower - Modernized Horse Riding (Total Riding Overhaul v1.2.0)
         assert_eq!(classify_in_mod("animationsetdatasinglefile/HorseProjectData~HorseProject/horseproject.txt"), None);
+        assert_eq!(
+            classify_in_mod("animationsetdatasinglefile/DragonProjectData~DragonProject/DragonProject.txt"),
+            None
+        );
+    }
+
+    /// Named like their folders, but read as patches: the list of projects, and a project of a mod.
+    #[test]
+    fn test_classify_what_only_looks_like_a_list_of_anim_sets() {
+        assert_eq!(classify_in_mod("animationsetdatasinglefile/$header$/$header$.txt"), Some(Category::Asdsf));
+        assert_eq!(
+            classify_in_mod("animationsetdatasinglefile/NemesisData~NemesisProject/NemesisProject.txt"),
+            Some(Category::Asdsf)
+        );
     }
 }

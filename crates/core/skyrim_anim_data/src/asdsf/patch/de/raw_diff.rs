@@ -2,6 +2,7 @@ use core::ops::Range;
 
 use json_patch::{JsonPath, ValueWithPriority};
 use rayon::prelude::*;
+use stdx::text::starts_with_ignore_case;
 use winnow::{
     ModalResult, Parser as _,
     ascii::{Caseless, line_ending, multispace0, till_line_ending},
@@ -320,15 +321,11 @@ fn till_ending_str_lines<'a>(input: &mut &'a str) -> ModalResult<Vec<&'a str>> {
 }
 
 fn clip_names_lines<'a>(input: &mut &'a str) -> ModalResult<Vec<&'a str>> {
-    fn is_attack_starts(s: &str) -> bool {
-        fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
-            s.len() >= prefix.len() && s.get(..prefix.len()).is_some_and(|p| p.eq_ignore_ascii_case(prefix))
-        }
-
-        starts_with_ignore_ascii(s, "attackStart")
-            || starts_with_ignore_ascii(s, "attackPowerStart")
-            || starts_with_ignore_ascii(s, "bashStart")
-            || starts_with_ignore_ascii(s, "bashPowerStart")
+    const fn is_attack_starts(s: &str) -> bool {
+        starts_with_ignore_case(s, "attackStart")
+            || starts_with_ignore_case(s, "attackPowerStart")
+            || starts_with_ignore_case(s, "bashStart")
+            || starts_with_ignore_case(s, "bashPowerStart")
     }
 
     /// Parse 1 line.

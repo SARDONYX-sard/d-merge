@@ -6,3 +6,4 @@
 pub mod arena;
 pub mod path;
 pub mod text;
+pub mod time;

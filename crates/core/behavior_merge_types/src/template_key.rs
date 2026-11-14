@@ -61,52 +61,10 @@ impl<'a> TemplateKey<'a> {
     }
 
     const fn is_valid(template_name: &str) -> bool {
-        const fn ascii_lowercase(byte: u8) -> u8 {
-            if byte >= b'A' && byte <= b'Z' { byte + (b'a' - b'A') } else { byte }
-        }
+        use stdx::text::{ends_with_ignore_case, starts_with_ignore_case};
 
-        const fn starts_with_ignore_ascii(s: &str, prefix: &str) -> bool {
-            let s = s.as_bytes();
-            let prefix = prefix.as_bytes();
-
-            if s.len() < prefix.len() {
-                return false;
-            }
-
-            let mut i = 0;
-            while i < prefix.len() {
-                if ascii_lowercase(s[i]) != ascii_lowercase(prefix[i]) {
-                    return false;
-                }
-                i += 1;
-            }
-
-            true
-        }
-
-        const fn ends_with_ignore_ascii(s: &str, suffix: &str) -> bool {
-            let s = s.as_bytes();
-            let suffix = suffix.as_bytes();
-
-            if s.len() < suffix.len() {
-                return false;
-            }
-
-            let offset = s.len() - suffix.len();
-
-            let mut i = 0;
-            while i < suffix.len() {
-                if ascii_lowercase(s[offset + i]) != ascii_lowercase(suffix[i]) {
-                    return false;
-                }
-                i += 1;
-            }
-
-            true
-        }
-
-        starts_with_ignore_ascii(template_name, "meshes")
-            && (ends_with_ignore_ascii(template_name, "bin") || ends_with_ignore_ascii(template_name, "xml"))
+        starts_with_ignore_case(template_name, "meshes")
+            && (ends_with_ignore_case(template_name, "bin") || ends_with_ignore_case(template_name, "xml"))
     }
 
     /// As utf-8

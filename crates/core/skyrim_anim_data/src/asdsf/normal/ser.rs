@@ -135,7 +135,7 @@ mod tests {
         let res = dbg!(actual == expected);
         if !res {
             let diff = ::diff::diff(&actual, &expected);
-            std::fs::write("../../../../dummy/diff.txt", diff).unwrap();
+            std::fs::write("../../../dummy/diff.txt", diff).unwrap();
             panic!("actual != expected");
         }
         assert!(res);

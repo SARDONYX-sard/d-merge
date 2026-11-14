@@ -11,14 +11,47 @@ pub fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
     needle.is_empty() || haystack.windows(needle.len()).any(|window| window.eq_ignore_ascii_case(needle))
 }
 
-/// Does `text` start with `prefix`, ignoring ASCII case?
+/// Does `text` start with `prefix`, ignoring ASCII case? `const`: also for checks at compile time.
 ///
 /// e.g., `#Mod$0` starts with `#mod`.
 #[must_use]
 #[inline]
-pub fn starts_with_ignore_case(text: &str, prefix: &str) -> bool {
+pub const fn starts_with_ignore_case(text: &str, prefix: &str) -> bool {
     let (text, prefix) = (text.as_bytes(), prefix.as_bytes());
-    text.get(..prefix.len()).is_some_and(|start| start.eq_ignore_ascii_case(prefix))
+    text.len() >= prefix.len() && text.split_at(prefix.len()).0.eq_ignore_ascii_case(prefix)
+}
+
+/// Does `text` end with `suffix`, ignoring ASCII case? `const`, as [`starts_with_ignore_case`].
+///
+/// e.g., `0_master.HKX` ends with `.hkx`.
+#[must_use]
+#[inline]
+pub const fn ends_with_ignore_case(text: &str, suffix: &str) -> bool {
+    let (text, suffix) = (text.as_bytes(), suffix.as_bytes());
+    text.len() >= suffix.len() && text.split_at(text.len() - suffix.len()).1.eq_ignore_ascii_case(suffix)
+}
+
+/// Where `needle` is in `haystack`, ignoring ASCII case: byte ranges, not overlapping. Nothing for
+/// an empty `needle`.
+///
+/// e.g., `ab Ab` and `ab` -> `0..2`, `3..5`
+pub fn find_ignore_case<'a>(haystack: &'a str, needle: &'a str) -> impl Iterator<Item = core::ops::Range<usize>> + 'a {
+    let (bytes, needle) = (haystack.as_bytes(), needle.as_bytes());
+    let mut at = 0;
+    core::iter::from_fn(move || {
+        if needle.is_empty() {
+            return None;
+        }
+        while at + needle.len() <= bytes.len() {
+            let start = at;
+            if bytes[start..start + needle.len()].eq_ignore_ascii_case(needle) {
+                at += needle.len();
+                return Some(start..at);
+            }
+            at += 1;
+        }
+        None
+    })
 }
 
 /// The two texts in order, ignoring ASCII case.
@@ -46,6 +79,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn finds_every_place_ignoring_ascii_case() {
+        assert!(find_ignore_case("ab Ab", "ab").eq([0..2, 3..5]));
+        assert!(find_ignore_case("aaa", "aa").eq(std::iter::once(0..2)), "not overlapping");
+        assert_eq!(find_ignore_case("abc", "").count(), 0);
+    }
+
+    #[test]
     fn contains_ignores_ascii_case() {
         assert!(contains_ignore_case("SoundPlay.Foo", "soundp"));
         assert!(contains_ignore_case("SoundPlay.Foo", "FOO"));
@@ -63,6 +103,14 @@ mod tests {
         assert!(starts_with_ignore_case("null", ""));
         assert!(!starts_with_ignore_case("nu", "null"));
         assert!(!starts_with_ignore_case("#Mod", "mod"));
+    }
+
+    #[test]
+    fn ends_with_ignores_ascii_case() {
+        assert!(ends_with_ignore_case("0_master.HKX", ".hkx"));
+        assert!(ends_with_ignore_case("x", ""));
+        assert!(!ends_with_ignore_case("kx", ".hkx"));
+        const _AT_COMPILE_TIME: () = assert!(ends_with_ignore_case("A.TXT", ".txt"));
     }
 
     #[test]

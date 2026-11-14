@@ -4,6 +4,7 @@
 //!
 //! - `adsf`: Represents `animationdatasinglefile.txt`
 //! - `asdsf`: Represents `animationsetdatasinglefile.txt`
+//! - `projects`: The vanilla projects, under the names each format has for them
 //!
 //! Each module is organized into three variants:
 //!
@@ -25,3 +26,4 @@ pub mod adsf;
 pub mod asdsf;
 pub(crate) mod common_parser;
 pub mod diff_line;
+pub mod projects;
