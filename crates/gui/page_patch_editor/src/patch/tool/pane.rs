@@ -30,7 +30,7 @@ use crate::patch::{
 pub(in crate::patch) struct PreviewSettings<'a> {
     pub(in crate::patch) code: &'a str,
     pub(in crate::patch) parser_mode: ParserMode,
-    pub(in crate::patch) export_format: ExportFormat,
+    pub(super) export_format: ExportFormat,
 }
 
 impl EditorPane {
@@ -69,12 +69,7 @@ impl EditorPane {
 
     /// Recomputes the patch of object `id` of `behavior`, its check and the underlines after the text
     /// changed. Returns whether it did (the work's problems are then to look at again).
-    pub(in crate::patch) fn refresh_preview(
-        &mut self,
-        behavior: &Behavior,
-        id: &str,
-        settings: PreviewSettings<'_>,
-    ) -> bool {
+    pub(super) fn refresh_preview(&mut self, behavior: &Behavior, id: &str, settings: PreviewSettings<'_>) -> bool {
         if self.preview.is_some() {
             return false;
         }
@@ -167,7 +162,7 @@ impl EditorPane {
 
     /// The text with block `block` of the preview put back as in `template`: an operation of the
     /// Pandora file, or a hunk of the Nemesis patch. `None`: no such block.
-    pub(in crate::patch) fn reverted_block(&self, template: &str, block: usize) -> Option<String> {
+    pub(super) fn reverted_block(&self, template: &str, block: usize) -> Option<String> {
         let is_pandora = self.preview_view.as_ref().is_some_and(editor::preview::Preview::is_pandora);
         if is_pandora {
             let opened = nemesis_diff::open_kept_arrays(&self.text);

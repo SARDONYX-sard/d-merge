@@ -20,7 +20,7 @@ const MAX_HEIGHT: f32 = 420.0;
 
 /// See the module docs.
 #[derive(Debug, Default)]
-pub(in crate::patch) struct ClassPicker {
+pub(super) struct ClassPicker {
     is_open: bool,
     filter: String,
     /// The filter takes the keyboard on the next draw.
@@ -29,22 +29,17 @@ pub(in crate::patch) struct ClassPicker {
 
 impl ClassPicker {
     /// Shows the window, its filter with the keyboard.
-    pub(in crate::patch) const fn open(&mut self) {
+    pub(super) const fn open(&mut self) {
         self.is_open = true;
         self.focus = true;
     }
 
-    pub(in crate::patch) const fn close(&mut self) {
+    pub(super) const fn close(&mut self) {
         self.is_open = false;
     }
 
     /// Draws the window, if open, with the classes in `behavior` first. Returns the class clicked.
-    pub(in crate::patch) fn window(
-        &mut self,
-        ctx: &egui::Context,
-        i18n: &I18nMap,
-        behavior: &Behavior,
-    ) -> Option<String> {
+    pub(super) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap, behavior: &Behavior) -> Option<String> {
         if !self.is_open {
             return None;
         }

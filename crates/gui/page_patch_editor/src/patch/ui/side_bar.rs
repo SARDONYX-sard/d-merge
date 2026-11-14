@@ -29,7 +29,7 @@ use crate::patch::{
 
 /// The view of the side bar. See the module docs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(in crate::patch) enum SideView {
+enum SideView {
     #[default]
     Explorer,
     Search,
@@ -51,19 +51,19 @@ pub(in crate::patch) enum SideView {
 pub(in crate::patch) struct SideArea {
     pub(in crate::patch) bar: SideBar,
     pub(in crate::patch) explorer: crate::patch::tool::list::Explorer,
-    pub(in crate::patch) scm: crate::patch::changes::Scm,
-    pub(in crate::patch) search: egui_code_editor::SearchView,
-    pub(in crate::patch) vars: crate::patch::ui::vars_panel::VarsPanel,
+    pub(super) scm: crate::patch::changes::Scm,
+    pub(super) search: egui_code_editor::SearchView,
+    pub(super) vars: crate::patch::ui::vars_panel::VarsPanel,
 }
 
 /// What the side bar shows.
 #[derive(Debug, Default)]
 pub(in crate::patch) struct SideBar {
-    pub(in crate::patch) view: SideView,
+    view: SideView,
     /// Only the activity bar shows: the icon of the view shown was clicked.
-    pub(in crate::patch) hidden: bool,
+    hidden: bool,
     /// The OBJECTS section of the explorer is folded.
-    pub(in crate::patch) objects_closed: bool,
+    pub(super) objects_closed: bool,
     /// The BEHAVIORS section of the explorer is open.
     pub(in crate::patch) behaviors_open: bool,
 }
@@ -71,7 +71,7 @@ pub(in crate::patch) struct SideBar {
 impl SideBar {
     /// A click on `view`'s icon: shows it, or hides the side bar if it is the one shown. Returns
     /// whether `view` is shown now.
-    pub(in crate::patch) fn toggle(&mut self, view: SideView) -> bool {
+    fn toggle(&mut self, view: SideView) -> bool {
         if self.view == view && !self.hidden {
             self.hidden = true;
             return false;
@@ -81,7 +81,7 @@ impl SideBar {
     }
 
     /// Shows `view` (a key of it: it never hides).
-    pub(in crate::patch) const fn show(&mut self, view: SideView) {
+    const fn show(&mut self, view: SideView) {
         self.view = view;
         self.hidden = false;
     }
@@ -206,7 +206,7 @@ impl SideArea {
     }
 
     /// Shows `view`, or hides the side bar if it is the one shown, as a click on its icon does.
-    pub(in crate::patch) fn toggle_view(&mut self, view: SideView) {
+    fn toggle_view(&mut self, view: SideView) {
         if self.bar.toggle(view) && view == SideView::Search {
             self.search.focus();
         }

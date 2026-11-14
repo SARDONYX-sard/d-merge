@@ -101,7 +101,7 @@ pub(in crate::patch) fn key_context(
 /// e.g. `D:/mods/My/Nemesis_Engine/mod/mymod/0_master/#0106.txt`,
 /// `D:/mods/My/Pandora_Engine/mod/mymod/patches/defaultmale~0_master.xml`,
 /// `<templates>/meshes/actors/character/behaviors/0_master.xml`
-pub(in crate::patch) fn object_file(
+fn object_file(
     (behavior, id): (&crate::patch::workspace::Behavior, &str),
     place: &crate::patch::tool::place::WorkPlace,
     format: crate::patch::workspace::ExportFormat,

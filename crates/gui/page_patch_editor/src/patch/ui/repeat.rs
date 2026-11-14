@@ -24,7 +24,7 @@ use crate::patch::{
 
 /// What the window holds.
 #[derive(Debug)]
-pub(in crate::patch) struct RepeatForm {
+pub(super) struct RepeatForm {
     /// The behavior the objects go to, in `Workspace::behaviors`.
     behavior: usize,
     /// e.g. `#0106`: what the template was taken from.
@@ -35,7 +35,7 @@ pub(in crate::patch) struct RepeatForm {
 
 /// What the window asked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::patch) enum RepeatAsk {
+pub(super) enum RepeatAsk {
     /// `✖`: the window goes.
     Close,
     /// `Create`: see [`RepeatForm::create`].
@@ -55,7 +55,7 @@ impl RepeatForm {
     }
 
     /// Draws the window. `code_ok`: the mod code is one new objects can be named by.
-    pub(in crate::patch) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap, code_ok: bool) -> Option<RepeatAsk> {
+    pub(super) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap, code_ok: bool) -> Option<RepeatAsk> {
         let mut open = true;
         let mut create = false;
         let rows = values(&self.values).rows.len();

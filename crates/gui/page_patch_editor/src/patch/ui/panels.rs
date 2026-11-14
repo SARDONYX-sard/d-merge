@@ -17,17 +17,17 @@ pub(in crate::patch) struct Panels {
     /// The details of the bar above are shown. See [`ui::top_bar`].
     pub(in crate::patch) project_open: bool,
     /// The mod code being typed to rename the work to, while that form is open.
-    pub(in crate::patch) rename_to: Option<String>,
+    pub(super) rename_to: Option<String>,
     /// See [`new_work`]. `Some`: its form is shown on the start screen.
     pub(in crate::patch) new_work: Option<new_work::NewWork>,
     /// A mod with several codes was opened: which of them? See [`ui::code_choice`].
     pub(in crate::patch) code_choice: Option<ui::code_choice::ModCodeChoice>,
     /// The window of the templates to add. See [`ui::template_picker`].
-    pub(in crate::patch) picker: ui::template_picker::TemplatePicker,
+    pub(super) picker: ui::template_picker::TemplatePicker,
     /// The "New object" window. See [`ui::class_picker`].
-    pub(in crate::patch) class_picker: ui::class_picker::ClassPicker,
+    pub(super) class_picker: ui::class_picker::ClassPicker,
     /// The window making many objects from one. See [`ui::repeat`].
-    pub(in crate::patch) repeat: Option<ui::repeat::RepeatForm>,
+    pub(super) repeat: Option<ui::repeat::RepeatForm>,
     /// The "animation data" window.
     pub(super) anim_data_dialog: Option<ui::anim_data::AnimDataDialog>,
     /// The "duplicate to" window.
@@ -35,7 +35,7 @@ pub(in crate::patch) struct Panels {
     /// The "new clips" window.
     pub(super) new_clips: Option<ui::anim_data::NewClipsForm>,
     /// The user patch's bulk delete asks once more.
-    pub(in crate::patch) confirm_clear: bool,
+    pub(super) confirm_clear: bool,
     /// The user patch written as a mod of its own. See [`crate::patch::user_patch::ModExport`].
     pub(in crate::patch) mod_export: crate::patch::user_patch::ModExport,
 }

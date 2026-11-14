@@ -22,7 +22,7 @@ use crate::patch::{
 #[derive(Debug, Clone, Copy)]
 pub(in crate::patch) struct Shown<'a> {
     pub(in crate::patch) tabs: &'a EditorTabs,
-    pub(in crate::patch) sel: &'a Selection,
+    pub(super) sel: &'a Selection,
 }
 
 /// What the editor shows after the work changed as a whole. The tabs of before are closed first.
@@ -54,7 +54,7 @@ pub(in crate::patch) fn of(behaviors: &[Behavior], shown: Shown<'_>, place: &Wor
 
 /// What a session opens again, besides its tabs.
 #[derive(Debug)]
-pub(in crate::patch) struct Restored {
+pub(super) struct Restored {
     pub(in crate::patch) active: usize,
     pub(in crate::patch) selected: Option<Rc<str>>,
     /// Empty: keep the one there is.
@@ -64,7 +64,7 @@ pub(in crate::patch) struct Restored {
 
 /// The tabs of `session` into `tabs`, and what else it had open, of what still exists in
 /// `behaviors`.
-pub(in crate::patch) fn restore(session: Session, behaviors: &[Behavior], tabs: &mut EditorTabs) -> Restored {
+pub(super) fn restore(session: Session, behaviors: &[Behavior], tabs: &mut EditorTabs) -> Restored {
     let at_of = |name: &str| behaviors.iter().position(|behavior| behavior.name == name);
     let exists = |at: usize, id: &str| behaviors.get(at).is_some_and(|behavior| behavior.text(id).is_some());
 

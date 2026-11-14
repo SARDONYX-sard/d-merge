@@ -22,7 +22,7 @@ use crate::patch::{
 
 /// See the module docs. Its own state only: what is typed, the last error, which list is shown.
 #[derive(Debug, Default)]
-pub(in crate::patch) struct VarsPanel {
+pub(super) struct VarsPanel {
     new: NewNames,
     error: Option<String>,
     /// Variables are listed (else events).
@@ -32,7 +32,7 @@ pub(in crate::patch) struct VarsPanel {
 impl VarsPanel {
     /// Draws the panel of `behavior` (its `names`), the lists filtered by `filter`. Returns the ids of
     /// the objects an add / rename / remove edited (none: nothing was done).
-    pub(in crate::patch) fn show(
+    pub(super) fn show(
         &mut self,
         ui: &mut egui::Ui,
         i18n: &I18nMap,

@@ -43,7 +43,7 @@ enum ChangeAction {
 
 impl SideArea {
     /// Draws the view, and does what it asked for of the work. Returns what it asked of the rest.
-    pub(in crate::patch) fn changes_view(
+    pub(super) fn changes_view(
         &mut self,
         ui: &mut egui::Ui,
         i18n: &I18nMap,

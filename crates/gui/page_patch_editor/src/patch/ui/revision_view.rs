@@ -85,12 +85,7 @@ impl Views {
 
 /// The text of object `id` of behavior `behavior` at revision `number` (`None`: in the work now).
 /// An object no revision changed is the template's.
-pub(in crate::patch) fn object_text_at(
-    workspace: &Workspace,
-    behavior: usize,
-    id: &str,
-    number: Option<u32>,
-) -> String {
+fn object_text_at(workspace: &Workspace, behavior: usize, id: &str, number: Option<u32>) -> String {
     let Some(of) = workspace.behaviors.get(behavior) else { return String::new() };
     let template = || of.template_object(id).map(|object| object.text.clone()).unwrap_or_default();
     match number {

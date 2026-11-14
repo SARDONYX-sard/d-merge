@@ -7,7 +7,7 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use crate::patch::{TabEvent, editor::tabs::EditorTabs, tree::Graph};
 
 /// What the tabs show of the editor and the work, besides the tabs themselves.
-pub(in crate::patch) struct TabMarks<'a> {
+pub(super) struct TabMarks<'a> {
     /// The editor has the keyboard: the shown tab's line is the accent color.
     pub(super) focused: bool,
     /// The work's problems: a tab of an object with some is red (errors) or yellow (warnings only).

@@ -31,17 +31,17 @@ use crate::patch::workspace::Workspace;
 
 /// What a reload keeps of the work: it is not in the mod. See `Work::reload_from_mod`.
 #[derive(Debug)]
-pub(in crate::patch) struct Kept {
+pub(super) struct Kept {
     pub(in crate::patch) output: String,
     pub(super) refs: Vec<String>,
 }
 
 /// A mod read: `(work, code, folders without a template)`, or why it could not be.
-pub(in crate::patch) type ReadMod = Result<(Workspace, String, Vec<String>), String>;
+pub(super) type ReadMod = Result<(Workspace, String, Vec<String>), String>;
 
 /// What a job made, to take in. See [`Work::poll_job`].
 #[derive(Debug)]
-pub(in crate::patch) enum Done {
+pub(super) enum Done {
     /// A mod read: `(work, code, folders without a template)`. `source`: the mod's root.
     Read { read: ReadMod, source: String, kept: Option<Kept> },
     /// The work of `code` loaded from its cache.
@@ -56,10 +56,20 @@ pub(in crate::patch) struct Job {
     /// What is shown, e.g. `Renaming the mod code`, and after it `detail`, e.g. `oldc -> newc`.
     pub(in crate::patch) label: I18nKey,
     pub(in crate::patch) detail: String,
-    pub(in crate::patch) work: gui_shared::job::Job<Done>,
+    pub(super) work: gui_shared::job::Job<Done>,
 }
 
 impl Job {
+    /// `(done, total)`: how far it is. `total` is `0` while not known.
+    pub(in crate::patch) fn counts(&self) -> (usize, usize) {
+        self.work.counts()
+    }
+
+    /// `done / total`, if `total` is known.
+    pub(in crate::patch) fn progress(&self) -> Option<f32> {
+        self.work.progress()
+    }
+
     /// Runs `run` on another thread, counting in the `AtomicUsize` it is given out of `total` (`0`:
     /// not known).
     pub(super) fn spawn(

@@ -15,7 +15,7 @@ use crate::patch::{editor::tabs::EditorTabs, ui::revision_view::Views};
 
 /// Which object is selected after a tab event.
 #[derive(Debug, Default, PartialEq, Eq)]
-pub(in crate::patch) enum Select {
+pub(super) enum Select {
     /// The one selected stays.
     #[default]
     Keep,
@@ -26,12 +26,12 @@ pub(in crate::patch) enum Select {
 
 /// What the tool must do after a tab event.
 #[derive(Debug, Default, PartialEq, Eq)]
-pub(in crate::patch) struct TabOutcome {
-    pub(in crate::patch) select: Select,
+pub(super) struct TabOutcome {
+    pub(super) select: Select,
     /// The open object's tab went: its editor state with it.
-    pub(in crate::patch) close_editor: bool,
+    pub(super) close_editor: bool,
     /// The editor keeps the keyboard (an object's tab was gone to by a key).
-    pub(in crate::patch) keep_focus: bool,
+    pub(super) keep_focus: bool,
 }
 
 impl TabOutcome {
@@ -41,7 +41,7 @@ impl TabOutcome {
 }
 
 /// What an object's tab asked for. `current`: the object shown now.
-pub(in crate::patch) fn object_action(
+pub(super) fn object_action(
     (tabs, views): (&mut EditorTabs, &mut Views),
     active: usize,
     (action, id): (TabAction, String),
@@ -78,7 +78,7 @@ pub(in crate::patch) fn object_action(
 }
 
 /// What a diff's / blame's tab asked for: as an object's, by its index in the views.
-pub(in crate::patch) fn view_action(
+pub(super) fn view_action(
     (tabs, views): (&mut EditorTabs, &mut Views),
     active: usize,
     (action, at): (TabAction, usize),
@@ -122,7 +122,7 @@ fn close_all((tabs, views): (&mut EditorTabs, &mut Views), active: usize) -> Tab
 
 /// The next / previous tab, the views' after the objects', around the ends. `current`: the object
 /// shown, if no view is.
-pub(in crate::patch) fn step(
+pub(super) fn step(
     (tabs, views): (&EditorTabs, &mut Views),
     active: usize,
     current: &str,

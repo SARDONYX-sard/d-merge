@@ -15,7 +15,7 @@ use crate::patch::{
 
 /// The window's state: its own only.
 #[derive(Debug, Default)]
-pub(in crate::patch) struct TemplatePicker {
+pub(super) struct TemplatePicker {
     is_open: bool,
     /// The filter takes the keyboard on the next draw.
     focus: bool,
@@ -30,14 +30,14 @@ pub(in crate::patch) struct TemplatePicker {
 
 impl TemplatePicker {
     /// Shows the window, its filter with the keyboard.
-    pub(in crate::patch) const fn open(&mut self) {
+    pub(super) const fn open(&mut self) {
         self.is_open = true;
         self.focus = true;
     }
 
     /// Draws the window, if open: the templates of `template_dir` that `scope` allows. Returns the
     /// one clicked (the window closes then).
-    pub(in crate::patch) fn window(
+    pub(super) fn window(
         &mut self,
         ctx: &egui::Context,
         i18n: &I18nMap,

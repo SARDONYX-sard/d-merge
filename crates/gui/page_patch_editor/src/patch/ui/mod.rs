@@ -29,8 +29,8 @@ pub(super) mod windows;
 pub(super) fn job_progress(ui: &mut egui::Ui, i18n: &gui_shared::i18n::I18nMap, job: &crate::patch::tool::job::Job) {
     ui.add_space(12.0);
     ui.label(format!("{}: {}", i18n.t(job.label), job.detail));
-    let (done, total) = job.work.counts();
-    let (ratio, text) = match job.work.progress() {
+    let (done, total) = job.counts();
+    let (ratio, text) = match job.progress() {
         Some(ratio) => (ratio, format!("{done} / {total}")),
         None => (0.0, done.to_string()),
     };

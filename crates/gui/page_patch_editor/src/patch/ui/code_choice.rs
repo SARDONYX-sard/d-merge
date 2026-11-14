@@ -30,7 +30,7 @@ fn row_label(code: &ModCode) -> String {
 
 /// What the window asked for.
 #[derive(Debug)]
-pub(in crate::patch) enum ChoiceAsk {
+pub(super) enum ChoiceAsk {
     /// Open this code of the mod.
     Open(String),
     Close,
@@ -38,7 +38,7 @@ pub(in crate::patch) enum ChoiceAsk {
 
 impl ModCodeChoice {
     /// Draws the window. See the module docs.
-    pub(in crate::patch) fn window(&self, ctx: &egui::Context, i18n: &I18nMap) -> Option<ChoiceAsk> {
+    pub(super) fn window(&self, ctx: &egui::Context, i18n: &I18nMap) -> Option<ChoiceAsk> {
         let mut open = true;
         let mut picked = None;
         egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisChooseModCode)).open(&mut open).show(ctx, |ui| {

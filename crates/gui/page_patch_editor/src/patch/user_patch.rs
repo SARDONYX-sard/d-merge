@@ -219,7 +219,7 @@ pub(super) fn work_of(paths: PatchPaths<'_>) -> Work {
 impl Work {
     /// Writes the user patch now. Saved again after: what the export wrote is part of the work.
     /// Returns the patches d-merge's parser rejects.
-    pub(super) fn write_user_patch(&mut self) -> Result<Vec<String>, String> {
+    fn write_user_patch(&mut self) -> Result<Vec<String>, String> {
         self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
         let invalid = self.workspace.export(Path::new(&self.place.output), USER_PATCH_CODE, self.parser_mode)?.1;
         self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;

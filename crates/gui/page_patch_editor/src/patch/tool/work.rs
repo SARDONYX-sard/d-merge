@@ -166,7 +166,7 @@ impl Work {
 
     /// What a session restored says of the work's place: where it was read from and exported to.
     /// See [`super::session::restore`].
-    pub(in crate::patch) fn take_restored_place(&mut self, (mod_dir, output): (String, String)) {
+    pub(super) fn take_restored_place(&mut self, (mod_dir, output): (String, String)) {
         if !mod_dir.is_empty() {
             self.place.mod_dir = mod_dir;
         }

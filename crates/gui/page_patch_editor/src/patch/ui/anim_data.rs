@@ -74,7 +74,7 @@ pub(super) struct AnimDataDialog {
 
 /// What a form's window asked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::patch) enum FormAsk {
+pub(super) enum FormAsk {
     /// Its button: generate / create / duplicate.
     Done,
     /// `✖` or `Esc`.
@@ -132,12 +132,7 @@ impl AnimDataDialog {
     }
 
     /// `Generate`: what was checked goes into `work`, and `sel` goes to the generated files.
-    pub(in crate::patch) fn generate(
-        self,
-        (work, sel): (&mut Work, &mut Selection),
-        i18n: &I18nMap,
-        notify: &mut Notification,
-    ) {
+    pub(super) fn generate(self, (work, sel): (&mut Work, &mut Selection), i18n: &I18nMap, notify: &mut Notification) {
         let code = work.place.mod_code.trim().to_owned();
         let chosen: Vec<(&ClipSource, HkxInfo)> =
             self.rows.iter().filter(|row| row.checked).filter_map(chosen_clip).collect();
@@ -438,7 +433,7 @@ impl DuplicateForm {
 
 impl DuplicateForm {
     /// The project picked, and the files: `None` if there is none to pick.
-    pub(in crate::patch) fn picked(self) -> Option<(Vec<String>, String)> {
+    pub(super) fn picked(self) -> Option<(Vec<String>, String)> {
         let to = self.projects.into_iter().nth(self.picked)?;
         Some((self.files, to))
     }
@@ -464,7 +459,7 @@ pub(in crate::patch) fn duplicate_files(work: &mut Work, active: usize, (files, 
 
 impl NewClipsForm {
     /// `Create`: the clips go into the animation data `sel.active` of `work`; the first is shown.
-    pub(in crate::patch) fn create(self, (work, sel): (&mut Work, &mut Selection)) {
+    pub(super) fn create(self, (work, sel): (&mut Work, &mut Selection)) {
         let code = work.place.mod_code.trim().to_owned();
         let adsf = &mut work.workspace.behaviors[sel.active];
         let added = data::add_numbered_clips(adsf, &code, self.folder.trim(), self.name.trim(), self.count);
