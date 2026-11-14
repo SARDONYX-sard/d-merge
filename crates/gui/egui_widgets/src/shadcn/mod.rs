@@ -9,6 +9,7 @@
 // Keep the layout arithmetic readable (and identical to the original) instead of `mul_add`.
 #![allow(clippy::suboptimal_flops)]
 
+mod alert_dialog;
 mod button;
 mod controls;
 pub mod icon;
@@ -17,6 +18,7 @@ mod text;
 pub mod theme;
 
 pub use self::{
+    alert_dialog::{AlertDialog, AlertDialogChoice},
     button::Button,
     controls::{Checkbox, RadioButton, Slider, ToggleGroup},
     icon::Icon,

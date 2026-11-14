@@ -20,7 +20,8 @@ const CLICKED_SIZE: Vec2 = Vec2::new(180.0, 48.0);
 /// length.
 ///
 /// It closes with its `x`, a click beside it, or `Esc` unless a widget has the keyboard: that key is
-/// the widget's, e.g. Vim's in an editor.
+/// the widget's, e.g. Vim's in an editor. Where `Esc` is so used that this can not be told (egui takes
+/// the keyboard from a `TextEdit` on that very key), [`Self::close_on_escape`] turns it off.
 #[derive(Debug)]
 #[must_use = "Call `show` to draw it"]
 pub struct Modal {
@@ -28,12 +29,19 @@ pub struct Modal {
     to_top: bool,
     size: Vec2,
     overlay_alpha: u8,
+    close_on_escape: bool,
 }
 
 impl Modal {
     #[inline]
     pub fn new(title: impl Into<egui::WidgetText>) -> Self {
-        Self { title: title.into(), to_top: false, size: Vec2::new(0.85, 0.85), overlay_alpha: 160 }
+        Self {
+            title: title.into(),
+            to_top: false,
+            size: Vec2::new(0.85, 0.85),
+            overlay_alpha: 160,
+            close_on_escape: true,
+        }
     }
 
     /// Comes above the other windows on this frame, e.g. another modal it was opened from.
@@ -57,14 +65,23 @@ impl Modal {
         self
     }
 
+    /// Whether `Esc` closes it (default `true`). e.g. `false` for an editor with Vim keys, whose `Esc`
+    /// closes a hover or leaves Insert mode.
+    #[inline]
+    pub const fn close_on_escape(mut self, close_on_escape: bool) -> Self {
+        self.close_on_escape = close_on_escape;
+        self
+    }
+
     /// Returns what `content` returned, unless it is closed.
     pub fn show<R>(self, ctx: &egui::Context, open: &mut bool, content: impl FnOnce(&mut egui::Ui) -> R) -> Option<R> {
         if !*open {
             return None;
         }
-        let esc = ctx.input(|input| input.key_pressed(egui::Key::Escape));
-        if modal_overlay(ctx, self.overlay_alpha).clicked() || (esc && ctx.memory(|memory| memory.focused().is_none()))
-        {
+        let esc = self.close_on_escape && ctx.input(|input| input.key_pressed(egui::Key::Escape));
+        // A dialog over it has that `Esc`.
+        let esc_is_for_this = ctx.memory(|memory| memory.focused().is_none() && memory.top_modal_layer().is_none());
+        if modal_overlay(ctx, self.overlay_alpha).clicked() || (esc && esc_is_for_this) {
             *open = false;
             return None;
         }
@@ -238,6 +255,11 @@ impl NearPointer {
 /// See [`window_near_pointer`]. `last_drawn`: the frame it was last drawn in, if any.
 fn just_opened(last_drawn: Option<u64>, frame: u64) -> bool {
     last_drawn.is_none_or(|last| last + 1 < frame)
+}
+
+/// A small window of one filter and its list near the pointer, as VS Code's quick pick.
+pub fn quick_pick_window<'a>(ctx: &egui::Context, title: impl Into<egui::WidgetText>) -> egui::Window<'a> {
+    window_near_pointer(ctx, title).collapsible(false).resizable(false).default_width(460.0)
 }
 
 #[cfg(test)]

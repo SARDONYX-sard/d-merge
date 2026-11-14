@@ -1,0 +1,24 @@
+[package]
+name        = "egui_tree"
+version     = "0.0.0"
+description = "Keyboard-driven trees and lists for egui, as VS Code's explorer: keys, rows, scrolling"
+
+authors.workspace      = true
+categories             = ["gui"]
+edition.workspace      = true
+keywords               = ["egui", "tree"]
+license                = "MIT"
+readme                 = "../../../README.md"
+repository.workspace   = true
+rust-version.workspace = true
+
+# NOTE: `egui` only. What a row is and what its keys come from (key bindings) are the host's.
+[dependencies]
+egui = { workspace = true }
+
+[dev-dependencies]
+# `cargo run -p egui_tree --example tree`: the same features as the app, to share its build.
+eframe = { workspace = true, features = ["accesskit", "clipboard", "default_fonts", "glow", "links"] }
+
+[lints]
+workspace = true

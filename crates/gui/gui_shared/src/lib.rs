@@ -8,6 +8,7 @@ pub mod error;
 pub mod fetch;
 pub mod fs;
 pub mod i18n;
+pub mod job;
 pub mod log;
 pub mod patch;
 pub mod settings;
