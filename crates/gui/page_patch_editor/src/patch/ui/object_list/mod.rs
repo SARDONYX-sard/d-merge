@@ -74,16 +74,13 @@ impl PatchTool {
             self.explorer.tree_focus = false;
         }
         // `t` / `c` / `u` (key bindings): what it shows, as the `[≡]` / `⋯` menu does.
-        self.explorer.tree_view ^= self.key_command(keybinding::commands::EXPLORER_TOGGLE_VIEW) && !anim;
-        self.explorer.changed_only ^= self.key_command(keybinding::commands::EXPLORER_TOGGLE_CHANGED_ONLY);
-        self.explorer.unlinked_only ^= self.key_command(keybinding::commands::EXPLORER_TOGGLE_UNLINKED_ONLY) && !anim;
+        self.explorer.tree_view ^= self.keys.take(keybinding::commands::EXPLORER_TOGGLE_VIEW) && !anim;
+        self.explorer.changed_only ^= self.keys.take(keybinding::commands::EXPLORER_TOGGLE_CHANGED_ONLY);
+        self.explorer.unlinked_only ^= self.keys.take(keybinding::commands::EXPLORER_TOGGLE_UNLINKED_ONLY) && !anim;
         let names = self.names();
         let graph = &names.graph;
-        let keys = if self.explorer.tree_focus {
-            keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key)
-        } else {
-            Vec::new()
-        };
+        let keys =
+            if self.explorer.tree_focus { self.keys.take_mapped(keybinding::host::tree_key) } else { Vec::new() };
 
         // A tree from the root container, unless filtering: a filter wants the flat list.
         let output = if anim {

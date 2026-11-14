@@ -244,8 +244,8 @@ impl PatchTool {
         }
         match result.configure {
             // The palette's "Open Keyboard Shortcuts (JSON)" comes the same way.
-            Some(action) if self.key_ui.run_action(action) => {}
-            Some(command) => self.key_ui.configure_command(command),
+            Some(action) if self.keys.ui.run_action(action) => {}
+            Some(command) => self.keys.ui.configure_command(command),
             None => {}
         }
         if let Some(older) = result.walk_history {

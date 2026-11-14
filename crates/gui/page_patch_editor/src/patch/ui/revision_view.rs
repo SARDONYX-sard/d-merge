@@ -235,10 +235,10 @@ impl PatchTool {
 
         // The keys of the tabs as on an object's: the tab bar's bindings, Vim's `gt` / `Space c`.
         let command = output.command;
-        let close = self.key_command(keybinding::commands::TABS_CLOSE) || command == Some(EditorCommand::CloseTab);
-        let next = self.key_command(keybinding::commands::TABS_NEXT) || command == Some(EditorCommand::NextTab);
+        let close = self.keys.take(keybinding::commands::TABS_CLOSE) || command == Some(EditorCommand::CloseTab);
+        let next = self.keys.take(keybinding::commands::TABS_NEXT) || command == Some(EditorCommand::NextTab);
         let previous =
-            self.key_command(keybinding::commands::TABS_PREVIOUS) || command == Some(EditorCommand::PreviousTab);
+            self.keys.take(keybinding::commands::TABS_PREVIOUS) || command == Some(EditorCommand::PreviousTab);
         let current = self.selected.as_deref().unwrap_or_default().to_owned();
         if close {
             self.views.list.close(at);

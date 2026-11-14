@@ -41,20 +41,6 @@ pub(in crate::patch) struct Explorer {
 pub(in crate::patch) const fn take_reveal(selected: Option<&Rc<str>>, forced: bool) -> bool {
     forced && selected.is_some()
 }
-/// The key recorder's texts. See [`keybinding::recorder`].
-fn recorder_texts(i18n: &gui_shared::i18n::I18nMap) -> keybinding::RecorderTexts<'_> {
-    use gui_shared::i18n::I18nKey;
-    keybinding::RecorderTexts {
-        hint: i18n.t(I18nKey::KeybindingRecordHint),
-        also_bound: i18n.t(I18nKey::KeybindingAlsoBound),
-        edit_json: i18n.t(I18nKey::KeybindingEditInJson),
-        labels: egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(i18n)),
-        unsaved: i18n.t(I18nKey::KeybindingUnsaved),
-        save: i18n.t(I18nKey::KeybindingSave),
-        dont_save: i18n.t(I18nKey::KeybindingDontSave),
-        cancel: i18n.t(I18nKey::CancelButton),
-    }
-}
 
 /// What is done with the file an object is in, as VS Code's "Copy Path" / "Reveal in File Explorer".
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,35 +77,16 @@ impl PatchTool {
         ui.memory_mut(|m| m.surrender_focus(editor));
     }
 
-    /// Takes the commands of this frame's keys (see [`keybinding`]): carried out by those who ask for
-    /// them with [`Self::key_command`] while it is drawn. `keys`: `None` when another has the keyboard
-    /// (the main work's tool while the user patch window is open).
-    ///
-    /// While the palette's `⚙` records new keys, it has them all: see [`keybinding::KeyUi`].
+    /// Reads this frame's keys: see [`super::keys::Keys::frame`].
     pub(in crate::patch) fn take_key_commands(
         &mut self,
         ctx: &egui::Context,
-        keys: Option<&mut keybinding::Keybindings>,
+        bindings: Option<&mut keybinding::Keybindings>,
         i18n: &gui_shared::i18n::I18nMap,
         notify: &mut egui_widgets::notify::Notification,
     ) {
-        self.key_commands.clear();
-        let Some(keys) = keys else { return };
         let context = key_context(ctx, (&self.pane, &self.explorer, &self.problems), self.is_user_patch);
-        let frame = self.key_ui.frame(ctx, keys, &context, recorder_texts(i18n));
-        self.key_commands = frame.commands;
-        match frame.saved {
-            Some(Ok(())) => notify.success(i18n.t(gui_shared::i18n::I18nKey::KeybindingSaved)),
-            Some(Err(err)) => notify.error(err),
-            None => {}
-        }
-    }
-
-    /// Was `command` asked for by this frame's keys? It is done then: asked again, `false`.
-    ///
-    /// e.g. `self.key_command(keybinding::commands::TABS_CLOSE)`
-    pub(in crate::patch) fn key_command(&mut self, command: &str) -> bool {
-        keybinding::host::take(&mut self.key_commands, command)
+        self.keys.frame(ctx, bindings, &context, (i18n, notify));
     }
 
     /// VS Code's "Copy Path" / "Reveal in File Explorer" of the file object `id` is in (see
@@ -147,7 +114,7 @@ impl PatchTool {
     /// tab's menu or Vim's `<Space>V` asked for ([`Self::file_asked`]).
     pub(in crate::patch) fn file_keys(&mut self, ctx: &egui::Context, notify: &mut egui_widgets::notify::Notification) {
         use keybinding::commands::{FILE_COPY_PATH, FILE_REVEAL};
-        let (copy, reveal) = (self.key_command(FILE_COPY_PATH), self.key_command(FILE_REVEAL));
+        let (copy, reveal) = (self.keys.take(FILE_COPY_PATH), self.keys.take(FILE_REVEAL));
         let selected = self.selected.as_deref().map(str::to_owned);
         let asked = [(copy, FileAction::CopyPath), (reveal, FileAction::Reveal)]
             .into_iter()

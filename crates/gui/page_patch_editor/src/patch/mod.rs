@@ -80,10 +80,8 @@ pub(crate) struct PatchTool {
     place: tool::place::WorkPlace,
     /// This tool is the user patch's, in its window: see [`user_patch`].
     is_user_patch: bool,
-    /// The commands this frame's keys asked for: see [`Self::key_command`].
-    key_commands: Vec<&'static str>,
-    /// The keys of the palette and its `⚙`. See [`keybinding::KeyUi`].
-    key_ui: keybinding::KeyUi,
+    /// This frame\'s keys, and the palette\'s. See [`tool::keys`].
+    keys: tool::keys::Keys,
     /// Copy path / reveal of an object asked for by a tab or the editor: done by
     /// [`Self::file_keys`], which has what it needs.
     file_asked: Option<(tool::list::FileAction, String)>,

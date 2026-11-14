@@ -162,7 +162,7 @@ impl PatchTool {
             (SIDE_BAR_CHANGES, SideView::Changes),
         ];
         for (command, view) in keys {
-            if self.key_command(command) {
+            if self.keys.take(command) {
                 self.side.show(view);
                 if view == SideView::Search {
                     self.search.focus();

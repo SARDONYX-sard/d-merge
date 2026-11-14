@@ -3,6 +3,7 @@
 pub(super) mod autosave;
 pub(super) mod editing;
 pub(super) mod job;
+pub(super) mod keys;
 pub(super) mod list;
 pub(super) mod pane;
 pub(super) mod place;

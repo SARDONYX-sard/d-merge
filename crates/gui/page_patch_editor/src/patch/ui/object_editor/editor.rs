@@ -54,7 +54,7 @@ impl PatchTool {
     /// the editor asked for: it is done afterwards, as the language still borrows the behavior here.
     pub(super) fn editor_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, id: &str) -> EditorResult {
         let format_and_save = self.editor_keys();
-        let problem_keys = host::take_mapped(&mut self.key_commands, host::problems_key);
+        let problem_keys = self.keys.take_mapped(host::problems_key);
         let requests = self.editor_requests(format_and_save);
 
         // The status bar counts the whole work's problems, of which the open object's are a part.
@@ -94,7 +94,7 @@ impl PatchTool {
                 id,
                 names: &names,
                 keymap,
-                key_ui: &self.key_ui,
+                key_ui: &self.keys.ui,
                 requests: &requests,
                 user_patch: self.is_user_patch,
             };
@@ -111,26 +111,26 @@ impl PatchTool {
     /// Vim's `Space p` / `Space d` / `Space w` and `]c` / `[c` (key bindings). Returns whether
     /// `Space w` (format and save) was pressed.
     fn editor_keys(&mut self) -> bool {
-        if self.key_command(commands::EDITOR_TOGGLE_PREVIEW) {
+        if self.keys.take(commands::EDITOR_TOGGLE_PREVIEW) {
             self.pane.show_preview = !self.pane.show_preview;
         }
-        if self.key_command(commands::EDITOR_TOGGLE_INLINE_DIFF) {
+        if self.keys.take(commands::EDITOR_TOGGLE_INLINE_DIFF) {
             self.pane.show_inline_diff = !self.pane.show_inline_diff;
         }
 
-        if self.key_command(commands::EDITOR_NEXT_CHANGE) {
+        if self.keys.take(commands::EDITOR_NEXT_CHANGE) {
             self.pane.step_change(true);
         }
-        if self.key_command(commands::EDITOR_PREVIOUS_CHANGE) {
+        if self.keys.take(commands::EDITOR_PREVIOUS_CHANGE) {
             self.pane.step_change(false);
         }
 
-        self.key_command(commands::EDITOR_FORMAT_AND_SAVE)
+        self.keys.take(commands::EDITOR_FORMAT_AND_SAVE)
     }
 
     /// The editor's own commands, by the key bindings' keys: it reads none of its keys itself then.
     fn editor_requests(&mut self, format_and_save: bool) -> Vec<EditorRequest> {
-        let mut requests = host::take_mapped(&mut self.key_commands, host::editor_request);
+        let mut requests = self.keys.take_mapped(host::editor_request);
         if format_and_save {
             requests.push(EditorRequest::Format);
         }

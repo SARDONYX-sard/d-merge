@@ -59,10 +59,10 @@ impl PatchTool {
         let has_focus = ui.memory(|m| m.has_focus(editor_id));
         self.note_editor_focus(ui.ctx(), has_focus);
 
-        if self.key_command(commands::EXPLORER_FOCUS) {
+        if self.keys.take(commands::EXPLORER_FOCUS) {
             self.enter_tree(ui, editor_id);
         }
-        if self.key_command(commands::PROBLEMS_TOGGLE) {
+        if self.keys.take(commands::PROBLEMS_TOGGLE) {
             self.toggle_problems_focus(ui, editor_id);
         } else if has_focus {
             self.problems.cursor.focused = false; // e.g. a click in the editor
@@ -73,15 +73,15 @@ impl PatchTool {
     /// Returns whether it was left this frame.
     fn leaving_keys(&mut self, ui: &egui::Ui, id: &Rc<str>) -> bool {
         // `Ctrl+W` with the Normal keymap, as in VS Code. (Vim uses that key itself.)
-        if self.key_command(commands::TABS_CLOSE) {
+        if self.keys.take(commands::TABS_CLOSE) {
             let close = TabEvent::Object(egui_widgets::TabAction::Close, id.to_string());
             self.apply_tab_event(Some(close), id);
             return true;
         }
 
-        let back_or_forward = if self.key_command(commands::HISTORY_BACK) {
+        let back_or_forward = if self.keys.take(commands::HISTORY_BACK) {
             Some(true)
-        } else if self.key_command(commands::HISTORY_FORWARD) {
+        } else if self.keys.take(commands::HISTORY_FORWARD) {
             Some(false)
         } else {
             egui_code_editor::NavHistory::<String>::mouse(ui)
@@ -93,9 +93,9 @@ impl PatchTool {
         }
 
         // `Ctrl+PageDown` / `Ctrl+PageUp` (`Alt+L` / `Alt+H`), as in VS Code, in every keymap.
-        let next_or_previous = if self.key_command(commands::TABS_NEXT) {
+        let next_or_previous = if self.keys.take(commands::TABS_NEXT) {
             Some(true)
-        } else if self.key_command(commands::TABS_PREVIOUS) {
+        } else if self.keys.take(commands::TABS_PREVIOUS) {
             Some(false)
         } else {
             None

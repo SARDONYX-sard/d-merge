@@ -50,11 +50,7 @@ impl PatchTool {
 
         let keys = {
             let focused = self.explorer.tree_focus;
-            let taken = if focused {
-                keybinding::host::take_mapped(&mut self.key_commands, keybinding::host::tree_key)
-            } else {
-                Vec::new()
-            };
+            let taken = if focused { self.keys.take_mapped(keybinding::host::tree_key) } else { Vec::new() };
             keys::run(&mut self.scm, &self.workspace, &taken, focused)
         };
 
