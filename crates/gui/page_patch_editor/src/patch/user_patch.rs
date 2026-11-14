@@ -213,19 +213,24 @@ impl PatchTool {
         let output = paths.patch_output_dir.trim();
         let mut workspace = Workspace::default();
         workspace.use_user_patch_format();
-        Self {
+        let place = super::tool::place::WorkPlace {
+            patch_output: output.to_owned(),
+            cache_root: workspace::cache_root_of(output),
+            output: user_patch_output(output).display().to_string(),
+            mod_code: USER_PATCH_CODE.to_owned(),
+            template_dir: paths.template_dir.to_owned(),
+            ..Default::default()
+        };
+        let work = super::tool::work_state::Work {
             workspace,
-            is_user_patch: true,
+            place,
             restored: true,
-            place: super::tool::place::WorkPlace {
-                patch_output: output.to_owned(),
-                cache_root: workspace::cache_root_of(output),
-                output: user_patch_output(output).display().to_string(),
-                mod_code: USER_PATCH_CODE.to_owned(),
-                template_dir: paths.template_dir.to_owned(),
-                ..Default::default()
-            },
             parser_mode: paths.parser_mode,
+            ..Default::default()
+        };
+        Self {
+            work,
+            is_user_patch: true,
             panels: super::ui::panels::Panels::with_behaviors_open(),
             explorer: super::tool::list::Explorer { changed_only: true, ..Default::default() },
             ..Self::default()
@@ -247,16 +252,16 @@ impl PatchTool {
         i18n: &I18nMap,
     ) -> &mut Self {
         let output = paths.patch_output_dir.trim();
-        if let Some(tool) = self.user_patch.tool.as_mut().filter(|tool| tool.place.patch_output != output) {
+        if let Some(tool) = self.user_patch.tool.as_mut().filter(|tool| tool.work.place.patch_output != output) {
             tool.undo_unedited_draft();
             tool.save_now(notify, i18n);
-            self.mod_written |= tool.mod_written;
+            self.work.mod_written |= tool.work.mod_written;
             self.user_patch.tool = None;
         }
         let tool = self.user_patch.tool.get_or_insert_with(|| Box::new(Self::for_user_patch(paths)));
         tool.set_parser_mode(paths.parser_mode);
-        if tool.place.template_dir != paths.template_dir {
-            paths.template_dir.clone_into(&mut tool.place.template_dir);
+        if tool.work.place.template_dir != paths.template_dir {
+            paths.template_dir.clone_into(&mut tool.work.place.template_dir);
         }
         tool.sync_workspace(notify, i18n);
         // Small, and what comes next uses it at once.
@@ -267,10 +272,11 @@ impl PatchTool {
     /// Writes the user patch now. Saved again after: what the export wrote is part of the work.
     /// Returns the patches d-merge's parser rejects.
     pub(super) fn write_user_patch(&mut self) -> Result<Vec<String>, String> {
-        self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
-        let invalid = self.workspace.export(Path::new(&self.place.output), USER_PATCH_CODE, self.parser_mode)?.1;
-        self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
-        self.autosave.take();
+        self.work.workspace.save(&self.work.place.cache_root, USER_PATCH_CODE)?;
+        let invalid =
+            self.work.workspace.export(Path::new(&self.work.place.output), USER_PATCH_CODE, self.work.parser_mode)?.1;
+        self.work.workspace.save(&self.work.place.cache_root, USER_PATCH_CODE)?;
+        self.work.autosave.take();
         Ok(invalid)
     }
 
@@ -290,18 +296,18 @@ impl PatchTool {
         }
         let root = PathBuf::from(paths.template_dir);
         let tool = self.user_patch_tool(paths, notify, i18n);
-        if tool.workspace.info.name.is_empty() {
-            i18n.t(I18nKey::UserPatchTitle).clone_into(&mut tool.workspace.info.name);
+        if tool.work.workspace.info.name.is_empty() {
+            i18n.t(I18nKey::UserPatchTitle).clone_into(&mut tool.work.workspace.info.name);
         }
         // What the value points to is that mod's.
-        tool.workspace.add_ref(Path::new(&request.mod_dir), USER_PATCH_CODE);
-        resolve::apply(&mut tool.workspace, &root, request)?;
-        tool.workspace.reload_refs(); // a behavior may have been opened
+        tool.work.workspace.add_ref(Path::new(&request.mod_dir), USER_PATCH_CODE);
+        resolve::apply(&mut tool.work.workspace, &root, request)?;
+        tool.work.workspace.reload_refs(); // a behavior may have been opened
         tool.reset_names();
         tool.pane.opened = None;
         tool.pane.preview = None;
         let invalid = tool.write_user_patch()?;
-        self.mod_written = true;
+        self.work.mod_written = true;
         if invalid.is_empty() { Ok(()) } else { Err(invalid.join("\n")) }
     }
 
@@ -325,31 +331,31 @@ impl PatchTool {
     pub(super) fn undo_unedited_draft(&mut self) {
         self.pane.merge_values = None;
         let Some(draft) = self.draft.take() else { return };
-        if draft.is_edited(&self.workspace) {
+        if draft.is_edited(&self.work.workspace) {
             return;
         }
         let id = draft.id.clone();
-        draft.undo(&mut self.workspace);
+        draft.undo(&mut self.work.workspace);
         self.reset_names();
         self.pane.opened = None;
         self.pane.preview = None;
-        self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
-        if self.workspace.behaviors.get(self.active).is_none_or(|behavior| behavior.text(&id).is_none()) {
+        self.active = self.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
+        if self.work.workspace.behaviors.get(self.active).is_none_or(|behavior| behavior.text(&id).is_none()) {
             self.tabs.clear();
             self.selected = None;
         }
-        self.autosave.seen_at(self.active, self.selected.as_ref());
+        self.work.autosave.seen_at(self.active, self.selected.as_ref());
         // Something saved meanwhile (another object) had it in: the disk goes back too.
-        if self.mod_written {
-            self.autosave.changed();
+        if self.work.mod_written {
+            self.work.autosave.changed();
         }
     }
 
     /// Takes everything out of the user patch, and writes that: nothing of it is merged any more.
     pub(super) fn clear_user_patch(&mut self, notify: &mut Notification, i18n: &I18nMap) {
         self.draft = None;
-        self.workspace.behaviors.clear();
-        self.workspace.ref_mods.clear();
+        self.work.workspace.behaviors.clear();
+        self.work.workspace.ref_mods.clear();
         self.reset_names();
         self.tabs.clear();
         self.active = 0;
@@ -357,14 +363,14 @@ impl PatchTool {
         self.pane.opened = None;
         self.pane.preview = None;
         match self.write_user_patch() {
-            Ok(_) => self.mod_written = true,
+            Ok(_) => self.work.mod_written = true,
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
         }
     }
 
     /// Writes the user patch as a mod: see [`ModExport`] and [`export_as_mod`].
     pub(super) fn export_user_patch_as_mod(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        if let Some(exported) = export_as_mod(&mut self.workspace, &self.mod_export, self.parser_mode) {
+        if let Some(exported) = export_as_mod(&mut self.work.workspace, &self.mod_export, self.work.parser_mode) {
             report_mod_export(notify, i18n, &exported);
         }
     }
@@ -374,7 +380,7 @@ impl PatchTool {
         let Some(tool) = &mut self.user_patch.tool else { return };
         tool.undo_unedited_draft();
         tool.save_now(notify, i18n);
-        self.mod_written |= std::mem::take(&mut tool.mod_written);
+        self.work.mod_written |= std::mem::take(&mut tool.work.mod_written);
     }
 }
 
@@ -395,9 +401,9 @@ mod tests {
     #[test]
     fn its_place_is_decided_by_the_patch_pages_output() {
         let tool = PatchTool::for_user_patch(paths("D:/out"));
-        assert_eq!(Path::new(&tool.place.output), Path::new("D:/out/.d_merge/user_patch"));
-        assert_eq!(tool.place.mod_code, USER_PATCH_CODE);
-        assert!(tool.place.cache_root.starts_with("D:/out/.d_merge/caches"));
+        assert_eq!(Path::new(&tool.work.place.output), Path::new("D:/out/.d_merge/user_patch"));
+        assert_eq!(tool.work.place.mod_code, USER_PATCH_CODE);
+        assert!(tool.work.place.cache_root.starts_with("D:/out/.d_merge/caches"));
     }
 
     #[test]
@@ -443,13 +449,16 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("d_merge_draft_none_{}", std::process::id()));
         let (mut main, mut notify, i18n) = proposed(&dir);
         let tool = main.user_patch.tool.as_mut().unwrap();
-        assert_eq!(tool.workspace.behaviors[0].text("D~1/Idle~m$0.txt"), Some("theirs\n"), "it shows the value");
-        assert!(!tool.autosave.is_dirty(), "nothing to save yet");
+        assert_eq!(tool.work.workspace.behaviors[0].text("D~1/Idle~m$0.txt"), Some("theirs\n"), "it shows the value");
+        assert!(!tool.work.autosave.is_dirty(), "nothing to save yet");
 
         main.close_user_patch(&mut notify, &i18n);
         let tool = main.user_patch.tool.as_ref().unwrap();
-        let (behaviors, refs, name) =
-            (tool.workspace.behaviors.len(), tool.workspace.ref_mods.len(), tool.workspace.info.name.clone());
+        let (behaviors, refs, name) = (
+            tool.work.workspace.behaviors.len(),
+            tool.work.workspace.ref_mods.len(),
+            tool.work.workspace.info.name.clone(),
+        );
         let written = dir.join("out").exists();
         let wrote = main.take_mod_written();
         std::fs::remove_dir_all(&dir).unwrap();
@@ -466,12 +475,12 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("d_merge_draft_edit_{}", std::process::id()));
         let (mut main, mut notify, i18n) = proposed(&dir);
         let tool = main.user_patch.tool.as_mut().unwrap();
-        tool.workspace.behaviors[0].set_text("D~1/Idle~m$0.txt", "mine\n");
-        tool.mark_dirty();
+        tool.work.workspace.behaviors[0].set_text("D~1/Idle~m$0.txt", "mine\n");
+        tool.work.mark_dirty();
 
         main.close_user_patch(&mut notify, &i18n);
         let tool = main.user_patch.tool.as_ref().unwrap();
-        let text = tool.workspace.behaviors[0].text("D~1/Idle~m$0.txt").map(str::to_owned);
+        let text = tool.work.workspace.behaviors[0].text("D~1/Idle~m$0.txt").map(str::to_owned);
         let wrote = main.take_mod_written();
         let exported =
             dir.join("out/.d_merge/user_patch/Nemesis_Engine/mod/upatch/animationdatasinglefile/D~1/Idle~m$0.txt");
@@ -530,7 +539,7 @@ mod tests {
             drawn.textures_delta.clear();
         }
         let tool = main.user_patch.tool.as_mut().unwrap();
-        assert_eq!(tool.place.loaded_for.as_deref(), Some(USER_PATCH_CODE));
+        assert_eq!(tool.work.place.loaded_for.as_deref(), Some(USER_PATCH_CODE));
 
         tool.clear_user_patch(&mut notify, &i18n);
         let cache = workspace::cache_root_of(&output).join(USER_PATCH_CODE);

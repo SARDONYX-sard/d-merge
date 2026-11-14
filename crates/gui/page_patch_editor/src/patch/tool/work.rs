@@ -29,9 +29,9 @@ impl PatchTool {
         i18n: &I18nMap,
     ) {
         self.save_now(notify, i18n);
-        code.clone_into(&mut self.place.mod_code);
-        output.clone_into(&mut self.place.output);
-        source.clone_into(&mut self.place.mod_dir);
+        code.clone_into(&mut self.work.place.mod_code);
+        output.clone_into(&mut self.work.place.output);
+        source.clone_into(&mut self.work.place.mod_dir);
     }
 
     /// After the work is synced: takes the value in, and shows where it went. It is a proposal for now:
@@ -39,39 +39,39 @@ impl PatchTool {
     pub(in crate::patch) fn take_in_resolution(&mut self, notify: &mut Notification, i18n: &I18nMap) {
         let Some(request) = self.pending_resolution.take() else { return };
         self.undo_unedited_draft();
-        let before = user_patch::Draft::before(&self.workspace);
-        let since = self.autosave.since();
-        if self.workspace.info.name.is_empty() {
-            i18n.t(I18nKey::UserPatchTitle).clone_into(&mut self.workspace.info.name);
+        let before = user_patch::Draft::before(&self.work.workspace);
+        let since = self.work.autosave.since();
+        if self.work.workspace.info.name.is_empty() {
+            i18n.t(I18nKey::UserPatchTitle).clone_into(&mut self.work.workspace.info.name);
         }
         // What the value points to is that mod's.
-        self.workspace.add_ref(Path::new(&request.mod_dir), gui_shared::patch::USER_PATCH_CODE);
+        self.work.workspace.add_ref(Path::new(&request.mod_dir), gui_shared::patch::USER_PATCH_CODE);
         // And what is taken from the others is theirs.
         for side in &request.sides {
-            self.workspace.add_ref(Path::new(&side.mod_dir), gui_shared::patch::USER_PATCH_CODE);
+            self.work.workspace.add_ref(Path::new(&side.mod_dir), gui_shared::patch::USER_PATCH_CODE);
         }
-        let root = PathBuf::from(&self.place.template_dir);
-        let shown = editor::resolve::apply(&mut self.workspace, &root, &request).map_or_else(
+        let root = PathBuf::from(&self.work.place.template_dir);
+        let shown = editor::resolve::apply(&mut self.work.workspace, &root, &request).map_or_else(
             |err| {
                 notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisResolveFailed)));
                 // It is for the user to edit: all the more if it could not be taken in.
-                editor::resolve::object_of(&mut self.workspace, &root, &request)
+                editor::resolve::object_of(&mut self.work.workspace, &root, &request)
             },
             Some,
         );
         let Some(editor::resolve::Resolved { behavior, id, line }) = shown else { return };
-        self.workspace.reload_refs(); // a behavior may have been opened
+        self.work.workspace.reload_refs(); // a behavior may have been opened
         self.reset_names();
         self.active = behavior;
         self.pane.opened = None;
-        self.draft = Some(before.with_proposal(&self.workspace, behavior, &id));
+        self.draft = Some(before.with_proposal(&self.work.workspace, behavior, &id));
         self.pane.merge_values = editor::resolve::merge_values(&request, &id);
         self.pane.merge_accepted.clear();
         self.reuse_resolution(behavior, &id, notify, i18n);
         self.selected = Some(id.into());
         // What is shown is no change of the work yet.
-        self.autosave.restore(since);
-        self.autosave.seen_at(self.active, self.selected.as_ref());
+        self.work.autosave.restore(since);
+        self.work.autosave.seen_at(self.active, self.selected.as_ref());
         // Picking another value of the object shown has no other sign of having gone anywhere.
         self.pane.focus = line.map(FocusAt::Line);
     }
@@ -80,12 +80,12 @@ impl PatchTool {
     /// resolved the same way at once. See [`editor::merge`].
     fn reuse_resolution(&mut self, behavior: usize, id: &str, notify: &mut Notification, i18n: &I18nMap) {
         let Some(values) = &self.pane.merge_values else { return };
-        let Some(resolution) = editor::merge::find(&self.workspace.resolutions, values) else { return };
+        let Some(resolution) = editor::merge::find(&self.work.workspace.resolutions, values) else { return };
         let result = resolution.result.clone();
-        let Some(text) = self.workspace.behaviors.get(behavior).and_then(|of| of.text(id)) else { return };
+        let Some(text) = self.work.workspace.behaviors.get(behavior).and_then(|of| of.text(id)) else { return };
         let candidates = editor::merge::candidates(values, &[]);
         if let Some(resolved) = editor::merge::replace_block(text, &candidates, &result) {
-            self.workspace.behaviors[behavior].set_text(id, &resolved);
+            self.work.workspace.behaviors[behavior].set_text(id, &resolved);
             self.pane.merge_accepted = result;
             notify.info(i18n.t(I18nKey::MergeReused));
         }
@@ -95,27 +95,27 @@ impl PatchTool {
     /// saved where it belongs first.
     pub(in crate::patch) fn set_patch_output(&mut self, output: &str, notify: &mut Notification, i18n: &I18nMap) {
         let output = output.trim();
-        if self.place.patch_output == output {
+        if self.work.place.patch_output == output {
             return;
         }
-        if self.restored {
+        if self.work.restored {
             self.close_work(notify, i18n);
         }
-        output.clone_into(&mut self.place.patch_output);
-        self.place.cache_root = workspace::cache_root_of(output);
+        output.clone_into(&mut self.work.place.patch_output);
+        self.work.place.cache_root = workspace::cache_root_of(output);
     }
 
     /// Loads the work of the code when it changes, and saves pending edits.
     pub(in crate::patch) fn sync_workspace(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        if self.job.is_some() {
+        if self.work.job.is_some() {
             return; // See `tool::job`: nothing is done to the work meanwhile.
         }
-        let code = self.place.mod_code.trim();
-        if is_existing_mod_code(code) && self.place.loaded_for.as_deref() != Some(code) {
+        let code = self.work.place.mod_code.trim();
+        if is_existing_mod_code(code) && self.work.place.loaded_for.as_deref() != Some(code) {
             let code = code.to_owned();
             self.save_now(notify, i18n); // the previous workspace
-            let root = self.place.cache_root.clone();
-            self.job = Some(Job::spawn(I18nKey::NemesisReadingWork, code.clone(), 0, move |done| Done::Loaded {
+            let root = self.work.place.cache_root.clone();
+            self.work.job = Some(Job::spawn(I18nKey::NemesisReadingWork, code.clone(), 0, move |done| Done::Loaded {
                 loaded: Workspace::load_counted(&root, &code, done),
                 code,
             }));
@@ -123,10 +123,10 @@ impl PatchTool {
         }
 
         // What is open is part of the work: back to it when it is opened again.
-        let has_work = self.place.is_open() && !self.workspace.behaviors.is_empty();
-        self.autosave.look_at(self.active, self.selected.as_ref(), has_work);
+        let has_work = self.work.place.is_open() && !self.work.workspace.behaviors.is_empty();
+        self.work.autosave.look_at(self.active, self.selected.as_ref(), has_work);
 
-        if self.autosave.is_due() {
+        if self.work.autosave.is_due() {
             self.save_now(notify, i18n);
         }
     }
@@ -141,9 +141,9 @@ impl PatchTool {
     ) {
         match loaded {
             Ok(workspace) => {
-                self.workspace = workspace;
+                self.work.workspace = workspace;
                 if self.is_user_patch {
-                    self.workspace.use_user_patch_format();
+                    self.work.workspace.use_user_patch_format();
                 }
                 self.reset_names();
                 self.tabs.clear();
@@ -154,26 +154,27 @@ impl PatchTool {
         self.selected = None;
         self.restore_session();
         remember_recent(
-            &mut self.recent,
-            RecentWork { output: self.place.output.trim().to_owned(), mod_code: code.clone() },
+            &mut self.work.recent,
+            RecentWork { output: self.work.place.output.trim().to_owned(), mod_code: code.clone() },
         );
-        self.place.loaded_for = Some(code);
+        self.work.place.loaded_for = Some(code);
     }
 
     pub(in crate::patch) fn save_now(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        if self.job.is_some() {
+        if self.work.job.is_some() {
             return; // A rename has taken the work: see `tool::job`.
         }
         self.sync_pandora_doc();
-        let Some(code) = self.place.loaded_for.clone() else { return };
-        if !self.autosave.take() {
+        let Some(code) = self.work.place.loaded_for.clone() else { return };
+        if !self.work.autosave.take() {
             return;
         }
         let open = (self.active, self.selected.as_deref());
-        self.workspace.session = super::session::of(&self.workspace.behaviors, &self.tabs, open, &self.place);
+        self.work.workspace.session =
+            super::session::of(&self.work.workspace.behaviors, &self.tabs, open, &self.work.place);
         // It has no `Export`: what is edited is what the next merge gets.
         if self.is_user_patch {
-            match self.workspace.export(Path::new(&self.place.output), &code, self.parser_mode) {
+            match self.work.workspace.export(Path::new(&self.work.place.output), &code, self.work.parser_mode) {
                 Ok((_, invalid)) if invalid.is_empty() => {}
                 Ok((_, invalid)) => notify.warn(format!(
                     "{} ({}):\n{}",
@@ -183,55 +184,58 @@ impl PatchTool {
                 )),
                 Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
             }
-            self.mod_written = true;
+            self.work.mod_written = true;
         }
-        if let Err(err) = self.workspace.save(&self.place.cache_root, &code) {
+        if let Err(err) = self.work.workspace.save(&self.work.place.cache_root, &code) {
             notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisSaveFailed)));
         }
         // The output may have changed.
-        remember_recent(&mut self.recent, RecentWork { output: self.place.output.trim().to_owned(), mod_code: code });
+        remember_recent(
+            &mut self.work.recent,
+            RecentWork { output: self.work.place.output.trim().to_owned(), mod_code: code },
+        );
     }
 
     /// Back to what the work just loaded had open. See [`super::session::restore`].
     pub(super) fn restore_session(&mut self) {
-        let session = std::mem::take(&mut self.workspace.session);
-        let restored = super::session::restore(session, &self.workspace.behaviors, &mut self.tabs);
+        let session = std::mem::take(&mut self.work.workspace.session);
+        let restored = super::session::restore(session, &self.work.workspace.behaviors, &mut self.tabs);
 
         self.active = restored.active;
         self.selected = restored.selected;
         if !restored.mod_dir.is_empty() {
-            self.place.mod_dir = restored.mod_dir;
+            self.work.place.mod_dir = restored.mod_dir;
         }
         // The user patch's is decided by the patch page's.
         if !restored.output.is_empty() && !self.is_user_patch {
-            self.place.output = restored.output;
+            self.work.place.output = restored.output;
         }
-        self.autosave.seen_at(self.active, self.selected.as_ref());
+        self.work.autosave.seen_at(self.active, self.selected.as_ref());
     }
 
     /// Opens a work of the list of recent ones. If its cache is gone, the mod it was exported to is
     /// read instead; if that is gone too, it leaves the list.
     pub(in crate::patch) fn open_recent(&mut self, work: &RecentWork, notify: &mut Notification, i18n: &I18nMap) {
-        if Workspace::exists(&self.place.cache_root, &work.mod_code) {
+        if Workspace::exists(&self.work.place.cache_root, &work.mod_code) {
             self.switch_work(&work.mod_code, &work.output, "", notify, i18n);
         } else if let Some(dir) = workspace::patch_dir_of_code(Path::new(&work.output), &work.mod_code) {
             self.open_mod(&dir, notify, i18n);
         } else {
             notify.warn(format!("{}: {} ({})", i18n.t(I18nKey::NemesisRecentMissing), work.mod_code, work.output));
-            self.recent.retain(|other| other.mod_code != work.mod_code);
+            self.work.recent.retain(|other| other.mod_code != work.mod_code);
         }
     }
 
     /// Back to the start screen. The work stays in its cache.
     pub(in crate::patch) fn close_work(&mut self, notify: &mut Notification, i18n: &I18nMap) {
         self.save_now(notify, i18n);
-        self.workspace = Workspace::default();
+        self.work.workspace = Workspace::default();
         self.reset_names();
         self.tabs.clear();
-        self.place.loaded_for = None;
-        self.place.mod_code.clear();
-        self.place.output.clear();
-        self.place.mod_dir.clear();
+        self.work.place.loaded_for = None;
+        self.work.place.mod_code.clear();
+        self.work.place.output.clear();
+        self.work.place.mod_dir.clear();
         self.active = 0;
         self.selected = None;
         self.pane.opened = None;
@@ -241,13 +245,13 @@ impl PatchTool {
     /// `New` of the start screen: the work's first save makes it exist.
     pub(in crate::patch) fn create_work(&mut self, code: String, output: String, scope: workspace::TemplateScope) {
         self.panels.new_work = None;
-        self.workspace.scope = scope;
-        self.workspace.export_format = scope.default_format();
-        self.place.mod_code = code;
-        self.place.output = output;
-        self.place.mod_dir.clear();
+        self.work.workspace.scope = scope;
+        self.work.workspace.export_format = scope.default_format();
+        self.work.place.mod_code = code;
+        self.work.place.output = output;
+        self.work.place.mod_dir.clear();
         self.panels.project_open = true; // Its name and author are still to be set.
-        self.autosave.changed();
+        self.work.autosave.changed();
     }
 
     /// The folder dialog for [`Self::open_mod`].
@@ -299,7 +303,7 @@ impl PatchTool {
         }
         let source = root.display().to_string();
         let is_source = |path: &str| path.eq_ignore_ascii_case(&source);
-        match Workspace::cached_session(&self.place.cache_root, &code) {
+        match Workspace::cached_session(&self.work.place.cache_root, &code) {
             Some(session) if is_source(&session.mod_dir) || is_source(&session.output) => {
                 self.switch_work(&code, &source, &source, notify, i18n);
                 return;
@@ -313,9 +317,9 @@ impl PatchTool {
     /// Replaces the work by what is in the mod at `selected`, as a job: see [`Self::finish_read`].
     /// `kept`: what a reload keeps of the work.
     fn read_mod(&mut self, selected: &Path, source: String, kept: Option<Kept>) {
-        let (selected, templates) = (selected.to_path_buf(), PathBuf::from(&self.place.template_dir));
+        let (selected, templates) = (selected.to_path_buf(), PathBuf::from(&self.work.place.template_dir));
         let detail = selected.display().to_string();
-        self.job = Some(Job::spawn(I18nKey::NemesisReadingWork, detail, 0, move |done| Done::Read {
+        self.work.job = Some(Job::spawn(I18nKey::NemesisReadingWork, detail, 0, move |done| Done::Read {
             read: Workspace::import_counted(&selected, &templates, done),
             source,
             kept,
@@ -337,30 +341,33 @@ impl PatchTool {
         };
         // Read again: the object that was being worked on comes back.
         let was_open =
-            self.place.loaded_for.as_deref().is_some_and(|loaded| loaded == code).then(|| self.editor_place());
+            self.work.place.loaded_for.as_deref().is_some_and(|loaded| loaded == code).then(|| self.editor_place());
         self.save_now(notify, i18n);
-        self.workspace = workspace;
+        self.work.workspace = workspace;
         self.tabs.clear();
-        self.place.mod_code.clone_from(&code);
-        self.place.output.clone_from(&source);
-        self.place.mod_dir = source;
+        self.work.place.mod_code.clone_from(&code);
+        self.work.place.output.clone_from(&source);
+        self.work.place.mod_dir = source;
         self.panels.new_work = None;
         // What was read is the work, rather than what may be in the cache.
-        remember_recent(&mut self.recent, RecentWork { output: self.place.output.clone(), mod_code: code.clone() });
-        self.place.loaded_for = Some(code);
+        remember_recent(
+            &mut self.work.recent,
+            RecentWork { output: self.work.place.output.clone(), mod_code: code.clone() },
+        );
+        self.work.place.loaded_for = Some(code);
         // Read for the first time: what the mod has is the history's first revision, so the Changes
         // view lists only what this work changes in it.
         if kept.is_none() {
-            self.workspace.commit_init();
+            self.work.workspace.commit_init();
         }
         // A reload: where it is exported to and the mods it refers to are not in the mod.
         if let Some(Kept { output, refs }) = kept {
-            self.place.output = output;
-            self.workspace.ref_mods = refs;
-            self.workspace.reload_refs();
+            self.work.place.output = output;
+            self.work.workspace.ref_mods = refs;
+            self.work.workspace.reload_refs();
         }
         self.reset_names();
-        self.mark_dirty();
+        self.work.mark_dirty();
         self.active = 0;
         self.selected = None;
         self.pane.opened = None;
@@ -375,33 +382,27 @@ impl PatchTool {
     /// `Reload from the mod`: discards the work's edits. Where it is exported to and the mods it
     /// refers to are not in the mod, so they stay.
     pub(in crate::patch) fn reload_from_mod(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        let Some(code) = self.place.loaded_for.clone() else { return };
-        let source = self.place.mod_dir.trim().to_owned();
+        let Some(code) = self.work.place.loaded_for.clone() else { return };
+        let source = self.work.place.mod_dir.trim().to_owned();
         let Some(dir) = workspace::patch_dir_of_code(Path::new(&source), &code) else {
             notify.error(format!("{}: {source}", i18n.t(I18nKey::NemesisNotAMod)));
             return;
         };
-        let kept = Kept { output: self.place.output.clone(), refs: self.workspace.ref_mods.clone() };
+        let kept = Kept { output: self.work.place.output.clone(), refs: self.work.workspace.ref_mods.clone() };
         self.read_mod(&dir, source, Some(kept));
     }
-    /// Something to save.
-    pub(in crate::patch) fn mark_dirty(&mut self) {
-        self.autosave.changed();
-        self.edits += 1;
-    }
-
     pub(in crate::patch) fn add_behavior(&mut self, path: &Path, notify: &mut Notification, i18n: &I18nMap) {
         match Behavior::open(path) {
             Ok(behavior) => {
-                if let Some(at) = self.workspace.behaviors.iter().position(|b| b.name == behavior.name) {
+                if let Some(at) = self.work.workspace.behaviors.iter().position(|b| b.name == behavior.name) {
                     self.active = at; // already there
                     return;
                 }
-                self.workspace.behaviors.push(behavior);
-                self.workspace.reload_refs();
-                self.active = self.workspace.behaviors.len() - 1;
+                self.work.workspace.behaviors.push(behavior);
+                self.work.workspace.reload_refs();
+                self.active = self.work.workspace.behaviors.len() - 1;
                 self.selected = None; // an id of the other behavior
-                self.mark_dirty();
+                self.work.mark_dirty();
             }
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage))),
         }
@@ -410,9 +411,9 @@ impl PatchTool {
     /// `Export` as Pandora: see [`workspace::ExportFormat`].
     fn export_pandora(&mut self, notify: &mut Notification, i18n: &I18nMap) {
         self.save_now(notify, i18n);
-        let Some(code) = self.place.loaded_for.clone() else { return };
-        let output = self.place.output.trim().to_owned();
-        match self.workspace.export_pandora(Path::new(&output), &code) {
+        let Some(code) = self.work.place.loaded_for.clone() else { return };
+        let output = self.work.place.output.trim().to_owned();
+        match self.work.workspace.export_pandora(Path::new(&output), &code) {
             Ok(export) if export.problems.is_empty() => notify.success(format!(
                 "{} ({}): {}",
                 i18n.t(I18nKey::NemesisExportedPandora),
@@ -430,15 +431,15 @@ impl PatchTool {
     }
 
     pub(in crate::patch) fn export(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        if self.workspace.export_format == workspace::ExportFormat::PandoraV5 {
+        if self.work.workspace.export_format == workspace::ExportFormat::PandoraV5 {
             self.export_pandora(notify, i18n);
             return;
         }
         self.save_now(notify, i18n);
-        let Some(code) = self.place.loaded_for.clone() else { return };
-        let output = self.place.output.trim().to_owned();
-        let exported = self.workspace.export(Path::new(&output), &code, self.parser_mode);
-        self.mod_written |= exported.is_ok();
+        let Some(code) = self.work.place.loaded_for.clone() else { return };
+        let output = self.work.place.output.trim().to_owned();
+        let exported = self.work.workspace.export(Path::new(&output), &code, self.work.parser_mode);
+        self.work.mod_written |= exported.is_ok();
         match exported {
             Ok((written, invalid)) if invalid.is_empty() => notify.success(format!(
                 "{} ({written}): {}",
@@ -454,7 +455,7 @@ impl PatchTool {
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
         }
         // What it wrote is what the next export replaces.
-        self.autosave.changed();
+        self.work.autosave.changed();
         self.save_now(notify, i18n);
     }
 }

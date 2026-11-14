@@ -46,7 +46,7 @@ impl PatchTool {
     pub(super) fn behaviors_section(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let mut add = None;
         let mut open = self.panels.behaviors_open;
-        let scope = self.workspace.scope;
+        let scope = self.work.workspace.scope;
         egui_widgets::section_header(ui, &mut open, i18n.t(I18nKey::NemesisBehaviorsSection), |ui| {
             add = add_menu(ui, scope, i18n);
         });
@@ -58,10 +58,10 @@ impl PatchTool {
             None => {}
         }
         if self.panels.behaviors_open {
-            let code = self.place.mod_code.trim();
+            let code = self.work.place.mod_code.trim();
             let code = if is_existing_mod_code(code) { code } else { "<code>" };
-            let ext = self.workspace.export_format.is_ext();
-            let event = behavior_rows(ui, i18n, (&self.workspace.behaviors, self.active), (code, ext));
+            let ext = self.work.workspace.export_format.is_ext();
+            let event = behavior_rows(ui, i18n, (&self.work.workspace.behaviors, self.active), (code, ext));
             self.apply_row_event(event);
         }
         ui.separator();
@@ -69,14 +69,14 @@ impl PatchTool {
 
     fn add_custom_template(&mut self, notify: &mut Notification, i18n: &I18nMap) {
         let dialog = gui_shared::rfd::FileDialog::new().add_filter("Template", &["xml", "bin"]);
-        if let Some(path) = dialog.set_directory(&self.place.template_dir).pick_file() {
+        if let Some(path) = dialog.set_directory(&self.work.place.template_dir).pick_file() {
             self.add_behavior(&path, notify, i18n);
         }
     }
 
     /// The mod the work was read from, or else the one it makes, or else asks for one.
     fn open_anim_data_for_mod(&mut self) {
-        let dirs = [self.place.mod_dir.trim(), self.place.output.trim()];
+        let dirs = [self.work.place.mod_dir.trim(), self.work.place.output.trim()];
         let chosen = dirs.into_iter().find(|dir| !dir.is_empty()).map(PathBuf::from);
         if let Some(root) = chosen.or_else(|| gui_shared::rfd::FileDialog::new().pick_folder()) {
             self.open_anim_data_dialog(&root);
@@ -91,13 +91,13 @@ impl PatchTool {
                 self.selected = self.tabs.last_of(i).map(Rc::from);
             }
             Some(RowEvent::Remove(i)) => {
-                self.workspace.behaviors.remove(i);
+                self.work.workspace.behaviors.remove(i);
                 self.reset_names(); // the numbers of the others shift
                 self.tabs.clear();
-                self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
+                self.active = self.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
                 self.selected = None;
                 self.pane.opened = None;
-                self.mark_dirty();
+                self.work.mark_dirty();
             }
             None => {}
         }
@@ -110,7 +110,7 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut Notification,
     ) {
-        let place = (self.place.template_dir.as_str(), self.workspace.scope);
+        let place = (self.work.place.template_dir.as_str(), self.work.workspace.scope);
         if let Some(path) = self.panels.picker.window(ctx, i18n, place) {
             self.add_behavior(&path, notify, i18n);
         }

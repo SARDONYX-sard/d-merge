@@ -68,7 +68,7 @@ impl Job {
 impl PatchTool {
     /// Takes in the job once it is done. Returns whether one is still running. Call each frame.
     pub(in crate::patch) fn poll_job(&mut self, notify: &mut Notification, i18n: &I18nMap) -> bool {
-        let Some(job) = self.job.take_if(|job| job.work.is_finished()) else { return self.job.is_some() };
+        let Some(job) = self.work.job.take_if(|job| job.work.is_finished()) else { return self.work.job.is_some() };
 
         if let Ok(done) = job.work.join() {
             self.finish_job(done, notify, i18n);

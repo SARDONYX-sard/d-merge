@@ -34,16 +34,16 @@ use crate::patch::{
 
 impl PatchTool {
     pub(in crate::patch) fn object_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let anim = self.workspace.behaviors[self.active].is_anim_data();
+        let anim = self.work.workspace.behaviors[self.active].is_anim_data();
         let mut open = !self.side.objects_closed;
         let asked = {
-            let behavior = &self.workspace.behaviors[self.active];
+            let behavior = &self.work.workspace.behaviors[self.active];
             let selected = self.selected.as_ref();
             let title = title::Title {
                 anim,
                 adsf: behavior.adsf,
                 tree_view: self.explorer.tree_view,
-                code_ok: is_existing_mod_code(self.place.mod_code.trim()),
+                code_ok: is_existing_mod_code(self.work.place.mod_code.trim()),
                 selected,
                 selected_is_new: selected.is_some_and(|id| **id == *PANDORA_DOC || behavior.added.contains_key(&**id)),
                 selected_is_pandora_doc: selected.is_some_and(|id| **id == *PANDORA_DOC),
@@ -85,10 +85,10 @@ impl PatchTool {
         // A tree from the root container, unless filtering: a filter wants the flat list.
         let output = if anim {
             let projects = self.anim_projects();
-            let is_adsf = self.workspace.behaviors[self.active].adsf;
+            let is_adsf = self.work.workspace.behaviors[self.active].adsf;
             self.explorer.anim(ui, i18n, (graph, is_adsf, &projects), &keys, &mut self.selected)
         } else if self.explorer.tree_view && self.explorer.filter.is_empty() && !self.explorer.unlinked_only {
-            let path = &self.workspace.behaviors[self.active].meshes_path;
+            let path = &self.work.workspace.behaviors[self.active].meshes_path;
             self.explorer.tree(ui, i18n, (graph, path), &keys, &mut self.selected)
         } else {
             self.explorer.flat(ui, i18n, graph, &keys, &mut self.selected)
@@ -104,7 +104,7 @@ impl PatchTool {
         self.apply_row_action(ui, graph, output.menu, notify);
 
         if let Some((pick, files, from)) = output.duplicate {
-            let behavior = &self.workspace.behaviors[self.active];
+            let behavior = &self.work.workspace.behaviors[self.active];
             let files = match files {
                 Files::ChangedOf(folder) => data::changed_files(behavior, &folder),
                 Files::WithMotion(id) => data::with_motion(behavior, &id),
@@ -132,7 +132,7 @@ impl PatchTool {
             TitleAsk::Duplicate(id) => self.new_object(Some(&id)),
             TitleAsk::RevertOrDelete(id) => self.revert_or_delete(&id),
 
-            TitleAsk::New if self.workspace.behaviors[self.active].adsf => {
+            TitleAsk::New if self.work.workspace.behaviors[self.active].adsf => {
                 let projects = self.anim_projects();
                 self.panels.new_clips = Some(NewClipsForm::new(self.selected.as_deref(), projects));
             }
@@ -145,7 +145,7 @@ impl PatchTool {
     /// The files go to the other project, which opens to show them.
     fn duplicate_anim_files(&mut self) {
         let Some((files, to)) = self.panels.pending_duplicate.take() else { return };
-        let made = data::duplicate_to(&mut self.workspace.behaviors[self.active], &files, &to);
+        let made = data::duplicate_to(&mut self.work.workspace.behaviors[self.active], &files, &to);
         for id in &made {
             self.object_changed(id);
         }
@@ -168,7 +168,7 @@ impl PatchTool {
             }
             RowAction::Duplicate => self.new_object(Some(id)),
             RowAction::Repeat => {
-                let behavior = &self.workspace.behaviors[self.active];
+                let behavior = &self.work.workspace.behaviors[self.active];
                 self.panels.repeat = super::repeat::RepeatForm::of(self.active, behavior, id);
             }
             RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),

@@ -112,7 +112,7 @@ impl PatchTool {
     /// Opens the window for the mod at `root`: reads the hkx of every clip of the workspace, and
     /// lists the hkx of the mod and the anim set files of the template.
     pub(in crate::patch) fn open_anim_data_dialog(&mut self, root: &Path) {
-        let clips = data::clip_sources(&self.workspace.behaviors);
+        let clips = data::clip_sources(&self.work.workspace.behaviors);
         let rows = clips
             .into_iter()
             .map(|clip| {
@@ -123,7 +123,7 @@ impl PatchTool {
             })
             .collect();
         let hkx = data::anim_hkx_files(root);
-        let sets = self.workspace.anim_set_projects(Path::new(&self.place.template_dir));
+        let sets = self.work.workspace.anim_set_projects(Path::new(&self.work.place.template_dir));
         let folders: Vec<&str> = sets.iter().map(|(folder, _)| folder.as_str()).collect();
         let project = data::default_project(&folders, hkx.first().map(String::as_str));
         let projects =
@@ -155,7 +155,7 @@ impl PatchTool {
 
     fn generate_anim_data(&mut self, i18n: &I18nMap, notify: &mut Notification) {
         let Some(dialog) = self.panels.anim_data_dialog.take() else { return };
-        let code = self.place.mod_code.trim().to_owned();
+        let code = self.work.place.mod_code.trim().to_owned();
         let chosen: Vec<(&ClipSource, HkxInfo)> =
             dialog.rows.iter().filter(|row| row.checked).filter_map(chosen_clip).collect();
         let sets: Vec<String> = dialog.projects.iter().flat_map(project_set_ids).collect();
@@ -175,8 +175,8 @@ impl PatchTool {
             request.push.sets.len(),
         );
         let first_result = if request.clips.is_empty() { ASDSF } else { ADSF };
-        let root = PathBuf::from(&self.place.template_dir);
-        if let Err(err) = data::generate(&mut self.workspace, &root, &request) {
+        let root = PathBuf::from(&self.work.place.template_dir);
+        if let Err(err) = data::generate(&mut self.work.workspace, &root, &request) {
             notify.error(err);
             return;
         }
@@ -189,9 +189,9 @@ impl PatchTool {
 
     /// The checked hkx to the `animationNames` of their characters, those the work's scope allows.
     fn add_names_to_characters(&mut self, root: &Path, hkx: &[&str], i18n: &I18nMap, notify: &mut Notification) {
-        let scope = self.workspace.scope;
+        let scope = self.work.workspace.scope;
         let allows = |behavior: &crate::patch::workspace::Behavior| scope.allows(behavior.nemesis.is_some());
-        match self.workspace.add_animation_names(root, hkx, allows) {
+        match self.work.workspace.add_animation_names(root, hkx, allows) {
             Ok(done) => {
                 if !done.characters.is_empty() {
                     notify.success(format!(
@@ -216,10 +216,10 @@ impl PatchTool {
     /// Goes to the generated files of the behavior named `name`.
     fn show_anim_data_result(&mut self, name: &str) {
         self.reset_names();
-        self.active = self.workspace.behaviors.iter().position(|b| b.name == name).unwrap_or(self.active);
+        self.active = self.work.workspace.behaviors.iter().position(|b| b.name == name).unwrap_or(self.active);
         self.selected = None;
         self.pane.opened = None;
-        self.mark_dirty();
+        self.work.mark_dirty();
     }
 }
 
@@ -481,12 +481,12 @@ impl PatchTool {
 
     /// Where a file of the open animation data can go. The template's are read once.
     pub(super) fn anim_projects(&mut self) -> Vec<String> {
-        let is_adsf = self.workspace.behaviors[self.active].adsf;
-        if is_adsf && self.template_projects.is_none() {
-            self.template_projects = Some(data::template_projects(Path::new(&self.place.template_dir)));
+        let is_adsf = self.work.workspace.behaviors[self.active].adsf;
+        if is_adsf && self.work.template_projects.is_none() {
+            self.work.template_projects = Some(data::template_projects(Path::new(&self.work.place.template_dir)));
         }
-        let template = if is_adsf { self.template_projects.as_deref().unwrap_or_default() } else { &[] };
-        data::project_folders(&self.workspace.behaviors[self.active], template)
+        let template = if is_adsf { self.work.template_projects.as_deref().unwrap_or_default() } else { &[] };
+        data::project_folders(&self.work.workspace.behaviors[self.active], template)
     }
 
     /// The window of [`NewClipsForm`]; `Create` adds the clips.
@@ -501,8 +501,8 @@ impl PatchTool {
 
     fn create_new_clips(&mut self) {
         let Some(form) = self.panels.new_clips.take() else { return };
-        let code = self.place.mod_code.trim().to_owned();
-        let adsf = &mut self.workspace.behaviors[self.active];
+        let code = self.work.place.mod_code.trim().to_owned();
+        let adsf = &mut self.work.workspace.behaviors[self.active];
         let added = data::add_numbered_clips(adsf, &code, form.folder.trim(), form.name.trim(), form.count);
         if let Some(first) = added.first() {
             self.selected = Some(first.as_str().into());

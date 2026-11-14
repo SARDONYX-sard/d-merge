@@ -88,7 +88,7 @@ impl PatchTool {
             .resizable(false)
             .exact_size(egui_widgets::ActivityBar::SIZE)
             .show(ui, |ui| {
-                self.scm.pending.refresh(&self.workspace, self.edits);
+                self.scm.pending.refresh(&self.work.workspace, self.work.edits);
                 activity_bar(ui, i18n, &self.side, self.scm.pending.changes.len())
             })
             .inner;
@@ -104,13 +104,13 @@ impl PatchTool {
                 SideView::Explorer => {
                     egui_widgets::side_bar_title(ui, i18n.t(title));
                     self.behaviors_section(ui, i18n, notify);
-                    if !self.workspace.behaviors.is_empty() {
+                    if !self.work.workspace.behaviors.is_empty() {
                         self.object_list(ui, i18n, notify);
                     }
                 }
                 SideView::Search => {
                     egui_widgets::side_bar_title(ui, i18n.t(title));
-                    if !self.workspace.behaviors.is_empty() {
+                    if !self.work.workspace.behaviors.is_empty() {
                         self.search_panel(ui, i18n);
                     }
                 }
@@ -118,16 +118,16 @@ impl PatchTool {
                 SideView::Variables => {
                     egui_widgets::side_bar_title(ui, i18n.t(title));
                     // The events and variables are a behavior's: which one, here as well.
-                    let behaviors = &self.workspace.behaviors;
+                    let behaviors = &self.work.workspace.behaviors;
                     if let Some(at) = behavior_select(ui, i18n, behaviors, self.active) {
                         self.active = at;
                         self.selected = self.tabs.last_of(at).map(std::rc::Rc::from);
                     }
                     let has_vars =
-                        self.workspace.behaviors.get(self.active).is_some_and(|behavior| !behavior.is_anim_data());
+                        self.work.workspace.behaviors.get(self.active).is_some_and(|behavior| !behavior.is_anim_data());
                     if has_vars {
                         let names = self.names();
-                        let behavior = &mut self.workspace.behaviors[self.active];
+                        let behavior = &mut self.work.workspace.behaviors[self.active];
                         let changed = self.vars.show(ui, i18n, behavior, &names, &self.explorer.filter);
                         if !changed.is_empty() {
                             self.pane.opened = None; // the open object may be one of them

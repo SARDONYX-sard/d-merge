@@ -74,10 +74,10 @@ pub struct PatchPaths<'a> {
 
 #[derive(Debug, Default)]
 pub(crate) struct PatchTool {
+    /// What is being made, where it lives, when it is saved. See [`tool::work_state`].
+    work: tool::work_state::Work,
     /// Which windows, forms and sections are open. See [`ui::panels`].
     panels: ui::panels::Panels,
-    /// Which work is open, and where its files are.
-    place: tool::place::WorkPlace,
     /// This tool is the user patch's, in its window: see [`user_patch`].
     is_user_patch: bool,
     /// This frame\'s keys, and the palette\'s. See [`tool::keys`].
@@ -89,33 +89,18 @@ pub(crate) struct PatchTool {
     pane: tool::editing::EditorPane,
     /// What `Edit...` proposed, until it is edited.
     draft: Option<user_patch::Draft>,
-    /// See [`Self::take_mod_written`].
-    mod_written: bool,
-    /// What was edited of the active behavior since [`Self::sync_pandora_doc`].
-    pandora_edited: Vec<String>,
-    /// `output` / `code` were taken from the settings.
-    restored: bool,
-    workspace: Workspace,
-    /// When the work is saved next.
-    autosave: tool::autosave::Autosave,
 
     active: usize,
     selected: Option<Rc<str>>,
     /// The objects of the explorer: the filters, the tree or the list, the keyboard in them. See [`tool::list`].
     explorer: tool::list::Explorer,
-    /// What runs on another thread: reading a mod, renaming its code. See [`tool::job`].
-    job: Option<tool::job::Job>,
 
-    /// The patch page's parser mode: what d-merge will accept, so what is checked here.
-    parser_mode: ParserMode,
     /// The objects open in tabs.
     tabs: editor::tabs::EditorTabs,
 
     search: egui_code_editor::SearchView,
     /// The side bar: which view, and whether it shows. See [`ui::side_bar`].
     side: ui::side_bar::SideBar,
-    /// Edits made, counted: what is found anew after one, e.g. [`changes::Pending`].
-    edits: u64,
     /// The Changes view: what changed since the last revision, and what is typed there. See [`changes`].
     scm: changes::Scm,
     /// The diffs and blames of the history open as tabs. See [`ui::revision_view`].
@@ -124,16 +109,10 @@ pub(crate) struct PatchTool {
     problems: problems::Problems,
     /// A conflict's value to change in the editor, taken in on the next frame.
     pending_resolution: Option<gui_shared::patch::ResolveRequest>,
-    /// The works opened lately, the last one first. From the settings.
-    recent: Vec<RecentWork>,
     /// The window of the user patch, and what it asks for.
     user_patch: user_patch::UserPatchView,
     /// The user patch written as a mod of its own. See [`user_patch::ModExport`].
     mod_export: user_patch::ModExport,
-    /// The projects of the clip data template, read once. See [`anim::data::template_projects`].
-    template_projects: Option<Vec<String>>,
-    /// The names of the events / variables panel and the completion. See [`Self::object_changed`].
-    names: editor::names::NamesCache,
     /// The EVENTS / VARIABLES panel. See [`ui::vars_panel`].
     vars: ui::vars_panel::VarsPanel,
 }
@@ -193,13 +172,13 @@ struct ObjectList {
 impl PatchTool {
     /// A mod was written since the last call: what the conflict check found may be old.
     pub(crate) const fn take_mod_written(&mut self) -> bool {
-        std::mem::replace(&mut self.mod_written, false)
+        std::mem::replace(&mut self.work.mod_written, false)
     }
 
     /// Follows the patch page's setting. A change takes effect on the shown object at once.
     pub(crate) fn set_parser_mode(&mut self, mode: ParserMode) {
-        if self.parser_mode != mode {
-            self.parser_mode = mode;
+        if self.work.parser_mode != mode {
+            self.work.parser_mode = mode;
             self.pane.preview = None;
         }
     }
@@ -225,24 +204,24 @@ impl PatchTool {
         keys: &mut keybinding::Keybindings,
     ) {
         self.pane.read_options(editor);
-        if self.place.template_dir != paths.template_dir {
-            paths.template_dir.clone_into(&mut self.place.template_dir);
+        if self.work.place.template_dir != paths.template_dir {
+            paths.template_dir.clone_into(&mut self.work.place.template_dir);
         }
         self.set_patch_output(paths.patch_output_dir, notify, i18n);
         // The first frame reopens the last work (its cache is found from these two).
-        if !self.restored {
-            self.restored = true;
-            self.place.output.clone_from(&settings.output);
-            self.place.mod_dir.clone_from(&settings.mod_dir);
-            self.place.mod_code.clone_from(&settings.mod_code);
-            self.recent.clone_from(&settings.recent);
+        if !self.work.restored {
+            self.work.restored = true;
+            self.work.place.output.clone_from(&settings.output);
+            self.work.place.mod_dir.clone_from(&settings.mod_dir);
+            self.work.place.mod_code.clone_from(&settings.mod_code);
+            self.work.recent.clone_from(&settings.recent);
             // It has a window of its own.
-            self.recent.retain(|work| !work.mod_code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE));
+            self.work.recent.retain(|work| !work.mod_code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE));
             // A work that is gone: the start screen rather than an empty work.
-            let code_is_free = self.place.mod_code.trim().eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE);
-            if self.place.patch_output.is_empty()
+            let code_is_free = self.work.place.mod_code.trim().eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE);
+            if self.work.place.patch_output.is_empty()
                 || code_is_free
-                || !Workspace::exists(&self.place.cache_root, self.place.mod_code.trim())
+                || !Workspace::exists(&self.work.place.cache_root, self.work.place.mod_code.trim())
             {
                 self.close_work(notify, i18n);
             }
@@ -271,11 +250,11 @@ impl PatchTool {
         self.draw(ui, i18n, notify);
 
         self.pane.write_options(editor);
-        if settings.mod_dir != self.place.mod_dir {
-            settings.mod_dir.clone_from(&self.place.mod_dir);
+        if settings.mod_dir != self.work.place.mod_dir {
+            settings.mod_dir.clone_from(&self.work.place.mod_dir);
         }
-        if settings.recent != self.recent {
-            settings.recent.clone_from(&self.recent);
+        if settings.recent != self.work.recent {
+            settings.recent.clone_from(&self.work.recent);
         }
         self.write_view_settings(settings);
         settings.changed_only = self.explorer.changed_only;
@@ -285,19 +264,19 @@ impl PatchTool {
                 settings.tree_open.insert(path.clone(), open);
             }
         }
-        if settings.output != self.place.output || settings.mod_code != self.place.mod_code {
-            settings.output.clone_from(&self.place.output);
-            settings.mod_code.clone_from(&self.place.mod_code);
+        if settings.output != self.work.place.output || settings.mod_code != self.work.place.mod_code {
+            settings.output.clone_from(&self.work.place.output);
+            settings.mod_code.clone_from(&self.work.place.mod_code);
         }
     }
 
     /// The "New object" window, if open: a class picked is a new object of it.
     fn class_picker(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        let behavior = &self.workspace.behaviors[self.active];
+        let behavior = &self.work.workspace.behaviors[self.active];
         let Some(class) = self.panels.class_picker.window(ctx, i18n, behavior) else { return };
 
-        let code = self.place.mod_code.trim().to_owned();
-        if let Some(id) = self.workspace.behaviors[self.active].add_class(&code, &class) {
+        let code = self.work.place.mod_code.trim().to_owned();
+        if let Some(id) = self.work.workspace.behaviors[self.active].add_class(&code, &class) {
             self.object_changed(&id);
             self.selected = Some(id.into());
             self.panels.class_picker.close();
@@ -307,17 +286,17 @@ impl PatchTool {
     /// The repeat window, if open, and what it asked for.
     fn repeat(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
         use ui::repeat::RepeatAsk;
-        let code = self.place.mod_code.trim().to_owned();
+        let code = self.work.place.mod_code.trim().to_owned();
         let Some(form) = &mut self.panels.repeat else { return };
         match form.window(ctx, i18n, nemesis_diff::is_existing_mod_code(&code)) {
             Some(RepeatAsk::Close) => self.panels.repeat = None,
             Some(RepeatAsk::Create) => {
                 let Some(form) = self.panels.repeat.take() else { return };
-                let Some(behavior) = self.workspace.behaviors.get_mut(form.behavior()) else { return };
+                let Some(behavior) = self.work.workspace.behaviors.get_mut(form.behavior()) else { return };
                 let first = form.create(behavior, &code);
                 self.active = form.behavior();
                 self.reset_names();
-                self.mark_dirty();
+                self.work.mark_dirty();
                 self.selected = first.map(Into::into);
             }
             None => {}
@@ -326,7 +305,7 @@ impl PatchTool {
 
     fn draw(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         // The work is on another thread: only how far it is.
-        if let Some(job) = &self.job {
+        if let Some(job) = &self.work.job {
             ui.add_space(12.0);
             ui.label(format!("{}: {}", i18n.t(job.label), job.detail));
             let (done, total) = job.work.counts();
@@ -340,7 +319,7 @@ impl PatchTool {
         self.code_choice_window(ui.ctx(), i18n, notify);
         if self.is_user_patch {
             self.user_patch_bar(ui, i18n, notify);
-        } else if !self.place.is_open() {
+        } else if !self.work.place.is_open() {
             self.start_screen(ui, i18n, notify);
             return;
         } else {
@@ -352,11 +331,11 @@ impl PatchTool {
         self.new_clips_window(ui.ctx(), i18n);
         self.duplicate_window(ui.ctx(), i18n);
         self.repeat(ui.ctx(), i18n);
-        self.active = self.active.min(self.workspace.behaviors.len().saturating_sub(1));
+        self.active = self.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
 
         // Like VS Code: the activity bar, the side bar, and the editor with what belongs to it.
         self.side_bar(ui, i18n, notify);
-        if self.workspace.behaviors.is_empty() {
+        if self.work.workspace.behaviors.is_empty() {
             egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisNoBehavior)));
             return;
         }
@@ -445,17 +424,13 @@ mod tests {
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../resource/assets/templates");
         let (workspace, code, _) = Workspace::import(Path::new(&selected), &root).unwrap();
         let explorer = tool::list::Explorer { tree_view: true, ..Default::default() };
-        let mut tool = PatchTool {
-            workspace,
-            explorer,
-            place: tool::place::WorkPlace { mod_code: code, ..Default::default() },
-            ..PatchTool::default()
-        };
+        let mut tool = PatchTool { explorer, ..PatchTool::default() };
+        (tool.work.workspace, tool.work.place.mod_code) = (workspace, code);
         let i18n = I18nMap::new();
 
-        for active in 0..tool.workspace.behaviors.len() {
+        for active in 0..tool.work.workspace.behaviors.len() {
             tool.active = active;
-            let behavior = &tool.workspace.behaviors[active];
+            let behavior = &tool.work.workspace.behaviors[active];
             let ids: Vec<String> = behavior.edits.keys().chain(behavior.added.keys()).cloned().collect();
             for id in ids {
                 println!("{active} {id}");
@@ -464,11 +439,11 @@ mod tests {
                     tool.object_list(ui, &i18n, &mut egui_widgets::notify::Notification::default());
                     tool.object_editor(ui, &i18n);
                 });
-                if tool.workspace.behaviors[active].is_anim_data() {
+                if tool.work.workspace.behaviors[active].is_anim_data() {
                     continue; // listed per actor, not in the tree
                 }
                 let names = tool.names();
-                let path = &tool.workspace.behaviors[active].meshes_path;
+                let path = &tool.work.workspace.behaviors[active].meshes_path;
                 let tree = &tool.explorer.trees[path];
                 let found = tree.rows().get(tree.cursor).map(|row| names.graph.id(row.node));
                 assert_eq!(found, Some(id.as_str()), "`{id}` is not selected in the tree");
@@ -486,7 +461,8 @@ mod work_tests {
     use super::*;
 
     fn tool_in(dir: &Path) -> PatchTool {
-        let mut tool = PatchTool { restored: true, ..PatchTool::default() };
+        let mut tool = PatchTool::default();
+        tool.work.restored = true;
         tool.set_patch_output(&dir.display().to_string(), &mut Notification::default(), &I18nMap::new());
         tool
     }
@@ -501,19 +477,19 @@ mod work_tests {
         tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        assert_eq!(tool.place.loaded_for.as_deref(), Some("aaaa"));
-        tool.workspace.info.name = "first".to_owned();
-        tool.mark_dirty();
+        assert_eq!(tool.work.place.loaded_for.as_deref(), Some("aaaa"));
+        tool.work.workspace.info.name = "first".to_owned();
+        tool.work.mark_dirty();
         tool.save_now(&mut notify, &i18n);
 
         // `File > New`: the first one goes away, and the second one starts empty.
         tool.close_work(&mut notify, &i18n);
-        assert_eq!(tool.place.loaded_for, None);
+        assert_eq!(tool.work.place.loaded_for, None);
         tool.create_work("bbbb".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
         tool.sync_workspace(&mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        assert_eq!(tool.place.loaded_for.as_deref(), Some("bbbb"));
-        assert_eq!(tool.workspace.info.name, "");
+        assert_eq!(tool.work.place.loaded_for.as_deref(), Some("bbbb"));
+        assert_eq!(tool.work.workspace.info.name, "");
         tool.save_now(&mut notify, &i18n);
 
         let root = workspace::cache_root_of(&dir.display().to_string());
@@ -523,7 +499,7 @@ mod work_tests {
         tool.switch_work("aaaa", "D:/mods/a", "", &mut notify, &i18n);
         tool.sync_workspace(&mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        let name = tool.workspace.info.name.clone();
+        let name = tool.work.workspace.info.name.clone();
         std::fs::remove_dir_all(&dir).unwrap();
 
         assert_eq!(both, (true, true));
@@ -541,7 +517,7 @@ mod work_tests {
         tool.wait_job(&mut notify, &i18n);
 
         tool.set_patch_output(&dir.join("two").display().to_string(), &mut notify, &i18n);
-        assert_eq!(tool.place.loaded_for, None);
+        assert_eq!(tool.work.place.loaded_for, None);
         let in_one = Workspace::exists(&workspace::cache_root_of(&dir.join("one").display().to_string()), "aaaa");
         std::fs::remove_dir_all(&dir).unwrap();
         assert!(in_one);
@@ -565,7 +541,7 @@ mod work_tests {
         tool.open_mod(&root, &mut notify, &i18n);
 
         tool.wait_job(&mut notify, &i18n);
-        let opened_at_once = tool.place.loaded_for.clone();
+        let opened_at_once = tool.work.place.loaded_for.clone();
         let choice = tool
             .panels
             .code_choice
@@ -574,7 +550,7 @@ mod work_tests {
 
         tool.open_chosen_code("ecnpc", &mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        let opened = tool.place.loaded_for.clone();
+        let opened = tool.work.place.loaded_for.clone();
         let asked_again = tool.panels.code_choice.is_some();
         std::fs::remove_dir_all(&dir).unwrap();
 
@@ -596,12 +572,12 @@ mod work_tests {
         tool.open_mod(&one, &mut notify, &i18n);
 
         tool.wait_job(&mut notify, &i18n);
-        let of_one = (tool.place.loaded_for.clone(), tool.panels.code_choice.is_some());
+        let of_one = (tool.work.place.loaded_for.clone(), tool.panels.code_choice.is_some());
 
         // The code of 7 letters, as Nemesis' own mod has it.
         tool.open_mod(&several.join("Nemesis_Engine/mod/nemesis"), &mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        let of_patch_dir = (tool.place.loaded_for.clone(), tool.panels.code_choice.is_some());
+        let of_patch_dir = (tool.work.place.loaded_for.clone(), tool.panels.code_choice.is_some());
         std::fs::remove_dir_all(&dir).unwrap();
 
         assert_eq!(of_one, (Some("para".to_owned()), false));
@@ -632,7 +608,7 @@ mod work_tests {
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let open = |notify: &mut Notification| {
             let mut tool = tool_in(&dir.join("out"));
-            tool.place.template_dir = dir.join("templates").display().to_string();
+            tool.work.place.template_dir = dir.join("templates").display().to_string();
             tool.open_mod(&mod_dir, notify, &i18n);
             tool.wait_job(notify, &i18n);
             tool.sync_workspace(notify, &i18n);
@@ -641,13 +617,13 @@ mod work_tests {
         };
 
         let mut first = open(&mut notify);
-        assert!(first.workspace.behaviors[0].edits["#0001"].contains(">false<"), "read from the mod");
-        assert_eq!(first.workspace.export_format, workspace::ExportFormat::PandoraV5);
-        first.mark_dirty();
+        assert!(first.work.workspace.behaviors[0].edits["#0001"].contains(">false<"), "read from the mod");
+        assert_eq!(first.work.workspace.export_format, workspace::ExportFormat::PandoraV5);
+        first.work.mark_dirty();
         first.save_now(&mut notify, &i18n);
 
         // What an old build left: the file, no edits, and no format.
-        let cache = first.place.cache_root.join("pandora");
+        let cache = first.work.place.cache_root.join("pandora");
         let behavior_dir =
             std::fs::read_dir(&cache).unwrap().flatten().map(|entry| entry.path()).find(|path| path.is_dir()).unwrap();
         for file in std::fs::read_dir(&behavior_dir).unwrap().flatten() {
@@ -661,11 +637,11 @@ mod work_tests {
         std::fs::write(&json, text.replace("\"export_format\":\"PandoraV5\",", "")).unwrap();
 
         let second = open(&mut notify);
-        let edits = second.workspace.behaviors.first().map(|behavior| behavior.edits.len());
-        let edited = second.workspace.behaviors[0].edits.get("#0001").cloned();
-        let format = second.workspace.export_format;
+        let edits = second.work.workspace.behaviors.first().map(|behavior| behavior.edits.len());
+        let edited = second.work.workspace.behaviors[0].edits.get("#0001").cloned();
+        let format = second.work.workspace.export_format;
         let changed = {
-            let graph = tree::Graph::new(&second.workspace.behaviors[0]);
+            let graph = tree::Graph::new(&second.work.workspace.behaviors[0]);
             graph.node_of("#0001").is_some_and(|node| graph.is_changed(node))
         };
         std::fs::remove_dir_all(&dir).unwrap();
@@ -732,12 +708,12 @@ mod work_tests {
         .unwrap();
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir.join("out"));
-        tool.place.template_dir = dir.join("templates").display().to_string();
+        tool.work.place.template_dir = dir.join("templates").display().to_string();
         tool.open_mod(&mod_dir, &mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
         tool.sync_workspace(&mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
-        tool.pane.text = tool.workspace.behaviors[0].text("#0001").unwrap().to_owned();
+        tool.pane.text = tool.work.workspace.behaviors[0].text("#0001").unwrap().to_owned();
 
         let shown = |tool: &mut PatchTool| {
             tool.pane.preview = None;
@@ -746,12 +722,12 @@ mod work_tests {
             lines.map_or_else(String::new, |lines| lines.collect::<Vec<_>>().join("\n"))
         };
         let as_pandora = shown(&mut tool);
-        tool.workspace.export_format = workspace::ExportFormat::Nemesis;
+        tool.work.workspace.export_format = workspace::ExportFormat::Nemesis;
         let as_nemesis = shown(&mut tool);
-        tool.workspace.export_format = workspace::ExportFormat::PandoraV5;
+        tool.work.workspace.export_format = workspace::ExportFormat::PandoraV5;
         shown(&mut tool);
         tool.revert_block("#0001", 0);
-        let edits = tool.workspace.behaviors[0].edits.len();
+        let edits = tool.work.workspace.behaviors[0].edits.len();
         std::fs::remove_dir_all(&dir).unwrap();
 
         assert!(as_pandora.starts_with("<Replace path=\"#0001/enable\">"), "{as_pandora}");

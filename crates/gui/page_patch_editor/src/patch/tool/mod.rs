@@ -11,3 +11,4 @@ pub(super) mod rename;
 mod session;
 mod tab_events;
 mod work;
+pub(super) mod work_state;

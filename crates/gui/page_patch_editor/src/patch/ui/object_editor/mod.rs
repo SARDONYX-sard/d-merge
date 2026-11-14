@@ -117,7 +117,7 @@ impl PatchTool {
             return None;
         }
 
-        let behavior = &self.workspace.behaviors[self.active];
+        let behavior = &self.work.workspace.behaviors[self.active];
         let is_new = behavior.added.contains_key(id) || behavior.is_ref(id) || id == PANDORA_DOC;
         if is_new || !self.pane.show_preview {
             return None;

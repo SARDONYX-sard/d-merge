@@ -43,20 +43,20 @@ impl PatchTool {
     pub(super) fn changes_view(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         egui_widgets::side_bar_title(ui, i18n.t(I18nKey::SideChanges));
 
-        let branch = header::branch_row(ui, i18n, &self.workspace.history, &mut self.scm.new_branch);
-        self.scm.pending.refresh(&self.workspace, self.edits);
+        let branch = header::branch_row(ui, i18n, &self.work.workspace.history, &mut self.scm.new_branch);
+        self.scm.pending.refresh(&self.work.workspace, self.work.edits);
         let has_changes = !self.scm.pending.changes.is_empty();
         let commit = header::commit_box(ui, i18n, &mut self.scm.commit_message, has_changes);
 
         let keys = {
             let focused = self.explorer.tree_focus;
             let taken = if focused { self.keys.take_mapped(keybinding::host::tree_key) } else { Vec::new() };
-            keys::run(&mut self.scm, &self.workspace, &taken, focused)
+            keys::run(&mut self.scm, &self.work.workspace, &taken, focused)
         };
 
         let output = {
             let input = list::ListInput {
-                workspace: &self.workspace,
+                workspace: &self.work.workspace,
                 scm: &self.scm,
                 selected: (self.active, self.selected.as_deref()),
                 cursor: (keys.cursor, keys.moved),
@@ -88,15 +88,15 @@ impl PatchTool {
     fn apply_branch(&mut self, ask: BranchAsk, notify: &mut Notification, i18n: &I18nMap) {
         match ask {
             BranchAsk::Switch(name) => {
-                if self.workspace.switch_branch(&name) {
+                if self.work.workspace.switch_branch(&name) {
                     self.work_restored();
                 } else {
                     notify.warn(i18n.t(I18nKey::SideBranchHasChanges));
                 }
             }
             BranchAsk::Create(name) => {
-                if self.workspace.history.create_branch(&name) {
-                    self.mark_dirty();
+                if self.work.workspace.history.create_branch(&name) {
+                    self.work.mark_dirty();
                 }
             }
         }
@@ -106,10 +106,10 @@ impl PatchTool {
     fn commit(&mut self) {
         let time = crate::patch::workspace::history::now();
         let message = std::mem::take(&mut self.scm.commit_message);
-        let mut history = std::mem::take(&mut self.workspace.history);
-        history.commit(&self.workspace, &message, time);
-        self.workspace.history = history;
-        self.mark_dirty();
+        let mut history = std::mem::take(&mut self.work.workspace.history);
+        history.commit(&self.work.workspace, &message, time);
+        self.work.workspace.history = history;
+        self.work.mark_dirty();
     }
 
     /// What a row asked for.
@@ -127,15 +127,15 @@ impl PatchTool {
             ChangeAction::Blame(behavior, id) => self.open_blame(behavior, &id),
 
             ChangeAction::Discard(behavior, id) => {
-                self.workspace.discard_change(behavior, &id);
+                self.work.workspace.discard_change(behavior, &id);
                 self.work_restored();
             }
             ChangeAction::RestoreObject(behavior, id, number) => {
-                self.workspace.restore_object(behavior, &id, number);
+                self.work.workspace.restore_object(behavior, &id, number);
                 self.work_restored();
             }
             ChangeAction::RestoreRevision(number) => {
-                self.workspace.restore_revision(number);
+                self.work.workspace.restore_revision(number);
                 self.work_restored();
             }
         }
@@ -146,6 +146,6 @@ impl PatchTool {
         self.reset_names();
         self.pane.opened = None;
         self.pane.preview = None;
-        self.mark_dirty();
+        self.work.mark_dirty();
     }
 }

@@ -178,8 +178,8 @@ impl Views {
 impl PatchTool {
     /// Opens the diff of object `id` from revision `from` to `to` (`None`: the work now).
     pub(in crate::patch) fn open_compare(&mut self, behavior: usize, id: &str, from: u32, to: Option<u32>) {
-        let old = object_text_at(&self.workspace, behavior, id, Some(from));
-        let new = object_text_at(&self.workspace, behavior, id, to);
+        let old = object_text_at(&self.work.workspace, behavior, id, Some(from));
+        let new = object_text_at(&self.work.workspace, behavior, id, to);
         let to_name = to.map_or_else(|| "working".to_owned(), |number| format!("#{number}"));
         let name = self.object_name(behavior, id);
         let title = format!("{name} (#{from}) ↔ {name} ({to_name})");
@@ -188,7 +188,7 @@ impl PatchTool {
 
     /// Opens the blame of object `id` of behavior `behavior`, as the work has it now.
     pub(in crate::patch) fn open_blame(&mut self, behavior: usize, id: &str) {
-        let Some((text, notes)) = blame_of(&self.workspace, behavior, id) else { return };
+        let Some((text, notes)) = blame_of(&self.work.workspace, behavior, id) else { return };
         let title = format!("Blame {}", self.object_name(behavior, id));
         self.show_in_editor(behavior, id, title, Box::new(DiffView::blame(text, notes)));
     }

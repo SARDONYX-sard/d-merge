@@ -142,15 +142,16 @@ impl Problems {
 impl PatchTool {
     /// Checks the work again if it is due, unless a job has it or none is open. Call each frame.
     pub(super) fn diagnose_work(&mut self) {
-        if self.job.is_none() && self.place.is_open() {
-            self.problems.check_work(&self.workspace.behaviors, (self.place.mod_code.trim(), self.parser_mode));
+        if self.work.job.is_none() && self.work.place.is_open() {
+            self.problems
+                .check_work(&self.work.workspace.behaviors, (self.work.place.mod_code.trim(), self.work.parser_mode));
         }
     }
 
     /// The object `id` of the active behavior changed: see [`Problems::refresh_object`].
     pub(super) fn refresh_problems(&mut self, id: &str) {
-        let Some(behavior) = self.workspace.behaviors.get(self.active) else { return };
-        let settings = (self.place.mod_code.trim(), self.parser_mode);
+        let Some(behavior) = self.work.workspace.behaviors.get(self.active) else { return };
+        let settings = (self.work.place.mod_code.trim(), self.work.parser_mode);
         self.problems.refresh_object((self.active, behavior), id, settings);
     }
 }
@@ -174,10 +175,10 @@ mod tests {
 
     fn tool(mode: ParserMode) -> PatchTool {
         let mut tool = PatchTool::default();
-        tool.workspace.behaviors.push(clip_data());
-        tool.place.mod_code = "m".to_owned();
-        tool.parser_mode = mode;
-        tool.place.loaded_for = Some("m".to_owned());
+        tool.work.workspace.behaviors.push(clip_data());
+        tool.work.place.mod_code = "m".to_owned();
+        tool.work.parser_mode = mode;
+        tool.work.place.loaded_for = Some("m".to_owned());
         tool
     }
 
@@ -193,10 +194,10 @@ mod tests {
         assert_eq!(ids, ["Female~1/Bad~m$0.txt", "Male~1/Bad~m$0.txt", "Male~1/m$2.txt"]);
 
         let motion = "Male~1/m$2.txt";
-        tool.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\n1\n0\n0\n".to_owned());
+        tool.work.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\n1\n0\n0\n".to_owned());
         tool.refresh_problems(motion);
         assert_eq!(tool.problems.counts(), Some((2, 0)));
-        tool.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\nwrong\n0\n0\n".to_owned());
+        tool.work.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\nwrong\n0\n0\n".to_owned());
         tool.refresh_problems(motion);
         assert_eq!(tool.problems.counts(), Some((3, 0)), "a new mistake comes in");
     }
@@ -206,8 +207,8 @@ mod tests {
     fn the_mode_of_the_patch_page_decides() {
         let count = |mode| {
             let mut tool = tool(mode);
-            tool.workspace.behaviors[0].added.clear();
-            tool.workspace.behaviors[0]
+            tool.work.workspace.behaviors[0].added.clear();
+            tool.work.workspace.behaviors[0]
                 .added
                 .insert("Male~1/Count~m$0.txt".to_owned(), "Count\nm$0\n1\n0\n0\n7\n".to_owned());
             tool.reset_names();

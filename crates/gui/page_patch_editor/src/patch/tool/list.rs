@@ -98,8 +98,8 @@ impl PatchTool {
         (action, id): (FileAction, &str),
         notify: &mut egui_widgets::notify::Notification,
     ) {
-        let behavior = &self.workspace.behaviors[self.active];
-        let file = object_file((behavior, id), &self.place, self.workspace.export_format);
+        let behavior = &self.work.workspace.behaviors[self.active];
+        let file = object_file((behavior, id), &self.work.place, self.work.workspace.export_format);
         match action {
             FileAction::CopyPath => ctx.copy_text(file.display().to_string()),
             FileAction::Reveal => {
@@ -151,7 +151,7 @@ impl PatchTool {
 
     /// Deletes a new object, or drops the edits of a template object.
     pub(in crate::patch) fn revert_or_delete(&mut self, id: &str) {
-        let behavior = &mut self.workspace.behaviors[self.active];
+        let behavior = &mut self.work.workspace.behaviors[self.active];
         behavior.edits.remove(id);
         let is_pandora_doc = id == PANDORA_DOC && behavior.pandora_doc.take().is_some();
         if behavior.added.remove(id).is_some() || is_pandora_doc {
@@ -166,8 +166,8 @@ impl PatchTool {
     }
 
     pub(in crate::patch) fn new_object(&mut self, from: Option<&str>) {
-        let code = self.place.mod_code.trim().to_string();
-        let id = self.workspace.behaviors[self.active].add_object(&code, from);
+        let code = self.work.place.mod_code.trim().to_string();
+        let id = self.work.workspace.behaviors[self.active].add_object(&code, from);
         self.object_changed(&id);
         self.selected = Some(id.into());
     }
@@ -235,30 +235,37 @@ mod tests {
         use crate::patch::workspace::{ADSF, Behavior};
         let mut clips = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
         clips.added.insert("Male~1/m$0.txt".to_owned(), String::new());
-        let mut tool = PatchTool {
-            place: crate::patch::tool::place::WorkPlace {
-                mod_code: "mymod".to_owned(),
-                output: "D:/mods/My".to_owned(),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-        tool.workspace.behaviors.push(clips);
+        let mut tool = PatchTool::default();
+        tool.work.place.mod_code = "mymod".to_owned();
+        tool.work.place.output = "D:/mods/My".to_owned();
+        tool.work.workspace.behaviors.push(clips);
 
         let patch = Path::new("D:/mods/My").join("Nemesis_Engine/mod/mymod").join(ADSF).join("Male~1/m$0.txt");
         assert_eq!(
-            object_file((&tool.workspace.behaviors[0], "Male~1/m$0.txt"), &tool.place, tool.workspace.export_format),
+            object_file(
+                (&tool.work.workspace.behaviors[0], "Male~1/m$0.txt"),
+                &tool.work.place,
+                tool.work.workspace.export_format
+            ),
             patch
         );
-        let template = tool.workspace.behaviors[0].template_path.clone();
+        let template = tool.work.workspace.behaviors[0].template_path.clone();
         assert_eq!(
-            object_file((&tool.workspace.behaviors[0], "Male~1/other.txt"), &tool.place, tool.workspace.export_format),
+            object_file(
+                (&tool.work.workspace.behaviors[0], "Male~1/other.txt"),
+                &tool.work.place,
+                tool.work.workspace.export_format
+            ),
             template,
             "not patched"
         );
-        tool.place.output.clear();
+        tool.work.place.output.clear();
         assert_eq!(
-            object_file((&tool.workspace.behaviors[0], "Male~1/m$0.txt"), &tool.place, tool.workspace.export_format),
+            object_file(
+                (&tool.work.workspace.behaviors[0], "Male~1/m$0.txt"),
+                &tool.work.place,
+                tool.work.workspace.export_format
+            ),
             template,
             "no mod to be in"
         );

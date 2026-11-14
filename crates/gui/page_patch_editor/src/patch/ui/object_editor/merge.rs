@@ -46,11 +46,11 @@ impl PatchTool {
             let merged =
                 merged_text(&self.pane.text, self.pane.cursor_line, (&values, &self.pane.merge_accepted), pick);
             if let Some(accepted) = merged.accepted {
-                merge::remember(&mut self.workspace.resolutions, &values, accepted.clone());
+                merge::remember(&mut self.work.workspace.resolutions, &values, accepted.clone());
                 self.pane.merge_accepted = accepted;
             }
             self.pane.text = merged.text;
-            self.workspace.behaviors[self.active].set_text(id, &self.pane.text);
+            self.work.workspace.behaviors[self.active].set_text(id, &self.pane.text);
             self.pane.preview = None;
             self.object_changed(id);
             self.pane.focus = Some(FocusAt::Line(merged.line));

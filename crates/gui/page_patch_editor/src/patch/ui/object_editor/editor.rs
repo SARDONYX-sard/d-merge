@@ -68,7 +68,7 @@ impl PatchTool {
         let mut toggle_problems = false;
         let mut problems = ProblemsOutput::default();
         egui::CentralPanel::default().show(ui, |ui| {
-            let behavior = &self.workspace.behaviors[self.active];
+            let behavior = &self.work.workspace.behaviors[self.active];
             let input = super::toolbar::ToolbarInput {
                 pane: &mut self.pane,
                 tabs: &self.tabs,
@@ -83,14 +83,14 @@ impl PatchTool {
             let toolbar = super::toolbar::show(ui, i18n, input);
             (result.walk_history, result.tab_event) = (toolbar.walk_history, toolbar.tab_event);
 
-            if self.workspace.behaviors[self.active].is_ref(id) {
+            if self.work.workspace.behaviors[self.active].is_ref(id) {
                 ui.weak(i18n.t(I18nKey::NemesisRefReadOnly));
             }
 
             toggle_problems = self.pane.status_bar(ui, i18n, keymap, self.is_user_patch);
-            problems = self.problems.panel_ui(ui, i18n, &self.workspace.behaviors, &problem_keys);
+            problems = self.problems.panel_ui(ui, i18n, &self.work.workspace.behaviors, &problem_keys);
             let input = EditorInput {
-                behavior: (self.active, &self.workspace.behaviors[self.active]),
+                behavior: (self.active, &self.work.workspace.behaviors[self.active]),
                 id,
                 names: &names,
                 keymap,

@@ -60,18 +60,18 @@ impl PatchTool {
     pub(in crate::patch) fn project_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         let mut asks = Vec::new();
         ui.horizontal(|ui| {
-            asks.extend(file_menu(ui, i18n, &self.recent));
+            asks.extend(file_menu(ui, i18n, &self.work.recent));
             let chevron = if self.panels.project_open { Icon::ChevronDown } else { Icon::ChevronRight };
             let mut toggle = ui.add(Button::new("").icon(chevron).small()).clicked();
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let ready = !self.place.output.trim().is_empty() && !self.workspace.behaviors.is_empty();
-                asks.extend(export_buttons(ui, i18n, ready, self.workspace.export_format));
+                let ready = !self.work.place.output.trim().is_empty() && !self.work.workspace.behaviors.is_empty();
+                asks.extend(export_buttons(ui, i18n, ready, self.work.workspace.export_format));
                 if cache_button(ui, i18n, &self.cache_dir()) {
                     asks.push(BarAsk::OpenCache);
                 }
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    toggle |= summary(ui, self.place.mod_code.trim(), self.place.output.trim());
+                    toggle |= summary(ui, self.work.place.mod_code.trim(), self.work.place.output.trim());
                 });
             });
             if toggle {
@@ -93,7 +93,7 @@ impl PatchTool {
 
         let output = PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
             .help(i18n.t(I18nKey::NemesisOutputHover))
-            .show(ui, &mut self.place.output);
+            .show(ui, &mut self.work.place.output);
         if let Some(err) = output.open_error {
             notify.error(err);
         }
@@ -101,20 +101,20 @@ impl PatchTool {
             asks.push(BarAsk::Edited);
         }
 
-        asks.extend(source_row(ui, i18n, self.place.mod_dir.trim(), notify));
-        asks.extend(ref_mods_row(ui, i18n, &self.workspace.ref_mods));
+        asks.extend(source_row(ui, i18n, self.work.place.mod_dir.trim(), notify));
+        asks.extend(ref_mods_row(ui, i18n, &self.work.workspace.ref_mods));
 
         ui.horizontal_wrapped(|ui| {
             // It is in the ids of the new objects and the names of the folders: renamed, not typed over.
             let hover = i18n.t(I18nKey::NemesisModCodeHover);
             ui.label(i18n.t(I18nKey::NemesisModCodeLabel)).on_hover_text(hover);
-            ui.strong(self.place.mod_code.trim()).on_hover_text(hover);
+            ui.strong(self.work.place.mod_code.trim()).on_hover_text(hover);
             if !self.is_user_patch {
-                let old = self.place.loaded_for.as_deref().unwrap_or_default();
-                let root = &self.place.cache_root;
+                let old = self.work.place.loaded_for.as_deref().unwrap_or_default();
+                let root = &self.work.place.cache_root;
                 asks.extend(rename_form(ui, i18n, &mut self.panels.rename_to, (old, root)));
             }
-            if info_fields(ui, i18n, &mut self.workspace.info) {
+            if info_fields(ui, i18n, &mut self.work.workspace.info) {
                 asks.push(BarAsk::Edited);
             }
         });
@@ -126,7 +126,7 @@ impl PatchTool {
         match ask {
             BarAsk::NewWork => {
                 // Usually next to the one that was open.
-                let output = self.place.output.clone();
+                let output = self.work.place.output.clone();
                 self.close_work(notify, i18n);
                 self.panels.new_work = Some(NewWork { code: String::new(), output, ..NewWork::default() });
             }
@@ -136,24 +136,24 @@ impl PatchTool {
 
             BarAsk::Export => self.export(notify, i18n),
             BarAsk::ExportFormat(format) => {
-                self.workspace.export_format = format;
+                self.work.workspace.export_format = format;
                 self.pane.preview = None; // it says what the export would write
-                self.mark_dirty();
+                self.work.mark_dirty();
             }
             BarAsk::OpenCache => self.open_cache(notify, i18n),
 
-            BarAsk::Edited => self.mark_dirty(),
+            BarAsk::Edited => self.work.mark_dirty(),
             BarAsk::Rename(new) => self.start_rename(&new, notify, i18n),
             BarAsk::ReloadFromMod => self.reload_from_mod(notify, i18n),
 
             BarAsk::RemoveRef(at) => {
-                self.workspace.ref_mods.remove(at);
-                self.workspace.reload_refs();
+                self.work.workspace.ref_mods.remove(at);
+                self.work.workspace.reload_refs();
                 self.refs_changed();
             }
             BarAsk::AddRef(dir) => {
-                let code = self.place.mod_code.trim().to_owned();
-                self.workspace.add_ref(&dir, &code);
+                let code = self.work.place.mod_code.trim().to_owned();
+                self.work.workspace.add_ref(&dir, &code);
                 self.refs_changed();
             }
         }
@@ -163,7 +163,7 @@ impl PatchTool {
     fn refs_changed(&mut self) {
         self.reset_names();
         self.pane.opened = None;
-        self.mark_dirty();
+        self.work.mark_dirty();
     }
 
     /// `Open work data`: the directory of the work, saved first (a new work has none until then).
@@ -176,9 +176,9 @@ impl PatchTool {
 
     /// The directory of the open work, or of all the works if none is open.
     pub(super) fn cache_dir(&self) -> PathBuf {
-        let root = &self.place.cache_root;
+        let root = &self.work.place.cache_root;
         let dir =
-            self.place.loaded_for.as_deref().map_or_else(|| root.clone(), |code| Workspace::cache_dir(root, code));
+            self.work.place.loaded_for.as_deref().map_or_else(|| root.clone(), |code| Workspace::cache_dir(root, code));
         std::path::absolute(&dir).unwrap_or(dir)
     }
 }

@@ -92,7 +92,7 @@ impl PatchTool {
                     self.mod_export.open = true;
                 }
                 ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    let output = egui::RichText::new(self.place.output.trim()).weak();
+                    let output = egui::RichText::new(self.work.place.output.trim()).weak();
                     ui.add(egui::Label::new(output).truncate()).on_hover_text(i18n.t(I18nKey::UserPatchOutputHover));
                 });
             });
@@ -101,7 +101,7 @@ impl PatchTool {
 
     /// `Export as a mod`'s window, if open; `Export` writes it.
     fn mod_export_window(&mut self, ctx: &egui::Context, i18n: &I18nMap, notify: &mut Notification) {
-        let outside: Vec<&str> = self.workspace.outside_nemesis().collect();
+        let outside: Vec<&str> = self.work.workspace.outside_nemesis().collect();
         if self.mod_export.window(ctx, i18n, notify, &outside) {
             self.export_user_patch_as_mod(notify, i18n);
         }
