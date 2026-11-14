@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use crate::patch::tool::{editing::EditorPane, work_state::Work};
+use crate::patch::{editor_area::EditorArea, tool::work_state::Work};
 
 /// The state of the objects in the explorer.
 ///
@@ -75,16 +75,15 @@ pub(in crate::patch) fn file_action(
 /// Who has the keyboard: what a binding's `when` sees. `user_patch`: the user patch's window.
 pub(in crate::patch) fn key_context(
     ctx: &egui::Context,
-    (pane, explorer, problems): (&EditorPane, &Explorer, &crate::patch::problems::Problems),
+    (editor, explorer, problems): (&EditorArea, &Explorer, &crate::patch::problems::Problems),
     user_patch: bool,
 ) -> keybinding::KeyContext {
-    let keymap = egui_code_editor::Keymap::from_vim(pane.mode.is_vim());
-    let editor_focus = pane.had_focus;
+    let (editor_focus, vim, vim_mode) = editor.key_state();
     keybinding::KeyContext {
         page: "patchEditor",
         editor_focus,
-        vim: keymap.is_vim(),
-        vim_mode: pane.state.keymap.vim_mode(keymap),
+        vim,
+        vim_mode,
         explorer_focus: explorer.tree_focus,
         explorer_view: Some(if explorer.tree_view { "tree" } else { "list" }),
         problems_focus: problems.cursor.focused,
@@ -164,15 +163,5 @@ mod tests {
         assert!(!take_reveal(Some(&a), false), "a selection alone");
         assert!(take_reveal(Some(&a), true), "the editor got the keyboard");
         assert!(!take_reveal(None, true), "nothing to show");
-    }
-
-    /// Only getting the keyboard asks: keeping it does not, or the side bar could not be scrolled.
-    #[test]
-    fn getting_into_the_editor_asks_the_side_bar_to_follow() {
-        let mut pane = EditorPane::default();
-        assert!(pane.note_focus(true));
-        assert!(!pane.note_focus(true));
-        assert!(!pane.note_focus(false));
-        assert!(pane.note_focus(true));
     }
 }

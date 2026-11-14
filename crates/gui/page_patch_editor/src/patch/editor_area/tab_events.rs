@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 use egui_widgets::TabAction;
 
-use crate::patch::{editor::tabs::EditorTabs, ui::revision_view::Views};
+use crate::patch::{editor::tabs::EditorTabs, editor_area::revision_view::Views};
 
 /// Which object is selected after a tab event.
 #[derive(Debug, Default, PartialEq, Eq)]

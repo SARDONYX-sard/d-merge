@@ -9,8 +9,11 @@ use egui_widgets::shadcn::{Button, Icon};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
-    FocusAt, TabEvent, editor::tabs::EditorTabs, problems::ObjectProblems, tool::editing::EditorPane, tree::Graph,
-    ui::revision_view::Views,
+    FocusAt, TabEvent,
+    editor::tabs::EditorTabs,
+    editor_area::{EditorPane, revision_view::Views},
+    problems::ObjectProblems,
+    tree::Graph,
 };
 
 /// What the row asked for.

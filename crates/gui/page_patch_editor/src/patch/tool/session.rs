@@ -21,8 +21,14 @@ use crate::patch::{
 /// What is shown now: the tabs and the selection. The work writes it with itself.
 #[derive(Debug, Clone, Copy)]
 pub(in crate::patch) struct Shown<'a> {
-    pub(in crate::patch) tabs: &'a EditorTabs,
+    pub(super) tabs: &'a EditorTabs,
     pub(super) sel: &'a Selection,
+}
+
+impl<'a> Shown<'a> {
+    pub(in crate::patch) const fn new(tabs: &'a EditorTabs, sel: &'a Selection) -> Self {
+        Self { tabs, sel }
+    }
 }
 
 /// What the editor shows after the work changed as a whole. The tabs of before are closed first.

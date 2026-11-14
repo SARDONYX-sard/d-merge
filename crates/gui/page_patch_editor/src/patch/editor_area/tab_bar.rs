@@ -11,7 +11,7 @@ pub(super) struct TabMarks<'a> {
     /// The editor has the keyboard: the shown tab's line is the accent color.
     pub(super) focused: bool,
     /// The work's problems: a tab of an object with some is red (errors) or yellow (warnings only).
-    pub(in crate::patch) problems: Option<&'a [crate::patch::problems::ObjectProblems]>,
+    pub(super) problems: Option<&'a [crate::patch::problems::ObjectProblems]>,
 }
 
 impl TabMarks<'_> {
@@ -98,7 +98,7 @@ fn object_items(ui: &mut egui::Ui, i18n: &I18nMap, id: &str) -> Option<TabEvent>
     let hover = i18n.t(I18nKey::NemesisObjectFileHover);
     let files = [
         (I18nKey::NemesisCopyPath, crate::patch::tool::list::FileAction::CopyPath),
-        (super::object_list::REVEAL_LABEL, crate::patch::tool::list::FileAction::Reveal),
+        (gui_shared::i18n::REVEAL_IN_FILE_MANAGER, crate::patch::tool::list::FileAction::Reveal),
     ];
     for (label, action) in files {
         if ui.button(i18n.t(label)).on_hover_text(hover).clicked() {

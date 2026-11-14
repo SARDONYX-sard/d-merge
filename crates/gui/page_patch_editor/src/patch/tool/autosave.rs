@@ -33,7 +33,7 @@ impl Autosave {
     }
 
     /// `Ctrl+S`: saved on the next frame.
-    pub(super) fn save_soon(&mut self) {
+    pub(in crate::patch) fn save_soon(&mut self) {
         self.since = Instant::now().checked_sub(SAVE_DELAY);
     }
 

@@ -10,7 +10,8 @@
 use egui_widgets::shadcn::{Button, Icon};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use crate::patch::{tool::editing::EditorPane, ui::preview::PreviewEvent};
+use super::preview::PreviewEvent;
+use crate::patch::editor_area::EditorPane;
 
 impl EditorPane {
     /// Draws the panel. Returns what its lines asked for (revert a block, go to a line).
@@ -28,7 +29,7 @@ impl EditorPane {
             .show(ui, |ui| {
                 self.preview_header(ui, i18n)?;
                 let view = self.preview_view.as_mut()?;
-                super::super::preview::lines_ui(view, ui, i18n.t(I18nKey::NemesisRevertHunkHover))
+                super::preview::lines_ui(view, ui, i18n.t(I18nKey::NemesisRevertHunkHover))
             })
             .inner
     }
@@ -41,7 +42,7 @@ impl EditorPane {
         ui.horizontal(|ui| {
             ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
             if let Some(view) = &mut self.preview_view {
-                super::super::preview::nav_ui(view, ui, i18n.t(I18nKey::NemesisJumpDiffHover));
+                super::preview::nav_ui(view, ui, i18n.t(I18nKey::NemesisJumpDiffHover));
             }
 
             match check {

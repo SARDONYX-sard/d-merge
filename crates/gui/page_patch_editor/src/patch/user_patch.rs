@@ -21,15 +21,10 @@ use gui_shared::{
 };
 
 use super::{
-    FocusAt, PatchPaths,
+    PatchPaths,
     editor::{merge, resolve},
-    tool::{
-        editing::{EditorArea, EditorPane},
-        place::WorkPlace,
-        selection::Selection,
-        session::Reshow,
-        work_state::Work,
-    },
+    editor_area::EditorArea,
+    tool::{place::WorkPlace, selection::Selection, session::Reshow, work_state::Work},
     workspace::{self, Workspace},
 };
 
@@ -299,44 +294,42 @@ pub(super) fn take_in_resolution(
     work.reset_names();
 
     sel.active = behavior;
-    editor.pane.opened = None;
     work.draft = Some(before.with_proposal(&work.workspace, behavior, &id));
-    editor.pane.merge_values = resolve::merge_values(request, &id);
-    editor.pane.merge_accepted.clear();
-    reuse_resolution((work, &mut editor.pane), (behavior, &id), notify, i18n);
+    let values = resolve::merge_values(request, &id);
+    let accepted = reuse_resolution(work, values.as_ref(), (behavior, &id), (notify, i18n));
+    // Picking another value of the object shown has no other sign of having gone anywhere.
+    editor.show_merge(values, accepted, line);
     sel.selected = Some(id.into());
 
     // What is shown is no change of the work yet.
     work.autosave.restore(since);
     work.autosave.seen_at(sel.active, sel.selected.as_ref());
-    // Picking another value of the object shown has no other sign of having gone anywhere.
-    editor.pane.focus = line.map(FocusAt::Line);
 }
 
-/// The conflict just taken in was resolved before, by the same mods with the same values: object
-/// `(behavior, id)` is resolved the same way at once. See [`crate::patch::editor::merge`].
+/// The conflict of `values` just taken in was resolved before, by the same mods with the same
+/// values: object `(behavior, id)` is resolved the same way at once. Returns the lines accepted then
+/// (none: nothing to reuse). See [`crate::patch::editor::merge`].
 fn reuse_resolution(
-    (work, pane): (&mut Work, &mut EditorPane),
+    work: &mut Work,
+    values: Option<&resolve::MergeValues>,
     (behavior, id): (usize, &str),
-    notify: &mut Notification,
-    i18n: &I18nMap,
-) {
-    let Some(values) = &pane.merge_values else { return };
-    let Some(resolution) = merge::find(&work.workspace.resolutions, values) else { return };
-    let result = resolution.result.clone();
-    let Some(text) = work.workspace.behaviors.get(behavior).and_then(|of| of.text(id)) else { return };
+    (notify, i18n): (&mut Notification, &I18nMap),
+) -> Vec<String> {
+    let Some(values) = values else { return Vec::new() };
+    let Some(resolution) = merge::find(&work.workspace.resolutions, values) else { return Vec::new() };
+    let Some(text) = work.workspace.behaviors.get(behavior).and_then(|of| of.text(id)) else { return Vec::new() };
 
     let candidates = merge::candidates(values, &[]);
-    if let Some(resolved) = merge::replace_block(text, &candidates, &result) {
-        work.workspace.behaviors[behavior].set_text(id, &resolved);
-        pane.merge_accepted = result;
-        notify.info(i18n.t(I18nKey::MergeReused));
-    }
+    let Some(resolved) = merge::replace_block(text, &candidates, &resolution.result) else { return Vec::new() };
+    let accepted = resolution.result.clone();
+    work.workspace.behaviors[behavior].set_text(id, &resolved);
+    notify.info(i18n.t(I18nKey::MergeReused));
+    accepted
 }
 
 /// What `Edit...` proposed goes, unless it was edited. See [`Draft`].
 pub(super) fn undo_unedited_draft((work, editor, sel): (&mut Work, &mut EditorArea, &mut Selection)) {
-    editor.pane.merge_values = None;
+    editor.close_merge();
     let Some(draft) = work.draft.take() else { return };
     if draft.is_edited(&work.workspace) {
         return;
@@ -345,11 +338,10 @@ pub(super) fn undo_unedited_draft((work, editor, sel): (&mut Work, &mut EditorAr
     let id = draft.id.clone();
     draft.undo(&mut work.workspace);
     work.reset_names();
-    editor.pane.opened = None;
-    editor.pane.preview = None;
+    editor.reload();
     sel.active = sel.active.min(work.workspace.behaviors.len().saturating_sub(1));
     if work.workspace.behaviors.get(sel.active).is_none_or(|behavior| behavior.text(&id).is_none()) {
-        editor.tabs.clear();
+        editor.behaviors_changed();
         sel.selected = None;
     }
     work.autosave.seen_at(sel.active, sel.selected.as_ref());

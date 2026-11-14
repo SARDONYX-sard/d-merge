@@ -27,13 +27,9 @@ use crate::patch::{
     EditorResult, FocusAt,
     anim::lines::AnimDataLanguage,
     editor::{language::NemesisXml, names::Names, pandora::PandoraXml},
+    editor_area::{EditorArea, EditorPane},
     problems::Problems,
-    tool::{
-        editing::{EditorArea, EditorPane},
-        keys::Keys,
-        selection::Selection,
-        work_state::Work,
-    },
+    tool::{keys::Keys, selection::Selection, work_state::Work},
     workspace::PANDORA_DOC,
 };
 
@@ -192,7 +188,7 @@ fn palette_actions<'a>(key_ui: &'a keybinding::KeyUi, i18n: &'a I18nMap) -> [Edi
         act(EditorCommand::CloseTab.action(""), I18nKey::EditorCloseTab),
         act(EditorCommand::TogglePreview.action(""), I18nKey::EditorTogglePreview),
         act(EditorCommand::ToggleInlineDiff.action(""), I18nKey::NemesisToggleInlineDiff),
-        act(EditorCommand::RevealFile.action(""), crate::patch::ui::object_list::REVEAL_LABEL),
+        act(EditorCommand::RevealFile.action(""), gui_shared::i18n::REVEAL_IN_FILE_MANAGER),
         act(new(OPEN_JSON_ACTION), I18nKey::KeybindingOpenJson),
     ]
 }

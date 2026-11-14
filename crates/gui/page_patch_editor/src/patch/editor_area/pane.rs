@@ -1,5 +1,5 @@
 //! The editor pane's own work: what it computes from the open object, seeing only the behavior and
-//! the settings it is given. [`EditorPane`] is in [`super::editing`].
+//! the settings it is given. See [`EditorPane`].
 //!
 //! ```text
 //! refresh_preview      the patch, its check, the underlines, the inline diff   (after a pause)
@@ -11,15 +11,14 @@
 //! reverted_block       the text with a block of the preview put back
 //! ```
 
-use std::{borrow::Cow, path::Path, rc::Rc};
+use std::{borrow::Cow, path::Path, rc::Rc, time::Instant};
 
-use egui_code_editor::InlineDiff;
+use egui_code_editor::{CodeEditorState, Diagnostic, InlineDiff};
 use gui_shared::settings::{
     pages::{patch::behavior::ParserMode, patch_editor::PatchEditorSettings},
-    ui::editor::LspOptions,
+    ui::editor::{EditorMode, LspOptions},
 };
 
-use super::editing::EditorPane;
 use crate::patch::{
     FocusAt, REFRESH_DELAY, anim, editor,
     workspace::{Behavior, ExportFormat, PANDORA_DOC},
@@ -27,23 +26,78 @@ use crate::patch::{
 
 /// What the preview is computed with: the mod code, the parser's mode, the export's format.
 #[derive(Debug, Clone, Copy)]
-pub(in crate::patch) struct PreviewSettings<'a> {
-    pub(in crate::patch) code: &'a str,
-    pub(in crate::patch) parser_mode: ParserMode,
+pub(super) struct PreviewSettings<'a> {
+    pub(super) code: &'a str,
+    pub(super) parser_mode: ParserMode,
     pub(super) export_format: ExportFormat,
+}
+
+/// The editor of the open object, and what is shown beside it.
+///
+/// ```text
+/// [tabs]                                             (EditorArea::tabs)
+/// ┌ editor (text, state) ──────────┬ preview / merge ┐
+/// │ underlines: problems            │ preview_view    │
+/// │ inline diff: inline_diff        │ merge_values    │
+/// └─────────────────────────────────┴─────────────────┘
+/// [status bar: mode, lsp]
+/// ```
+#[derive(Debug, Default)]
+pub(super) struct EditorPane {
+    /// The text in the editor.
+    pub(super) text: String,
+    /// What `text` belongs to: `(behavior, id)`.
+    pub(super) opened: Option<(usize, String)>,
+    pub(super) state: CodeEditorState,
+    /// The editor had the keyboard last frame. See [`Self::note_focus`].
+    pub(super) had_focus: bool,
+    /// Where the keyboard goes next frame.
+    pub(super) focus: Option<FocusAt>,
+    /// The line of the cursor, last frame.
+    pub(super) cursor_line: usize,
+    /// The patch of the open object and the parser's word on it. `None`: to compute again, see
+    /// [`EditorArea::refresh_preview`].
+    pub(super) preview: Option<(Option<String>, Result<(), String>)>,
+    /// When the text was last typed: the preview waits for a pause.
+    pub(super) typed_at: Option<Instant>,
+    /// The problems of the open object, underlined in the editor.
+    pub(super) problems: Vec<Diagnostic>,
+    pub(super) inline_diff: InlineDiff,
+    pub(super) show_inline_diff: bool,
+    pub(super) show_preview: bool,
+    /// The preview scrolls with the cursor.
+    pub(super) follow_preview: bool,
+    pub(super) preview_view: Option<editor::preview::Preview>,
+    /// What the merge panel shows, and the lines accepted last. See [`editor::merge`].
+    pub(super) merge_values: Option<editor::resolve::MergeValues>,
+    pub(super) merge_accepted: Vec<String>,
+    /// The window of the references of an object.
+    pub(super) references: Option<egui_code_editor::ReferenceList>,
+    /// Back and forward, as `Alt+←` / `Alt+→`.
+    pub(super) history: egui_code_editor::NavHistory<String>,
+    pub(super) mode: EditorMode,
+    pub(super) lsp: LspOptions,
+    pub(super) show_lsp_options: bool,
+    /// `(behavior, values)`: enum / flag values per field, for the completion.
+    pub(super) field_values: Option<(usize, Rc<editor::language::FieldValues>)>,
+    /// What each line of an animation data file is. See [`anim::lines`].
+    pub(super) anim_roles: Vec<anim::lines::LineRole>,
+    /// The trigger names of the clip data template, read once; and those known now, for the completion.
+    template_triggers: Option<std::collections::BTreeSet<String>>,
+    pub(super) trigger_names: Vec<String>,
 }
 
 impl EditorPane {
     /// Notes whether the editor has the keyboard this frame. Returns whether it just got it: the
     /// side bar shows its object again then, as VS Code's explorer follows the file being edited.
-    pub(in crate::patch) const fn note_focus(&mut self, has_focus: bool) -> bool {
+    pub(super) const fn note_focus(&mut self, has_focus: bool) -> bool {
         let got = has_focus && !self.had_focus;
         self.had_focus = has_focus;
         got
     }
 
     /// Gives the editor the keyboard and moves its cursor, if that was asked for.
-    pub(in crate::patch) fn apply_focus_request(&mut self, ctx: &egui::Context, editor: egui::Id) {
+    pub(super) fn apply_focus_request(&mut self, ctx: &egui::Context, editor: egui::Id) {
         let Some(at) = self.focus.take() else { return };
         let index = match at {
             FocusAt::Line(line) => egui_code_editor::text_pos::LinePos { line, column: 0 }.to_char_index(&self.text),
@@ -56,7 +110,7 @@ impl EditorPane {
 
     /// The pause after typing is over: `preview` goes, for [`Self::refresh_preview`] to compute it.
     /// Until then the last results stay on screen, as in VS Code.
-    pub(in crate::patch) fn expire_preview(&mut self, ctx: &egui::Context) {
+    pub(super) fn expire_preview(&mut self, ctx: &egui::Context) {
         let Some(typed_at) = self.typed_at else { return };
         let left = REFRESH_DELAY.saturating_sub(typed_at.elapsed());
         if left.is_zero() {
@@ -126,11 +180,7 @@ impl EditorPane {
     }
 
     /// Enum / flag values only depend on the template: computed once per behavior (`index`).
-    pub(in crate::patch) fn field_values(
-        &mut self,
-        index: usize,
-        behavior: &Behavior,
-    ) -> Rc<editor::language::FieldValues> {
+    pub(super) fn field_values(&mut self, index: usize, behavior: &Behavior) -> Rc<editor::language::FieldValues> {
         let cached = self.field_values.take().filter(|(cached, _)| *cached == index);
         let (_, values) = cached.unwrap_or_else(|| (index, Rc::new(editor::language::field_values(behavior))));
         self.field_values = Some((index, Rc::clone(&values)));
@@ -138,7 +188,7 @@ impl EditorPane {
     }
 
     /// In a clip data file, trigger lines complete with the known names (the template's read once).
-    pub(in crate::patch) fn refresh_trigger_names(&mut self, behavior: &Behavior, template_dir: &Path) {
+    pub(super) fn refresh_trigger_names(&mut self, behavior: &Behavior, template_dir: &Path) {
         if !behavior.adsf {
             return;
         }
@@ -148,7 +198,7 @@ impl EditorPane {
 
     /// `]c` / `[c`, `▲ ▼`: the next / previous change, of the inline diff if shown, else of the
     /// preview.
-    pub(in crate::patch) fn step_change(&mut self, forward: bool) {
+    pub(super) fn step_change(&mut self, forward: bool) {
         if self.show_inline_diff {
             if let Some(line) = self.inline_diff.step(self.cursor_line, forward) {
                 self.focus = Some(FocusAt::Line(line));
@@ -173,13 +223,13 @@ impl EditorPane {
     }
 
     /// The editor's settings, shared with the hkanno editor.
-    pub(in crate::patch) fn read_options(&mut self, editor: &LspOptions) {
+    pub(super) fn read_options(&mut self, editor: &LspOptions) {
         self.mode = editor.editor_mode;
         self.lsp.clone_from(editor);
     }
 
     /// Back to the settings: changed by the keymap box and the options window.
-    pub(in crate::patch) fn write_options(&mut self, editor: &mut LspOptions) {
+    pub(super) fn write_options(&mut self, editor: &mut LspOptions) {
         // Both hold the keymap: the box only changes `editor_mode`.
         self.lsp.editor_mode = self.mode;
         if *editor != self.lsp {
@@ -188,15 +238,82 @@ impl EditorPane {
     }
 
     /// What is shown beside the text, kept in the settings.
-    pub(in crate::patch) const fn read_view(&mut self, settings: &PatchEditorSettings) {
+    pub(super) const fn read_view(&mut self, settings: &PatchEditorSettings) {
         self.show_inline_diff = settings.inline_diff;
         self.follow_preview = settings.follow_preview;
         self.show_preview = settings.show_preview;
     }
 
-    pub(in crate::patch) const fn write_view(&self, settings: &mut PatchEditorSettings) {
+    pub(super) const fn write_view(&self, settings: &mut PatchEditorSettings) {
         settings.inline_diff = self.show_inline_diff;
         settings.show_preview = self.show_preview;
         settings.follow_preview = self.follow_preview;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Only getting the keyboard asks: keeping it does not, or the side bar could not be scrolled.
+    #[test]
+    fn getting_into_the_editor_asks_the_side_bar_to_follow() {
+        let mut pane = EditorPane::default();
+        assert!(pane.note_focus(true));
+        assert!(!pane.note_focus(true));
+        assert!(!pane.note_focus(false));
+        assert!(pane.note_focus(true));
+    }
+
+    /// Vim `]c`: in the text while the inline diff shows, else in the preview.
+    #[test]
+    fn the_change_keys_go_to_what_shows_the_changes() {
+        let mut pane = EditorPane {
+            inline_diff: egui_code_editor::InlineDiff::between("a\nb\nc\nd\n", "a\nx\nc\ny\n"),
+            preview_view: Some(crate::patch::editor::preview::Preview::new(
+                "<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- CLOSE -->\n<!-- MOD_CODE ~m~ OPEN -->\nd\n<!-- CLOSE -->\n",
+            )),
+            show_inline_diff: true,
+            show_preview: true,
+            ..Default::default()
+        };
+        let current = |pane: &EditorPane| pane.preview_view.as_ref().map(|view| view.current);
+
+        pane.step_change(true);
+        assert!(matches!(pane.focus, Some(FocusAt::Line(1))));
+        pane.cursor_line = 1;
+        pane.step_change(true);
+        assert!(matches!(pane.focus, Some(FocusAt::Line(3))));
+        pane.cursor_line = 3;
+        pane.step_change(false);
+        assert!(matches!(pane.focus, Some(FocusAt::Line(1))));
+        assert_eq!(current(&pane), Some(0), "the preview stays");
+
+        pane.focus = None;
+        pane.show_inline_diff = false;
+        pane.step_change(true);
+        assert_eq!(current(&pane), Some(1));
+        assert!(pane.focus.is_none(), "the cursor stays");
+
+        pane.show_preview = false;
+        pane.step_change(true);
+        assert_eq!(current(&pane), Some(1), "neither shows");
+    }
+
+    /// `LspOptions` holds the keymap too: it must not put back the one it was given.
+    #[test]
+    fn the_keymap_box_changes_the_keymap() {
+        let mut pane = EditorPane::default();
+        let mut editor = LspOptions { editor_mode: EditorMode::Normal, ..LspOptions::default() };
+        pane.read_options(&editor);
+        pane.mode = EditorMode::Vim;
+        pane.write_options(&mut editor);
+        assert_eq!(editor.editor_mode, EditorMode::Vim);
+
+        pane.read_options(&editor);
+        pane.lsp.hover = !pane.lsp.hover;
+        pane.write_options(&mut editor);
+        assert_eq!(editor.hover, pane.lsp.hover);
+        assert_eq!(editor.editor_mode, EditorMode::Vim);
     }
 }

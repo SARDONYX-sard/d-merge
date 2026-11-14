@@ -8,7 +8,7 @@ use crate::patch::editor::preview::{Kind, Preview};
 const TEXT_LEFT: f32 = 24.0;
 
 /// `▲ ▼ 2/5`: moves the current block (and scrolls to it).
-pub(in crate::patch) fn nav_ui(preview: &mut Preview, ui: &mut egui::Ui, hover: &str) {
+pub(super) fn nav_ui(preview: &mut Preview, ui: &mut egui::Ui, hover: &str) {
     if preview.blocks() == 0 {
         return;
     }

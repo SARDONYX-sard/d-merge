@@ -15,7 +15,9 @@
 mod bottom;
 mod editor;
 mod merge;
+mod preview;
 mod preview_panel;
+mod problems;
 mod toolbar;
 
 use std::rc::Rc;
@@ -23,11 +25,12 @@ use std::rc::Rc;
 use gui_shared::i18n::{I18nKey, I18nMap};
 use keybinding::commands;
 
-use super::preview::PreviewEvent;
+use self::preview::PreviewEvent;
 use crate::patch::{
     EditorResult, FocusAt, TabEvent,
+    editor_area::EditorArea,
     problems::Problems,
-    tool::{editing::EditorArea, keys::Keys, list::FileAction, selection::Selection, work_state::Work},
+    tool::{keys::Keys, list::FileAction, selection::Selection, work_state::Work},
     workspace::PANDORA_DOC,
 };
 

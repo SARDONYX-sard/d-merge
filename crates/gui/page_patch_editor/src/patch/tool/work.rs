@@ -164,9 +164,22 @@ impl Work {
         remember_recent(&mut self.recent, RecentWork { output, mod_code: code });
     }
 
+    /// Back to what `session` had open: its tabs into `tabs`, and where the work was read from and
+    /// exported to. Returns what it showed: `(behavior, object)`.
+    pub(in crate::patch) fn restore_session(
+        &mut self,
+        session: workspace::Session,
+        tabs: &mut crate::patch::editor::tabs::EditorTabs,
+    ) -> (usize, Option<std::rc::Rc<str>>) {
+        let restored = super::session::restore(session, &self.workspace.behaviors, tabs);
+        self.take_restored_place((restored.mod_dir, restored.output));
+        self.autosave.seen_at(restored.active, restored.selected.as_ref());
+        (restored.active, restored.selected)
+    }
+
     /// What a session restored says of the work's place: where it was read from and exported to.
     /// See [`super::session::restore`].
-    pub(super) fn take_restored_place(&mut self, (mod_dir, output): (String, String)) {
+    fn take_restored_place(&mut self, (mod_dir, output): (String, String)) {
         if !mod_dir.is_empty() {
             self.place.mod_dir = mod_dir;
         }

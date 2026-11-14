@@ -15,7 +15,7 @@ use gui_shared::{
     settings::ui::editor::{EditorMode, LspOptions},
 };
 
-use crate::patch::{problems::Problems, tool::editing::EditorPane, workspace::Behavior};
+use crate::patch::{editor_area::EditorPane, problems::Problems, workspace::Behavior};
 
 /// What the Problems panel asked for.
 #[derive(Debug, Default)]
@@ -67,7 +67,7 @@ impl Problems {
         };
 
         let was_focused = self.cursor.focused;
-        let go_to = super::super::problems::problems_panel(ui, i18n, problems, behaviors, &mut self.cursor, keys);
+        let go_to = super::problems::problems_panel(ui, i18n, problems, behaviors, &mut self.cursor, keys);
         // `Esc`: back to the editor, where it was. (`Enter` goes to the problem's line.)
         let left = was_focused && !self.cursor.focused && go_to.is_none();
 

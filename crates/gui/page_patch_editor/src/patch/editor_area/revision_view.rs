@@ -18,7 +18,8 @@ use egui_widgets::preview_tabs::PreviewTabs;
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
-    tool::{editing::EditorArea, keys::Keys, list::FileAction, selection::Selection, work_state::Work},
+    editor_area::EditorArea,
+    tool::{keys::Keys, list::FileAction, selection::Selection, work_state::Work},
     workspace::{
         Workspace,
         history::{ObjectKey, Origin},
@@ -28,9 +29,9 @@ use crate::patch::{
 /// A diff or a blame of an object, in a tab of the editor as VS Code opens a diff:
 /// `GetUpModList (#2) ↔ GetUpModList (working) 🔒 ✖`. Read only. Its tab's group is its behavior.
 #[derive(Debug)]
-pub(in crate::patch) struct RevisionView {
+pub(super) struct RevisionView {
     /// The object, e.g. `#0106`.
-    pub(in crate::patch) id: String,
+    pub(super) id: String,
     /// What its tab says. e.g. `GetUpModList (#2) ↔ GetUpModList (working)`
     pub(super) title: String,
     body: Box<DiffView>,
@@ -38,12 +39,12 @@ pub(in crate::patch) struct RevisionView {
 
 /// A tab of a view, for the tab bar. e.g. `{ at: 0, title: "Blame Root", shown: true, pinned: false }`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(in crate::patch) struct ViewTab<'a> {
+pub(super) struct ViewTab<'a> {
     /// Its index in [`Views::list`].
-    pub(in crate::patch) at: usize,
+    pub(super) at: usize,
     pub(super) title: &'a str,
     /// Its object, e.g. `#0106`.
-    pub(in crate::patch) id: &'a str,
+    pub(super) id: &'a str,
     pub(super) shown: bool,
     pub(super) pinned: bool,
 }
@@ -51,13 +52,13 @@ pub(in crate::patch) struct ViewTab<'a> {
 /// The views open, as tabs after the objects'. The one shown in the editor's place is
 /// `list.active`; `None`: the object of the tab selected.
 #[derive(Debug, Default)]
-pub(in crate::patch) struct Views {
-    pub(in crate::patch) list: PreviewTabs<RevisionView>,
+pub(super) struct Views {
+    pub(super) list: PreviewTabs<RevisionView>,
 }
 
 impl Views {
     /// The tabs of `behavior`, in order: see [`ViewTab`].
-    pub(in crate::patch) fn tabs_of(&self, behavior: usize) -> Vec<ViewTab<'_>> {
+    pub(super) fn tabs_of(&self, behavior: usize) -> Vec<ViewTab<'_>> {
         let of = self.list.of(behavior);
         of.map(|(at, view)| ViewTab {
             at,
@@ -70,7 +71,7 @@ impl Views {
     }
 
     /// Shows view `at`, its editor with the keyboard.
-    pub(in crate::patch) fn show(&mut self, at: usize) {
+    pub(super) fn show(&mut self, at: usize) {
         if let Some(view) = self.list.get_mut(at) {
             view.body.focus();
             self.list.active = Some(at);
@@ -78,7 +79,7 @@ impl Views {
     }
 
     /// Keeps only `at` of the views of its behavior, and shows it.
-    pub(in crate::patch) fn close_others(&mut self, at: usize) {
+    pub(super) fn close_others(&mut self, at: usize) {
         self.list.active = self.list.close_others(at);
     }
 }

@@ -32,6 +32,7 @@
 mod anim;
 mod changes;
 mod editor;
+mod editor_area;
 mod new_work;
 mod problems;
 mod repeat;
@@ -102,8 +103,8 @@ pub(crate) struct PatchTool {
     keys: tool::keys::Keys,
     /// The side bar and its views. See [`ui::side_bar::SideArea`].
     side: ui::side_bar::SideArea,
-    /// The tabs, the editor of the open object, the diffs. See [`tool::editing::EditorArea`].
-    editor: tool::editing::EditorArea,
+    /// The tabs, the editor of the open object, the diffs. See [`editor_area::EditorArea`].
+    editor: editor_area::EditorArea,
     /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
     problems: problems::Problems,
     /// Which windows, forms and sections are open. See [`ui::panels`].
@@ -131,7 +132,7 @@ enum FocusAt {
     Line(usize),
 }
 
-/// What the editor asked for in a frame. See [`tool::editing::EditorArea::apply_editor_result`].
+/// What the editor asked for in a frame. See [`editor_area::EditorArea::apply_editor_result`].
 #[derive(Debug, Default)]
 struct EditorResult {
     /// The text was edited.
@@ -157,7 +158,7 @@ struct EditorResult {
 enum TabEvent {
     /// An object's tab, by its id.
     Object(egui_widgets::TabAction, String),
-    /// A diff's / blame's tab, by its index in [`ui::revision_view::Views`].
+    /// A diff's / blame's tab, by its index in [`editor_area::revision_view::Views`].
     View(egui_widgets::TabAction, usize),
     /// The object's file: its path to the clipboard, or shown in the file manager.
     File(tool::list::FileAction, String),
@@ -184,7 +185,7 @@ impl PatchTool {
     pub(crate) fn set_parser_mode(&mut self, mode: ParserMode) {
         if self.work.parser_mode != mode {
             self.work.parser_mode = mode;
-            self.editor.pane.preview = None;
+            self.editor.preview_again();
         }
     }
 
@@ -198,7 +199,7 @@ impl PatchTool {
         (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
         keys: &mut keybinding::Keybindings,
     ) {
-        self.editor.pane.read_options(editor);
+        self.editor.read_options(editor);
         if self.work.place.template_dir != paths.template_dir {
             paths.template_dir.clone_into(&mut self.work.place.template_dir);
         }
@@ -219,7 +220,7 @@ impl PatchTool {
         self.take_key_commands(ui.ctx(), keys, i18n, notify);
         self.draw(ui, i18n, notify);
 
-        self.editor.pane.write_options(editor);
+        self.editor.write_options(editor);
         self.write_settings(settings);
     }
 
@@ -282,12 +283,12 @@ impl PatchTool {
 
     /// What is shown of the editor, kept in the settings.
     const fn read_view_settings(&mut self, settings: &PatchEditorSettings) {
-        self.editor.pane.read_view(settings);
+        self.editor.read_view(settings);
         self.side.explorer.tree_view = settings.tree_view;
     }
 
     const fn write_view_settings(&self, settings: &mut PatchEditorSettings) {
-        self.editor.pane.write_view(settings);
+        self.editor.write_view(settings);
         settings.tree_view = self.side.explorer.tree_view;
     }
 
@@ -336,7 +337,7 @@ impl PatchTool {
         i18n: &I18nMap,
         notify: &mut Notification,
     ) {
-        let parts = (&self.editor.pane, &self.side.explorer, &self.problems);
+        let parts = (&self.editor, &self.side.explorer, &self.problems);
         let context = tool::list::key_context(ctx, parts, self.work.user_patch);
         self.keys.frame(ctx, bindings, &context, (i18n, notify));
     }
@@ -440,13 +441,13 @@ impl PatchTool {
             }
             SideAsk::File(action, id) => tool::list::file_action(ctx, (&self.work, sel.active), (action, &id), notify),
 
-            SideAsk::FocusEditor => editor.pane.focus = Some(FocusAt::Keep),
+            SideAsk::FocusEditor => editor.focus_editor(),
             SideAsk::Reload => editor.reload(),
         }
     }
 
-    /// What the editor asked for: see [`ui::object_editor::EditorOut`].
-    fn apply_editor_out(&mut self, ui: &egui::Ui, out: ui::object_editor::EditorOut, notify: &mut Notification) {
+    /// What the editor asked for: see [`editor_area::EditorOut`].
+    fn apply_editor_out(&mut self, ui: &egui::Ui, out: editor_area::EditorOut, notify: &mut Notification) {
         if out.reveal {
             self.side.explorer.reveal = true;
         }
@@ -605,14 +606,14 @@ impl PatchTool {
         (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
         keys: &mut keybinding::Keybindings,
     ) {
-        self.editor.pane.read_options(editor);
+        self.editor.read_options(editor);
         self.read_view_settings(settings);
         let shown = self.editor.shown(&self.sel);
         self.work.sync_workspace(shown, notify, i18n);
         self.take_resolution(notify, i18n);
         self.take_key_commands(ui.ctx(), Some(keys), i18n, notify);
         self.draw(ui, i18n, notify);
-        self.editor.pane.write_options(editor);
+        self.editor.write_options(editor);
         self.write_view_settings(settings);
     }
 }
@@ -716,8 +717,9 @@ mod tests {
                 let tree = &tool.side.explorer.trees[path];
                 let found = tree.rows().get(tree.cursor).map(|row| names.graph.id(row.node));
                 assert_eq!(found, Some(id.as_str()), "`{id}` is not selected in the tree");
-                assert_eq!(tool.editor.pane.opened.as_ref().map(|(_, open)| open.as_str()), Some(id.as_str()));
-                assert!(!tool.editor.pane.text.is_empty(), "`{id}` opened empty");
+                let (opened, text) = tool.editor.opened().unwrap_or_default();
+                assert_eq!(opened, id.as_str());
+                assert!(!text.is_empty(), "`{id}` opened empty");
             }
         }
     }
@@ -930,105 +932,6 @@ mod work_tests {
         assert!(edited.unwrap().contains(">false<"));
         assert!(changed, "the list marks it");
         assert_eq!(format, workspace::ExportFormat::PandoraV5);
-    }
-
-    /// Vim `]c`: in the text while the inline diff shows, else in the preview.
-    #[test]
-    fn the_change_keys_go_to_what_shows_the_changes() {
-        let mut pane = tool::editing::EditorPane {
-            inline_diff: egui_code_editor::InlineDiff::between("a\nb\nc\nd\n", "a\nx\nc\ny\n"),
-            preview_view: Some(editor::preview::Preview::new(
-                "<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- CLOSE -->\n<!-- MOD_CODE ~m~ OPEN -->\nd\n<!-- CLOSE -->\n",
-            )),
-            show_inline_diff: true,
-            show_preview: true,
-            ..Default::default()
-        };
-        let current = |pane: &tool::editing::EditorPane| pane.preview_view.as_ref().map(|view| view.current);
-
-        pane.step_change(true);
-        assert!(matches!(pane.focus, Some(FocusAt::Line(1))));
-        pane.cursor_line = 1;
-        pane.step_change(true);
-        assert!(matches!(pane.focus, Some(FocusAt::Line(3))));
-        pane.cursor_line = 3;
-        pane.step_change(false);
-        assert!(matches!(pane.focus, Some(FocusAt::Line(1))));
-        assert_eq!(current(&pane), Some(0), "the preview stays");
-
-        pane.focus = None;
-        pane.show_inline_diff = false;
-        pane.step_change(true);
-        assert_eq!(current(&pane), Some(1));
-        assert!(pane.focus.is_none(), "the cursor stays");
-
-        pane.show_preview = false;
-        pane.step_change(true);
-        assert_eq!(current(&pane), Some(1), "neither shows");
-    }
-
-    /// The preview says what `Export` would write, and its `↶` takes back what it shows.
-    #[test]
-    fn the_preview_follows_the_export_format() {
-        let dir = std::env::temp_dir().join(format!("d_merge_pandora_preview_{}", std::process::id()));
-        let meshes = dir.join("templates/meshes/actors/character/behaviors");
-        std::fs::create_dir_all(&meshes).unwrap();
-        std::fs::write(
-            meshes.join("0_master.xml"),
-            "<hkpackfile><hksection name=\"__data__\">\n<hkobject name=\"#0001\" class=\"hkbStateMachine\" signature=\"0x1\">\n\t<hkparam name=\"enable\">true</hkparam>\n</hkobject>\n</hksection></hkpackfile>\n",
-        )
-        .unwrap();
-        let mod_dir = dir.join("mods/Pandora/Pandora_Engine/mod/pandora");
-        std::fs::create_dir_all(mod_dir.join("patches")).unwrap();
-        std::fs::write(
-            mod_dir.join("patches/0_master.xml"),
-            "<patch>\n\t<Replace path=\"#0001/enable\">\n\t\t<hkparam name=\"enable\">false</hkparam>\n\t</Replace>\n</patch>\n",
-        )
-        .unwrap();
-        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
-        let mut tool = tool_in(&dir.join("out"));
-        tool.work.place.template_dir = dir.join("templates").display().to_string();
-        open_mod(&mut tool, &mod_dir, &mut notify, &i18n);
-        sync(&mut tool, &mut notify, &i18n);
-        tool.editor.pane.text = tool.work.workspace.behaviors[0].text("#0001").unwrap().to_owned();
-
-        let shown = |tool: &mut PatchTool| {
-            tool.editor.pane.preview = None;
-            tool.editor.refresh_preview((&mut tool.work, &mut tool.problems), 0, "#0001");
-            let view = tool.editor.pane.preview_view.as_ref();
-            let lines = view.map(|view| view.lines().iter().map(|(_, line)| line.clone()));
-            lines.map_or_else(String::new, |lines| lines.collect::<Vec<_>>().join("\n"))
-        };
-        let as_pandora = shown(&mut tool);
-        tool.work.workspace.export_format = workspace::ExportFormat::Nemesis;
-        let as_nemesis = shown(&mut tool);
-        tool.work.workspace.export_format = workspace::ExportFormat::PandoraV5;
-        shown(&mut tool);
-        tool.editor.revert_block((&mut tool.work, 0), "#0001", 0);
-        let edits = tool.work.workspace.behaviors[0].edits.len();
-        std::fs::remove_dir_all(&dir).unwrap();
-
-        assert!(as_pandora.starts_with("<Replace path=\"#0001/enable\">"), "{as_pandora}");
-        assert!(as_nemesis.contains("<!-- MOD_CODE ~"), "{as_nemesis}");
-        assert_eq!(edits, 0, "back to the template");
-    }
-
-    /// `LspOptions` holds the keymap too: it must not put back the one it was given.
-    #[test]
-    fn the_keymap_box_changes_the_keymap() {
-        let mut pane = tool::editing::EditorPane::default();
-        let mut editor =
-            LspOptions { editor_mode: gui_shared::settings::ui::editor::EditorMode::Normal, ..LspOptions::default() };
-        pane.read_options(&editor);
-        pane.mode = gui_shared::settings::ui::editor::EditorMode::Vim;
-        pane.write_options(&mut editor);
-        assert_eq!(editor.editor_mode, gui_shared::settings::ui::editor::EditorMode::Vim);
-
-        pane.read_options(&editor);
-        pane.lsp.hover = !pane.lsp.hover;
-        pane.write_options(&mut editor);
-        assert_eq!(editor.hover, pane.lsp.hover);
-        assert_eq!(editor.editor_mode, gui_shared::settings::ui::editor::EditorMode::Vim);
     }
 }
 

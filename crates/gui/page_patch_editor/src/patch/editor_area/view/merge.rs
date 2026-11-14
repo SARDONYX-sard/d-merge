@@ -20,7 +20,8 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use crate::patch::{
     FocusAt,
     editor::{merge, resolve},
-    tool::{editing::EditorPane, work_state::Work},
+    editor_area::EditorPane,
+    tool::work_state::Work,
 };
 
 /// What the panel asked for.
