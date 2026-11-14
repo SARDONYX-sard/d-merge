@@ -2,7 +2,7 @@
 
 use std::rc::Rc;
 
-use crate::patch::{FocusAt, PatchTool, tool::editing::EditorPane, workspace::PANDORA_DOC};
+use crate::patch::tool::{editing::EditorPane, work_state::Work};
 
 /// The state of the objects in the explorer.
 ///
@@ -51,130 +51,29 @@ pub(in crate::patch) enum FileAction {
 
 pub(in crate::patch) use egui_tree::list::{ListScroll, fixed_row, offset_to_show, row_height};
 
-impl PatchTool {
-    /// Notes whether the editor `has_focus` this frame. Getting it asks the side bar to show the
-    /// object again (next frame: the side bar is drawn first).
-    pub(in crate::patch) fn note_editor_focus(&mut self, ctx: &egui::Context, has_focus: bool) {
-        if has_focus && !self.pane.had_focus {
-            self.explorer.reveal = true;
-            ctx.request_repaint();
-        }
-        self.pane.had_focus = has_focus;
-    }
-
-    /// The keyboard goes to the object tree or list, as it shows, its filter kept (Vim `Space e`, or
-    /// the palette).
-    pub(in crate::patch) fn enter_tree(&mut self, ui: &egui::Ui, editor: egui::Id) {
-        // The view shown, as VS Code's "Focus Side Bar": the tree or the list, or the changes. The
-        // views without keys of their own (the search, the variables) give way to the explorer.
-        use crate::patch::ui::side_bar::SideView;
-        self.explorer.tree_focus = true;
-        if !matches!(self.side.view, SideView::Explorer | SideView::Changes) || self.side.hidden {
-            self.side.view = SideView::Explorer;
-        }
-        self.side.hidden = false;
-        self.side.objects_closed = false;
-        ui.memory_mut(|m| m.surrender_focus(editor));
-    }
-
-    /// Reads this frame's keys: see [`super::keys::Keys::frame`].
-    pub(in crate::patch) fn take_key_commands(
-        &mut self,
-        ctx: &egui::Context,
-        bindings: Option<&mut keybinding::Keybindings>,
-        i18n: &gui_shared::i18n::I18nMap,
-        notify: &mut egui_widgets::notify::Notification,
-    ) {
-        let context = key_context(ctx, (&self.pane, &self.explorer, &self.problems), self.is_user_patch);
-        self.keys.frame(ctx, bindings, &context, (i18n, notify));
-    }
-
-    /// VS Code's "Copy Path" / "Reveal in File Explorer" of the file object `id` is in (see
-    /// [`object_file`]): its path to the clipboard, or the file selected in its folder (what exists
-    /// of the folder if it isn't written yet).
-    pub(in crate::patch) fn file_action(
-        &self,
-        ctx: &egui::Context,
-        (action, id): (FileAction, &str),
-        notify: &mut egui_widgets::notify::Notification,
-    ) {
-        let behavior = &self.work.workspace.behaviors[self.sel.active];
-        let file = object_file((behavior, id), &self.work.place, self.work.workspace.export_format);
-        match action {
-            FileAction::CopyPath => ctx.copy_text(file.display().to_string()),
-            FileAction::Reveal => {
-                if let Err(err) = gui_shared::fs::reveal_file(&file) {
-                    notify.error(err);
-                }
+/// VS Code's "Copy Path" / "Reveal in File Explorer" of the file object `id` of the active behavior
+/// is in (see [`object_file`]): its path to the clipboard, or the file selected in its folder (what
+/// exists of the folder if it isn't written yet).
+pub(in crate::patch) fn file_action(
+    ctx: &egui::Context,
+    (work, active): (&Work, usize),
+    (action, id): (FileAction, &str),
+    notify: &mut egui_widgets::notify::Notification,
+) {
+    let behavior = &work.workspace.behaviors[active];
+    let file = object_file((behavior, id), &work.place, work.workspace.export_format);
+    match action {
+        FileAction::CopyPath => ctx.copy_text(file.display().to_string()),
+        FileAction::Reveal => {
+            if let Err(err) = gui_shared::fs::reveal_file(&file) {
+                notify.error(err);
             }
         }
-    }
-
-    /// `Shift+Alt+C` / `Shift+Alt+R` (key bindings), as VS Code: of the selected object. Also what a
-    /// tab's menu or Vim's `<Space>V` asked for ([`Self::file_asked`]).
-    pub(in crate::patch) fn file_keys(&mut self, ctx: &egui::Context, notify: &mut egui_widgets::notify::Notification) {
-        use keybinding::commands::{FILE_COPY_PATH, FILE_REVEAL};
-        let (copy, reveal) = (self.keys.take(FILE_COPY_PATH), self.keys.take(FILE_REVEAL));
-        let selected = self.sel.selected.as_deref().map(str::to_owned);
-        let asked = [(copy, FileAction::CopyPath), (reveal, FileAction::Reveal)]
-            .into_iter()
-            .filter_map(|(on, action)| on.then_some(action).zip(selected.clone()));
-        for (action, id) in asked.chain(self.file_asked.take()) {
-            self.file_action(ctx, (action, &id), notify);
-        }
-    }
-
-    /// `Ctrl+Shift+L`, as VS Code's `Ctrl+Shift+M`: the Problems panel shows and gets the keyboard;
-    /// if it has it, it hides and the editor gets it back. See [`egui_code_editor::problems`].
-    pub(in crate::patch) fn toggle_problems_focus(&mut self, ui: &egui::Ui, editor: egui::Id) {
-        let cursor = &mut self.problems.cursor;
-        if cursor.focused {
-            cursor.focused = false;
-            self.problems.open = false;
-            self.pane.focus = Some(FocusAt::Keep);
-            return;
-        }
-        self.problems.open = true;
-        if self.problems.list.is_none() {
-            return; // Not checked yet: no panel to take the keyboard.
-        }
-        self.problems.cursor.focused = true;
-        self.explorer.tree_focus = false;
-        ui.memory_mut(|m| m.surrender_focus(editor));
-    }
-
-    /// The keyboard goes back to the editor.
-    pub(in crate::patch) const fn leave_tree(&mut self) {
-        self.explorer.tree_focus = false;
-        self.pane.focus = Some(FocusAt::Keep);
-    }
-
-    /// Deletes a new object, or drops the edits of a template object.
-    pub(in crate::patch) fn revert_or_delete(&mut self, id: &str) {
-        let behavior = &mut self.work.workspace.behaviors[self.sel.active];
-        behavior.edits.remove(id);
-        let is_pandora_doc = id == PANDORA_DOC && behavior.pandora_doc.take().is_some();
-        if behavior.added.remove(id).is_some() || is_pandora_doc {
-            let neighbor = self.tabs.close(self.sel.active, id);
-            if self.sel.selected.as_deref() == Some(id) {
-                self.sel.selected = neighbor.map(Rc::from);
-            }
-        }
-        self.pane.opened = None;
-        self.refresh_problems(id);
-        self.object_changed(id);
-    }
-
-    pub(in crate::patch) fn new_object(&mut self, from: Option<&str>) {
-        let code = self.work.place.mod_code.trim().to_string();
-        let id = self.work.workspace.behaviors[self.sel.active].add_object(&code, from);
-        self.object_changed(&id);
-        self.sel.selected = Some(id.into());
     }
 }
 
 /// Who has the keyboard: what a binding's `when` sees. `user_patch`: the user patch's window.
-fn key_context(
+pub(in crate::patch) fn key_context(
     ctx: &egui::Context,
     (pane, explorer, problems): (&EditorPane, &Explorer, &crate::patch::problems::Problems),
     user_patch: bool,
@@ -235,37 +134,25 @@ mod tests {
         use crate::patch::workspace::{ADSF, Behavior};
         let mut clips = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
         clips.added.insert("Male~1/m$0.txt".to_owned(), String::new());
-        let mut tool = PatchTool::default();
-        tool.work.place.mod_code = "mymod".to_owned();
-        tool.work.place.output = "D:/mods/My".to_owned();
-        tool.work.workspace.behaviors.push(clips);
+        let mut work = Work::default();
+        work.place.mod_code = "mymod".to_owned();
+        work.place.output = "D:/mods/My".to_owned();
+        work.workspace.behaviors.push(clips);
 
         let patch = Path::new("D:/mods/My").join("Nemesis_Engine/mod/mymod").join(ADSF).join("Male~1/m$0.txt");
         assert_eq!(
-            object_file(
-                (&tool.work.workspace.behaviors[0], "Male~1/m$0.txt"),
-                &tool.work.place,
-                tool.work.workspace.export_format
-            ),
+            object_file((&work.workspace.behaviors[0], "Male~1/m$0.txt"), &work.place, work.workspace.export_format),
             patch
         );
-        let template = tool.work.workspace.behaviors[0].template_path.clone();
+        let template = work.workspace.behaviors[0].template_path.clone();
         assert_eq!(
-            object_file(
-                (&tool.work.workspace.behaviors[0], "Male~1/other.txt"),
-                &tool.work.place,
-                tool.work.workspace.export_format
-            ),
+            object_file((&work.workspace.behaviors[0], "Male~1/other.txt"), &work.place, work.workspace.export_format),
             template,
             "not patched"
         );
-        tool.work.place.output.clear();
+        work.place.output.clear();
         assert_eq!(
-            object_file(
-                (&tool.work.workspace.behaviors[0], "Male~1/m$0.txt"),
-                &tool.work.place,
-                tool.work.workspace.export_format
-            ),
+            object_file((&work.workspace.behaviors[0], "Male~1/m$0.txt"), &work.place, work.workspace.export_format),
             template,
             "no mod to be in"
         );
@@ -282,14 +169,10 @@ mod tests {
     /// Only getting the keyboard asks: keeping it does not, or the side bar could not be scrolled.
     #[test]
     fn getting_into_the_editor_asks_the_side_bar_to_follow() {
-        let ctx = egui::Context::default();
-        let mut tool = PatchTool::default();
-        tool.note_editor_focus(&ctx, true);
-        assert!(std::mem::take(&mut tool.explorer.reveal));
-        tool.note_editor_focus(&ctx, true);
-        assert!(!tool.explorer.reveal);
-        tool.note_editor_focus(&ctx, false);
-        tool.note_editor_focus(&ctx, true);
-        assert!(tool.explorer.reveal);
+        let mut pane = EditorPane::default();
+        assert!(pane.note_focus(true));
+        assert!(!pane.note_focus(true));
+        assert!(!pane.note_focus(false));
+        assert!(pane.note_focus(true));
     }
 }

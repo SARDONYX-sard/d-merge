@@ -8,7 +8,8 @@
 //! `info.ini`. The list of behaviors is in [`super::behaviors`].
 //!
 //! Each part is a function that sees only what it shows and returns what was asked ([`BarAsk`]);
-//! [`PatchTool::project_bar`] does it.
+//! [`apply`] does it, and says what the editor shows then ([`BarDone`]). The start screen and the
+//! user patch's bar ask the same way.
 
 use std::path::{Path, PathBuf};
 
@@ -23,9 +24,13 @@ use gui_shared::{
 };
 
 use crate::patch::{
-    PatchTool,
     new_work::NewWork,
-    tool::rename::rename_problem,
+    tool::{
+        rename::rename_problem,
+        session::{Reshow, Shown},
+        work_state::Work,
+    },
+    ui::panels::Panels,
     workspace::{ExportFormat, ModInfo, Workspace},
 };
 
@@ -36,9 +41,9 @@ const EXPORT_FORMAT_WIDTH: f32 = 112.0;
 pub(super) const PATH_ACTIONS: PathActions =
     PathActions { open: gui_shared::fs::open_dir_of, pick: gui_shared::fs::pick_folder_from };
 
-/// What the bar asked for.
+/// What the bar, the start screen or the user patch's bar asked for. See [`apply`].
 #[derive(Debug)]
-enum BarAsk {
+pub(in crate::patch) enum BarAsk {
     /// `File > New`: a new work, its output next to the open one's.
     NewWork,
     OpenMod,
@@ -53,133 +58,168 @@ enum BarAsk {
     ReloadFromMod,
     RemoveRef(usize),
     AddRef(PathBuf),
+    /// The start screen's `Create`.
+    CreateWork(NewWork),
+    /// The user patch's `Delete all`.
+    ClearUserPatch,
+    /// The user patch's `Export as a mod`.
+    ExportUserPatchAsMod,
 }
 
-impl PatchTool {
-    /// The one line, and the details if unfolded.
-    pub(in crate::patch) fn project_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let mut asks = Vec::new();
-        ui.horizontal(|ui| {
-            asks.extend(file_menu(ui, i18n, &self.work.recent));
-            let chevron = if self.panels.project_open { Icon::ChevronDown } else { Icon::ChevronRight };
-            let mut toggle = ui.add(Button::new("").icon(chevron).small()).clicked();
+/// What the editor shows after a [`BarAsk`].
+#[derive(Debug)]
+pub(in crate::patch) enum BarDone {
+    /// The work changed as a whole.
+    Reshow(Reshow),
+    /// The objects changed under the editor: it loads the open one again.
+    Reload,
+}
 
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                let ready = !self.work.place.output.trim().is_empty() && !self.work.workspace.behaviors.is_empty();
-                asks.extend(export_buttons(ui, i18n, ready, self.work.workspace.export_format));
-                if cache_button(ui, i18n, &self.cache_dir()) {
-                    asks.push(BarAsk::OpenCache);
-                }
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    toggle |= summary(ui, self.work.place.mod_code.trim(), self.work.place.output.trim());
-                });
-            });
-            if toggle {
-                self.panels.project_open = !self.panels.project_open;
+/// The one line, and the details if unfolded.
+pub(in crate::patch) fn project_bar(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    (work, panels): (&mut Work, &mut Panels),
+    notify: &mut Notification,
+) -> Vec<BarAsk> {
+    let mut asks = Vec::new();
+    ui.horizontal(|ui| {
+        asks.extend(file_menu(ui, i18n, &work.recent));
+        let chevron = if panels.project_open { Icon::ChevronDown } else { Icon::ChevronRight };
+        let mut toggle = ui.add(Button::new("").icon(chevron).small()).clicked();
+
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            let ready = !work.place.output.trim().is_empty() && !work.workspace.behaviors.is_empty();
+            asks.extend(export_buttons(ui, i18n, ready, work.workspace.export_format));
+            if cache_button(ui, i18n, &work.place.cache_dir()) {
+                asks.push(BarAsk::OpenCache);
             }
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                toggle |= summary(ui, work.place.mod_code.trim(), work.place.output.trim());
+            });
         });
+        if toggle {
+            panels.project_open = !panels.project_open;
+        }
+    });
 
-        if self.panels.project_open {
-            asks.extend(self.project_form(ui, i18n, notify));
-        }
-        for ask in asks {
-            self.apply_bar(ask, notify, i18n);
-        }
+    if panels.project_open {
+        asks.extend(project_form(ui, i18n, (work, &mut panels.rename_to), notify));
+    }
+    asks
+}
+
+/// The directories, the mod code, and the mod's `info.ini`. `rename_to`: the rename form's code.
+fn project_form(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    (work, rename_to): (&mut Work, &mut Option<String>),
+    notify: &mut Notification,
+) -> Vec<BarAsk> {
+    let mut asks = Vec::new();
+
+    let output = PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
+        .help(i18n.t(I18nKey::NemesisOutputHover))
+        .show(ui, &mut work.place.output);
+    if let Some(err) = output.open_error {
+        notify.error(err);
+    }
+    if output.changed {
+        asks.push(BarAsk::Edited);
     }
 
-    /// The directories, the mod code, and the mod's `info.ini`.
-    fn project_form(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) -> Vec<BarAsk> {
-        let mut asks = Vec::new();
+    asks.extend(source_row(ui, i18n, work.place.mod_dir.trim(), notify));
+    asks.extend(ref_mods_row(ui, i18n, &work.workspace.ref_mods));
 
-        let output = PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
-            .help(i18n.t(I18nKey::NemesisOutputHover))
-            .show(ui, &mut self.work.place.output);
-        if let Some(err) = output.open_error {
-            notify.error(err);
+    ui.horizontal_wrapped(|ui| {
+        // It is in the ids of the new objects and the names of the folders: renamed, not typed over.
+        let hover = i18n.t(I18nKey::NemesisModCodeHover);
+        ui.label(i18n.t(I18nKey::NemesisModCodeLabel)).on_hover_text(hover);
+        ui.strong(work.place.mod_code.trim()).on_hover_text(hover);
+        if !work.user_patch {
+            let old = work.place.loaded_for.as_deref().unwrap_or_default();
+            asks.extend(rename_form(ui, i18n, rename_to, (old, &work.place.cache_root)));
         }
-        if output.changed {
+        if info_fields(ui, i18n, &mut work.workspace.info) {
             asks.push(BarAsk::Edited);
         }
+    });
+    asks
+}
 
-        asks.extend(source_row(ui, i18n, self.work.place.mod_dir.trim(), notify));
-        asks.extend(ref_mods_row(ui, i18n, &self.work.workspace.ref_mods));
+/// Does what was asked. `shown`: what the editor shows, saved with the work first where it is
+/// left. Returns what the editor shows then.
+pub(in crate::patch) fn apply(
+    ask: BarAsk,
+    (work, panels): (&mut Work, &mut Panels),
+    shown: Shown<'_>,
+    notify: &mut Notification,
+    i18n: &I18nMap,
+) -> Option<BarDone> {
+    match ask {
+        BarAsk::NewWork => {
+            // Usually next to the one that was open.
+            let output = work.place.output.clone();
+            let closed = work.close_work(shown, notify, i18n);
+            panels.project_open = false;
+            panels.new_work = Some(NewWork { code: String::new(), output, ..NewWork::default() });
+            return Some(BarDone::Reshow(closed));
+        }
+        BarAsk::CreateWork(form) => {
+            panels.new_work = None;
+            work.create_work(form.code.trim().to_owned(), form.output.trim().to_owned(), form.scope);
+            panels.project_open = true; // Its name and author are still to be set.
+        }
+        BarAsk::OpenMod => panels.code_choice = work.pick_mod(shown, notify, i18n),
+        BarAsk::OpenRecent(recent) => panels.code_choice = work.open_recent(shown, &recent, notify, i18n),
+        BarAsk::CloseWork => {
+            panels.project_open = false;
+            return Some(BarDone::Reshow(work.close_work(shown, notify, i18n)));
+        }
 
-        ui.horizontal_wrapped(|ui| {
-            // It is in the ids of the new objects and the names of the folders: renamed, not typed over.
-            let hover = i18n.t(I18nKey::NemesisModCodeHover);
-            ui.label(i18n.t(I18nKey::NemesisModCodeLabel)).on_hover_text(hover);
-            ui.strong(self.work.place.mod_code.trim()).on_hover_text(hover);
-            if !self.is_user_patch {
-                let old = self.work.place.loaded_for.as_deref().unwrap_or_default();
-                let root = &self.work.place.cache_root;
-                asks.extend(rename_form(ui, i18n, &mut self.panels.rename_to, (old, root)));
-            }
-            if info_fields(ui, i18n, &mut self.work.workspace.info) {
-                asks.push(BarAsk::Edited);
-            }
-        });
-        asks
-    }
+        BarAsk::Export => work.export(shown, notify, i18n),
+        BarAsk::ExportFormat(format) => {
+            work.workspace.export_format = format;
+            work.mark_dirty();
+            return Some(BarDone::Reload); // the preview says what the export would write
+        }
+        BarAsk::OpenCache => open_cache(work, shown, notify, i18n),
 
-    /// Does what the bar asked for.
-    fn apply_bar(&mut self, ask: BarAsk, notify: &mut Notification, i18n: &I18nMap) {
-        match ask {
-            BarAsk::NewWork => {
-                // Usually next to the one that was open.
-                let output = self.work.place.output.clone();
-                self.close_work(notify, i18n);
-                self.panels.new_work = Some(NewWork { code: String::new(), output, ..NewWork::default() });
-            }
-            BarAsk::OpenMod => self.pick_mod(notify, i18n),
-            BarAsk::OpenRecent(work) => self.open_recent(&work, notify, i18n),
-            BarAsk::CloseWork => self.close_work(notify, i18n),
+        BarAsk::Edited => work.mark_dirty(),
+        BarAsk::Rename(new) => work.start_rename(shown, &new, notify, i18n),
+        BarAsk::ReloadFromMod => work.reload_from_mod(notify, i18n),
 
-            BarAsk::Export => self.export(notify, i18n),
-            BarAsk::ExportFormat(format) => {
-                self.work.workspace.export_format = format;
-                self.pane.preview = None; // it says what the export would write
-                self.work.mark_dirty();
-            }
-            BarAsk::OpenCache => self.open_cache(notify, i18n),
+        BarAsk::RemoveRef(at) => {
+            work.workspace.ref_mods.remove(at);
+            work.workspace.reload_refs();
+            return Some(refs_changed(work));
+        }
+        BarAsk::AddRef(dir) => {
+            let code = work.place.mod_code.trim().to_owned();
+            work.workspace.add_ref(&dir, &code);
+            return Some(refs_changed(work));
+        }
 
-            BarAsk::Edited => self.work.mark_dirty(),
-            BarAsk::Rename(new) => self.start_rename(&new, notify, i18n),
-            BarAsk::ReloadFromMod => self.reload_from_mod(notify, i18n),
-
-            BarAsk::RemoveRef(at) => {
-                self.work.workspace.ref_mods.remove(at);
-                self.work.workspace.reload_refs();
-                self.refs_changed();
-            }
-            BarAsk::AddRef(dir) => {
-                let code = self.work.place.mod_code.trim().to_owned();
-                self.work.workspace.add_ref(&dir, &code);
-                self.refs_changed();
-            }
+        BarAsk::ClearUserPatch => return Some(BarDone::Reshow(work.clear_user_patch(notify, i18n))),
+        BarAsk::ExportUserPatchAsMod => {
+            crate::patch::user_patch::export_as_mod(work, &panels.mod_export, notify, i18n);
         }
     }
+    None
+}
 
-    /// The mods depended on changed: what they lend is read again.
-    fn refs_changed(&mut self) {
-        self.reset_names();
-        self.pane.opened = None;
-        self.work.mark_dirty();
-    }
+/// The mods depended on changed: what they lend is read again.
+fn refs_changed(work: &mut Work) -> BarDone {
+    work.reset_names();
+    work.mark_dirty();
+    BarDone::Reload
+}
 
-    /// `Open work data`: the directory of the work, saved first (a new work has none until then).
-    pub(super) fn open_cache(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        self.save_now(notify, i18n);
-        if let Err(err) = gui_shared::fs::open_dir_of(&self.cache_dir().to_string_lossy()) {
-            notify.error(err);
-        }
-    }
-
-    /// The directory of the open work, or of all the works if none is open.
-    pub(super) fn cache_dir(&self) -> PathBuf {
-        let root = &self.work.place.cache_root;
-        let dir =
-            self.work.place.loaded_for.as_deref().map_or_else(|| root.clone(), |code| Workspace::cache_dir(root, code));
-        std::path::absolute(&dir).unwrap_or(dir)
+/// `Open work data`: the directory of the work, saved first (a new work has none until then).
+fn open_cache(work: &mut Work, shown: Shown<'_>, notify: &mut Notification, i18n: &I18nMap) {
+    work.save_now(shown, notify, i18n);
+    if let Err(err) = gui_shared::fs::open_dir_of(&work.place.cache_dir().to_string_lossy()) {
+        notify.error(err);
     }
 }
 

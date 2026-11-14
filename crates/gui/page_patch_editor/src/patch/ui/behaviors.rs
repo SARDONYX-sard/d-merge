@@ -8,7 +8,7 @@
 //! The template list opens as a window with the filter focused, like VS Code's quick open, but next
 //! to what was clicked.
 
-use std::{path::PathBuf, rc::Rc};
+use std::path::PathBuf;
 
 use egui_widgets::{
     notify::Notification,
@@ -18,7 +18,12 @@ use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
 
 use crate::patch::{
-    PatchTool,
+    tool::{selection::Selection, work_state::Work},
+    ui::{
+        anim_data::AnimDataDialog,
+        panels::Panels,
+        side_bar::{SideArea, SideAsk},
+    },
     workspace::{Behavior, Target, TemplateScope},
 };
 
@@ -41,80 +46,73 @@ enum AddEvent {
     AnimData,
 }
 
-impl PatchTool {
-    /// See the module docs.
-    pub(super) fn behaviors_section(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let mut add = None;
-        let mut open = self.panels.behaviors_open;
-        let scope = self.work.workspace.scope;
-        egui_widgets::section_header(ui, &mut open, i18n.t(I18nKey::NemesisBehaviorsSection), |ui| {
-            add = add_menu(ui, scope, i18n);
-        });
-        self.panels.behaviors_open = open;
-        match add {
-            Some(AddEvent::Template) => self.panels.picker.open(),
-            Some(AddEvent::File) => self.add_custom_template(notify, i18n),
-            Some(AddEvent::AnimData) => self.open_anim_data_for_mod(),
-            None => {}
-        }
-        if self.panels.behaviors_open {
-            let code = self.work.place.mod_code.trim();
-            let code = if is_existing_mod_code(code) { code } else { "<code>" };
-            let ext = self.work.workspace.export_format.is_ext();
-            let event = behavior_rows(ui, i18n, (&self.work.workspace.behaviors, self.sel.active), (code, ext));
-            self.apply_row_event(event);
-        }
-        ui.separator();
-    }
-
-    fn add_custom_template(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        let dialog = gui_shared::rfd::FileDialog::new().add_filter("Template", &["xml", "bin"]);
-        if let Some(path) = dialog.set_directory(&self.work.place.template_dir).pick_file() {
-            self.add_behavior(&path, notify, i18n);
-        }
-    }
-
-    /// The mod the work was read from, or else the one it makes, or else asks for one.
-    fn open_anim_data_for_mod(&mut self) {
-        let dirs = [self.work.place.mod_dir.trim(), self.work.place.output.trim()];
-        let chosen = dirs.into_iter().find(|dir| !dir.is_empty()).map(PathBuf::from);
-        if let Some(root) = chosen.or_else(|| gui_shared::rfd::FileDialog::new().pick_folder()) {
-            self.open_anim_data_dialog(&root);
-        }
-    }
-
-    fn apply_row_event(&mut self, event: Option<RowEvent>) {
-        match event {
-            Some(RowEvent::Select(i)) => {
-                self.sel.active = i;
-                // Back to where it was left in that behavior.
-                self.sel.selected = self.tabs.last_of(i).map(Rc::from);
-            }
-            Some(RowEvent::Remove(i)) => {
-                self.work.workspace.behaviors.remove(i);
-                self.reset_names(); // the numbers of the others shift
-                self.tabs.clear();
-                self.sel.active = self.sel.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
-                self.sel.selected = None;
-                self.pane.opened = None;
-                self.work.mark_dirty();
-            }
-            None => {}
-        }
-    }
-
-    /// The window of the templates of `template_dir`, if open; a click adds one as a behavior.
-    pub(in crate::patch) fn template_picker_window(
+impl SideArea {
+    /// See the module docs. What `[+]` asks for opens a window (`panels`), or adds a behavior now.
+    pub(super) fn behaviors_section(
         &mut self,
-        ctx: &egui::Context,
+        ui: &mut egui::Ui,
         i18n: &I18nMap,
+        (work, sel): (&mut Work, &mut Selection),
+        panels: &mut Panels,
         notify: &mut Notification,
-    ) {
-        let place = (self.work.place.template_dir.as_str(), self.work.workspace.scope);
-        if let Some(path) = self.panels.picker.window(ctx, i18n, place) {
-            self.add_behavior(&path, notify, i18n);
+    ) -> Option<SideAsk> {
+        let mut add = None;
+        let scope = work.workspace.scope;
+        egui_widgets::section_header(
+            ui,
+            &mut self.bar.behaviors_open,
+            i18n.t(I18nKey::NemesisBehaviorsSection),
+            |ui| {
+                add = add_menu(ui, scope, i18n);
+            },
+        );
+        match add {
+            Some(AddEvent::Template) => panels.picker.open(),
+            Some(AddEvent::File) => add_custom_template((work, sel), notify, i18n),
+            Some(AddEvent::AnimData) => panels.anim_data_dialog = open_anim_data_for_mod(work),
+            None => {}
+        }
+        if !self.bar.behaviors_open {
+            ui.separator();
+            return None;
+        }
+
+        let event = {
+            let code = work.place.mod_code.trim();
+            let code = if is_existing_mod_code(code) { code } else { "<code>" };
+            let ext = work.workspace.export_format.is_ext();
+            behavior_rows(ui, i18n, (&work.workspace.behaviors, sel.active), (code, ext))
+        };
+        ui.separator();
+        match event? {
+            RowEvent::Select(at) => Some(SideAsk::ShowBehavior(at)),
+            RowEvent::Remove(at) => {
+                work.workspace.behaviors.remove(at);
+                work.reset_names(); // the numbers of the others shift
+                work.mark_dirty();
+                sel.active = sel.active.min(work.workspace.behaviors.len().saturating_sub(1));
+                sel.selected = None;
+                Some(SideAsk::BehaviorRemoved)
+            }
         }
     }
+}
+
+/// A template file of the user's own, picked in a file dialog, as a behavior of the work.
+fn add_custom_template((work, sel): (&mut Work, &mut Selection), notify: &mut Notification, i18n: &I18nMap) {
+    let dialog = gui_shared::rfd::FileDialog::new().add_filter("Template", &["xml", "bin"]);
+    if let Some(path) = dialog.set_directory(&work.place.template_dir).pick_file() {
+        work.add_behavior(sel, &path, notify, i18n);
+    }
+}
+
+/// The animation data window of the mod the work was read from, or else the one it makes, or else
+/// one asked for.
+fn open_anim_data_for_mod(work: &Work) -> Option<AnimDataDialog> {
+    let dirs = [work.place.mod_dir.trim(), work.place.output.trim()];
+    let chosen = dirs.into_iter().find(|dir| !dir.is_empty()).map(PathBuf::from);
+    let root = chosen.or_else(|| gui_shared::rfd::FileDialog::new().pick_folder())?;
+    Some(AnimDataDialog::open(work, &root))
 }
 
 /// `[+]` and its menu. A template file of your own

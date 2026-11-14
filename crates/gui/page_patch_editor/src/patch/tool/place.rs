@@ -12,6 +12,8 @@
 
 use std::path::PathBuf;
 
+use crate::patch::workspace::Workspace;
+
 /// See the module docs.
 #[derive(Debug, Default)]
 pub(in crate::patch) struct WorkPlace {
@@ -35,5 +37,12 @@ impl WorkPlace {
     /// Is a work open?
     pub(in crate::patch) const fn is_open(&self) -> bool {
         self.loaded_for.is_some()
+    }
+
+    /// The directory of the open work, or of all the works if none is open.
+    pub(in crate::patch) fn cache_dir(&self) -> PathBuf {
+        let root = &self.cache_root;
+        let dir = self.loaded_for.as_deref().map_or_else(|| root.clone(), |code| Workspace::cache_dir(root, code));
+        std::path::absolute(&dir).unwrap_or(dir)
     }
 }

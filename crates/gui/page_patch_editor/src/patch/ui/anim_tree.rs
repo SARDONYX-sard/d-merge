@@ -31,6 +31,14 @@ pub(in crate::patch) struct AnimTreeState {
     /// The row the keyboard is on (`j` / `k` ...), while the explorer has it. See [`apply_key`].
     pub(super) cursor: usize,
 }
+
+impl AnimTreeState {
+    /// Project `folder` opens, e.g. to show the files that went to it.
+    pub(in crate::patch) fn show_project(&mut self, folder: String) {
+        self.open.insert(folder);
+    }
+}
+
 /// A kind of file, in the order they are shown. See [`AdsfFile`], [`AsdsfFile`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(super) enum FileKind {

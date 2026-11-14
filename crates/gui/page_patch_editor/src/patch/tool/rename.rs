@@ -11,11 +11,12 @@ use egui_widgets::notify::Notification;
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_valid_mod_code;
 
-use super::job::{Done, Job};
-use crate::patch::{
-    PatchTool,
-    workspace::{self, Workspace},
+use super::{
+    job::{Done, Job},
+    session::Shown,
+    work_state::Work,
 };
+use crate::patch::workspace::{self, Workspace};
 
 /// Why `new` can not be the work's code instead of `old`, if so. `exists`: is there a work with it?
 ///
@@ -28,55 +29,30 @@ pub(in crate::patch) fn rename_problem(old: &str, new: &str, exists: impl FnOnce
     (new.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE) || exists(new)).then_some(I18nKey::NemesisWorkExists)
 }
 
-impl PatchTool {
+impl Work {
     /// Starts renaming the open work to `new`, saved first. See the module docs.
-    pub(in crate::patch) fn start_rename(&mut self, new: &str, notify: &mut Notification, i18n: &I18nMap) {
-        let Some(old) = self.work.place.loaded_for.clone() else { return };
-        if rename_problem(&old, new, |code| Workspace::exists(&self.work.place.cache_root, code)).is_some() {
-            return;
-        }
-        self.work.mark_dirty();
-        self.save_now(notify, i18n);
-        let mut work = std::mem::take(&mut self.work.workspace);
-        let total = workspace::rename::object_count(&work);
-        let new = new.trim().to_owned();
-        let detail = format!("{old} -> {new}");
-        self.work.job = Some(Job::spawn(I18nKey::NemesisRenameCodeRunning, detail, total, move |done| {
-            work.rename_code(&old, &new, done);
-            Done::Renamed { work, old, new }
-        }));
-    }
-
-    pub(super) fn finish_rename(
+    pub(in crate::patch) fn start_rename(
         &mut self,
-        work: Workspace,
-        old: &str,
+        shown: Shown<'_>,
         new: &str,
         notify: &mut Notification,
         i18n: &I18nMap,
     ) {
-        self.work.workspace = work;
-        new.clone_into(&mut self.work.place.mod_code);
-        self.work.place.loaded_for = Some(new.to_owned());
-        self.reset_names();
-        self.tabs.clear();
-        self.sel.selected = None;
-        self.pane.opened = None;
-        self.pane.preview = None;
-        self.restore_session();
-        self.work.mark_dirty();
-        self.save_now(notify, i18n);
-        // Only once it is saved under the new code does the old one go.
-        if Workspace::exists(&self.work.place.cache_root, new)
-            && let Err(err) = std::fs::remove_dir_all(Workspace::cache_dir(&self.work.place.cache_root, old))
-        {
-            notify.warn(format!("{}: {err}", Workspace::cache_dir(&self.work.place.cache_root, old).display()));
+        let Some(old) = self.place.loaded_for.clone() else { return };
+        if rename_problem(&old, new, |code| Workspace::exists(&self.place.cache_root, code)).is_some() {
+            return;
         }
-        for work in self.work.recent.iter_mut().filter(|work| work.mod_code.eq_ignore_ascii_case(old)) {
-            new.clone_into(&mut work.mod_code);
-        }
-        self.work.autosave.changed();
-        notify.success(format!("{}: {old} -> {new}", i18n.t(I18nKey::NemesisRenameCodeDone)));
+        self.mark_dirty();
+        self.save_now(shown, notify, i18n);
+
+        let mut work = std::mem::take(&mut self.workspace);
+        let total = workspace::rename::object_count(&work);
+        let new = new.trim().to_owned();
+        let detail = format!("{old} -> {new}");
+        self.job = Some(Job::spawn(I18nKey::NemesisRenameCodeRunning, detail, total, move |done| {
+            work.rename_code(&old, &new, done);
+            Done::Renamed { work, old, new }
+        }));
     }
 }
 
@@ -98,28 +74,30 @@ mod tests {
     #[test]
     fn a_work_is_renamed_and_saved_under_the_new_code() {
         let dir = std::env::temp_dir().join(format!("d_merge_rename_{}", std::process::id()));
-        let mut tool = PatchTool::default();
-        tool.work.place.cache_root.clone_from(&dir);
+        let (tabs, sel) = (crate::patch::editor::tabs::EditorTabs::default(), Default::default());
+        let shown = Shown { tabs: &tabs, sel: &sel };
+        let mut work = Work::default();
+        work.place.cache_root.clone_from(&dir);
         let mut behavior =
             workspace::Behavior::open(&std::path::Path::new("meshes").join(format!("{}.bin", workspace::ADSF)))
                 .unwrap();
         behavior.added.insert("M~1/Idle~oldc$0.txt".to_owned(), "Idle\noldc$0\n1\n0\n0\n0\n".to_owned());
-        tool.work.workspace.behaviors.push(behavior);
-        tool.work.place.mod_code = "oldc".to_owned();
-        tool.work.place.loaded_for = Some("oldc".to_owned());
+        work.workspace.behaviors.push(behavior);
+        work.place.mod_code = "oldc".to_owned();
+        work.place.loaded_for = Some("oldc".to_owned());
         let (mut notify, i18n) = (Notification::default(), I18nMap::default());
-        tool.work.mark_dirty();
-        tool.save_now(&mut notify, &i18n);
+        work.mark_dirty();
+        work.save_now(shown, &mut notify, &i18n);
         assert!(Workspace::exists(&dir, "oldc"));
 
-        tool.start_rename("newc", &mut notify, &i18n);
-        assert!(tool.work.job.is_some() && tool.work.workspace.behaviors.is_empty());
-        tool.wait_job(&mut notify, &i18n);
-        let renamed = tool.work.workspace.behaviors[0].added.contains_key("M~1/Idle~newc$0.txt");
+        work.start_rename(shown, "newc", &mut notify, &i18n);
+        assert!(work.job.is_some() && work.workspace.behaviors.is_empty());
+        work.wait_job(shown, &mut notify, &i18n);
+        let renamed = work.workspace.behaviors[0].added.contains_key("M~1/Idle~newc$0.txt");
         let (old_gone, new_there) = (!Workspace::exists(&dir, "oldc"), Workspace::exists(&dir, "newc"));
         std::fs::remove_dir_all(&dir).unwrap();
 
-        assert_eq!(tool.work.place.mod_code, "newc");
+        assert_eq!(work.place.mod_code, "newc");
         assert!(renamed && old_gone && new_there);
     }
 }

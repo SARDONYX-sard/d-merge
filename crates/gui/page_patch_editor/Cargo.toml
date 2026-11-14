@@ -29,7 +29,7 @@ behavior_merge_types = { workspace = true }
 egui_code_editor     = { workspace = true }
 egui_tree            = { workspace = true }
 egui_widgets         = { workspace = true }
-keybinding = { workspace = true }
+keybinding           = { workspace = true }
 gui_shared           = { workspace = true }
 hkx_io               = { workspace = true }
 nemesis_diff         = { workspace = true }

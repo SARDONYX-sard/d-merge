@@ -34,6 +34,14 @@ pub(in crate::patch) struct PreviewSettings<'a> {
 }
 
 impl EditorPane {
+    /// Notes whether the editor has the keyboard this frame. Returns whether it just got it: the
+    /// side bar shows its object again then, as VS Code's explorer follows the file being edited.
+    pub(in crate::patch) const fn note_focus(&mut self, has_focus: bool) -> bool {
+        let got = has_focus && !self.had_focus;
+        self.had_focus = has_focus;
+        got
+    }
+
     /// Gives the editor the keyboard and moves its cursor, if that was asked for.
     pub(in crate::patch) fn apply_focus_request(&mut self, ctx: &egui::Context, editor: egui::Id) {
         let Some(at) = self.focus.take() else { return };

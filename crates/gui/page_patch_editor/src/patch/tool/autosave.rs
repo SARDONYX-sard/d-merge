@@ -6,7 +6,7 @@
 //! an edit, a rename, an export     changed()      -> due SAVE_DELAY later
 //! Ctrl+S                           save_soon()    -> due now
 //! another behavior / object shown  look_at(..)    -> a change, if a work is open
-//! each frame                       is_due()       -> PatchTool::save_now -> take()
+//! each frame                       is_due()       -> Work::save_now -> take()
 //! ```
 
 use std::{
@@ -38,7 +38,6 @@ impl Autosave {
     }
 
     /// Is there something to save?
-    #[cfg(test)]
     pub(in crate::patch) const fn is_dirty(&self) -> bool {
         self.since.is_some()
     }
@@ -55,11 +54,11 @@ impl Autosave {
 
     /// What `since` is, to put back with [`Self::restore`]: around something that must not count as
     /// a change (e.g. a proposal shown, not taken yet).
-    pub(super) const fn since(&self) -> Option<Instant> {
+    pub(in crate::patch) const fn since(&self) -> Option<Instant> {
         self.since
     }
 
-    pub(super) const fn restore(&mut self, since: Option<Instant>) {
+    pub(in crate::patch) const fn restore(&mut self, since: Option<Instant>) {
         self.since = since;
     }
 

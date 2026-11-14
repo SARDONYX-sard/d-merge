@@ -12,10 +12,7 @@ mod explorer;
 mod flat;
 mod title;
 
-use egui_widgets::{
-    notify::Notification,
-    shadcn::{Button, TextEdit},
-};
+use egui_widgets::shadcn::{Button, TextEdit};
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
 
@@ -23,33 +20,32 @@ use self::{
     anim_list::{DuplicatePick, Files},
     explorer::ListOutput,
 };
-use super::anim_data::{DuplicateForm, NewClipsForm};
+use super::anim_data::{DuplicateForm, NewClipsForm, anim_projects, duplicate_files};
 use crate::patch::{
-    PatchTool,
     anim::data,
-    tool::list::FileAction,
-    tree::{Graph, Node},
+    tool::{keys::Keys, list::FileAction, selection::Selection, work_state::Work},
+    tree::Graph,
+    ui::{
+        panels::Panels,
+        side_bar::{SideArea, SideAsk},
+    },
     workspace::PANDORA_DOC,
 };
 
-impl PatchTool {
-    pub(in crate::patch) fn object_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let anim = self.work.workspace.behaviors[self.sel.active].is_anim_data();
-        let mut open = !self.side.objects_closed;
+impl SideArea {
+    /// See the module docs. Returns what it asked of the rest; a window it asked for is in `panels`.
+    pub(super) fn object_list(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        (work, sel, keys): (&mut Work, &mut Selection, &mut Keys),
+        panels: &mut Panels,
+    ) -> Vec<SideAsk> {
+        let mut asks = Vec::new();
+        let anim = work.workspace.behaviors[sel.active].is_anim_data();
+        let mut open = !self.bar.objects_closed;
         let asked = {
-            let behavior = &self.work.workspace.behaviors[self.sel.active];
-            let selected = self.sel.selected.as_ref();
-            let title = title::Title {
-                anim,
-                adsf: behavior.adsf,
-                tree_view: self.explorer.tree_view,
-                code_ok: is_existing_mod_code(self.work.place.mod_code.trim()),
-                selected,
-                selected_is_new: selected.is_some_and(|id| **id == *PANDORA_DOC || behavior.added.contains_key(&**id)),
-                selected_is_pandora_doc: selected.is_some_and(|id| **id == *PANDORA_DOC),
-                changed_only: &mut self.explorer.changed_only,
-                unlinked_only: &mut self.explorer.unlinked_only,
-            };
+            let title = self.title(work, sel, anim);
             let mut asked = None;
             egui_widgets::section_header(ui, &mut open, i18n.t(I18nKey::NemesisObjectsTab), |ui| {
                 asked = title::buttons(ui, i18n, title);
@@ -57,126 +53,156 @@ impl PatchTool {
             asked
         };
         if let Some(asked) = asked {
-            self.apply_title(asked);
+            asks.extend(self.apply_title((work, sel), panels, asked));
         }
-        self.side.objects_closed = !open;
-        if self.side.objects_closed {
-            return;
+        self.bar.objects_closed = !open;
+        if self.bar.objects_closed {
+            return asks;
         }
+
         ui.add(
             TextEdit::singleline(&mut self.explorer.filter)
                 .hint_text(i18n.t(I18nKey::NemesisFilterHint))
                 .desired_width(ui.available_width()),
         );
-
         // Clicking any text field takes the keyboard out of the tree.
         if ui.memory(|m| m.focused().is_some()) {
             self.explorer.tree_focus = false;
         }
-        // `t` / `c` / `u` (key bindings): what it shows, as the `[≡]` / `⋯` menu does.
-        self.explorer.tree_view ^= self.keys.take(keybinding::commands::EXPLORER_TOGGLE_VIEW) && !anim;
-        self.explorer.changed_only ^= self.keys.take(keybinding::commands::EXPLORER_TOGGLE_CHANGED_ONLY);
-        self.explorer.unlinked_only ^= self.keys.take(keybinding::commands::EXPLORER_TOGGLE_UNLINKED_ONLY) && !anim;
-        let names = self.names();
+        self.filter_keys(keys, anim);
+
+        let names = work.names(sel.active);
         let graph = &names.graph;
-        let keys =
-            if self.explorer.tree_focus { self.keys.take_mapped(keybinding::host::tree_key) } else { Vec::new() };
+        let tree_keys =
+            if self.explorer.tree_focus { keys.take_mapped(keybinding::host::tree_key) } else { Vec::new() };
 
         // A tree from the root container, unless filtering: a filter wants the flat list.
         let output = if anim {
-            let projects = self.anim_projects();
-            let is_adsf = self.work.workspace.behaviors[self.sel.active].adsf;
-            self.explorer.anim(ui, i18n, (graph, is_adsf, &projects), &keys, &mut self.sel.selected)
+            let projects = anim_projects(work, sel.active);
+            let is_adsf = work.workspace.behaviors[sel.active].adsf;
+            self.explorer.anim(ui, i18n, (graph, is_adsf, &projects), &tree_keys, &mut sel.selected)
         } else if self.explorer.tree_view && self.explorer.filter.is_empty() && !self.explorer.unlinked_only {
-            let path = &self.work.workspace.behaviors[self.sel.active].meshes_path;
-            self.explorer.tree(ui, i18n, (graph, path), &keys, &mut self.sel.selected)
+            let path = &work.workspace.behaviors[sel.active].meshes_path;
+            self.explorer.tree(ui, i18n, (graph, path), &tree_keys, &mut sel.selected)
         } else {
-            self.explorer.flat(ui, i18n, graph, &keys, &mut self.sel.selected)
+            self.explorer.flat(ui, i18n, graph, &tree_keys, &mut sel.selected)
         };
-        self.apply_list_output(ui, graph, output, notify);
+        asks.extend(self.apply_list_output(ui, (work, sel), panels, graph, output));
+        asks
     }
 
-    /// What the list asked of the tool: back to the editor, a row's menu, a duplicate.
-    fn apply_list_output(&mut self, ui: &egui::Ui, graph: &Graph, output: ListOutput, notify: &mut Notification) {
-        if output.leave {
-            self.leave_tree();
+    /// The title's buttons, of what is shown.
+    fn title<'a>(&'a mut self, work: &'a Work, sel: &'a Selection, anim: bool) -> title::Title<'a> {
+        let behavior = &work.workspace.behaviors[sel.active];
+        let selected = sel.selected.as_ref();
+        title::Title {
+            anim,
+            adsf: behavior.adsf,
+            tree_view: self.explorer.tree_view,
+            code_ok: is_existing_mod_code(work.place.mod_code.trim()),
+            selected,
+            selected_is_new: selected.is_some_and(|id| **id == *PANDORA_DOC || behavior.added.contains_key(&**id)),
+            selected_is_pandora_doc: selected.is_some_and(|id| **id == *PANDORA_DOC),
+            changed_only: &mut self.explorer.changed_only,
+            unlinked_only: &mut self.explorer.unlinked_only,
         }
-        self.apply_row_action(ui, graph, output.menu, notify);
+    }
 
-        if let Some((pick, files, from)) = output.duplicate {
-            let behavior = &self.work.workspace.behaviors[self.sel.active];
-            let files = match files {
+    /// `t` / `c` / `u` (key bindings): what the list shows, as the `[≡]` / `⋯` menu does.
+    fn filter_keys(&mut self, keys: &mut Keys, anim: bool) {
+        use keybinding::commands::{EXPLORER_TOGGLE_CHANGED_ONLY, EXPLORER_TOGGLE_UNLINKED_ONLY, EXPLORER_TOGGLE_VIEW};
+        self.explorer.tree_view ^= keys.take(EXPLORER_TOGGLE_VIEW) && !anim;
+        self.explorer.changed_only ^= keys.take(EXPLORER_TOGGLE_CHANGED_ONLY);
+        self.explorer.unlinked_only ^= keys.take(EXPLORER_TOGGLE_UNLINKED_ONLY) && !anim;
+    }
+
+    /// What the list asked for: back to the editor, a row's menu, a duplicate.
+    fn apply_list_output(
+        &mut self,
+        ui: &egui::Ui,
+        (work, sel): (&mut Work, &mut Selection),
+        panels: &mut Panels,
+        graph: &Graph,
+        output: ListOutput,
+    ) -> Vec<SideAsk> {
+        let mut asks = Vec::new();
+        if output.leave {
+            self.explorer.tree_focus = false;
+            asks.push(SideAsk::FocusEditor);
+        }
+        if let Some((node, action)) = output.menu {
+            asks.extend(row_action(ui, (work, sel), panels, (graph.id(node), action)));
+        }
+
+        let Some((pick, files, from)) = output.duplicate else { return asks };
+        let files = {
+            let behavior = &work.workspace.behaviors[sel.active];
+            match files {
                 Files::ChangedOf(folder) => data::changed_files(behavior, &folder),
                 Files::WithMotion(id) => data::with_motion(behavior, &id),
-            };
-            match pick {
-                DuplicatePick::To(to) => self.panels.pending_duplicate = Some((files, to)),
-                DuplicatePick::Choose => {
-                    let projects = self.anim_projects();
-                    self.panels.duplicate_form = Some(DuplicateForm::new(files, projects, &from));
-                }
+            }
+        };
+        match pick {
+            DuplicatePick::To(to) => {
+                duplicate_files(work, sel.active, (&files, &to));
+                self.explorer.anim_tree.open.insert(to); // it opens to show them
+            }
+            DuplicatePick::Choose => {
+                let projects = anim_projects(work, sel.active);
+                panels.duplicate_form = Some(DuplicateForm::new(files, projects, &from));
             }
         }
-        self.duplicate_anim_files();
+        asks
     }
 
     /// What a button of the title asked for.
-    fn apply_title(&mut self, asked: title::TitleAsk) {
+    fn apply_title(
+        &mut self,
+        (work, sel): (&mut Work, &mut Selection),
+        panels: &mut Panels,
+        asked: title::TitleAsk,
+    ) -> Option<SideAsk> {
         use title::TitleAsk;
         match asked {
             TitleAsk::ToggleTreeView => self.explorer.tree_view = !self.explorer.tree_view,
             TitleAsk::ExpandAll => self.explorer.anim_tree.expand_all = true,
             TitleAsk::CollapseAll => self.explorer.anim_tree.open.clear(),
 
-            TitleAsk::OpenPandoraDoc => self.open_pandora_doc(),
-            TitleAsk::Duplicate(id) => self.new_object(Some(&id)),
-            TitleAsk::RevertOrDelete(id) => self.revert_or_delete(&id),
+            TitleAsk::OpenPandoraDoc => return Some(SideAsk::OpenPandoraDoc),
+            TitleAsk::Duplicate(id) => sel.selected = Some(work.new_object(sel.active, Some(&id)).into()),
+            TitleAsk::RevertOrDelete(id) => return Some(SideAsk::RevertOrDelete(id.to_string())),
 
-            TitleAsk::New if self.work.workspace.behaviors[self.sel.active].adsf => {
-                let projects = self.anim_projects();
-                self.panels.new_clips = Some(NewClipsForm::new(self.sel.selected.as_deref(), projects));
+            TitleAsk::New if work.workspace.behaviors[sel.active].adsf => {
+                let projects = anim_projects(work, sel.active);
+                panels.new_clips = Some(NewClipsForm::new(sel.selected.as_deref(), projects));
             }
-            TitleAsk::New => {
-                self.panels.class_picker.open();
-            }
+            TitleAsk::New => panels.class_picker.open(),
         }
+        None
     }
+}
 
-    /// The files go to the other project, which opens to show them.
-    fn duplicate_anim_files(&mut self) {
-        let Some((files, to)) = self.panels.pending_duplicate.take() else { return };
-        let made = data::duplicate_to(&mut self.work.workspace.behaviors[self.sel.active], &files, &to);
-        for id in &made {
-            self.object_changed(id);
+/// What a row's menu asked for, of object `id`.
+fn row_action(
+    ui: &egui::Ui,
+    (work, sel): (&mut Work, &mut Selection),
+    panels: &mut Panels,
+    (id, action): (&str, RowAction),
+) -> Option<SideAsk> {
+    match action {
+        RowAction::KeepOpen => return Some(SideAsk::KeepOpen(id.to_owned())),
+        RowAction::NewObject => panels.class_picker.open(),
+        RowAction::Duplicate => sel.selected = Some(work.new_object(sel.active, Some(id)).into()),
+        RowAction::Repeat => {
+            let behavior = &work.workspace.behaviors[sel.active];
+            panels.repeat = super::repeat::RepeatForm::of(sel.active, behavior, id);
         }
-        self.explorer.anim_tree.open.insert(to);
+        RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
+        RowAction::RevertOrDelete => return Some(SideAsk::RevertOrDelete(id.to_owned())),
+        RowAction::CopyPath => return Some(SideAsk::File(FileAction::CopyPath, id.to_owned())),
+        RowAction::Reveal => return Some(SideAsk::File(FileAction::Reveal, id.to_owned())),
     }
-
-    fn apply_row_action(
-        &mut self,
-        ui: &egui::Ui,
-        graph: &Graph,
-        action: Option<(Node, RowAction)>,
-        notify: &mut Notification,
-    ) {
-        let Some((node, action)) = action else { return };
-        let id = graph.id(node);
-        match action {
-            RowAction::KeepOpen => self.keep_open(id),
-            RowAction::NewObject => {
-                self.panels.class_picker.open();
-            }
-            RowAction::Duplicate => self.new_object(Some(id)),
-            RowAction::Repeat => {
-                let behavior = &self.work.workspace.behaviors[self.sel.active];
-                self.panels.repeat = super::repeat::RepeatForm::of(self.sel.active, behavior, id);
-            }
-            RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
-            RowAction::RevertOrDelete => self.revert_or_delete(id),
-            RowAction::CopyPath => self.file_action(ui.ctx(), (FileAction::CopyPath, id), notify),
-            RowAction::Reveal => self.file_action(ui.ctx(), (FileAction::Reveal, id), notify),
-        }
-    }
+    None
 }
 
 /// What a row's right-click menu asked for, in the flat list and the tree.
@@ -189,9 +215,9 @@ pub(super) enum RowAction {
     /// Many new objects from this one: see [`crate::patch::repeat`].
     Repeat,
     CopyId,
-    /// The path of the file the object is in: see [`PatchTool::object_file`].
+    /// The path of the file the object is in: see [`crate::patch::tool::list::object_file`].
     CopyPath,
-    /// The file selected in the file manager: see [`PatchTool::file_action`].
+    /// The file selected in the file manager: see [`crate::patch::tool::list::file_action`].
     Reveal,
     RevertOrDelete,
 }

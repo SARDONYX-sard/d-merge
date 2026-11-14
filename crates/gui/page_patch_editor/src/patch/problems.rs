@@ -19,8 +19,8 @@ use gui_shared::settings::pages::patch::behavior::ParserMode;
 use rayon::prelude::*;
 
 use super::{
-    PatchTool,
     editor::{diagnostics, preview::Preview},
+    tool::work_state::Work,
     workspace::{Behavior, ObjectText},
 };
 
@@ -29,8 +29,9 @@ use super::{
 pub(super) struct Problems {
     /// `None` until the work was checked.
     pub(super) list: Option<Vec<ObjectProblems>>,
-    /// The work changed as a whole (read, loaded, restored): `list` is found again.
-    pub(super) stale: bool,
+    /// The [`Work::reloads`] `list` was found of: the work changed as a whole since (read, loaded,
+    /// restored) if it is another, and `list` is found again.
+    checked: Option<u64>,
     /// The Problems panel shows: a click on the status bar's counts.
     pub(super) open: bool,
     /// The keyboard in the panel: `Ctrl+Shift+L` moves it there and back.
@@ -100,26 +101,17 @@ fn sort(groups: &mut [ObjectProblems]) {
 impl Problems {
     /// Checks the whole work again if it changed as a whole (read, loaded, restored). `(code, mode)`:
     /// the mod code, and the parser's mode.
-    pub(super) fn check_work(&mut self, behaviors: &[Behavior], (code, mode): (&str, ParserMode)) {
-        if !self.stale {
-            return;
-        }
+    fn check_work(&mut self, behaviors: &[Behavior], (code, mode): (&str, ParserMode)) {
         let checker = |index| Checker { index, behavior: &behaviors[index], code, mode };
         let mut found: Vec<ObjectProblems> =
             (0..behaviors.len()).flat_map(|index| behavior_problems(checker(index))).collect();
         sort(&mut found);
         self.list = Some(found);
-        self.stale = false;
     }
 
     /// The object `id` of behavior `index` changed: only its problems are found again. After typing
     /// pauses.
-    pub(super) fn refresh_object(
-        &mut self,
-        (index, behavior): (usize, &Behavior),
-        id: &str,
-        (code, mode): (&str, ParserMode),
-    ) {
+    fn refresh_object(&mut self, (index, behavior): (usize, &Behavior), id: &str, (code, mode): (&str, ParserMode)) {
         let checker = Checker { index, behavior, code, mode };
         let object = behavior.object_text(id).filter(|object| is_checked(behavior, object));
         let found = object.and_then(|object| object_problems(checker, &object));
@@ -139,20 +131,22 @@ impl Problems {
     }
 }
 
-impl PatchTool {
-    /// Checks the work again if it is due, unless a job has it or none is open. Call each frame.
-    pub(super) fn diagnose_work(&mut self) {
-        if self.work.job.is_none() && self.work.place.is_open() {
-            self.problems
-                .check_work(&self.work.workspace.behaviors, (self.work.place.mod_code.trim(), self.work.parser_mode));
+impl Problems {
+    /// Checks `work` again if it changed as a whole, unless a job has it or none is open. Call each
+    /// frame.
+    pub(super) fn diagnose(&mut self, work: &Work) {
+        if work.job.is_some() || !work.place.is_open() || self.checked == Some(work.reloads) {
+            return;
         }
+        self.check_work(&work.workspace.behaviors, (work.place.mod_code.trim(), work.parser_mode));
+        self.checked = Some(work.reloads);
     }
 
-    /// The object `id` of the active behavior changed: see [`Problems::refresh_object`].
-    pub(super) fn refresh_problems(&mut self, id: &str) {
-        let Some(behavior) = self.work.workspace.behaviors.get(self.sel.active) else { return };
-        let settings = (self.work.place.mod_code.trim(), self.work.parser_mode);
-        self.problems.refresh_object((self.sel.active, behavior), id, settings);
+    /// The object `id` of behavior `active` changed: see [`Self::refresh_object`].
+    pub(super) fn refresh_in(&mut self, work: &Work, active: usize, id: &str) {
+        let Some(behavior) = work.workspace.behaviors.get(active) else { return };
+        let settings = (work.place.mod_code.trim(), work.parser_mode);
+        self.refresh_object((active, behavior), id, settings);
     }
 }
 
@@ -173,47 +167,47 @@ mod tests {
         adsf
     }
 
-    fn tool(mode: ParserMode) -> PatchTool {
-        let mut tool = PatchTool::default();
-        tool.work.workspace.behaviors.push(clip_data());
-        tool.work.place.mod_code = "m".to_owned();
-        tool.work.parser_mode = mode;
-        tool.work.place.loaded_for = Some("m".to_owned());
-        tool
+    fn work(mode: ParserMode) -> Work {
+        let mut work = Work::default();
+        work.workspace.behaviors.push(clip_data());
+        work.place.mod_code = "m".to_owned();
+        work.parser_mode = mode;
+        work.place.loaded_for = Some("m".to_owned());
+        work
     }
 
     /// What is read is checked at once; then an edit only checks its object again.
     #[test]
     fn the_work_is_checked_when_read_and_then_per_edit() {
-        let mut tool = tool(ParserMode::Strict);
-        assert_eq!(tool.problems.counts(), None, "not checked yet");
-        tool.reset_names(); // as a read or a load does
-        tool.diagnose_work();
-        assert_eq!(tool.problems.counts(), Some((3, 0)));
-        let ids: Vec<&str> = tool.problems.list.iter().flatten().map(|group| group.id.as_str()).collect();
+        let (mut work, mut problems) = (work(ParserMode::Strict), Problems::default());
+        assert_eq!(problems.counts(), None, "not checked yet");
+        work.reset_names(); // as a read or a load does
+        problems.diagnose(&work);
+        assert_eq!(problems.counts(), Some((3, 0)));
+        let ids: Vec<&str> = problems.list.iter().flatten().map(|group| group.id.as_str()).collect();
         assert_eq!(ids, ["Female~1/Bad~m$0.txt", "Male~1/Bad~m$0.txt", "Male~1/m$2.txt"]);
 
         let motion = "Male~1/m$2.txt";
-        tool.work.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\n1\n0\n0\n".to_owned());
-        tool.refresh_problems(motion);
-        assert_eq!(tool.problems.counts(), Some((2, 0)));
-        tool.work.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\nwrong\n0\n0\n".to_owned());
-        tool.refresh_problems(motion);
-        assert_eq!(tool.problems.counts(), Some((3, 0)), "a new mistake comes in");
+        work.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\n1\n0\n0\n".to_owned());
+        problems.refresh_in(&work, 0, motion);
+        assert_eq!(problems.counts(), Some((2, 0)));
+        work.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\nwrong\n0\n0\n".to_owned());
+        problems.refresh_in(&work, 0, motion);
+        assert_eq!(problems.counts(), Some((3, 0)), "a new mistake comes in");
     }
 
     /// The count is the parser's to check, in the mode of the patch page.
     #[test]
     fn the_mode_of_the_patch_page_decides() {
         let count = |mode| {
-            let mut tool = tool(mode);
-            tool.work.workspace.behaviors[0].added.clear();
-            tool.work.workspace.behaviors[0]
+            let (mut work, mut problems) = (work(mode), Problems::default());
+            work.workspace.behaviors[0].added.clear();
+            work.workspace.behaviors[0]
                 .added
                 .insert("Male~1/Count~m$0.txt".to_owned(), "Count\nm$0\n1\n0\n0\n7\n".to_owned());
-            tool.reset_names();
-            tool.diagnose_work();
-            tool.problems.counts()
+            work.reset_names();
+            problems.diagnose(&work);
+            problems.counts()
         };
         assert_eq!(count(ParserMode::Strict), Some((1, 0)));
         assert_eq!(count(ParserMode::Lenient), Some((0, 0)));

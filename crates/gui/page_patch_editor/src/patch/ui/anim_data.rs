@@ -29,8 +29,8 @@ use egui_widgets::{
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
-    PatchTool,
     anim::data::{self, AnimSetPush, ClipSource, Generate, HkxInfo},
+    tool::{selection::Selection, work_state::Work},
     workspace::{ADSF, ASDSF},
 };
 
@@ -83,7 +83,7 @@ pub(in crate::patch) enum FormAsk {
 
 impl AnimDataDialog {
     /// Draws the window. Returns what was asked.
-    fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
+    pub(super) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
         let mut open = true;
         let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisAnimData)).open(&mut open);
         let generate =
@@ -108,11 +108,11 @@ impl AnimDataDialog {
     }
 }
 
-impl PatchTool {
-    /// Opens the window for the mod at `root`: reads the hkx of every clip of the workspace, and
-    /// lists the hkx of the mod and the anim set files of the template.
-    pub(in crate::patch) fn open_anim_data_dialog(&mut self, root: &Path) {
-        let clips = data::clip_sources(&self.work.workspace.behaviors);
+impl AnimDataDialog {
+    /// The window for the mod at `root`: reads the hkx of every clip of `work`, and lists the hkx of
+    /// the mod and the anim set files of the template.
+    pub(in crate::patch) fn open(work: &Work, root: &Path) -> Self {
+        let clips = data::clip_sources(&work.workspace.behaviors);
         let rows = clips
             .into_iter()
             .map(|clip| {
@@ -123,47 +123,30 @@ impl PatchTool {
             })
             .collect();
         let hkx = data::anim_hkx_files(root);
-        let sets = self.work.workspace.anim_set_projects(Path::new(&self.work.place.template_dir));
+        let sets = work.workspace.anim_set_projects(Path::new(&work.place.template_dir));
         let folders: Vec<&str> = sets.iter().map(|(folder, _)| folder.as_str()).collect();
         let project = data::default_project(&folders, hkx.first().map(String::as_str));
         let projects =
             sets.into_iter().map(|(folder, files)| SetProject { folder, files: Checklist::new(files) }).collect();
-        self.panels.anim_data_dialog = Some(AnimDataDialog {
-            root: root.to_path_buf(),
-            rows,
-            hkx: Checklist::new(hkx),
-            projects,
-            project,
-            add_names: true,
-        });
+        Self { root: root.to_path_buf(), rows, hkx: Checklist::new(hkx), projects, project, add_names: true }
     }
 
-    /// Draws the window if it is open, and generates what was asked for.
-    pub(in crate::patch) fn anim_data_window(
-        &mut self,
-        ctx: &egui::Context,
+    /// `Generate`: what was checked goes into `work`, and `sel` goes to the generated files.
+    pub(in crate::patch) fn generate(
+        self,
+        (work, sel): (&mut Work, &mut Selection),
         i18n: &I18nMap,
         notify: &mut Notification,
     ) {
-        let Some(dialog) = &mut self.panels.anim_data_dialog else { return };
-        match dialog.window(ctx, i18n) {
-            Some(FormAsk::Done) => self.generate_anim_data(i18n, notify),
-            Some(FormAsk::Close) => self.panels.anim_data_dialog = None,
-            None => {}
-        }
-    }
-
-    fn generate_anim_data(&mut self, i18n: &I18nMap, notify: &mut Notification) {
-        let Some(dialog) = self.panels.anim_data_dialog.take() else { return };
-        let code = self.work.place.mod_code.trim().to_owned();
+        let code = work.place.mod_code.trim().to_owned();
         let chosen: Vec<(&ClipSource, HkxInfo)> =
-            dialog.rows.iter().filter(|row| row.checked).filter_map(chosen_clip).collect();
-        let sets: Vec<String> = dialog.projects.iter().flat_map(project_set_ids).collect();
+            self.rows.iter().filter(|row| row.checked).filter_map(chosen_clip).collect();
+        let sets: Vec<String> = self.projects.iter().flat_map(project_set_ids).collect();
         let request = Generate {
             code: &code,
             clips: chosen.iter().map(|(clip, info)| (*clip, info)).collect(),
             push: AnimSetPush {
-                hkx: dialog.hkx.checked_items().collect(),
+                hkx: self.hkx.checked_items().collect(),
                 sets: sets.iter().map(String::as_str).collect(),
             },
         };
@@ -174,53 +157,43 @@ impl PatchTool {
             request.push.hkx.len(),
             request.push.sets.len(),
         );
+
         let first_result = if request.clips.is_empty() { ASDSF } else { ADSF };
-        let root = PathBuf::from(&self.work.place.template_dir);
-        if let Err(err) = data::generate(&mut self.work.workspace, &root, &request) {
+        let root = PathBuf::from(&work.place.template_dir);
+        if let Err(err) = data::generate(&mut work.workspace, &root, &request) {
             notify.error(err);
             return;
         }
         notify.success(summary);
-        if dialog.add_names {
-            self.add_names_to_characters(&root, &request.push.hkx, i18n, notify);
+        if self.add_names {
+            add_names_to_characters(work, (&root, &request.push.hkx), i18n, notify);
         }
-        self.show_anim_data_result(first_result);
-    }
 
-    /// The checked hkx to the `animationNames` of their characters, those the work's scope allows.
-    fn add_names_to_characters(&mut self, root: &Path, hkx: &[&str], i18n: &I18nMap, notify: &mut Notification) {
-        let scope = self.work.workspace.scope;
-        let allows = |behavior: &crate::patch::workspace::Behavior| scope.allows(behavior.nemesis.is_some());
-        match self.work.workspace.add_animation_names(root, hkx, allows) {
-            Ok(done) => {
-                if !done.characters.is_empty() {
-                    notify.success(format!(
-                        "{}: {}",
-                        i18n.t(I18nKey::NemesisAnimNamesAdded),
-                        done.characters.join(", ")
-                    ));
-                }
-                if !done.no_character.is_empty() {
-                    notify.warn(format!(
-                        "{}: {}",
-                        i18n.t(I18nKey::NemesisAnimNamesNoCharacter),
-                        done.no_character.join(", ")
-                    ));
-                }
-                self.reset_names();
-            }
-            Err(err) => notify.error(err),
-        }
+        // To the generated files.
+        work.reset_names();
+        work.mark_dirty();
+        sel.active = work.workspace.behaviors.iter().position(|b| b.name == first_result).unwrap_or(sel.active);
+        sel.selected = None;
     }
+}
 
-    /// Goes to the generated files of the behavior named `name`.
-    fn show_anim_data_result(&mut self, name: &str) {
-        self.reset_names();
-        self.sel.active = self.work.workspace.behaviors.iter().position(|b| b.name == name).unwrap_or(self.sel.active);
-        self.sel.selected = None;
-        self.pane.opened = None;
-        self.work.mark_dirty();
+/// The checked hkx (of the templates at `root`) to the `animationNames` of their characters, those
+/// the work's scope allows.
+fn add_names_to_characters(work: &mut Work, (root, hkx): (&Path, &[&str]), i18n: &I18nMap, notify: &mut Notification) {
+    let scope = work.workspace.scope;
+    let allows = |behavior: &crate::patch::workspace::Behavior| scope.allows(behavior.nemesis.is_some());
+    let done = match work.workspace.add_animation_names(root, hkx, allows) {
+        Ok(done) => done,
+        Err(err) => return notify.error(err),
+    };
+
+    if !done.characters.is_empty() {
+        notify.success(format!("{}: {}", i18n.t(I18nKey::NemesisAnimNamesAdded), done.characters.join(", ")));
     }
+    if !done.no_character.is_empty() {
+        notify.warn(format!("{}: {}", i18n.t(I18nKey::NemesisAnimNamesNoCharacter), done.no_character.join(", ")));
+    }
+    work.reset_names();
 }
 
 /// `DefaultMaleData~DefaultMale/1HMSolo.txt` for each checked file of the project.
@@ -346,7 +319,7 @@ pub(super) struct NewClipsForm {
 
 impl NewClipsForm {
     /// Draws the window: actor, name, count, `Create`. Returns what was asked.
-    fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
+    pub(super) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let mut create = false;
         let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisNewClips)).open(&mut open);
@@ -432,7 +405,7 @@ pub(super) struct DuplicateForm {
 
 impl DuplicateForm {
     /// Draws the window: how many files, and the project to pick. Returns what was asked.
-    fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
+    pub(super) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let mut go = false;
         let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisDuplicateTo)).open(&mut open);
@@ -463,52 +436,43 @@ impl DuplicateForm {
     }
 }
 
-impl PatchTool {
-    /// The window of [`DuplicateForm`]: what it asks for goes on as a row's menu's does.
-    pub(in crate::patch) fn duplicate_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        let Some(form) = &mut self.panels.duplicate_form else { return };
-        match form.window(ctx, i18n) {
-            Some(FormAsk::Done) => {
-                let Some(form) = self.panels.duplicate_form.take() else { return };
-                if let Some(to) = form.projects.into_iter().nth(form.picked) {
-                    self.panels.pending_duplicate = Some((form.files, to));
-                }
-            }
-            Some(FormAsk::Close) => self.panels.duplicate_form = None,
-            None => {}
-        }
+impl DuplicateForm {
+    /// The project picked, and the files: `None` if there is none to pick.
+    pub(in crate::patch) fn picked(self) -> Option<(Vec<String>, String)> {
+        let to = self.projects.into_iter().nth(self.picked)?;
+        Some((self.files, to))
     }
+}
 
-    /// Where a file of the open animation data can go. The template's are read once.
-    pub(super) fn anim_projects(&mut self) -> Vec<String> {
-        let is_adsf = self.work.workspace.behaviors[self.sel.active].adsf;
-        if is_adsf && self.work.template_projects.is_none() {
-            self.work.template_projects = Some(data::template_projects(Path::new(&self.work.place.template_dir)));
-        }
-        let template = if is_adsf { self.work.template_projects.as_deref().unwrap_or_default() } else { &[] };
-        data::project_folders(&self.work.workspace.behaviors[self.sel.active], template)
+/// Where a file of the animation data `active` of `work` can go. The template's are read once.
+pub(in crate::patch) fn anim_projects(work: &mut Work, active: usize) -> Vec<String> {
+    let is_adsf = work.workspace.behaviors[active].adsf;
+    if is_adsf && work.template_projects.is_none() {
+        work.template_projects = Some(data::template_projects(Path::new(&work.place.template_dir)));
     }
+    let template = if is_adsf { work.template_projects.as_deref().unwrap_or_default() } else { &[] };
+    data::project_folders(&work.workspace.behaviors[active], template)
+}
 
-    /// The window of [`NewClipsForm`]; `Create` adds the clips.
-    pub(in crate::patch) fn new_clips_window(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        let Some(form) = &mut self.panels.new_clips else { return };
-        match form.window(ctx, i18n) {
-            Some(FormAsk::Done) => self.create_new_clips(),
-            Some(FormAsk::Close) => self.panels.new_clips = None,
-            None => {}
-        }
+/// `files` of the animation data `active` of `work` go to project `to`.
+pub(in crate::patch) fn duplicate_files(work: &mut Work, active: usize, (files, to): (&[String], &str)) {
+    let made = data::duplicate_to(&mut work.workspace.behaviors[active], files, to);
+    for id in &made {
+        work.object_changed(id);
     }
+}
 
-    fn create_new_clips(&mut self) {
-        let Some(form) = self.panels.new_clips.take() else { return };
-        let code = self.work.place.mod_code.trim().to_owned();
-        let adsf = &mut self.work.workspace.behaviors[self.sel.active];
-        let added = data::add_numbered_clips(adsf, &code, form.folder.trim(), form.name.trim(), form.count);
+impl NewClipsForm {
+    /// `Create`: the clips go into the animation data `sel.active` of `work`; the first is shown.
+    pub(in crate::patch) fn create(self, (work, sel): (&mut Work, &mut Selection)) {
+        let code = work.place.mod_code.trim().to_owned();
+        let adsf = &mut work.workspace.behaviors[sel.active];
+        let added = data::add_numbered_clips(adsf, &code, self.folder.trim(), self.name.trim(), self.count);
         if let Some(first) = added.first() {
-            self.sel.selected = Some(first.as_str().into());
+            sel.selected = Some(first.as_str().into());
         }
         for id in &added {
-            self.object_changed(id);
+            work.object_changed(id);
         }
     }
 }

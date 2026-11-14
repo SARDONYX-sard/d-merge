@@ -1,7 +1,7 @@
 //! The user patch: what the conflict tool decided. A mod of its own (`upatch`) that loads last.
 //!
 //! It has its own editor in its own window, which can be opened on any page, whatever the main editor
-//! has open: [`PatchTool`] again, kept in [`UserPatchView`]. What it is written to is decided by the
+//! has open: the patch tool again, kept by the main one. What it is written to is decided by the
 //! patch page's output directory, as its conflicts are: `<output>/.d_merge/user_patch`.
 //!
 //! `Use this` in the conflict window decides at once: the value goes in, and the mod is written, so
@@ -21,8 +21,15 @@ use gui_shared::{
 };
 
 use super::{
-    PatchPaths, PatchTool,
-    editor::resolve,
+    FocusAt, PatchPaths,
+    editor::{merge, resolve},
+    tool::{
+        editing::{EditorArea, EditorPane},
+        place::WorkPlace,
+        selection::Selection,
+        session::Reshow,
+        work_state::Work,
+    },
     workspace::{self, Workspace},
 };
 
@@ -124,7 +131,7 @@ pub(super) struct ModExport {
     pub(super) format: workspace::ExportFormat,
 }
 
-/// What [`export_as_mod`] wrote.
+/// What [`write_as_mod`] wrote.
 struct ModExported<'a> {
     output: &'a str,
     /// The patches d-merge's parser rejects, or why nothing was written.
@@ -134,7 +141,7 @@ struct ModExported<'a> {
 }
 
 /// Writes the user patch of `work` as a mod, where and how `export` says. `None`: no output yet.
-fn export_as_mod<'a>(
+fn write_as_mod<'a>(
     work: &'a mut Workspace,
     export: &'a ModExport,
     mode: gui_shared::settings::pages::patch::behavior::ParserMode,
@@ -164,7 +171,7 @@ fn export_as_mod<'a>(
     Some(ModExported { output, written, outside })
 }
 
-/// Tells how [`export_as_mod`] went: written, written with templates Nemesis does not know,
+/// Tells how [`write_as_mod`] went: written, written with templates Nemesis does not know,
 /// rejected patches, or failed.
 fn report_mod_export(notify: &mut Notification, i18n: &I18nMap, exported: &ModExported<'_>) {
     let ModExported { output, written, outside } = exported;
@@ -173,221 +180,187 @@ fn report_mod_export(notify: &mut Notification, i18n: &I18nMap, exported: &ModEx
             notify.success(format!("{}: {output}", i18n.t(I18nKey::ExportedMessage)));
         }
         Ok(problems) if problems.is_empty() => notify.warn(format!(
-            "{}: {output}
-{} ({}):
-{}",
+            "{}: {output}\n{} ({}):\n{}",
             i18n.t(I18nKey::ExportedMessage),
             i18n.t(I18nKey::UserPatchOutsideNemesis),
             outside.len(),
-            outside.join(
-                "
-"
-            )
+            outside.join("\n")
         )),
-        Ok(problems) => notify.warn(format!(
-            "{} ({}):
-{}",
-            i18n.t(I18nKey::NemesisRejected),
-            problems.len(),
-            problems.join(
-                "
-"
-            )
-        )),
+        Ok(problems) => {
+            notify.warn(format!("{} ({}):\n{}", i18n.t(I18nKey::NemesisRejected), problems.len(), problems.join("\n")));
+        }
         Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
     }
 }
 
-/// The window's state. See the module docs.
-#[derive(Debug, Default)]
-pub(super) struct UserPatchView {
-    pub(super) open: bool,
-    /// Comes above what it was opened from, on the next frame.
-    pub(super) to_top: bool,
-    /// Its editor, from the first time it is needed.
-    pub(super) tool: Option<Box<PatchTool>>,
+/// Writes the user patch of `work` as a mod: see [`ModExport`] and [`write_as_mod`].
+pub(super) fn export_as_mod(work: &mut Work, export: &ModExport, notify: &mut Notification, i18n: &I18nMap) {
+    if let Some(exported) = write_as_mod(&mut work.workspace, export, work.parser_mode) {
+        report_mod_export(notify, i18n, &exported);
+    }
 }
 
-impl PatchTool {
-    fn for_user_patch(paths: PatchPaths<'_>) -> Self {
-        let output = paths.patch_output_dir.trim();
-        let mut workspace = Workspace::default();
-        workspace.use_user_patch_format();
-        let place = super::tool::place::WorkPlace {
-            patch_output: output.to_owned(),
-            cache_root: workspace::cache_root_of(output),
-            output: user_patch_output(output).display().to_string(),
-            mod_code: USER_PATCH_CODE.to_owned(),
-            template_dir: paths.template_dir.to_owned(),
-            ..Default::default()
-        };
-        let work = super::tool::work_state::Work {
-            workspace,
-            place,
-            restored: true,
-            parser_mode: paths.parser_mode,
-            ..Default::default()
-        };
-        Self {
-            work,
-            is_user_patch: true,
-            panels: super::ui::panels::Panels::with_behaviors_open(),
-            explorer: super::tool::list::Explorer { changed_only: true, ..Default::default() },
-            ..Self::default()
-        }
-    }
+/// The user patch's work, as it starts: nothing open yet, kept where `paths` say.
+pub(super) fn work_of(paths: PatchPaths<'_>) -> Work {
+    let output = paths.patch_output_dir.trim();
+    let mut workspace = Workspace::default();
+    workspace.use_user_patch_format();
+    let place = WorkPlace {
+        patch_output: output.to_owned(),
+        cache_root: workspace::cache_root_of(output),
+        output: user_patch_output(output).display().to_string(),
+        mod_code: USER_PATCH_CODE.to_owned(),
+        template_dir: paths.template_dir.to_owned(),
+        ..Default::default()
+    };
+    Work { workspace, place, restored: true, parser_mode: paths.parser_mode, user_patch: true, ..Default::default() }
+}
 
-    /// Opens or closes the window of the user patch.
-    pub(crate) const fn toggle_user_patch(&mut self) {
-        self.user_patch.open = !self.user_patch.open;
-        self.user_patch.to_top = self.user_patch.open;
-    }
-
-    /// The user patch's editor, up to date. A new output directory has another user patch: what was
-    /// open is saved where it belongs first.
-    pub(super) fn user_patch_tool(
-        &mut self,
-        paths: PatchPaths<'_>,
-        notify: &mut Notification,
-        i18n: &I18nMap,
-    ) -> &mut Self {
-        let output = paths.patch_output_dir.trim();
-        if let Some(tool) = self.user_patch.tool.as_mut().filter(|tool| tool.work.place.patch_output != output) {
-            tool.undo_unedited_draft();
-            tool.save_now(notify, i18n);
-            self.work.mod_written |= tool.work.mod_written;
-            self.user_patch.tool = None;
-        }
-        let tool = self.user_patch.tool.get_or_insert_with(|| Box::new(Self::for_user_patch(paths)));
-        tool.set_parser_mode(paths.parser_mode);
-        if tool.work.place.template_dir != paths.template_dir {
-            paths.template_dir.clone_into(&mut tool.work.place.template_dir);
-        }
-        tool.sync_workspace(notify, i18n);
-        // Small, and what comes next uses it at once.
-        tool.wait_job(notify, i18n);
-        tool
-    }
-
+impl Work {
     /// Writes the user patch now. Saved again after: what the export wrote is part of the work.
     /// Returns the patches d-merge's parser rejects.
     pub(super) fn write_user_patch(&mut self) -> Result<Vec<String>, String> {
-        self.work.workspace.save(&self.work.place.cache_root, USER_PATCH_CODE)?;
-        let invalid =
-            self.work.workspace.export(Path::new(&self.work.place.output), USER_PATCH_CODE, self.work.parser_mode)?.1;
-        self.work.workspace.save(&self.work.place.cache_root, USER_PATCH_CODE)?;
-        self.work.autosave.take();
+        self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
+        let invalid = self.workspace.export(Path::new(&self.place.output), USER_PATCH_CODE, self.parser_mode)?.1;
+        self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
+        self.autosave.take();
         Ok(invalid)
     }
 
-    /// `Use this`: the value goes in now, and the mod is written. The window need not be open.
+    /// `Use this`: the value of `request` goes in now (templates at `root`), and the mod is written.
+    /// Returns the patches d-merge's parser rejects.
     ///
     /// # Errors
-    /// There is no output directory to keep it in, or the value could not be taken in.
-    pub(crate) fn resolve_now(
+    /// The value could not be taken in, or written.
+    pub(super) fn resolve_now(
         &mut self,
         request: &ResolveRequest,
-        paths: PatchPaths<'_>,
-        notify: &mut Notification,
+        root: &Path,
         i18n: &I18nMap,
-    ) -> Result<(), String> {
-        if paths.patch_output_dir.trim().is_empty() {
-            return Err(i18n.t(I18nKey::NemesisNeedPatchOutput).to_owned());
-        }
-        let root = PathBuf::from(paths.template_dir);
-        let tool = self.user_patch_tool(paths, notify, i18n);
-        if tool.work.workspace.info.name.is_empty() {
-            i18n.t(I18nKey::UserPatchTitle).clone_into(&mut tool.work.workspace.info.name);
+    ) -> Result<Vec<String>, String> {
+        if self.workspace.info.name.is_empty() {
+            i18n.t(I18nKey::UserPatchTitle).clone_into(&mut self.workspace.info.name);
         }
         // What the value points to is that mod's.
-        tool.work.workspace.add_ref(Path::new(&request.mod_dir), USER_PATCH_CODE);
-        resolve::apply(&mut tool.work.workspace, &root, request)?;
-        tool.work.workspace.reload_refs(); // a behavior may have been opened
-        tool.reset_names();
-        tool.pane.opened = None;
-        tool.pane.preview = None;
-        let invalid = tool.write_user_patch()?;
-        self.work.mod_written = true;
-        if invalid.is_empty() { Ok(()) } else { Err(invalid.join("\n")) }
-    }
-
-    /// `Edit...`: the value goes in, and the window shows it.
-    pub(crate) fn open_resolution(
-        &mut self,
-        request: ResolveRequest,
-        paths: PatchPaths<'_>,
-        notify: &mut Notification,
-        i18n: &I18nMap,
-    ) {
-        self.user_patch.open = true;
-        self.user_patch.to_top = true;
-        if paths.patch_output_dir.trim().is_empty() {
-            return; // the window says what to do
-        }
-        self.user_patch_tool(paths, notify, i18n).pending_resolution = Some(request);
-    }
-
-    /// What `Edit...` proposed goes, unless it was edited. See [`Draft`].
-    pub(super) fn undo_unedited_draft(&mut self) {
-        self.pane.merge_values = None;
-        let Some(draft) = self.draft.take() else { return };
-        if draft.is_edited(&self.work.workspace) {
-            return;
-        }
-        let id = draft.id.clone();
-        draft.undo(&mut self.work.workspace);
+        self.workspace.add_ref(Path::new(&request.mod_dir), USER_PATCH_CODE);
+        resolve::apply(&mut self.workspace, root, request)?;
+        self.workspace.reload_refs(); // a behavior may have been opened
         self.reset_names();
-        self.pane.opened = None;
-        self.pane.preview = None;
-        self.sel.active = self.sel.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
-        if self.work.workspace.behaviors.get(self.sel.active).is_none_or(|behavior| behavior.text(&id).is_none()) {
-            self.tabs.clear();
-            self.sel.selected = None;
-        }
-        self.work.autosave.seen_at(self.sel.active, self.sel.selected.as_ref());
-        // Something saved meanwhile (another object) had it in: the disk goes back too.
-        if self.work.mod_written {
-            self.work.autosave.changed();
-        }
+
+        self.write_user_patch()
     }
 
     /// Takes everything out of the user patch, and writes that: nothing of it is merged any more.
-    pub(super) fn clear_user_patch(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+    pub(super) fn clear_user_patch(&mut self, notify: &mut Notification, i18n: &I18nMap) -> Reshow {
         self.draft = None;
-        self.work.workspace.behaviors.clear();
-        self.work.workspace.ref_mods.clear();
+        self.workspace.behaviors.clear();
+        self.workspace.ref_mods.clear();
         self.reset_names();
-        self.tabs.clear();
-        self.sel.active = 0;
-        self.sel.selected = None;
-        self.pane.opened = None;
-        self.pane.preview = None;
         match self.write_user_patch() {
-            Ok(_) => self.work.mod_written = true,
+            Ok(_) => self.mod_written = true,
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
         }
+        Reshow::Nothing
+    }
+}
+
+/// After the work is synced: the value of `request` goes in, and the editor shows where it went. It
+/// is a proposal for now: see [`Draft`]. So nothing of it is saved until there is an edit.
+pub(super) fn take_in_resolution(
+    request: &ResolveRequest,
+    (work, editor, sel): (&mut Work, &mut EditorArea, &mut Selection),
+    notify: &mut Notification,
+    i18n: &I18nMap,
+) {
+    undo_unedited_draft((work, editor, sel));
+    let before = Draft::before(&work.workspace);
+    let since = work.autosave.since();
+    if work.workspace.info.name.is_empty() {
+        i18n.t(I18nKey::UserPatchTitle).clone_into(&mut work.workspace.info.name);
+    }
+    // What the value points to is that mod's.
+    work.workspace.add_ref(Path::new(&request.mod_dir), USER_PATCH_CODE);
+    // And what is taken from the others is theirs.
+    for side in &request.sides {
+        work.workspace.add_ref(Path::new(&side.mod_dir), USER_PATCH_CODE);
     }
 
-    /// Writes the user patch as a mod: see [`ModExport`] and [`export_as_mod`].
-    pub(super) fn export_user_patch_as_mod(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        if let Some(exported) = export_as_mod(&mut self.work.workspace, &self.mod_export, self.work.parser_mode) {
-            report_mod_export(notify, i18n, &exported);
-        }
+    let root = PathBuf::from(&work.place.template_dir);
+    let shown = resolve::apply(&mut work.workspace, &root, request).map_or_else(
+        |err| {
+            notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisResolveFailed)));
+            // It is for the user to edit: all the more if it could not be taken in.
+            resolve::object_of(&mut work.workspace, &root, request)
+        },
+        Some,
+    );
+    let Some(resolve::Resolved { behavior, id, line }) = shown else { return };
+    work.workspace.reload_refs(); // a behavior may have been opened
+    work.reset_names();
+
+    sel.active = behavior;
+    editor.pane.opened = None;
+    work.draft = Some(before.with_proposal(&work.workspace, behavior, &id));
+    editor.pane.merge_values = resolve::merge_values(request, &id);
+    editor.pane.merge_accepted.clear();
+    reuse_resolution((work, &mut editor.pane), (behavior, &id), notify, i18n);
+    sel.selected = Some(id.into());
+
+    // What is shown is no change of the work yet.
+    work.autosave.restore(since);
+    work.autosave.seen_at(sel.active, sel.selected.as_ref());
+    // Picking another value of the object shown has no other sign of having gone anywhere.
+    editor.pane.focus = line.map(FocusAt::Line);
+}
+
+/// The conflict just taken in was resolved before, by the same mods with the same values: object
+/// `(behavior, id)` is resolved the same way at once. See [`crate::patch::editor::merge`].
+fn reuse_resolution(
+    (work, pane): (&mut Work, &mut EditorPane),
+    (behavior, id): (usize, &str),
+    notify: &mut Notification,
+    i18n: &I18nMap,
+) {
+    let Some(values) = &pane.merge_values else { return };
+    let Some(resolution) = merge::find(&work.workspace.resolutions, values) else { return };
+    let result = resolution.result.clone();
+    let Some(text) = work.workspace.behaviors.get(behavior).and_then(|of| of.text(id)) else { return };
+
+    let candidates = merge::candidates(values, &[]);
+    if let Some(resolved) = merge::replace_block(text, &candidates, &result) {
+        work.workspace.behaviors[behavior].set_text(id, &resolved);
+        pane.merge_accepted = result;
+        notify.info(i18n.t(I18nKey::MergeReused));
+    }
+}
+
+/// What `Edit...` proposed goes, unless it was edited. See [`Draft`].
+pub(super) fn undo_unedited_draft((work, editor, sel): (&mut Work, &mut EditorArea, &mut Selection)) {
+    editor.pane.merge_values = None;
+    let Some(draft) = work.draft.take() else { return };
+    if draft.is_edited(&work.workspace) {
+        return;
     }
 
-    /// The window was closed: what it wrote is for the conflict check to see now, not at each pause.
-    pub(super) fn close_user_patch(&mut self, notify: &mut Notification, i18n: &I18nMap) {
-        let Some(tool) = &mut self.user_patch.tool else { return };
-        tool.undo_unedited_draft();
-        tool.save_now(notify, i18n);
-        self.work.mod_written |= std::mem::take(&mut tool.work.mod_written);
+    let id = draft.id.clone();
+    draft.undo(&mut work.workspace);
+    work.reset_names();
+    editor.pane.opened = None;
+    editor.pane.preview = None;
+    sel.active = sel.active.min(work.workspace.behaviors.len().saturating_sub(1));
+    if work.workspace.behaviors.get(sel.active).is_none_or(|behavior| behavior.text(&id).is_none()) {
+        editor.tabs.clear();
+        sel.selected = None;
+    }
+    work.autosave.seen_at(sel.active, sel.selected.as_ref());
+    // Something saved meanwhile (another object) had it in: the disk goes back too.
+    if work.mod_written {
+        work.autosave.changed();
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use gui_shared::settings::{pages::patch_editor::PatchEditorSettings, ui::editor::LspOptions};
-
     use super::*;
 
     fn paths(output: &str) -> PatchPaths<'_> {
@@ -400,96 +373,10 @@ mod tests {
 
     #[test]
     fn its_place_is_decided_by_the_patch_pages_output() {
-        let tool = PatchTool::for_user_patch(paths("D:/out"));
-        assert_eq!(Path::new(&tool.work.place.output), Path::new("D:/out/.d_merge/user_patch"));
-        assert_eq!(tool.work.place.mod_code, USER_PATCH_CODE);
-        assert!(tool.work.place.cache_root.starts_with("D:/out/.d_merge/caches"));
-    }
-
-    #[test]
-    fn it_needs_the_output_directory() {
-        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
-        let request = ResolveRequest {
-            target: "meshes/x.bin".into(),
-            path: "#1/C/a".into(),
-            mod_dir: "D:/mods/a".into(),
-            edit: false,
-            sides: Vec::new(),
-            keep_all_events: false,
-        };
-        let mut main = PatchTool::default();
-        assert!(main.resolve_now(&request, paths(""), &mut notify, &i18n).is_err());
-        assert!(main.user_patch.tool.is_none());
-    }
-
-    /// A proposal of `Edit...`: as a conflict's `Edit...` does, with a mod's clip of animation data.
-    fn proposed(dir: &Path) -> (PatchTool, Notification, I18nMap) {
-        let file = dir.join("mods/a/animationdatasinglefile/D~1/Idle~m$0.txt");
-        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-        std::fs::write(&file, "theirs\n").unwrap();
-        let output = dir.join("out").display().to_string();
-        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
-        let mut main = PatchTool::default();
-        let request = ResolveRequest {
-            target: "meshes/animationdatasinglefile.bin".into(),
-            path: "D~1/Idle~m$0/name".into(),
-            mod_dir: dir.join("mods/a").display().to_string(),
-            edit: true,
-            sides: Vec::new(),
-            keep_all_events: false,
-        };
-        main.open_resolution(request, paths(&output), &mut notify, &i18n);
-        main.user_patch.tool.as_mut().unwrap().take_in_resolution(&mut notify, &i18n);
-        (main, notify, i18n)
-    }
-
-    /// Opening it to look and closing it decides nothing.
-    #[test]
-    fn an_edit_that_was_not_made_changes_nothing() {
-        let dir = std::env::temp_dir().join(format!("d_merge_draft_none_{}", std::process::id()));
-        let (mut main, mut notify, i18n) = proposed(&dir);
-        let tool = main.user_patch.tool.as_mut().unwrap();
-        assert_eq!(tool.work.workspace.behaviors[0].text("D~1/Idle~m$0.txt"), Some("theirs\n"), "it shows the value");
-        assert!(!tool.work.autosave.is_dirty(), "nothing to save yet");
-
-        main.close_user_patch(&mut notify, &i18n);
-        let tool = main.user_patch.tool.as_ref().unwrap();
-        let (behaviors, refs, name) = (
-            tool.work.workspace.behaviors.len(),
-            tool.work.workspace.ref_mods.len(),
-            tool.work.workspace.info.name.clone(),
-        );
-        let written = dir.join("out").exists();
-        let wrote = main.take_mod_written();
-        std::fs::remove_dir_all(&dir).unwrap();
-
-        assert_eq!(behaviors, 0, "the behavior was opened for it");
-        assert_eq!(refs, 0);
-        assert_eq!(name, "");
-        assert!(!written, "nothing is on the disk");
-        assert!(!wrote, "the conflict check has nothing to follow");
-    }
-
-    #[test]
-    fn an_edit_that_was_made_stays() {
-        let dir = std::env::temp_dir().join(format!("d_merge_draft_edit_{}", std::process::id()));
-        let (mut main, mut notify, i18n) = proposed(&dir);
-        let tool = main.user_patch.tool.as_mut().unwrap();
-        tool.work.workspace.behaviors[0].set_text("D~1/Idle~m$0.txt", "mine\n");
-        tool.work.mark_dirty();
-
-        main.close_user_patch(&mut notify, &i18n);
-        let tool = main.user_patch.tool.as_ref().unwrap();
-        let text = tool.work.workspace.behaviors[0].text("D~1/Idle~m$0.txt").map(str::to_owned);
-        let wrote = main.take_mod_written();
-        let exported =
-            dir.join("out/.d_merge/user_patch/Nemesis_Engine/mod/upatch/animationdatasinglefile/D~1/Idle~m$0.txt");
-        let on_disk = std::fs::read_to_string(exported).ok();
-        std::fs::remove_dir_all(&dir).unwrap();
-
-        assert_eq!(text.as_deref(), Some("mine\n"));
-        assert!(wrote);
-        assert_eq!(on_disk.as_deref(), Some("mine\n"));
+        let work = work_of(paths("D:/out"));
+        assert_eq!(Path::new(&work.place.output), Path::new("D:/out/.d_merge/user_patch"));
+        assert_eq!(work.place.mod_code, USER_PATCH_CODE);
+        assert!(work.place.cache_root.starts_with("D:/out/.d_merge/caches"));
     }
 
     /// The old value of the user patch comes back, and what else was edited stays.
@@ -510,45 +397,5 @@ mod tests {
         let _ = dir;
         assert_eq!(workspace.behaviors[0].text("D~1/Idle~m$0.txt"), Some("old\n"));
         assert_eq!(workspace.behaviors[0].text("D~1/Other.txt"), Some("other\n"));
-    }
-
-    /// Its window draws, on any page, and the main tool does not take its code.
-    #[test]
-    fn the_window_draws_and_clears() {
-        let dir = std::env::temp_dir().join(format!("d_merge_user_patch_{}", std::process::id()));
-        let output = dir.display().to_string();
-        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
-        let mut main = PatchTool::default();
-        let (mut settings, mut editor) = (PatchEditorSettings::default(), LspOptions::default());
-        main.toggle_user_patch();
-
-        let ctx = egui::Context::default();
-        for _ in 0..3 {
-            let mut drawn = ctx.run_ui(egui::RawInput::default(), |ui| {
-                let ctx = ui.ctx().clone();
-                let mut keys = keybinding::Keybindings::default();
-                main.user_patch_window(
-                    &ctx,
-                    &i18n,
-                    &mut notify,
-                    paths(&output),
-                    (&mut settings, &mut editor),
-                    &mut keys,
-                );
-            });
-            drawn.textures_delta.clear();
-        }
-        let tool = main.user_patch.tool.as_mut().unwrap();
-        assert_eq!(tool.work.place.loaded_for.as_deref(), Some(USER_PATCH_CODE));
-
-        tool.clear_user_patch(&mut notify, &i18n);
-        let cache = workspace::cache_root_of(&output).join(USER_PATCH_CODE);
-        let kept = cache.is_dir();
-        main.close_user_patch(&mut notify, &i18n);
-        let written = main.take_mod_written();
-        std::fs::remove_dir_all(&dir).unwrap();
-
-        assert!(kept);
-        assert!(written, "the conflict check follows");
     }
 }

@@ -74,7 +74,7 @@ pub(super) struct Pending {
 }
 
 impl Pending {
-    /// Finds the changes again if the work was edited (`edits`: see `PatchTool::edits`), committed, or
+    /// Finds the changes again if the work was edited (`edits`: see `Work::edits`), committed, or
     /// got or lost a behavior since.
     pub(super) fn refresh(&mut self, workspace: &Workspace, edits: u64) {
         let now = (edits, workspace.history.revisions.len(), workspace.behaviors.len());

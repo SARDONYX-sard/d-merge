@@ -9,103 +9,48 @@
 //!
 //! `Delete all` asks first in an [`AlertDialog`], as it can't be undone.
 
-use egui::Vec2;
 use egui_widgets::{
-    Modal,
     notify::Notification,
     shadcn::{AlertDialog, AlertDialogChoice, Button, ComboBox, Icon},
 };
-use gui_shared::{
-    i18n::{I18nKey, I18nMap},
-    settings::{pages::patch_editor::PatchEditorSettings, ui::editor::LspOptions},
-};
+use gui_shared::i18n::{I18nKey, I18nMap};
 
-use crate::patch::{PatchPaths, PatchTool};
+use super::top_bar::BarAsk;
+use crate::patch::{tool::work_state::Work, ui::panels::Panels};
 
-impl PatchTool {
-    /// Draws the window if it is open. It belongs to no page: it stays when another is shown.
-    pub(crate) fn user_patch_window(
-        &mut self,
-        ctx: &egui::Context,
-        i18n: &I18nMap,
-        notify: &mut Notification,
-        paths: PatchPaths<'_>,
-        (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
-        keys: &mut keybinding::Keybindings,
-    ) {
-        if !self.user_patch.open {
-            return;
-        }
-        let to_top = std::mem::take(&mut self.user_patch.to_top);
-        let has_output = !paths.patch_output_dir.trim().is_empty();
-        let mut tool = has_output.then(|| self.user_patch_tool(paths, notify, i18n));
-        let mut open = true;
-        Modal::new(i18n.t(I18nKey::UserPatchTitle))
-            .size(Vec2::new(0.90, 0.95))
-            .to_top(to_top)
-            // Its editor uses `Esc` (Vim, hovers, quick fixes): the window closes with its `x`.
-            .close_on_escape(false)
-            .show(ctx, &mut open, |ui| match &mut tool {
-                Some(tool) => tool.user_patch_ui(ui, i18n, notify, (settings, editor), keys),
-                None => {
-                    ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNeedPatchOutput));
-                }
-            });
-        self.user_patch.open = open;
-        if !open {
-            self.close_user_patch(notify, i18n);
-        }
+/// Where it goes, which is not for the user to change, and deleting all of it. Returns what was
+/// asked: see [`super::top_bar::apply`].
+pub(in crate::patch) fn user_patch_bar(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    (work, panels): (&Work, &mut Panels),
+    notify: &mut Notification,
+) -> Vec<BarAsk> {
+    let mut asks = Vec::new();
+    let outside: Vec<&str> = work.workspace.outside_nemesis().collect();
+    if panels.mod_export.window(ui.ctx(), i18n, notify, &outside) {
+        asks.push(BarAsk::ExportUserPatchAsMod);
     }
 
-    /// One frame of the user patch's own tool, which keeps nothing of its work in the settings.
-    fn user_patch_ui(
-        &mut self,
-        ui: &mut egui::Ui,
-        i18n: &I18nMap,
-        notify: &mut Notification,
-        (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
-        keys: &mut keybinding::Keybindings,
-    ) {
-        self.pane.read_options(editor);
-        self.read_view_settings(settings);
-        self.sync_workspace(notify, i18n);
-        self.take_in_resolution(notify, i18n);
-        self.take_key_commands(ui.ctx(), Some(keys), i18n, notify);
-        self.draw(ui, i18n, notify);
-        self.pane.write_options(editor);
-        self.write_view_settings(settings);
-    }
-
-    /// Where it goes, which is not for the user to change, and deleting all of it.
-    pub(in crate::patch) fn user_patch_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        self.mod_export_window(ui.ctx(), i18n, notify);
-        ui.horizontal(|ui| {
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if clear_button(ui, i18n, &mut self.panels.confirm_clear) {
-                    self.clear_user_patch(notify, i18n);
-                }
-                if super::top_bar::cache_button(ui, i18n, &self.cache_dir()) {
-                    self.open_cache(notify, i18n);
-                }
-                let export = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::UserPatchExportMod));
-                if ui.add(export).on_hover_text(i18n.t(I18nKey::UserPatchExportModHover)).clicked() {
-                    self.mod_export.open = true;
-                }
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    let output = egui::RichText::new(self.work.place.output.trim()).weak();
-                    ui.add(egui::Label::new(output).truncate()).on_hover_text(i18n.t(I18nKey::UserPatchOutputHover));
-                });
+    ui.horizontal(|ui| {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if clear_button(ui, i18n, &mut panels.confirm_clear) {
+                asks.push(BarAsk::ClearUserPatch);
+            }
+            if super::top_bar::cache_button(ui, i18n, &work.place.cache_dir()) {
+                asks.push(BarAsk::OpenCache);
+            }
+            let export = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::UserPatchExportMod));
+            if ui.add(export).on_hover_text(i18n.t(I18nKey::UserPatchExportModHover)).clicked() {
+                panels.mod_export.open = true;
+            }
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                let output = egui::RichText::new(work.place.output.trim()).weak();
+                ui.add(egui::Label::new(output).truncate()).on_hover_text(i18n.t(I18nKey::UserPatchOutputHover));
             });
         });
-    }
-
-    /// `Export as a mod`'s window, if open; `Export` writes it.
-    fn mod_export_window(&mut self, ctx: &egui::Context, i18n: &I18nMap, notify: &mut Notification) {
-        let outside: Vec<&str> = self.work.workspace.outside_nemesis().collect();
-        if self.mod_export.window(ctx, i18n, notify, &outside) {
-            self.export_user_patch_as_mod(notify, i18n);
-        }
-    }
+    });
+    asks
 }
 
 /// `[Delete all]`, which asks first: nothing of it can be undone. `confirm`: the question is open.
@@ -134,7 +79,13 @@ impl crate::patch::user_patch::ModExport {
     /// Draws the window, if open: `Output: [...] [Select]  Format: [Nemesis Ext ▼]  [Export]`, and a
     /// note of the templates Nemesis does not know (`outside`) for its format. Returns whether to
     /// export.
-    fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap, notify: &mut Notification, outside: &[&str]) -> bool {
+    pub(super) fn window(
+        &mut self,
+        ctx: &egui::Context,
+        i18n: &I18nMap,
+        notify: &mut Notification,
+        outside: &[&str],
+    ) -> bool {
         use crate::patch::workspace::ExportFormat;
         if !self.open {
             return false;

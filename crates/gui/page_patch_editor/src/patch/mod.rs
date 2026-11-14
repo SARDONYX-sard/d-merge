@@ -14,6 +14,20 @@
 //! ```
 //!
 //! Work is cached under the patch page's output dir and saved a moment after each edit (see [`workspace`]).
+//!
+//! [`PatchTool`] only puts its parts together. Each part works on what it is given, and returns
+//! what it asks of the others; this file hands that over:
+//!
+//! ```text
+//! work      Work         what is made: open / save / export     tool::work, tool::work_state
+//! sel       Selection    what is shown                          tool::selection
+//! keys      Keys         this frame's keys                      tool::keys
+//! side      SideArea     the side bar          -> SideAsk       ui::side_bar
+//! editor    EditorArea   tabs, editor, diffs   -> EditorOut     tool::editing, ui::object_editor
+//! problems  Problems     the work's problems                    problems
+//! panels    Panels       the windows           -> WindowDone    ui::panels, ui::windows
+//! bars      (functions)  top bar, start screen -> BarAsk        ui::top_bar
+//! ```
 
 mod anim;
 mod changes;
@@ -29,10 +43,13 @@ mod user_patch;
 mod vars_edit;
 mod workspace;
 
+use std::path::PathBuf;
+
 use egui_code_editor::EditorCommand;
-use egui_widgets::notify::Notification;
+use egui_widgets::{Modal, notify::Notification};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
+    patch::ResolveRequest,
     settings::{
         pages::{
             patch::behavior::ParserMode,
@@ -42,7 +59,11 @@ use gui_shared::{
     },
 };
 
-use self::workspace::Workspace;
+use self::{
+    tool::session::Reshow,
+    ui::{side_bar::SideAsk, top_bar::BarDone, windows::WindowDone},
+    workspace::Workspace,
+};
 
 /// How many works the list of recent ones keeps.
 const MAX_RECENT: usize = 12;
@@ -70,49 +91,35 @@ pub struct PatchPaths<'a> {
     pub parser_mode: ParserMode,
 }
 
+/// See the module docs.
 #[derive(Debug, Default)]
 pub(crate) struct PatchTool {
     /// What is being made, where it lives, when it is saved. See [`tool::work_state`].
     work: tool::work_state::Work,
-    /// Which windows, forms and sections are open. See [`ui::panels`].
-    panels: ui::panels::Panels,
-    /// This tool is the user patch's, in its window: see [`user_patch`].
-    is_user_patch: bool,
-    /// This frame\'s keys, and the palette\'s. See [`tool::keys`].
-    keys: tool::keys::Keys,
-    /// Copy path / reveal of an object asked for by a tab or the editor: done by
-    /// [`Self::file_keys`], which has what it needs.
-    file_asked: Option<(tool::list::FileAction, String)>,
-    /// The editor of the open object and what is beside it: preview, merge, problems. See [`tool::editing`].
-    pane: tool::editing::EditorPane,
-    /// What `Edit...` proposed, until it is edited.
-    draft: Option<user_patch::Draft>,
-
     /// What is shown: the behavior and the object. See [`tool::selection`].
     sel: tool::selection::Selection,
-    /// The objects of the explorer: the filters, the tree or the list, the keyboard in them. See [`tool::list`].
-    explorer: tool::list::Explorer,
-
-    /// The objects open in tabs.
-    tabs: editor::tabs::EditorTabs,
-
-    search: egui_code_editor::SearchView,
-    /// The side bar: which view, and whether it shows. See [`ui::side_bar`].
-    side: ui::side_bar::SideBar,
-    /// The Changes view: what changed since the last revision, and what is typed there. See [`changes`].
-    scm: changes::Scm,
-    /// The diffs and blames of the history open as tabs. See [`ui::revision_view`].
-    views: ui::revision_view::Views,
+    /// This frame's keys, and the palette's. See [`tool::keys`].
+    keys: tool::keys::Keys,
+    /// The side bar and its views. See [`ui::side_bar::SideArea`].
+    side: ui::side_bar::SideArea,
+    /// The tabs, the editor of the open object, the diffs. See [`tool::editing::EditorArea`].
+    editor: tool::editing::EditorArea,
     /// The problems of the whole work: the status bar's counts, the Problems panel. See [`problems`].
     problems: problems::Problems,
-    /// A conflict's value to change in the editor, taken in on the next frame.
-    pending_resolution: Option<gui_shared::patch::ResolveRequest>,
-    /// The window of the user patch, and what it asks for.
-    user_patch: user_patch::UserPatchView,
-    /// The user patch written as a mod of its own. See [`user_patch::ModExport`].
-    mod_export: user_patch::ModExport,
-    /// The EVENTS / VARIABLES panel. See [`ui::vars_panel`].
-    vars: ui::vars_panel::VarsPanel,
+    /// Which windows, forms and sections are open. See [`ui::panels`].
+    panels: ui::panels::Panels,
+    /// The window of the user patch, with its own tool. See [`user_patch`].
+    user_patch: UserPatchView,
+}
+
+/// The user patch's window. See [`user_patch`].
+#[derive(Debug, Default)]
+struct UserPatchView {
+    open: bool,
+    /// Comes above what it was opened from, on the next frame.
+    to_top: bool,
+    /// Its editor, from the first time it is needed.
+    tool: Option<Box<PatchTool>>,
 }
 
 /// Where the cursor goes when the editor gets the keyboard back.
@@ -124,7 +131,7 @@ enum FocusAt {
     Line(usize),
 }
 
-/// What the editor asked for in a frame. See [`PatchTool::apply_editor_result`].
+/// What the editor asked for in a frame. See [`tool::editing::EditorArea::apply_editor_result`].
 #[derive(Debug, Default)]
 struct EditorResult {
     /// The text was edited.
@@ -177,21 +184,11 @@ impl PatchTool {
     pub(crate) fn set_parser_mode(&mut self, mode: ParserMode) {
         if self.work.parser_mode != mode {
             self.work.parser_mode = mode;
-            self.pane.preview = None;
+            self.editor.pane.preview = None;
         }
     }
 
-    /// What is shown of the editor, kept in the settings.
-    const fn read_view_settings(&mut self, settings: &PatchEditorSettings) {
-        self.pane.read_view(settings);
-        self.explorer.tree_view = settings.tree_view;
-    }
-
-    const fn write_view_settings(&self, settings: &mut PatchEditorSettings) {
-        self.pane.write_view(settings);
-        settings.tree_view = self.explorer.tree_view;
-    }
-
+    /// One frame of the page.
     pub(crate) fn ui(
         &mut self,
         ui: &mut egui::Ui,
@@ -201,147 +198,423 @@ impl PatchTool {
         (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
         keys: &mut keybinding::Keybindings,
     ) {
-        self.pane.read_options(editor);
+        self.editor.pane.read_options(editor);
         if self.work.place.template_dir != paths.template_dir {
             paths.template_dir.clone_into(&mut self.work.place.template_dir);
         }
         self.set_patch_output(paths.patch_output_dir, notify, i18n);
         // The first frame reopens the last work (its cache is found from these two).
         if !self.work.restored {
-            self.work.restored = true;
-            self.work.place.output.clone_from(&settings.output);
-            self.work.place.mod_dir.clone_from(&settings.mod_dir);
-            self.work.place.mod_code.clone_from(&settings.mod_code);
-            self.work.recent.clone_from(&settings.recent);
-            // It has a window of its own.
-            self.work.recent.retain(|work| !work.mod_code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE));
-            // A work that is gone: the start screen rather than an empty work.
-            let code_is_free = self.work.place.mod_code.trim().eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE);
-            if self.work.place.patch_output.is_empty()
-                || code_is_free
-                || !Workspace::exists(&self.work.place.cache_root, self.work.place.mod_code.trim())
-            {
-                self.close_work(notify, i18n);
-            }
-            // What is set once stays out of the way, unless it still has to be set.
-            self.panels.project_open = false;
-            self.panels.behaviors_open = true;
-            self.explorer.trees = settings
-                .tree_open
-                .iter()
-                .map(|(path, open)| {
-                    let open = open.iter().map(|(id, open)| (id.as_str(), *open));
-                    (path.clone(), tree::TreeState::restored(open))
-                })
-                .collect();
+            self.restore_settings(settings, notify, i18n);
         }
         self.read_view_settings(settings);
-        self.explorer.changed_only = settings.changed_only;
-        if self.poll_job(notify, i18n) {
-            ui.ctx().request_repaint();
-        }
-        self.sync_workspace(notify, i18n);
-        self.diagnose_work();
+        self.side.explorer.changed_only = settings.changed_only;
+
+        self.poll_job(ui.ctx(), notify, i18n);
+        let shown = self.editor.shown(&self.sel);
+        self.work.sync_workspace(shown, notify, i18n);
+        self.problems.diagnose(&self.work);
         // The user patch window, above the page, has the keys while it is open.
         let keys = (!self.user_patch.open).then_some(keys);
         self.take_key_commands(ui.ctx(), keys, i18n, notify);
         self.draw(ui, i18n, notify);
 
-        self.pane.write_options(editor);
-        if settings.mod_dir != self.work.place.mod_dir {
-            settings.mod_dir.clone_from(&self.work.place.mod_dir);
+        self.editor.pane.write_options(editor);
+        self.write_settings(settings);
+    }
+
+    /// The first frame: the work, the recent works and the trees as the settings kept them.
+    fn restore_settings(&mut self, settings: &PatchEditorSettings, notify: &mut Notification, i18n: &I18nMap) {
+        self.work.restored = true;
+        let place = &mut self.work.place;
+        place.output.clone_from(&settings.output);
+        place.mod_dir.clone_from(&settings.mod_dir);
+        place.mod_code.clone_from(&settings.mod_code);
+        self.work.recent.clone_from(&settings.recent);
+        // It has a window of its own.
+        self.work.recent.retain(|work| !work.mod_code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE));
+
+        // A work that is gone: the start screen rather than an empty work.
+        let place = &self.work.place;
+        let code_is_free = place.mod_code.trim().eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE);
+        if place.patch_output.is_empty() || code_is_free || !Workspace::exists(&place.cache_root, place.mod_code.trim())
+        {
+            let shown = self.editor.shown(&self.sel);
+            let closed = self.work.close_work(shown, notify, i18n);
+            self.reshow(closed);
+        }
+
+        // What is set once stays out of the way, unless it still has to be set.
+        self.panels.project_open = false;
+        self.side.bar.behaviors_open = true;
+        self.side.explorer.trees = settings
+            .tree_open
+            .iter()
+            .map(|(path, open)| {
+                let open = open.iter().map(|(id, open)| (id.as_str(), *open));
+                (path.clone(), tree::TreeState::restored(open))
+            })
+            .collect();
+    }
+
+    /// What the page keeps in the settings: the work, the recent works, what is shown.
+    fn write_settings(&mut self, settings: &mut PatchEditorSettings) {
+        let place = &self.work.place;
+        if settings.mod_dir != place.mod_dir {
+            settings.mod_dir.clone_from(&place.mod_dir);
         }
         if settings.recent != self.work.recent {
             settings.recent.clone_from(&self.work.recent);
         }
         self.write_view_settings(settings);
-        settings.changed_only = self.explorer.changed_only;
-        for (path, tree) in &mut self.explorer.trees {
+        settings.changed_only = self.side.explorer.changed_only;
+        for (path, tree) in &mut self.side.explorer.trees {
             if let Some(open) = tree.take_open_changes() {
                 let open = open.map(|(id, open)| (id.to_owned(), open)).collect();
                 settings.tree_open.insert(path.clone(), open);
             }
         }
-        if settings.output != self.work.place.output || settings.mod_code != self.work.place.mod_code {
-            settings.output.clone_from(&self.work.place.output);
-            settings.mod_code.clone_from(&self.work.place.mod_code);
+        if settings.output != place.output || settings.mod_code != place.mod_code {
+            settings.output.clone_from(&place.output);
+            settings.mod_code.clone_from(&place.mod_code);
         }
     }
 
-    /// The "New object" window, if open: a class picked is a new object of it.
-    fn class_picker(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        let behavior = &self.work.workspace.behaviors[self.sel.active];
-        let Some(class) = self.panels.class_picker.window(ctx, i18n, behavior) else { return };
+    /// What is shown of the editor, kept in the settings.
+    const fn read_view_settings(&mut self, settings: &PatchEditorSettings) {
+        self.editor.pane.read_view(settings);
+        self.side.explorer.tree_view = settings.tree_view;
+    }
 
-        let code = self.work.place.mod_code.trim().to_owned();
-        if let Some(id) = self.work.workspace.behaviors[self.sel.active].add_class(&code, &class) {
-            self.object_changed(&id);
-            self.sel.selected = Some(id.into());
-            self.panels.class_picker.close();
+    const fn write_view_settings(&self, settings: &mut PatchEditorSettings) {
+        self.editor.pane.write_view(settings);
+        settings.tree_view = self.side.explorer.tree_view;
+    }
+
+    /// The patch page's output directory may have changed: see [`tool::work_state::Work::set_patch_output`].
+    fn set_patch_output(&mut self, output: &str, notify: &mut Notification, i18n: &I18nMap) {
+        let shown = self.editor.shown(&self.sel);
+        if let Some(closed) = self.work.set_patch_output(shown, output, notify, i18n) {
+            self.panels.project_open = false;
+            self.reshow(closed);
         }
     }
 
-    /// The repeat window, if open, and what it asked for.
-    fn repeat(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        use ui::repeat::RepeatAsk;
-        let code = self.work.place.mod_code.trim().to_owned();
-        let Some(form) = &mut self.panels.repeat else { return };
-        match form.window(ctx, i18n, nemesis_diff::is_existing_mod_code(&code)) {
-            Some(RepeatAsk::Close) => self.panels.repeat = None,
-            Some(RepeatAsk::Create) => {
-                let Some(form) = self.panels.repeat.take() else { return };
-                let Some(behavior) = self.work.workspace.behaviors.get_mut(form.behavior()) else { return };
-                let first = form.create(behavior, &code);
-                self.sel.active = form.behavior();
-                self.reset_names();
-                self.work.mark_dirty();
-                self.sel.selected = first.map(Into::into);
-            }
-            None => {}
+    /// Takes in the job once it is done; while it runs, the page is drawn again and again.
+    fn poll_job(&mut self, ctx: &egui::Context, notify: &mut Notification, i18n: &I18nMap) {
+        let shown = self.editor.shown(&self.sel);
+        if let Some(reshow) = self.work.poll_job(shown, notify, i18n) {
+            self.reshow(reshow);
+        }
+        if self.work.job.is_some() {
+            ctx.request_repaint();
         }
     }
 
+    /// Waits for the job, if one runs: see [`tool::work_state::Work::wait_job`].
+    fn wait_job(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        let shown = self.editor.shown(&self.sel);
+        if let Some(reshow) = self.work.wait_job(shown, notify, i18n) {
+            self.reshow(reshow);
+        }
+    }
+
+    /// The work changed as a whole: the editor shows `reshow`. A mod read closes the form of a new
+    /// work.
+    fn reshow(&mut self, reshow: Reshow) {
+        if matches!(reshow, Reshow::Place(_)) {
+            self.panels.new_work = None;
+        }
+        self.editor.reshow(reshow, &mut self.work, &mut self.sel);
+    }
+
+    /// Reads this frame's keys: see [`tool::keys::Keys::frame`].
+    fn take_key_commands(
+        &mut self,
+        ctx: &egui::Context,
+        bindings: Option<&mut keybinding::Keybindings>,
+        i18n: &I18nMap,
+        notify: &mut Notification,
+    ) {
+        let parts = (&self.editor.pane, &self.side.explorer, &self.problems);
+        let context = tool::list::key_context(ctx, parts, self.work.user_patch);
+        self.keys.frame(ctx, bindings, &context, (i18n, notify));
+    }
+
+    /// The bar, the side bar and the editor; or the start screen, or how far a job is.
     fn draw(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         // The work is on another thread: only how far it is.
         if let Some(job) = &self.work.job {
-            ui.add_space(12.0);
-            ui.label(format!("{}: {}", i18n.t(job.label), job.detail));
-            let (done, total) = job.work.counts();
-            let (ratio, text) = match job.work.progress() {
-                Some(ratio) => (ratio, format!("{done} / {total}")),
-                None => (0.0, done.to_string()),
-            };
-            ui.add(egui::ProgressBar::new(ratio).text(text).animate(true));
+            ui::job_progress(ui, i18n, job);
             return;
         }
-        self.code_choice_window(ui.ctx(), i18n, notify);
-        if self.is_user_patch {
-            self.user_patch_bar(ui, i18n, notify);
-        } else if !self.work.place.is_open() {
-            self.start_screen(ui, i18n, notify);
-            return;
+
+        let windows = self.panels.windows(ui.ctx(), i18n, (&mut self.work, &mut self.sel), notify);
+        for done in windows {
+            self.apply_window(done, notify, i18n);
+        }
+
+        let user_patch = self.work.user_patch;
+        let start = !user_patch && !self.work.place.is_open();
+        let parts = (&mut self.work, &mut self.panels);
+        let asks = if user_patch {
+            ui::user_patch::user_patch_bar(ui, i18n, (&*parts.0, parts.1), notify)
+        } else if start {
+            ui::start_screen::start_screen(ui, i18n, (&*parts.0, parts.1), notify)
         } else {
-            self.project_bar(ui, i18n, notify);
+            ui::top_bar::project_bar(ui, i18n, parts, notify)
+        };
+        for ask in asks {
+            self.apply_bar(ask, notify, i18n);
+        }
+        if start {
+            return;
         }
         ui.separator();
-        self.template_picker_window(ui.ctx(), i18n, notify);
-        self.anim_data_window(ui.ctx(), i18n, notify);
-        self.new_clips_window(ui.ctx(), i18n);
-        self.duplicate_window(ui.ctx(), i18n);
-        self.repeat(ui.ctx(), i18n);
         self.sel.active = self.sel.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
 
         // Like VS Code: the activity bar, the side bar, and the editor with what belongs to it.
-        self.side_bar(ui, i18n, notify);
+        let parts = (&mut self.work, &mut self.sel, &mut self.keys);
+        let asks = self.side.show(ui, i18n, parts, &mut self.panels, notify);
+        for ask in asks {
+            self.apply_side(ask, ui.ctx(), notify);
+        }
         if self.work.workspace.behaviors.is_empty() {
             egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisNoBehavior)));
             return;
         }
-        self.class_picker(ui.ctx(), i18n);
-        self.object_editor(ui, i18n);
+
+        let parts = (&mut self.work, &mut self.sel, &mut self.keys);
+        let out = self.editor.show(ui, i18n, parts, &mut self.problems);
+        self.apply_editor_out(ui, out, notify);
     }
 
-    // ── Workspace on disk ────────────────────────────────────────────────────
+    /// What a window did: see [`WindowDone`].
+    fn apply_window(&mut self, done: WindowDone, notify: &mut Notification, i18n: &I18nMap) {
+        match done {
+            WindowDone::Reload => self.editor.reload(),
+            WindowDone::Duplicated(to) => self.side.explorer.anim_tree.show_project(to),
+            WindowDone::OpenCode(choice, code) => {
+                let shown = self.editor.shown(&self.sel);
+                self.work.open_chosen_code(shown, (&choice, &code), notify, i18n);
+            }
+        }
+    }
+
+    /// What a bar asked for: see [`ui::top_bar::apply`].
+    fn apply_bar(&mut self, ask: ui::top_bar::BarAsk, notify: &mut Notification, i18n: &I18nMap) {
+        let shown = self.editor.shown(&self.sel);
+        match ui::top_bar::apply(ask, (&mut self.work, &mut self.panels), shown, notify, i18n) {
+            Some(BarDone::Reshow(reshow)) => self.reshow(reshow),
+            Some(BarDone::Reload) => self.editor.reload(),
+            None => {}
+        }
+    }
+
+    /// What the side bar asked for: see [`SideAsk`].
+    fn apply_side(&mut self, ask: SideAsk, ctx: &egui::Context, notify: &mut Notification) {
+        let (editor, sel) = (&mut self.editor, &mut self.sel);
+        match ask {
+            SideAsk::ShowBehavior(at) => editor.show_behavior(sel, at),
+            SideAsk::BehaviorRemoved => editor.behaviors_changed(),
+            SideAsk::KeepOpen(id) => editor.keep_open(sel, &id),
+            SideAsk::OpenLocation(id, line) => {
+                let current = sel.selected.clone().unwrap_or_default();
+                editor.open_location(sel, &current, (&id, line));
+            }
+
+            SideAsk::OpenChange(behavior, id) => editor.open_object(sel, (behavior, &id)),
+            SideAsk::Compare(behavior, id, from, to) => {
+                editor.open_compare((&mut self.work, sel), (behavior, &id), (from, to));
+            }
+            SideAsk::Blame(behavior, id) => editor.open_blame((&mut self.work, sel), (behavior, &id)),
+
+            SideAsk::RevertOrDelete(id) => {
+                let gone = self.work.revert_or_delete(sel.active, &id);
+                self.problems.refresh_in(&self.work, sel.active, &id);
+                editor.object_reverted(sel, &id, gone);
+            }
+            SideAsk::OpenPandoraDoc => {
+                self.work.make_pandora_doc(sel.active);
+                editor.open_pandora_doc(sel);
+            }
+            SideAsk::File(action, id) => tool::list::file_action(ctx, (&self.work, sel.active), (action, &id), notify),
+
+            SideAsk::FocusEditor => editor.pane.focus = Some(FocusAt::Keep),
+            SideAsk::Reload => editor.reload(),
+        }
+    }
+
+    /// What the editor asked for: see [`ui::object_editor::EditorOut`].
+    fn apply_editor_out(&mut self, ui: &egui::Ui, out: ui::object_editor::EditorOut, notify: &mut Notification) {
+        if out.reveal {
+            self.side.explorer.reveal = true;
+        }
+        if out.leave_tree {
+            self.side.explorer.tree_focus = false;
+        }
+        if let Some(editor_id) = out.enter_tree {
+            self.side.enter_tree(ui, editor_id);
+        }
+        if let Some((action, id)) = out.file {
+            tool::list::file_action(ui.ctx(), (&self.work, self.sel.active), (action, &id), notify);
+        }
+    }
+
+    // ── The user patch ───────────────────────────────────────────────────────
+
+    /// The user patch's tool, as it starts: see [`user_patch::work_of`].
+    fn for_user_patch(paths: PatchPaths<'_>) -> Self {
+        let mut tool = Self { work: user_patch::work_of(paths), ..Self::default() };
+        tool.side.bar.behaviors_open = true;
+        tool.side.explorer.changed_only = true;
+        tool
+    }
+
+    /// Opens or closes the window of the user patch.
+    pub(crate) const fn toggle_user_patch(&mut self) {
+        self.user_patch.open = !self.user_patch.open;
+        self.user_patch.to_top = self.user_patch.open;
+    }
+
+    /// The user patch's editor, up to date. A new output directory has another user patch: what was
+    /// open is saved where it belongs first.
+    fn user_patch_tool(&mut self, paths: PatchPaths<'_>, notify: &mut Notification, i18n: &I18nMap) -> &mut Self {
+        let output = paths.patch_output_dir.trim();
+        if let Some(tool) = self.user_patch.tool.as_mut().filter(|tool| tool.work.place.patch_output != output) {
+            tool.leave_user_patch(notify, i18n);
+            self.work.mod_written |= tool.work.mod_written;
+            self.user_patch.tool = None;
+        }
+
+        let tool = self.user_patch.tool.get_or_insert_with(|| Box::new(Self::for_user_patch(paths)));
+        tool.set_parser_mode(paths.parser_mode);
+        if tool.work.place.template_dir != paths.template_dir {
+            paths.template_dir.clone_into(&mut tool.work.place.template_dir);
+        }
+        let shown = tool.editor.shown(&tool.sel);
+        tool.work.sync_workspace(shown, notify, i18n);
+        // Small, and what comes next uses it at once.
+        tool.wait_job(notify, i18n);
+        tool
+    }
+
+    /// `Use this`: the value goes in now, and the mod is written. The window need not be open.
+    ///
+    /// # Errors
+    /// There is no output directory to keep it in, or the value could not be taken in.
+    pub(crate) fn resolve_now(
+        &mut self,
+        request: &ResolveRequest,
+        paths: PatchPaths<'_>,
+        notify: &mut Notification,
+        i18n: &I18nMap,
+    ) -> Result<(), String> {
+        if paths.patch_output_dir.trim().is_empty() {
+            return Err(i18n.t(I18nKey::NemesisNeedPatchOutput).to_owned());
+        }
+        let root = PathBuf::from(paths.template_dir);
+        let tool = self.user_patch_tool(paths, notify, i18n);
+        let invalid = tool.work.resolve_now(request, &root, i18n)?;
+        tool.editor.reload();
+
+        self.work.mod_written = true;
+        if invalid.is_empty() { Ok(()) } else { Err(invalid.join("\n")) }
+    }
+
+    /// `Edit...`: the value goes in, and the window shows it.
+    pub(crate) fn open_resolution(
+        &mut self,
+        request: ResolveRequest,
+        paths: PatchPaths<'_>,
+        notify: &mut Notification,
+        i18n: &I18nMap,
+    ) {
+        self.user_patch.open = true;
+        self.user_patch.to_top = true;
+        if paths.patch_output_dir.trim().is_empty() {
+            return; // the window says what to do
+        }
+        self.user_patch_tool(paths, notify, i18n).work.resolution = Some(request);
+    }
+
+    /// The value `Edit...` asked for, taken in: see [`user_patch::take_in_resolution`].
+    fn take_resolution(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        let Some(request) = self.work.resolution.take() else { return };
+        user_patch::take_in_resolution(&request, (&mut self.work, &mut self.editor, &mut self.sel), notify, i18n);
+    }
+
+    /// The user patch's tool is left (closed, or another one): what `Edit...` proposed goes unless
+    /// edited, and the rest is saved.
+    fn leave_user_patch(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        user_patch::undo_unedited_draft((&mut self.work, &mut self.editor, &mut self.sel));
+        let shown = self.editor.shown(&self.sel);
+        self.work.save_now(shown, notify, i18n);
+    }
+
+    /// The window was closed: what it wrote is for the conflict check to see now, not at each pause.
+    fn close_user_patch(&mut self, notify: &mut Notification, i18n: &I18nMap) {
+        let Some(tool) = &mut self.user_patch.tool else { return };
+        tool.leave_user_patch(notify, i18n);
+        self.work.mod_written |= std::mem::take(&mut tool.work.mod_written);
+    }
+
+    /// Draws the user patch's window if it is open. It belongs to no page: it stays when another is
+    /// shown. See [`ui::user_patch`].
+    pub(crate) fn user_patch_window(
+        &mut self,
+        ctx: &egui::Context,
+        i18n: &I18nMap,
+        notify: &mut Notification,
+        paths: PatchPaths<'_>,
+        (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
+        keys: &mut keybinding::Keybindings,
+    ) {
+        if !self.user_patch.open {
+            return;
+        }
+        let to_top = std::mem::take(&mut self.user_patch.to_top);
+        let has_output = !paths.patch_output_dir.trim().is_empty();
+        let mut tool = has_output.then(|| self.user_patch_tool(paths, notify, i18n));
+
+        let mut open = true;
+        Modal::new(i18n.t(I18nKey::UserPatchTitle))
+            .size(egui::Vec2::new(0.90, 0.95))
+            .to_top(to_top)
+            // Its editor uses `Esc` (Vim, hovers, quick fixes): the window closes with its `x`.
+            .close_on_escape(false)
+            .show(ctx, &mut open, |ui| match &mut tool {
+                Some(tool) => tool.user_patch_ui(ui, i18n, notify, (settings, editor), keys),
+                None => {
+                    ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNeedPatchOutput));
+                }
+            });
+
+        self.user_patch.open = open;
+        if !open {
+            self.close_user_patch(notify, i18n);
+        }
+    }
+
+    /// One frame of the user patch's own tool, which keeps nothing of its work in the settings.
+    fn user_patch_ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        notify: &mut Notification,
+        (settings, editor): (&mut PatchEditorSettings, &mut LspOptions),
+        keys: &mut keybinding::Keybindings,
+    ) {
+        self.editor.pane.read_options(editor);
+        self.read_view_settings(settings);
+        let shown = self.editor.shown(&self.sel);
+        self.work.sync_workspace(shown, notify, i18n);
+        self.take_resolution(notify, i18n);
+        self.take_key_commands(ui.ctx(), Some(keys), i18n, notify);
+        self.draw(ui, i18n, notify);
+        self.editor.pane.write_options(editor);
+        self.write_view_settings(settings);
+    }
 }
 
 #[cfg(test)]
@@ -421,8 +694,9 @@ mod tests {
         let selected = std::env::var("PATCH_EDITOR_MOD").unwrap();
         let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../resource/assets/templates");
         let (workspace, code, _) = Workspace::import(Path::new(&selected), &root).unwrap();
-        let explorer = tool::list::Explorer { tree_view: true, ..Default::default() };
-        let mut tool = PatchTool { explorer, ..PatchTool::default() };
+        let mut tool = PatchTool::default();
+        tool.side.explorer.tree_view = true;
+        tool.work.place.loaded_for = Some(code.clone());
         (tool.work.workspace, tool.work.place.mod_code) = (workspace, code);
         let i18n = I18nMap::new();
 
@@ -433,20 +707,17 @@ mod tests {
             for id in ids {
                 println!("{active} {id}");
                 tool.sel.selected = Some(id.as_str().into());
-                egui::__run_test_ui(|ui| {
-                    tool.object_list(ui, &i18n, &mut egui_widgets::notify::Notification::default());
-                    tool.object_editor(ui, &i18n);
-                });
+                egui::__run_test_ui(|ui| tool.draw(ui, &i18n, &mut Notification::default()));
                 if tool.work.workspace.behaviors[active].is_anim_data() {
                     continue; // listed per actor, not in the tree
                 }
-                let names = tool.names();
+                let names = tool.work.names(active);
                 let path = &tool.work.workspace.behaviors[active].meshes_path;
-                let tree = &tool.explorer.trees[path];
+                let tree = &tool.side.explorer.trees[path];
                 let found = tree.rows().get(tree.cursor).map(|row| names.graph.id(row.node));
                 assert_eq!(found, Some(id.as_str()), "`{id}` is not selected in the tree");
-                assert_eq!(tool.pane.opened.as_ref().map(|(_, open)| open.as_str()), Some(id.as_str()));
-                assert!(!tool.pane.text.is_empty(), "`{id}` opened empty");
+                assert_eq!(tool.editor.pane.opened.as_ref().map(|(_, open)| open.as_str()), Some(id.as_str()));
+                assert!(!tool.editor.pane.text.is_empty(), "`{id}` opened empty");
             }
         }
     }
@@ -465,6 +736,25 @@ mod work_tests {
         tool
     }
 
+    /// Loads the work of the code typed, as a frame does, and waits for it.
+    fn sync(tool: &mut PatchTool, notify: &mut Notification, i18n: &I18nMap) {
+        let shown = tool.editor.shown(&tool.sel);
+        tool.work.sync_workspace(shown, notify, i18n);
+        tool.wait_job(notify, i18n);
+    }
+
+    fn save(tool: &mut PatchTool, notify: &mut Notification, i18n: &I18nMap) {
+        let shown = tool.editor.shown(&tool.sel);
+        tool.work.save_now(shown, notify, i18n);
+    }
+
+    /// Opens the mod at `dir`: of several codes, the one to open is asked for.
+    fn open_mod(tool: &mut PatchTool, dir: &Path, notify: &mut Notification, i18n: &I18nMap) {
+        let shown = tool.editor.shown(&tool.sel);
+        tool.panels.code_choice = tool.work.open_mod(shown, dir, notify, i18n);
+        tool.wait_job(notify, i18n);
+    }
+
     /// A work is kept in the patch page's output, and another one can be made next to it.
     #[test]
     fn a_new_work_can_be_made_beside_another() {
@@ -472,31 +762,29 @@ mod work_tests {
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir);
 
-        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
-        tool.sync_workspace(&mut notify, &i18n);
-        tool.wait_job(&mut notify, &i18n);
+        tool.work.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
+        sync(&mut tool, &mut notify, &i18n);
         assert_eq!(tool.work.place.loaded_for.as_deref(), Some("aaaa"));
         tool.work.workspace.info.name = "first".to_owned();
         tool.work.mark_dirty();
-        tool.save_now(&mut notify, &i18n);
+        save(&mut tool, &mut notify, &i18n);
 
         // `File > New`: the first one goes away, and the second one starts empty.
-        tool.close_work(&mut notify, &i18n);
+        tool.apply_bar(ui::top_bar::BarAsk::CloseWork, &mut notify, &i18n);
         assert_eq!(tool.work.place.loaded_for, None);
-        tool.create_work("bbbb".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
-        tool.sync_workspace(&mut notify, &i18n);
-        tool.wait_job(&mut notify, &i18n);
+        tool.work.create_work("bbbb".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
+        sync(&mut tool, &mut notify, &i18n);
         assert_eq!(tool.work.place.loaded_for.as_deref(), Some("bbbb"));
         assert_eq!(tool.work.workspace.info.name, "");
-        tool.save_now(&mut notify, &i18n);
+        save(&mut tool, &mut notify, &i18n);
 
         let root = workspace::cache_root_of(&dir.display().to_string());
         let both = (Workspace::exists(&root, "aaaa"), Workspace::exists(&root, "bbbb"));
 
         // Back to the first one.
-        tool.switch_work("aaaa", "D:/mods/a", "", &mut notify, &i18n);
-        tool.sync_workspace(&mut notify, &i18n);
-        tool.wait_job(&mut notify, &i18n);
+        let shown = tool.editor.shown(&tool.sel);
+        tool.work.switch_work(shown, ("aaaa", "D:/mods/a", ""), &mut notify, &i18n);
+        sync(&mut tool, &mut notify, &i18n);
         let name = tool.work.workspace.info.name.clone();
         std::fs::remove_dir_all(&dir).unwrap();
 
@@ -510,9 +798,8 @@ mod work_tests {
         let dir = std::env::temp_dir().join(format!("d_merge_other_output_{}", std::process::id()));
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir.join("one"));
-        tool.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
-        tool.sync_workspace(&mut notify, &i18n);
-        tool.wait_job(&mut notify, &i18n);
+        tool.work.create_work("aaaa".to_owned(), "D:/mods/a".to_owned(), workspace::TemplateScope::Nemesis);
+        sync(&mut tool, &mut notify, &i18n);
 
         tool.set_patch_output(&dir.join("two").display().to_string(), &mut notify, &i18n);
         assert_eq!(tool.work.place.loaded_for, None);
@@ -536,9 +823,7 @@ mod work_tests {
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir.join("out"));
 
-        tool.open_mod(&root, &mut notify, &i18n);
-
-        tool.wait_job(&mut notify, &i18n);
+        open_mod(&mut tool, &root, &mut notify, &i18n);
         let opened_at_once = tool.work.place.loaded_for.clone();
         let choice = tool
             .panels
@@ -546,7 +831,9 @@ mod work_tests {
             .as_ref()
             .map(|choice| choice.codes.iter().map(|code| code.code.clone()).collect::<Vec<_>>());
 
-        tool.open_chosen_code("ecnpc", &mut notify, &i18n);
+        let asked = tool.panels.code_choice.take().unwrap();
+        let shown = tool.editor.shown(&tool.sel);
+        tool.work.open_chosen_code(shown, (&asked, "ecnpc"), &mut notify, &i18n);
         tool.wait_job(&mut notify, &i18n);
         let opened = tool.work.place.loaded_for.clone();
         let asked_again = tool.panels.code_choice.is_some();
@@ -567,14 +854,11 @@ mod work_tests {
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir.join("out"));
 
-        tool.open_mod(&one, &mut notify, &i18n);
-
-        tool.wait_job(&mut notify, &i18n);
+        open_mod(&mut tool, &one, &mut notify, &i18n);
         let of_one = (tool.work.place.loaded_for.clone(), tool.panels.code_choice.is_some());
 
         // The code of 7 letters, as Nemesis' own mod has it.
-        tool.open_mod(&several.join("Nemesis_Engine/mod/nemesis"), &mut notify, &i18n);
-        tool.wait_job(&mut notify, &i18n);
+        open_mod(&mut tool, &several.join("Nemesis_Engine/mod/nemesis"), &mut notify, &i18n);
         let of_patch_dir = (tool.work.place.loaded_for.clone(), tool.panels.code_choice.is_some());
         std::fs::remove_dir_all(&dir).unwrap();
 
@@ -607,10 +891,8 @@ mod work_tests {
         let open = |notify: &mut Notification| {
             let mut tool = tool_in(&dir.join("out"));
             tool.work.place.template_dir = dir.join("templates").display().to_string();
-            tool.open_mod(&mod_dir, notify, &i18n);
-            tool.wait_job(notify, &i18n);
-            tool.sync_workspace(notify, &i18n);
-            tool.wait_job(notify, &i18n);
+            open_mod(&mut tool, &mod_dir, notify, &i18n);
+            sync(&mut tool, notify, &i18n);
             tool
         };
 
@@ -618,7 +900,7 @@ mod work_tests {
         assert!(first.work.workspace.behaviors[0].edits["#0001"].contains(">false<"), "read from the mod");
         assert_eq!(first.work.workspace.export_format, workspace::ExportFormat::PandoraV5);
         first.work.mark_dirty();
-        first.save_now(&mut notify, &i18n);
+        save(&mut first, &mut notify, &i18n);
 
         // What an old build left: the file, no edits, and no format.
         let cache = first.work.place.cache_root.join("pandora");
@@ -653,7 +935,7 @@ mod work_tests {
     /// Vim `]c`: in the text while the inline diff shows, else in the preview.
     #[test]
     fn the_change_keys_go_to_what_shows_the_changes() {
-        let pane = tool::editing::EditorPane {
+        let mut pane = tool::editing::EditorPane {
             inline_diff: egui_code_editor::InlineDiff::between("a\nb\nc\nd\n", "a\nx\nc\ny\n"),
             preview_view: Some(editor::preview::Preview::new(
                 "<!-- MOD_CODE ~m~ OPEN -->\nb\n<!-- CLOSE -->\n<!-- MOD_CODE ~m~ OPEN -->\nd\n<!-- CLOSE -->\n",
@@ -662,28 +944,27 @@ mod work_tests {
             show_preview: true,
             ..Default::default()
         };
-        let mut tool = PatchTool { pane, ..PatchTool::default() };
-        let current = |tool: &PatchTool| tool.pane.preview_view.as_ref().map(|view| view.current);
+        let current = |pane: &tool::editing::EditorPane| pane.preview_view.as_ref().map(|view| view.current);
 
-        tool.pane.step_change(true);
-        assert!(matches!(tool.pane.focus, Some(FocusAt::Line(1))));
-        tool.pane.cursor_line = 1;
-        tool.pane.step_change(true);
-        assert!(matches!(tool.pane.focus, Some(FocusAt::Line(3))));
-        tool.pane.cursor_line = 3;
-        tool.pane.step_change(false);
-        assert!(matches!(tool.pane.focus, Some(FocusAt::Line(1))));
-        assert_eq!(current(&tool), Some(0), "the preview stays");
+        pane.step_change(true);
+        assert!(matches!(pane.focus, Some(FocusAt::Line(1))));
+        pane.cursor_line = 1;
+        pane.step_change(true);
+        assert!(matches!(pane.focus, Some(FocusAt::Line(3))));
+        pane.cursor_line = 3;
+        pane.step_change(false);
+        assert!(matches!(pane.focus, Some(FocusAt::Line(1))));
+        assert_eq!(current(&pane), Some(0), "the preview stays");
 
-        tool.pane.focus = None;
-        tool.pane.show_inline_diff = false;
-        tool.pane.step_change(true);
-        assert_eq!(current(&tool), Some(1));
-        assert!(tool.pane.focus.is_none(), "the cursor stays");
+        pane.focus = None;
+        pane.show_inline_diff = false;
+        pane.step_change(true);
+        assert_eq!(current(&pane), Some(1));
+        assert!(pane.focus.is_none(), "the cursor stays");
 
-        tool.pane.show_preview = false;
-        tool.pane.step_change(true);
-        assert_eq!(current(&tool), Some(1), "neither shows");
+        pane.show_preview = false;
+        pane.step_change(true);
+        assert_eq!(current(&pane), Some(1), "neither shows");
     }
 
     /// The preview says what `Export` would write, and its `↶` takes back what it shows.
@@ -707,16 +988,15 @@ mod work_tests {
         let (mut notify, i18n) = (Notification::default(), I18nMap::new());
         let mut tool = tool_in(&dir.join("out"));
         tool.work.place.template_dir = dir.join("templates").display().to_string();
-        tool.open_mod(&mod_dir, &mut notify, &i18n);
-        tool.wait_job(&mut notify, &i18n);
-        tool.sync_workspace(&mut notify, &i18n);
-        tool.wait_job(&mut notify, &i18n);
-        tool.pane.text = tool.work.workspace.behaviors[0].text("#0001").unwrap().to_owned();
+        open_mod(&mut tool, &mod_dir, &mut notify, &i18n);
+        sync(&mut tool, &mut notify, &i18n);
+        tool.editor.pane.text = tool.work.workspace.behaviors[0].text("#0001").unwrap().to_owned();
 
         let shown = |tool: &mut PatchTool| {
-            tool.pane.preview = None;
-            tool.refresh_preview("#0001");
-            let lines = tool.pane.preview_view.as_ref().map(|view| view.lines().iter().map(|(_, line)| line.clone()));
+            tool.editor.pane.preview = None;
+            tool.editor.refresh_preview((&mut tool.work, &mut tool.problems), 0, "#0001");
+            let view = tool.editor.pane.preview_view.as_ref();
+            let lines = view.map(|view| view.lines().iter().map(|(_, line)| line.clone()));
             lines.map_or_else(String::new, |lines| lines.collect::<Vec<_>>().join("\n"))
         };
         let as_pandora = shown(&mut tool);
@@ -724,7 +1004,7 @@ mod work_tests {
         let as_nemesis = shown(&mut tool);
         tool.work.workspace.export_format = workspace::ExportFormat::PandoraV5;
         shown(&mut tool);
-        tool.revert_block("#0001", 0);
+        tool.editor.revert_block((&mut tool.work, 0), "#0001", 0);
         let edits = tool.work.workspace.behaviors[0].edits.len();
         std::fs::remove_dir_all(&dir).unwrap();
 
@@ -736,18 +1016,157 @@ mod work_tests {
     /// `LspOptions` holds the keymap too: it must not put back the one it was given.
     #[test]
     fn the_keymap_box_changes_the_keymap() {
-        let mut tool = PatchTool::default();
+        let mut pane = tool::editing::EditorPane::default();
         let mut editor =
             LspOptions { editor_mode: gui_shared::settings::ui::editor::EditorMode::Normal, ..LspOptions::default() };
-        tool.pane.read_options(&editor);
-        tool.pane.mode = gui_shared::settings::ui::editor::EditorMode::Vim;
-        tool.pane.write_options(&mut editor);
+        pane.read_options(&editor);
+        pane.mode = gui_shared::settings::ui::editor::EditorMode::Vim;
+        pane.write_options(&mut editor);
         assert_eq!(editor.editor_mode, gui_shared::settings::ui::editor::EditorMode::Vim);
 
-        tool.pane.read_options(&editor);
-        tool.pane.lsp.hover = !tool.pane.lsp.hover;
-        tool.pane.write_options(&mut editor);
-        assert_eq!(editor.hover, tool.pane.lsp.hover);
+        pane.read_options(&editor);
+        pane.lsp.hover = !pane.lsp.hover;
+        pane.write_options(&mut editor);
+        assert_eq!(editor.hover, pane.lsp.hover);
         assert_eq!(editor.editor_mode, gui_shared::settings::ui::editor::EditorMode::Vim);
+    }
+}
+
+#[cfg(test)]
+mod user_patch_tests {
+    use std::path::Path;
+
+    use gui_shared::patch::USER_PATCH_CODE;
+
+    use super::*;
+
+    fn paths(output: &str) -> PatchPaths<'_> {
+        PatchPaths { patch_output_dir: output, template_dir: "", parser_mode: ParserMode::Strict }
+    }
+
+    #[test]
+    fn it_needs_the_output_directory() {
+        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
+        let request = ResolveRequest {
+            target: "meshes/x.bin".into(),
+            path: "#1/C/a".into(),
+            mod_dir: "D:/mods/a".into(),
+            edit: false,
+            sides: Vec::new(),
+            keep_all_events: false,
+        };
+        let mut main = PatchTool::default();
+        assert!(main.resolve_now(&request, paths(""), &mut notify, &i18n).is_err());
+        assert!(main.user_patch.tool.is_none());
+    }
+
+    /// A proposal of `Edit...`: as a conflict's `Edit...` does, with a mod's clip of animation data.
+    fn proposed(dir: &Path) -> (PatchTool, Notification, I18nMap) {
+        let file = dir.join("mods/a/animationdatasinglefile/D~1/Idle~m$0.txt");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, "theirs\n").unwrap();
+        let output = dir.join("out").display().to_string();
+        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
+        let mut main = PatchTool::default();
+        let request = ResolveRequest {
+            target: "meshes/animationdatasinglefile.bin".into(),
+            path: "D~1/Idle~m$0/name".into(),
+            mod_dir: dir.join("mods/a").display().to_string(),
+            edit: true,
+            sides: Vec::new(),
+            keep_all_events: false,
+        };
+        main.open_resolution(request, paths(&output), &mut notify, &i18n);
+        main.user_patch.tool.as_mut().unwrap().take_resolution(&mut notify, &i18n);
+        (main, notify, i18n)
+    }
+
+    /// Opening it to look and closing it decides nothing.
+    #[test]
+    fn an_edit_that_was_not_made_changes_nothing() {
+        let dir = std::env::temp_dir().join(format!("d_merge_draft_none_{}", std::process::id()));
+        let (mut main, mut notify, i18n) = proposed(&dir);
+        let tool = main.user_patch.tool.as_mut().unwrap();
+        assert_eq!(tool.work.workspace.behaviors[0].text("D~1/Idle~m$0.txt"), Some("theirs\n"), "it shows the value");
+        assert!(!tool.work.autosave.is_dirty(), "nothing to save yet");
+
+        main.close_user_patch(&mut notify, &i18n);
+        let tool = main.user_patch.tool.as_ref().unwrap();
+        let (behaviors, refs, name) = (
+            tool.work.workspace.behaviors.len(),
+            tool.work.workspace.ref_mods.len(),
+            tool.work.workspace.info.name.clone(),
+        );
+        let written = dir.join("out").exists();
+        let wrote = main.take_mod_written();
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(behaviors, 0, "the behavior was opened for it");
+        assert_eq!(refs, 0);
+        assert_eq!(name, "");
+        assert!(!written, "nothing is on the disk");
+        assert!(!wrote, "the conflict check has nothing to follow");
+    }
+
+    #[test]
+    fn an_edit_that_was_made_stays() {
+        let dir = std::env::temp_dir().join(format!("d_merge_draft_edit_{}", std::process::id()));
+        let (mut main, mut notify, i18n) = proposed(&dir);
+        let tool = main.user_patch.tool.as_mut().unwrap();
+        tool.work.workspace.behaviors[0].set_text("D~1/Idle~m$0.txt", "mine\n");
+        tool.work.mark_dirty();
+
+        main.close_user_patch(&mut notify, &i18n);
+        let tool = main.user_patch.tool.as_ref().unwrap();
+        let text = tool.work.workspace.behaviors[0].text("D~1/Idle~m$0.txt").map(str::to_owned);
+        let wrote = main.take_mod_written();
+        let exported =
+            dir.join("out/.d_merge/user_patch/Nemesis_Engine/mod/upatch/animationdatasinglefile/D~1/Idle~m$0.txt");
+        let on_disk = std::fs::read_to_string(exported).ok();
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(text.as_deref(), Some("mine\n"));
+        assert!(wrote);
+        assert_eq!(on_disk.as_deref(), Some("mine\n"));
+    }
+
+    /// Its window draws, on any page, and the main tool does not take its code.
+    #[test]
+    fn the_window_draws_and_clears() {
+        let dir = std::env::temp_dir().join(format!("d_merge_user_patch_{}", std::process::id()));
+        let output = dir.display().to_string();
+        let (mut notify, i18n) = (Notification::default(), I18nMap::new());
+        let mut main = PatchTool::default();
+        let (mut settings, mut editor) = (PatchEditorSettings::default(), LspOptions::default());
+        main.toggle_user_patch();
+
+        let ctx = egui::Context::default();
+        for _ in 0..3 {
+            let mut drawn = ctx.run_ui(egui::RawInput::default(), |ui| {
+                let ctx = ui.ctx().clone();
+                let mut keys = keybinding::Keybindings::default();
+                main.user_patch_window(
+                    &ctx,
+                    &i18n,
+                    &mut notify,
+                    paths(&output),
+                    (&mut settings, &mut editor),
+                    &mut keys,
+                );
+            });
+            drawn.textures_delta.clear();
+        }
+        let tool = main.user_patch.tool.as_mut().unwrap();
+        assert_eq!(tool.work.place.loaded_for.as_deref(), Some(USER_PATCH_CODE));
+
+        tool.apply_bar(ui::top_bar::BarAsk::ClearUserPatch, &mut notify, &i18n);
+        let cache = workspace::cache_root_of(&output).join(USER_PATCH_CODE);
+        let kept = cache.is_dir();
+        main.close_user_patch(&mut notify, &i18n);
+        let written = main.take_mod_written();
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert!(kept);
+        assert!(written, "the conflict check follows");
     }
 }

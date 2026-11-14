@@ -8,7 +8,7 @@
 //! ▼ OBJECT HISTORY  #0106
 //! ▼ HISTORY
 //! ```
-//! `keys.rs` runs the keyboard on the rows. Each part returns what was asked; [`PatchTool::changes_view`]
+//! `keys.rs` runs the keyboard on the rows. Each part returns what was asked; [`SideArea::changes_view`]
 //! does it, in one place. The history is [`crate::patch::workspace::history`]; the diffs open in the
 //! editor's place ([`super::revision_view`]).
 
@@ -20,7 +20,10 @@ use egui_widgets::notify::Notification;
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use self::header::BranchAsk;
-use crate::patch::PatchTool;
+use crate::patch::{
+    tool::{keys::Keys, selection::Selection, work_state::Work},
+    ui::side_bar::{SideArea, SideAsk},
+};
 
 /// What a row of the Changes view asked for: `(behavior, id)`.
 #[derive(Debug)]
@@ -38,40 +41,48 @@ enum ChangeAction {
     Blame(usize, String),
 }
 
-impl PatchTool {
-    /// Draws the view, and does what it asked for.
-    pub(super) fn changes_view(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+impl SideArea {
+    /// Draws the view, and does what it asked for of the work. Returns what it asked of the rest.
+    pub(in crate::patch) fn changes_view(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        (work, sel, keys): (&mut Work, &Selection, &mut Keys),
+        notify: &mut Notification,
+    ) -> Vec<SideAsk> {
         egui_widgets::side_bar_title(ui, i18n.t(I18nKey::SideChanges));
 
-        let branch = header::branch_row(ui, i18n, &self.work.workspace.history, &mut self.scm.new_branch);
-        self.scm.pending.refresh(&self.work.workspace, self.work.edits);
+        let branch = header::branch_row(ui, i18n, &work.workspace.history, &mut self.scm.new_branch);
+        self.scm.pending.refresh(&work.workspace, work.edits);
         let has_changes = !self.scm.pending.changes.is_empty();
         let commit = header::commit_box(ui, i18n, &mut self.scm.commit_message, has_changes);
 
         let keys = {
             let focused = self.explorer.tree_focus;
-            let taken = if focused { self.keys.take_mapped(keybinding::host::tree_key) } else { Vec::new() };
-            keys::run(&mut self.scm, &self.work.workspace, &taken, focused)
+            let taken = if focused { keys.take_mapped(keybinding::host::tree_key) } else { Vec::new() };
+            keys::run(&mut self.scm, &work.workspace, &taken, focused)
         };
 
         let output = {
             let input = list::ListInput {
-                workspace: &self.work.workspace,
+                workspace: &work.workspace,
                 scm: &self.scm,
-                selected: (self.sel.active, self.sel.selected.as_deref()),
+                selected: (sel.active, sel.selected.as_deref()),
                 cursor: (keys.cursor, keys.moved),
             };
             list::show(ui, i18n, &input)
         };
 
+        let mut asks = Vec::new();
         if let Some(ask) = branch {
-            self.apply_branch(ask, notify, i18n);
+            asks.extend(apply_branch(work, ask, notify, i18n));
         }
         if commit {
-            self.commit();
+            commit_changes(work, std::mem::take(&mut self.scm.commit_message));
         }
         if keys.leave {
-            self.leave_tree();
+            self.explorer.tree_focus = false;
+            asks.push(SideAsk::FocusEditor);
         }
         if let Some(number) = output.toggled
             && !self.scm.open_revisions.remove(&number)
@@ -79,73 +90,65 @@ impl PatchTool {
             self.scm.open_revisions.insert(number);
         }
         if let Some(action) = output.picked.or(keys.picked) {
-            self.apply_change(action);
+            asks.push(apply_change(work, action));
         }
+        asks
     }
+}
 
-    /// Another branch puts the work on it, unless that would lose its changes; a new one starts
-    /// where the work is.
-    fn apply_branch(&mut self, ask: BranchAsk, notify: &mut Notification, i18n: &I18nMap) {
-        match ask {
-            BranchAsk::Switch(name) => {
-                if self.work.workspace.switch_branch(&name) {
-                    self.work_restored();
-                } else {
-                    notify.warn(i18n.t(I18nKey::SideBranchHasChanges));
-                }
+/// Another branch puts the work on it, unless that would lose its changes; a new one starts where
+/// the work is.
+fn apply_branch(work: &mut Work, ask: BranchAsk, notify: &mut Notification, i18n: &I18nMap) -> Option<SideAsk> {
+    match ask {
+        BranchAsk::Switch(name) => {
+            if work.workspace.switch_branch(&name) {
+                return Some(work_restored(work));
             }
-            BranchAsk::Create(name) => {
-                if self.work.workspace.history.create_branch(&name) {
-                    self.work.mark_dirty();
-                }
-            }
+            notify.warn(i18n.t(I18nKey::SideBranchHasChanges));
         }
-    }
-
-    /// A revision of the changes, with the message typed.
-    fn commit(&mut self) {
-        let time = crate::patch::workspace::history::now();
-        let message = std::mem::take(&mut self.scm.commit_message);
-        let mut history = std::mem::take(&mut self.work.workspace.history);
-        history.commit(&self.work.workspace, &message, time);
-        self.work.workspace.history = history;
-        self.work.mark_dirty();
-    }
-
-    /// What a row asked for.
-    fn apply_change(&mut self, action: ChangeAction) {
-        match action {
-            ChangeAction::Open(behavior, id) => {
-                self.views.list.active = None; // the object itself, not a diff of it
-                if behavior != self.sel.active {
-                    self.sel.active = behavior;
-                    self.tabs.clear();
-                }
-                self.sel.selected = Some(id.into());
-            }
-            ChangeAction::Compare(behavior, id, from, to) => self.open_compare(behavior, &id, from, to),
-            ChangeAction::Blame(behavior, id) => self.open_blame(behavior, &id),
-
-            ChangeAction::Discard(behavior, id) => {
-                self.work.workspace.discard_change(behavior, &id);
-                self.work_restored();
-            }
-            ChangeAction::RestoreObject(behavior, id, number) => {
-                self.work.workspace.restore_object(behavior, &id, number);
-                self.work_restored();
-            }
-            ChangeAction::RestoreRevision(number) => {
-                self.work.workspace.restore_revision(number);
-                self.work_restored();
+        BranchAsk::Create(name) => {
+            if work.workspace.history.create_branch(&name) {
+                work.mark_dirty();
             }
         }
     }
+    None
+}
 
-    /// The objects changed under the editor: what shows them is made again.
-    fn work_restored(&mut self) {
-        self.reset_names();
-        self.pane.opened = None;
-        self.pane.preview = None;
-        self.work.mark_dirty();
+/// A revision of the changes, with `message`.
+fn commit_changes(work: &mut Work, message: String) {
+    let time = crate::patch::workspace::history::now();
+    let mut history = std::mem::take(&mut work.workspace.history);
+    history.commit(&work.workspace, &message, time);
+    work.workspace.history = history;
+    work.mark_dirty();
+}
+
+/// What a row asked for: what changes the work is done, what is shown is asked for.
+fn apply_change(work: &mut Work, action: ChangeAction) -> SideAsk {
+    match action {
+        ChangeAction::Open(behavior, id) => SideAsk::OpenChange(behavior, id),
+        ChangeAction::Compare(behavior, id, from, to) => SideAsk::Compare(behavior, id, from, to),
+        ChangeAction::Blame(behavior, id) => SideAsk::Blame(behavior, id),
+
+        ChangeAction::Discard(behavior, id) => {
+            work.workspace.discard_change(behavior, &id);
+            work_restored(work)
+        }
+        ChangeAction::RestoreObject(behavior, id, number) => {
+            work.workspace.restore_object(behavior, &id, number);
+            work_restored(work)
+        }
+        ChangeAction::RestoreRevision(number) => {
+            work.workspace.restore_revision(number);
+            work_restored(work)
+        }
     }
+}
+
+/// The objects changed under the editor: what shows them is made again.
+fn work_restored(work: &mut Work) -> SideAsk {
+    work.reset_names();
+    work.mark_dirty();
+    SideAsk::Reload
 }

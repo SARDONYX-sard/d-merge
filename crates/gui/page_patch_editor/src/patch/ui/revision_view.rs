@@ -18,7 +18,7 @@ use egui_widgets::preview_tabs::PreviewTabs;
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
-    PatchTool,
+    tool::{editing::EditorArea, keys::Keys, list::FileAction, selection::Selection, work_state::Work},
     workspace::{
         Workspace,
         history::{ObjectKey, Origin},
@@ -175,41 +175,51 @@ impl Views {
     }
 }
 
-impl PatchTool {
+impl EditorArea {
     /// Opens the diff of object `id` from revision `from` to `to` (`None`: the work now).
-    pub(in crate::patch) fn open_compare(&mut self, behavior: usize, id: &str, from: u32, to: Option<u32>) {
-        let old = object_text_at(&self.work.workspace, behavior, id, Some(from));
-        let new = object_text_at(&self.work.workspace, behavior, id, to);
+    pub(in crate::patch) fn open_compare(
+        &mut self,
+        (work, sel): (&mut Work, &mut Selection),
+        (behavior, id): (usize, &str),
+        (from, to): (u32, Option<u32>),
+    ) {
+        let old = object_text_at(&work.workspace, behavior, id, Some(from));
+        let new = object_text_at(&work.workspace, behavior, id, to);
         let to_name = to.map_or_else(|| "working".to_owned(), |number| format!("#{number}"));
-        let name = self.object_name(behavior, id);
+        let name = object_name(work, sel.active, (behavior, id));
         let title = format!("{name} (#{from}) ↔ {name} ({to_name})");
-        self.show_in_editor(behavior, id, title, Box::new(DiffView::diff(&old, new)));
+        self.show_view(sel, (behavior, id), title, Box::new(DiffView::diff(&old, new)));
     }
 
     /// Opens the blame of object `id` of behavior `behavior`, as the work has it now.
-    pub(in crate::patch) fn open_blame(&mut self, behavior: usize, id: &str) {
-        let Some((text, notes)) = blame_of(&self.work.workspace, behavior, id) else { return };
-        let title = format!("Blame {}", self.object_name(behavior, id));
-        self.show_in_editor(behavior, id, title, Box::new(DiffView::blame(text, notes)));
+    pub(in crate::patch) fn open_blame(
+        &mut self,
+        (work, sel): (&mut Work, &mut Selection),
+        (behavior, id): (usize, &str),
+    ) {
+        let Some((text, notes)) = blame_of(&work.workspace, behavior, id) else { return };
+        let title = format!("Blame {}", object_name(work, sel.active, (behavior, id)));
+        self.show_view(sel, (behavior, id), title, Box::new(DiffView::blame(text, notes)));
     }
 
-    /// The object's name as its tab says it. e.g. `GetUpModList`; its id if it has none.
-    fn object_name(&mut self, behavior: usize, id: &str) -> String {
-        if behavior != self.sel.active {
-            return id.to_owned();
+    /// The object `(behavior, id)` itself, not a diff of it.
+    pub(in crate::patch) fn open_object(&mut self, sel: &mut Selection, (behavior, id): (usize, &str)) {
+        self.views.list.active = None;
+        self.select_object(sel, (behavior, id));
+    }
+
+    /// Shows object `id` of `behavior`. Another behavior's: the tabs of this one close.
+    fn select_object(&mut self, sel: &mut Selection, (behavior, id): (usize, &str)) {
+        if behavior != sel.active {
+            sel.active = behavior;
+            self.tabs.clear();
         }
-        let names = self.names();
-        let name = names.graph.node_of(id).map_or("", |node| names.graph.short_name(node));
-        if name.is_empty() { id.to_owned() } else { name.to_owned() }
+        sel.selected = Some(id.into());
     }
 
     /// Opens a tab of object `id` with `body`, or shows the one open with that title.
-    fn show_in_editor(&mut self, behavior: usize, id: &str, title: String, body: Box<DiffView>) {
-        if behavior != self.sel.active {
-            self.sel.active = behavior;
-            self.tabs.clear();
-        }
-        self.sel.selected = Some(id.into());
+    fn show_view(&mut self, sel: &mut Selection, (behavior, id): (usize, &str), title: String, body: Box<DiffView>) {
+        self.select_object(sel, (behavior, id));
         let at = match self.views.list.find(behavior, |known| known.title == title) {
             Some(at) => at,
             None => self.views.list.open(behavior, RevisionView { id: id.to_owned(), title, body }, |_| false, None),
@@ -217,42 +227,59 @@ impl PatchTool {
         self.views.show(at);
     }
 
-    /// Draws the view shown, with the tabs, in the editor's place. Returns whether one is shown.
-    pub(super) fn views_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> bool {
+    /// Draws the view shown, with the tabs, in the editor's place. Returns `None` if none is shown.
+    pub(super) fn views_ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        (work, sel, keys): (&mut Work, &mut Selection, &mut Keys),
+    ) -> Option<ViewShown> {
         // Another object selected (the tree, the list): its editor, the view's tab stays.
-        let selected = self.sel.selected.as_deref();
+        let selected = sel.selected.as_deref();
+        let active = sel.active;
         let shown = self.views.list.active.filter(|&at| {
-            self.views
-                .list
-                .get(at)
-                .is_some_and(|view| view.group == self.sel.active && selected == Some(view.id.as_str()))
+            self.views.list.get(at).is_some_and(|view| view.group == active && selected == Some(view.id.as_str()))
         });
         self.views.list.active = shown;
-        let Some(at) = shown else { return false };
+        let at = shown?;
 
         let keymap = Keymap::from_vim(self.pane.mode.is_vim());
-        let names = self.names();
-        let output = self.views.show_at(ui, i18n, at, (&self.tabs, &names.graph, self.sel.active), keymap);
+        let names = work.names(active);
+        let output = self.views.show_at(ui, i18n, at, (&self.tabs, &names.graph, active), keymap);
         // What the key bindings see (`editorFocus`): this editor, as the object's is seen.
         self.pane.had_focus = output.has_focus;
 
         // The keys of the tabs as on an object's: the tab bar's bindings, Vim's `gt` / `Space c`.
         let command = output.command;
-        let close = self.keys.take(keybinding::commands::TABS_CLOSE) || command == Some(EditorCommand::CloseTab);
-        let next = self.keys.take(keybinding::commands::TABS_NEXT) || command == Some(EditorCommand::NextTab);
-        let previous =
-            self.keys.take(keybinding::commands::TABS_PREVIOUS) || command == Some(EditorCommand::PreviousTab);
-        let current = self.sel.selected.as_deref().unwrap_or_default().to_owned();
+        let close = keys.take(keybinding::commands::TABS_CLOSE) || command == Some(EditorCommand::CloseTab);
+        let next = keys.take(keybinding::commands::TABS_NEXT) || command == Some(EditorCommand::NextTab);
+        let previous = keys.take(keybinding::commands::TABS_PREVIOUS) || command == Some(EditorCommand::PreviousTab);
+        let current = sel.selected.as_deref().unwrap_or_default().to_owned();
         if close {
             self.views.list.close(at);
         } else if next || previous {
-            self.step_tab(&current, next);
+            self.step_tab(sel, &current, next);
         }
-        if output.tab_event.is_some() {
-            self.apply_tab_event(output.tab_event, &current);
-        }
-        true
+        Some(ViewShown { file: self.apply_tab_event(sel, output.tab_event, &current) })
     }
+}
+
+/// A diff or a blame was shown, see [`EditorArea::views_ui`].
+#[derive(Debug)]
+pub(super) struct ViewShown {
+    /// What a tab asked of an object's file.
+    pub(super) file: Option<(FileAction, String)>,
+}
+
+/// The name of object `(behavior, id)` as its tab says it, e.g. `GetUpModList`; its id if it has none
+/// (or is not of the behavior `active`, whose names are known).
+fn object_name(work: &mut Work, active: usize, (behavior, id): (usize, &str)) -> String {
+    if behavior != active {
+        return id.to_owned();
+    }
+    let names = work.names(active);
+    let name = names.graph.node_of(id).map_or("", |node| names.graph.short_name(node));
+    if name.is_empty() { id.to_owned() } else { name.to_owned() }
 }
 
 #[cfg(test)]
@@ -268,26 +295,22 @@ mod tests {
 
     #[test]
     fn the_next_tab_goes_through_the_views_too() {
-        let mut tool = PatchTool::default();
+        let (mut area, mut sel) = (EditorArea::default(), Selection::default());
         for id in ["#a", "#b"] {
-            tool.tabs.restore(0, id, true);
+            area.tabs.restore(0, id, true);
         }
-        tool.tabs.restore(1, "#x", true);
+        area.tabs.restore(1, "#x", true);
         let mut view = blank_view("Blame a");
         view.id = "#a".to_owned();
-        tool.views.list.push(view);
-        tool.sel.selected = Some("#b".into());
+        area.views.list.push(view);
+        sel.selected = Some("#b".into());
 
-        tool.step_tab("#b", true);
-        assert_eq!(
-            (tool.views.list.active, tool.sel.selected.as_deref()),
-            (Some(0), Some("#a")),
-            "the view after `#b`"
-        );
-        tool.step_tab("#a", true);
-        assert_eq!((tool.views.list.active, tool.sel.selected.as_deref()), (None, Some("#a")), "around the end");
-        tool.step_tab("#a", false);
-        assert_eq!(tool.views.list.active, Some(0), "back around the start");
+        area.step_tab(&mut sel, "#b", true);
+        assert_eq!((area.views.list.active, sel.selected.as_deref()), (Some(0), Some("#a")), "the view after `#b`");
+        area.step_tab(&mut sel, "#a", true);
+        assert_eq!((area.views.list.active, sel.selected.as_deref()), (None, Some("#a")), "around the end");
+        area.step_tab(&mut sel, "#a", false);
+        assert_eq!(area.views.list.active, Some(0), "back around the start");
     }
 
     /// The views' tabs are `PreviewTabs`: `Close Others` shows the one kept.

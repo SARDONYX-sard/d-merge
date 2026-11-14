@@ -18,8 +18,9 @@ use egui_widgets::shadcn::Button;
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
-    FocusAt, PatchTool,
+    FocusAt,
     editor::{merge, resolve},
+    tool::{editing::EditorPane, work_state::Work},
 };
 
 /// What the panel asked for.
@@ -31,33 +32,39 @@ enum MergePick {
     Accept(Vec<String>),
 }
 
-impl PatchTool {
-    /// Draws the panel of `id`'s conflict, and does what it asked for.
-    pub(super) fn merge_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, id: &str) {
-        let Some(values) = self.pane.merge_values.take() else { return };
+impl EditorPane {
+    /// Draws the panel of `id`'s conflict, and does what it asked for to object `id` of behavior
+    /// `active` of `work`.
+    pub(super) fn merge_panel(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        (work, active): (&mut Work, usize),
+        id: &str,
+    ) {
+        let Some(values) = self.merge_values.take() else { return };
 
         let (picked, close) = {
-            let panel_id = if self.is_user_patch { "user_patch_merge" } else { "nemesis_merge" };
+            let panel_id = if work.user_patch { "user_patch_merge" } else { "nemesis_merge" };
             let panel = egui::Panel::right(panel_id).default_size(620.0).resizable(true);
             panel.show(ui, |ui| panel_ui(ui, i18n, id, &values)).inner
         };
 
         if let Some(pick) = picked {
-            let merged =
-                merged_text(&self.pane.text, self.pane.cursor_line, (&values, &self.pane.merge_accepted), pick);
+            let merged = merged_text(&self.text, self.cursor_line, (&values, &self.merge_accepted), pick);
             if let Some(accepted) = merged.accepted {
-                merge::remember(&mut self.work.workspace.resolutions, &values, accepted.clone());
-                self.pane.merge_accepted = accepted;
+                merge::remember(&mut work.workspace.resolutions, &values, accepted.clone());
+                self.merge_accepted = accepted;
             }
-            self.pane.text = merged.text;
-            self.work.workspace.behaviors[self.sel.active].set_text(id, &self.pane.text);
-            self.pane.preview = None;
-            self.object_changed(id);
-            self.pane.focus = Some(FocusAt::Line(merged.line));
+            self.text = merged.text;
+            work.workspace.behaviors[active].set_text(id, &self.text);
+            self.preview = None;
+            work.object_changed(id);
+            self.focus = Some(FocusAt::Line(merged.line));
         }
 
         if !close {
-            self.pane.merge_values = Some(values);
+            self.merge_values = Some(values);
         }
     }
 }

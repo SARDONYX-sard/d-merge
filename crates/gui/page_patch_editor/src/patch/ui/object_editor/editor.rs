@@ -24,10 +24,16 @@ use keybinding::{
 
 use super::bottom::{ProblemsOutput, editor_features};
 use crate::patch::{
-    EditorResult, FocusAt, PatchTool,
+    EditorResult, FocusAt,
     anim::lines::AnimDataLanguage,
     editor::{language::NemesisXml, names::Names, pandora::PandoraXml},
-    tool::editing::EditorPane,
+    problems::Problems,
+    tool::{
+        editing::{EditorArea, EditorPane},
+        keys::Keys,
+        selection::Selection,
+        work_state::Work,
+    },
     workspace::PANDORA_DOC,
 };
 
@@ -36,7 +42,7 @@ const ACTION_FOCUS_TREE: &str = "focus_tree";
 const ACTION_BACK: &str = "go_back";
 const ACTION_FORWARD: &str = "go_forward";
 
-/// What this editor acts on: see [`PatchTool::apply_editor_result`].
+/// What this editor acts on: see [`EditorArea::apply_editor_result`].
 const HOST_COMMANDS: [EditorCommand; 9] = [
     EditorCommand::NextTab,
     EditorCommand::PreviousTab,
@@ -49,32 +55,39 @@ const HOST_COMMANDS: [EditorCommand; 9] = [
     EditorCommand::RevealFile,
 ];
 
-impl PatchTool {
+impl EditorArea {
     /// The toolbar, the editor, the Problems panel and the status bar of object `id`. Returns what
     /// the editor asked for: it is done afterwards, as the language still borrows the behavior here.
-    pub(super) fn editor_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, id: &str) -> EditorResult {
-        let format_and_save = self.editor_keys();
-        let problem_keys = self.keys.take_mapped(host::problems_key);
-        let requests = self.editor_requests(format_and_save);
+    pub(super) fn editor_panel(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        (work, sel, keys): (&mut Work, &mut Selection, &mut Keys),
+        problems: &mut Problems,
+        id: &str,
+    ) -> EditorResult {
+        let format_and_save = self.pane.editor_keys(keys);
+        let problem_keys = keys.take_mapped(host::problems_key);
+        let requests = editor_requests(keys, format_and_save);
 
         // The status bar counts the whole work's problems, of which the open object's are a part.
-        self.pane.state.set_status_problems(self.problems.counts());
-        let names = self.names();
+        self.pane.state.set_status_problems(problems.counts());
+        let names = work.names(sel.active);
         let keymap = Keymap::from_vim(self.pane.mode.is_vim());
-        let editor_id = egui_code_editor::editor_id(("nemesis_object", self.is_user_patch, id));
+        let editor_id = egui_code_editor::editor_id(("nemesis_object", work.user_patch, id));
         let editor_focused = ui.memory(|m| m.has_focus(editor_id));
 
         let mut result = EditorResult::default();
         let mut toggle_problems = false;
-        let mut problems = ProblemsOutput::default();
+        let mut clicked = ProblemsOutput::default();
         egui::CentralPanel::default().show(ui, |ui| {
-            let behavior = &self.work.workspace.behaviors[self.sel.active];
+            let behavior = &work.workspace.behaviors[sel.active];
             let input = super::toolbar::ToolbarInput {
                 pane: &mut self.pane,
                 tabs: &self.tabs,
                 views: &self.views,
-                problems: self.problems.list.as_deref(),
-                active: self.sel.active,
+                problems: problems.list.as_deref(),
+                active: sel.active,
                 id,
                 graph: &names.graph,
                 focused: editor_focused,
@@ -83,20 +96,20 @@ impl PatchTool {
             let toolbar = super::toolbar::show(ui, i18n, input);
             (result.walk_history, result.tab_event) = (toolbar.walk_history, toolbar.tab_event);
 
-            if self.work.workspace.behaviors[self.sel.active].is_ref(id) {
+            if behavior.is_ref(id) {
                 ui.weak(i18n.t(I18nKey::NemesisRefReadOnly));
             }
 
-            toggle_problems = self.pane.status_bar(ui, i18n, keymap, self.is_user_patch);
-            problems = self.problems.panel_ui(ui, i18n, &self.work.workspace.behaviors, &problem_keys);
+            toggle_problems = self.pane.status_bar(ui, i18n, keymap, work.user_patch);
+            clicked = problems.panel_ui(ui, i18n, &work.workspace.behaviors, &problem_keys);
             let input = EditorInput {
-                behavior: (self.sel.active, &self.work.workspace.behaviors[self.sel.active]),
+                behavior: (sel.active, behavior),
                 id,
                 names: &names,
                 keymap,
-                key_ui: &self.keys.ui,
+                key_ui: &keys.ui,
                 requests: &requests,
-                user_patch: self.is_user_patch,
+                user_patch: work.user_patch,
             };
             self.pane.code_editor(ui, i18n, input, &mut result);
         });
@@ -104,57 +117,63 @@ impl PatchTool {
         if format_and_save {
             result.command = Some(EditorCommand::Save); // after the format of this frame
         }
-        self.apply_problems(toggle_problems, problems);
+        self.apply_problems(sel, problems, (toggle_problems, clicked));
         result
     }
 
-    /// Vim's `Space p` / `Space d` / `Space w` and `]c` / `[c` (key bindings). Returns whether
-    /// `Space w` (format and save) was pressed.
-    fn editor_keys(&mut self) -> bool {
-        if self.keys.take(commands::EDITOR_TOGGLE_PREVIEW) {
-            self.pane.show_preview = !self.pane.show_preview;
-        }
-        if self.keys.take(commands::EDITOR_TOGGLE_INLINE_DIFF) {
-            self.pane.show_inline_diff = !self.pane.show_inline_diff;
-        }
-
-        if self.keys.take(commands::EDITOR_NEXT_CHANGE) {
-            self.pane.step_change(true);
-        }
-        if self.keys.take(commands::EDITOR_PREVIOUS_CHANGE) {
-            self.pane.step_change(false);
-        }
-
-        self.keys.take(commands::EDITOR_FORMAT_AND_SAVE)
-    }
-
-    /// The editor's own commands, by the key bindings' keys: it reads none of its keys itself then.
-    fn editor_requests(&mut self, format_and_save: bool) -> Vec<EditorRequest> {
-        let mut requests = self.keys.take_mapped(host::editor_request);
-        if format_and_save {
-            requests.push(EditorRequest::Format);
-        }
-        requests
-    }
-
     /// What a click in the Problems panel or on the status bar's counts asked for.
-    fn apply_problems(&mut self, toggle: bool, problems: ProblemsOutput) {
+    fn apply_problems(
+        &mut self,
+        sel: &mut Selection,
+        problems: &mut Problems,
+        (toggle, clicked): (bool, ProblemsOutput),
+    ) {
         if toggle {
-            self.problems.open = !self.problems.open;
+            problems.open = !problems.open;
         }
-        if problems.left {
+        if clicked.left {
             self.pane.focus = Some(FocusAt::Keep);
         }
 
-        if let Some((behavior, object, line)) = problems.go_to {
-            if behavior != self.sel.active {
-                self.sel.active = behavior;
-                self.sel.selected = None;
-            }
-            let current = self.sel.selected.clone().unwrap_or_default();
-            self.open_location(&current, &object, line);
+        let Some((behavior, object, line)) = clicked.go_to else { return };
+        if behavior != sel.active {
+            sel.active = behavior;
+            sel.selected = None;
         }
+        let current = sel.selected.clone().unwrap_or_default();
+        self.open_location(sel, &current, (&object, line));
     }
+}
+
+impl EditorPane {
+    /// Vim's `Space p` / `Space d` / `Space w` and `]c` / `[c` (key bindings). Returns whether
+    /// `Space w` (format and save) was pressed.
+    fn editor_keys(&mut self, keys: &mut Keys) -> bool {
+        if keys.take(commands::EDITOR_TOGGLE_PREVIEW) {
+            self.show_preview = !self.show_preview;
+        }
+        if keys.take(commands::EDITOR_TOGGLE_INLINE_DIFF) {
+            self.show_inline_diff = !self.show_inline_diff;
+        }
+
+        if keys.take(commands::EDITOR_NEXT_CHANGE) {
+            self.step_change(true);
+        }
+        if keys.take(commands::EDITOR_PREVIOUS_CHANGE) {
+            self.step_change(false);
+        }
+
+        keys.take(commands::EDITOR_FORMAT_AND_SAVE)
+    }
+}
+
+/// The editor's own commands, by the key bindings' keys: it reads none of its keys itself then.
+fn editor_requests(keys: &mut Keys, format_and_save: bool) -> Vec<EditorRequest> {
+    let mut requests = keys.take_mapped(host::editor_request);
+    if format_and_save {
+        requests.push(EditorRequest::Format);
+    }
+    requests
 }
 
 /// The palette's own actions, with their keys as the key bindings have them and a `⚙` to change

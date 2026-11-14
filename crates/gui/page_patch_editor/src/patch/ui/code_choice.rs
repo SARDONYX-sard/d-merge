@@ -9,10 +9,9 @@
 
 use std::path::PathBuf;
 
-use egui_widgets::notify::Notification;
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use crate::patch::{PatchTool, workspace::ModCode};
+use crate::patch::workspace::ModCode;
 
 /// The list stops growing at this height, and scrolls.
 const MAX_LIST_HEIGHT: f32 = 320.0;
@@ -29,23 +28,24 @@ fn row_label(code: &ModCode) -> String {
     if code.name.is_empty() { code.code.clone() } else { format!("{}  {}", code.code, code.name) }
 }
 
-impl PatchTool {
-    /// Draws the window while [`Self::code_choice`] is set, and opens what is clicked.
-    pub(in crate::patch) fn code_choice_window(
-        &mut self,
-        ctx: &egui::Context,
-        i18n: &I18nMap,
-        notify: &mut Notification,
-    ) {
-        let Some(choice) = &self.panels.code_choice else { return };
+/// What the window asked for.
+#[derive(Debug)]
+pub(in crate::patch) enum ChoiceAsk {
+    /// Open this code of the mod.
+    Open(String),
+    Close,
+}
 
+impl ModCodeChoice {
+    /// Draws the window. See the module docs.
+    pub(in crate::patch) fn window(&self, ctx: &egui::Context, i18n: &I18nMap) -> Option<ChoiceAsk> {
         let mut open = true;
         let mut picked = None;
         egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisChooseModCode)).open(&mut open).show(ctx, |ui| {
-            ui.weak(choice.root.display().to_string());
+            ui.weak(self.root.display().to_string());
             ui.add_space(4.0);
             egui::ScrollArea::vertical().max_height(MAX_LIST_HEIGHT).show(ui, |ui| {
-                for code in &choice.codes {
+                for code in &self.codes {
                     if ui.button(row_label(code)).clicked() {
                         picked = Some(code.code.clone());
                     }
@@ -53,10 +53,9 @@ impl PatchTool {
             });
         });
 
-        if let Some(code) = picked {
-            self.open_chosen_code(&code, notify, i18n);
-        } else if !open {
-            self.panels.code_choice = None;
+        match picked {
+            Some(code) => Some(ChoiceAsk::Open(code)),
+            None => (!open).then_some(ChoiceAsk::Close),
         }
     }
 }
