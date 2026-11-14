@@ -94,9 +94,7 @@ impl CrcTool {
             ui.label(i18n.t(I18nKey::CrcModDirLabel)).on_hover_text(hover);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add(
-                    TextEdit::singleline(&mut self.filter)
-                        .hint_text(i18n.t(I18nKey::CrcFilterHint))
-                        .desired_width(160.0),
+                    TextEdit::singleline(&mut self.filter).hint_text(i18n.t(I18nKey::FilterLabel)).desired_width(160.0),
                 );
                 if ui.add(Button::new(i18n.t(I18nKey::SelectButton))).clicked()
                     && let Some(dir) = gui_shared::rfd::FileDialog::new().set_directory(&self.mod_dir).pick_folder()
@@ -163,7 +161,7 @@ fn row(ui: &mut egui::Ui, name: &str, crc: u32, i18n: &I18nMap, is_dir: bool) {
 
 /// `[Copy] 0xbe34c373 3191128947` (drawn right to left). Copies the decimal value.
 fn crc_cells(ui: &mut egui::Ui, crc: u32, i18n: &I18nMap) {
-    if ui.small_button(i18n.t(I18nKey::CrcCopy)).clicked() {
+    if ui.small_button(i18n.t(I18nKey::EditorCopy)).clicked() {
         ui.ctx().copy_text(crc.to_string());
     }
     ui.monospace(format!("{crc:#010x}"));
