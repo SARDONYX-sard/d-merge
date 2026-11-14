@@ -87,6 +87,8 @@ pub struct VimOptions {
     pub escape_timeout: f64,
     /// What `>` inserts and `<` removes. Follows [`crate::Language::indent`].
     pub indent: crate::Indent,
+    /// What `gc` puts in / takes out. Follows [`crate::Language::comment`].
+    pub comment: Option<crate::Comment>,
 }
 
 impl Default for VimOptions {
@@ -95,6 +97,7 @@ impl Default for VimOptions {
             insert_escapes: vec![['j', 'k'], ['k', 'j'], ['j', 'j']],
             escape_timeout: 0.5,
             indent: crate::Indent::default(),
+            comment: None,
         }
     }
 }
@@ -151,6 +154,26 @@ impl VimState {
         self.mode
     }
 
+    /// The mode as the host's key bindings name it (`vim.mode` of their `when`). A command being
+    /// typed (`2d`, `:w`) is `pending` / `command`: a binding of `normal` must not cut it.
+    ///
+    /// e.g. `normal`, `insert`, `visual`, `visualLine`, `visualBlock`, `pending`, `command`
+    pub(crate) const fn mode_name(&self) -> &'static str {
+        if self.prompt.is_some() {
+            return "command";
+        }
+        if !self.pending.is_empty() {
+            return "pending";
+        }
+        match self.mode {
+            Mode::Normal => "normal",
+            Mode::Insert => "insert",
+            Mode::Visual => "visual",
+            Mode::VisualLine => "visualLine",
+            Mode::VisualBlock => "visualBlock",
+        }
+    }
+
     /// Status line: the mode badge and the details next to it.
     /// e.g., (`Insert`, ``), (`Command`, `:w`), (`Normal`, `recording @a  2d`)
     /// The key the pending keys wait on, if it has a list of what can follow.
@@ -195,12 +218,21 @@ impl VimState {
     }
 
     /// Runs this frame's keys. Call **before** showing the `TextEdit` with id `id`.
-    pub(super) fn handle(&mut self, ui: &egui::Ui, id: egui::Id, text: &mut String, view: View) -> KeymapOutput {
+    /// `host_keys`: the host's key bindings have the leader (`Space e`, ...; see
+    /// [`crate::CodeEditor::requests`]): a `Space` that starts a command is theirs, not Vim's.
+    pub(super) fn handle(
+        &mut self,
+        ui: &egui::Ui,
+        id: egui::Id,
+        text: &mut String,
+        (view, host_keys): (View, bool),
+    ) -> KeymapOutput {
         self.view = view;
         let inserting = self.mode == Mode::Insert;
         if !inserting {
             self.escape_seq.reset();
         }
+        copy_selection(ui, id, text);
         let keys = keys::take(ui, inserting, &mut self.escape_seq, &self.options);
         if keys.is_empty() {
             return KeymapOutput::default();
@@ -234,6 +266,19 @@ impl VimState {
             edits: 0,
         };
         for key in keys {
+            let leader = key == VimKey::Char(' ')
+                && self.pending.is_empty()
+                && self.prompt.is_none()
+                && self.mode != Mode::Insert;
+            if host_keys && leader {
+                continue; // a binding of the host's that was not completed: it means nothing to Vim
+            }
+            // `gt`, `gd`, `]c` ... (no count) are the host's key bindings then: given back to Vim
+            // only when the user took them away, so they do nothing here.
+            if host_keys && host_owned(&self.pending, key) {
+                self.pending.clear();
+                continue;
+            }
             self.feed(key, &mut exec);
         }
 
@@ -351,9 +396,46 @@ impl VimState {
     }
 }
 
+/// The keys the host's key bindings have when it has the keys (see `VimState::handle`): `gt` `gT`
+/// `gd` `gD` `]c` `[c`, without a count or a register before them.
+///
+/// e.g. pending `[g]` + `t` -> `true`; pending `[3, g]` + `t` -> `false` (Vim's `3gt`)
+const fn host_owned(pending: &[VimKey], key: VimKey) -> bool {
+    matches!(
+        (pending, key),
+        ([VimKey::Char('g')], VimKey::Char('t' | 'T' | 'd' | 'D')) | ([VimKey::Char(']' | '[')], VimKey::Char('c'))
+    )
+}
+
+/// `Ctrl+C` with a selection (Visual mode, or one made with the mouse) copies it, as VSCodeVim's
+/// `overrideCopy`; it still leaves the mode as `Esc` does (see [`keys::take`]). Without one it is only
+/// that `Esc`.
+fn copy_selection(ui: &egui::Ui, id: egui::Id, text: &str) {
+    if !ui.input(|i| i.events.iter().any(|event| matches!(event, egui::Event::Copy))) {
+        return;
+    }
+    let Some(range) = egui::TextEdit::load_state(ui.ctx(), id).and_then(|state| state.cursor.char_range()) else {
+        return;
+    };
+    let (a, b) = (range.primary.index.0, range.secondary.index.0);
+    if let Some(selected) = crate::edit_ops::selected_text(text, &(a.min(b)..a.max(b))) {
+        ui.ctx().copy_text(selected.to_owned());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// With the host's keys, `gt` ... are the host's; with a count they are Vim's (`3gt`).
+    #[test]
+    fn the_host_has_g_keys_without_a_count() {
+        let g = [VimKey::Char('g')];
+        assert!(host_owned(&g, VimKey::Char('t')) && host_owned(&g, VimKey::Char('D')));
+        assert!(host_owned(&[VimKey::Char(']')], VimKey::Char('c')));
+        assert!(!host_owned(&g, VimKey::Char('g')), "`gg` is Vim's");
+        assert!(!host_owned(&[VimKey::Char('3'), VimKey::Char('g')], VimKey::Char('t')), "`3gt` is Vim's");
+    }
 
     fn exec(text: &str) -> exec::Exec {
         exec::Exec {

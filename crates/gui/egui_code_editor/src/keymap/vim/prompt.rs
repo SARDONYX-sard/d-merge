@@ -11,7 +11,7 @@
 //! Ex commands themselves are in [`super::ex`].
 
 use super::{VimState, buffer::Buffer, exec::Exec, keys::VimKey};
-use crate::search::{Matcher, find_from};
+use crate::search::{Matcher, index_of, next_match};
 
 /// What the prompt line is for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,8 +72,9 @@ pub(super) struct LastSearch {
 }
 
 impl LastSearch {
+    /// `/` and `?` are regexes, as Vim's; the word of `*` / `#` is text.
     fn matcher(&self) -> Option<Matcher> {
-        Matcher::with_options(&self.pattern, self.whole_word)
+        Matcher::with_options(&self.pattern, self.whole_word, !self.whole_word)
     }
 }
 
@@ -123,7 +124,7 @@ impl VimState {
         if let Some(prompt) = &mut self.prompt
             && prompt.is_search()
         {
-            prompt.matches = Matcher::new(&prompt.text).map(|m| m.count(&exec.buf.chars));
+            prompt.matches = Matcher::regex(&prompt.text).map(|m| m.find_all_chars(&exec.buf.chars).len());
         }
     }
 
@@ -156,17 +157,18 @@ impl VimState {
         let matcher = last.matcher()?;
         let forward = last.forward == same_direction;
 
+        let matches = matcher.find_all_chars(&buf.chars);
         let mut at = self.cursor;
         for _ in 0..count {
-            let Some(next) = find_from(&matcher, &buf.chars, at, forward) else {
+            let Some(next) = next_match(&matches, at, forward) else {
                 self.message = Some(format!("Pattern not found: {}", last.pattern));
                 return None;
             };
-            at = next;
+            at = next.start;
         }
         self.hlsearch = true;
-        let total = matcher.count(&buf.chars);
-        let index = matcher.index_of(&buf.chars, at).unwrap_or(0);
+        let total = matches.len();
+        let index = index_of(&matches, at).unwrap_or(0);
         let prefix = if last.forward { '/' } else { '?' };
         self.message = Some(format!("{prefix}{}    [{index}/{total}]", last.pattern));
         Some(at)
@@ -176,7 +178,7 @@ impl VimState {
     /// (unless hidden by `:noh`).
     pub(crate) fn search_highlight(&self) -> Option<Matcher> {
         match &self.prompt {
-            Some(prompt) if prompt.is_search() => Matcher::new(&prompt.text),
+            Some(prompt) if prompt.is_search() => Matcher::regex(&prompt.text),
             _ if self.hlsearch => self.search.as_ref().and_then(LastSearch::matcher),
             _ => None,
         }
@@ -223,13 +225,13 @@ mod tests {
         assert_eq!(url_at(&text, 3), None); // space
     }
 
+    /// `/` is a regex; `*` searches its word as text.
     #[test]
-    fn search_wraps_around() {
-        let text = chars("ab x ab");
-        let m = Matcher::new("ab").unwrap();
-        assert_eq!(find_from(&m, &text, 0, true), Some(5));
-        assert_eq!(find_from(&m, &text, 5, true), Some(0)); // wraps
-        assert_eq!(find_from(&m, &text, 5, false), Some(0));
-        assert_eq!(find_from(&m, &text, 0, false), Some(5)); // wraps backward
+    fn a_search_is_a_regex_and_a_star_is_text() {
+        let text = chars(r"#0106 a.b #12");
+        let slash = LastSearch { pattern: r"#\d+".to_owned(), forward: true, whole_word: false };
+        assert_eq!(slash.matcher().unwrap().find_all_chars(&text), vec![0..5, 10..13]);
+        let star = LastSearch { pattern: "a.b".to_owned(), forward: true, whole_word: true };
+        assert_eq!(star.matcher().unwrap().find_all_chars(&chars("a.b axb")), vec![0..3]);
     }
 }

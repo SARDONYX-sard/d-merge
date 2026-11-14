@@ -14,10 +14,17 @@ rust-version.workspace = true
 
 # NOTE: No language or app logic here; a language plugs in through the `Language` trait.
 [dependencies]
-egui = { workspace = true }
+egui  = { workspace = true }
+imara-diff = { workspace = true } # `InlineDiff::between`: the line diff
+regex      = { workspace = true } # Vim `/`, the find bar, the search view
 
 # workspace members
 egui_widgets = { workspace = true } # Markdown for hover / completion docs
+stdx         = { workspace = true } # the search view: text ignoring case
+
+[dev-dependencies]
+# `cargo run -p egui_code_editor --example vscode`: the same features as the app, to share its build.
+eframe = { workspace = true, features = ["accesskit", "clipboard", "default_fonts", "glow", "links"] }
 
 [lints]
 workspace = true

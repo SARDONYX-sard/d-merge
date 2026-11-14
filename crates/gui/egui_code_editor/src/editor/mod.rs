@@ -9,7 +9,8 @@ mod text;
 use egui::text::CCursor;
 
 use crate::{
-    Diagnostic, EditorAction, EditorLabels, InlineDiff, Keymap, Language, Location, References, Severity,
+    Diagnostic, EditorAction, EditorLabels, EditorRequest, InlineDiff, Keymap, Language, Location, References,
+    Severity,
     command::{EditorCommand, EditorFeatures},
     cursor::editor_id,
     editor::{
@@ -54,6 +55,11 @@ pub struct CodeEditorOutput<'a> {
     pub navigation: Option<Navigation<'a>>,
     /// The id of the [`EditorAction`] run from the command palette.
     pub action: Option<&'a str>,
+    /// The id of the [`EditorAction`] whose `⚙` was clicked in the palette: the host lets its keys
+    /// be changed, as VS Code's palette does.
+    pub configure: Option<&'a str>,
+    /// The editor's own command whose `⚙` was clicked: see [`CodeEditor::request_keys`].
+    pub configure_request: Option<EditorRequest>,
     /// The `↶` of this [`InlineDiff::hunks`] entry was clicked: the host puts it back.
     pub inline_revert: Option<usize>,
 }
@@ -80,6 +86,9 @@ pub struct CodeEditor<'a> {
     inline_diff: Option<&'a InlineDiff>,
     read_only: bool,
     host_commands: &'a [EditorCommand],
+    requests: Option<&'a [EditorRequest]>,
+    request_keys: Option<&'a [(EditorRequest, String)]>,
+    annotations: &'a [String],
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -106,7 +115,36 @@ impl<'a> CodeEditor<'a> {
             inline_diff: None,
             read_only: false,
             host_commands: &[],
+            requests: None,
+            request_keys: None,
+            annotations: &[],
         }
+    }
+
+    /// A note per line in a column left of the line numbers, as GitLens' blame: e.g.
+    /// `#2 fix the speed`. A run of lines with the same note shows it once, on its first line, with
+    /// a line above the run. Missing ones are none.
+    #[inline]
+    pub const fn line_annotations(mut self, annotations: &'a [String]) -> Self {
+        self.annotations = annotations;
+        self
+    }
+
+    /// The host's keys of the editor's commands, as its palette shows them (e.g.
+    /// `(Format, "shift+alt+f")`; `""`: none), each with a `⚙` that asks the host to change them
+    /// ([`CodeEditorOutput::configure_request`]). For a host that gives its [`Self::requests`].
+    #[inline]
+    pub const fn request_keys(mut self, keys: &'a [(EditorRequest, String)]) -> Self {
+        self.request_keys = Some(keys);
+        self
+    }
+
+    /// The editor's commands the host's keys asked for this frame (see [`EditorRequest`]): the
+    /// editor then reads none of its own keys for them, so that the host's key bindings decide.
+    #[inline]
+    pub const fn requests(mut self, requests: &'a [EditorRequest]) -> Self {
+        self.requests = Some(requests);
+        self
     }
 
     /// What the host acts on, so Vim's list of keys offers them. e.g., a host without a tree has no
@@ -211,6 +249,9 @@ impl<'a> CodeEditor<'a> {
             inline_diff,
             read_only,
             host_commands,
+            requests,
+            request_keys,
+            annotations,
         } = self;
         if read_only {
             // In a buffer that stays: this is every frame.
@@ -223,11 +264,19 @@ impl<'a> CodeEditor<'a> {
             features,
             keymap,
             inline_diff,
+            requests,
+            request_keys,
         };
 
         state.indent = language.indent();
         state.keymap.vim_options_mut().indent = state.indent;
+        state.keymap.set_comment(language.comment());
         let input = read_input(frame, ui, state, text, &labels, actions);
+        // A line found in the palette, or `:42`: the cursor goes there.
+        if let Some(palette::Picked::Jump { line, column }) = input.picked {
+            let at = crate::text_pos::LinePos { line, column }.to_char_index(text);
+            crate::cursor::set_cursor(ui.ctx(), id, at);
+        }
         tab_key_follows_indent(ui, id, state.indent);
         let mut changed = input.keys.changed | input.pasted | {
             let asked = input.triggers.format || input.keys.format;
@@ -241,7 +290,10 @@ impl<'a> CodeEditor<'a> {
         let inserting = state.keymap.is_inserting(keymap);
 
         // Gutter for the line numbers on the left (drawn after the text is laid out, below).
-        let gutter = line_numbers.then(|| overlays::gutter_width(ui, text));
+        // The notes first, then the line numbers, in the one gutter.
+        let notes_width = overlays::annotations_width(ui, annotations);
+        let gutter = (line_numbers || notes_width > 0.0)
+            .then(|| notes_width + if line_numbers { overlays::gutter_width(ui, text) } else { 0.0 });
         let (gutter_left, output) = show_text(frame, ui, state, text, desired_rows, gutter);
         let response = &output.response.response;
         let placed = (&*output.galley, output.galley_pos);
@@ -270,9 +322,10 @@ impl<'a> CodeEditor<'a> {
             keymap,
             text,
             placed,
-            gutter.map(|width| gutter_left..gutter_left + width),
+            gutter.map(|width| gutter_left + notes_width..gutter_left + width),
             cursor,
         );
+        overlays::annotations(ui, placed, gutter_left..gutter_left + notes_width, annotations);
         if let Some(cursor) = anchor {
             scroll_to_cursor(ui, id, cursor, placed.0, input.keys.scroll);
         }
@@ -328,6 +381,8 @@ impl<'a> CodeEditor<'a> {
             pointer,
             navigation,
             action: input.picked.and_then(palette::Picked::host_action),
+            configure: input.picked.and_then(palette::Picked::configure),
+            configure_request: input.picked.and_then(palette::Picked::configure_request),
             inline_revert,
         }
     }
@@ -343,6 +398,10 @@ struct EditorFrame<'a> {
     features: EditorFeatures,
     keymap: Keymap,
     inline_diff: Option<&'a InlineDiff>,
+    /// See [`CodeEditor::requests`].
+    requests: Option<&'a [EditorRequest]>,
+    /// See [`CodeEditor::request_keys`].
+    request_keys: Option<&'a [(EditorRequest, String)]>,
 }
 
 #[cfg(test)]

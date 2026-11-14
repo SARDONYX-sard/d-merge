@@ -11,6 +11,15 @@ use std::{borrow::Cow, ops::Range};
 
 use egui::Color32;
 
+/// How the language comments a line out, for `Ctrl+/` and Vim's `gc`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Comment {
+    /// A mark to the end of the line. e.g. `//`, `#`
+    Line(&'static str),
+    /// Open and close marks around the line. e.g. `<!--`, `-->`
+    Block(&'static str, &'static str),
+}
+
 /// One level of indentation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Indent {
@@ -106,6 +115,11 @@ pub trait Language {
     fn inlay_hints_at(&self, line_no: usize, line: &str) -> Vec<Cow<'_, str>> {
         let _ = line_no;
         self.inlay_hints(line).into_iter().map(Cow::Owned).collect()
+    }
+
+    /// How a line is commented out (`Ctrl+/`, Vim `gcc`). `None`: it can't be.
+    fn comment(&self) -> Option<Comment> {
+        None
     }
 
     /// What one level of indentation is: what `Tab` and Vim's `>` insert, shown in the status bar.

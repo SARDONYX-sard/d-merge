@@ -125,6 +125,8 @@ pub(super) enum Operator {
     Lower,
     Upper,
     ToggleCase,
+    /// `gc`: comment the lines out, or back in (`gcc`: the line).
+    Comment,
 }
 
 /// Text objects after `i` / `a`.
@@ -234,7 +236,8 @@ pub(super) enum Simple {
     ToggleExplorer,
     /// `<Space>f`: format the document. `<Space>w`: and save it (`save`).
     Format { save: bool },
-    /// `<Space>l`, `<Space>h`, `<Space>c`, `gt`, `gT`, `<Space>p`, `<Space>d`: ask the host for it.
+    /// `<Space>l`, `<Space>h`, `<Space>c`, `gt`, `gT`, `<Space>p`, `<Space>d`, `]c`, `[c`:
+    /// ask the host for it.
     Ask(crate::EditorCommand),
     /// `Ctrl+A` (`up`) / `Ctrl+X`: add / subtract `count` to the number at or after the cursor
     Increment { up: bool },

@@ -72,12 +72,11 @@ const fn host(keys: &'static str, command: EditorCommand, text: &'static str) ->
 const LEADER: &[WhichKey] = &[
     own(" f", "Format"),
     own(" w", "Format and save"),
-    host(" l", EditorCommand::NextTab, "Next tab"),
-    host(" h", EditorCommand::PreviousTab, "Previous tab"),
     host(" c", EditorCommand::CloseTab, "Close the tab"),
     host(" p", EditorCommand::TogglePreview, "Show or hide the preview"),
     host(" d", EditorCommand::ToggleInlineDiff, "Show or hide the inline diff"),
     host(" e", EditorCommand::ToggleExplorer, "Move to the tree"),
+    host(" V", EditorCommand::RevealFile, "Reveal the file in the file manager"),
 ];
 
 const G: &[WhichKey] = &[
@@ -97,8 +96,16 @@ const G: &[WhichKey] = &[
     own("g#", "Search the word backward, also inside others"),
     own("gu", "Lowercase (then a motion)"),
     own("gU", "Uppercase (then a motion)"),
+    own("gc", "Toggle comment (then a motion; gcc: the line)"),
     own("g~", "Toggle the case (then a motion)"),
 ];
+
+/// Vim's own keys after `g` that the host's key bindings do not have, with what they do: for a
+/// host whose bindings hold `g` (to list them with its own). e.g. `("g", "First line")`
+pub fn own_g_keys() -> impl Iterator<Item = (&'static str, &'static str)> {
+    const HOSTS: [&str; 4] = ["gd", "gD", "gt", "gT"];
+    G.iter().filter(|key| key.needs.is_none() && !HOSTS.contains(&key.keys)).map(|key| (key.key(), key.text))
+}
 
 /// The prefix the pending keys wait on, with what may come before it: `Space`, `3g`, `"ag`.
 pub(super) fn waiting_prefix(keys: &[VimKey]) -> Option<Prefix> {
@@ -148,7 +155,7 @@ mod tests {
     fn a_host_is_offered_what_it_acts_on() {
         let keys = |prefix: Prefix, host: &[EditorCommand]| prefix.hints(host).map(WhichKey::key).collect::<Vec<_>>();
         assert_eq!(keys(Prefix::Leader, &[]), ["f", "w"]);
-        assert_eq!(keys(Prefix::Leader, &[EditorCommand::NextTab]), ["f", "w", "l"]);
+        assert_eq!(keys(Prefix::Leader, &[EditorCommand::CloseTab]), ["f", "w", "c"]);
         assert!(!keys(Prefix::G, &[]).contains(&"t"));
         assert!(keys(Prefix::G, &[EditorCommand::NextTab]).contains(&"t"));
         assert!(keys(Prefix::G, &[]).contains(&"d"), "the language answers that");

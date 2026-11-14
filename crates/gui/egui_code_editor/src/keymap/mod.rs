@@ -14,8 +14,8 @@
 pub(crate) mod normal;
 pub(crate) mod vim;
 
-pub use self::vim::VimOptions;
 pub(crate) use self::vim::which_key::Prefix;
+pub use self::vim::{VimOptions, which_key::own_g_keys as vim_own_g_keys};
 use crate::{EditorCommand, search::Matcher};
 
 /// Key binding style of the editor.
@@ -26,6 +26,35 @@ pub enum Keymap {
     Normal,
     /// Vim emulation (see [`vim`] for the supported subset).
     Vim,
+}
+
+impl Keymap {
+    /// Every keymap, as a status bar lists them.
+    pub const ALL: [Self; 2] = [Self::Normal, Self::Vim];
+
+    /// e.g. `Normal`, `Vim`
+    #[inline]
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Normal => "Normal",
+            Self::Vim => "Vim",
+        }
+    }
+
+    /// `true`: [`Self::Vim`]. e.g. from the app's editor mode: `Keymap::from_vim(mode.is_vim())`
+    #[inline]
+    #[must_use]
+    pub const fn from_vim(vim: bool) -> Self {
+        if vim { Self::Vim } else { Self::Normal }
+    }
+
+    /// Is it [`Self::Vim`]?
+    #[inline]
+    #[must_use]
+    pub const fn is_vim(self) -> bool {
+        matches!(self, Self::Vim)
+    }
 }
 
 /// What a keymap did this frame.
@@ -119,9 +148,17 @@ impl Default for View {
 #[derive(Debug, Default)]
 pub struct KeymapState {
     vim: vim::VimState,
+    /// How the language comments a line out: see [`crate::Language::comment`].
+    comment: Option<crate::Comment>,
 }
 
 impl KeymapState {
+    /// The language's comment, for `Ctrl+/` and Vim's `gc`.
+    pub(crate) const fn set_comment(&mut self, comment: Option<crate::Comment>) {
+        self.comment = comment;
+        self.vim.options.comment = comment;
+    }
+
     /// Vim settings, e.g., the Insert-mode escape sequences (`jk`, ...).
     pub(crate) const fn vim_options_mut(&mut self) -> &mut vim::VimOptions {
         &mut self.vim.options
@@ -136,11 +173,14 @@ impl KeymapState {
         ui: &egui::Ui,
         id: egui::Id,
         text: &mut String,
-        view: View,
+        (view, requests): (View, Option<&[crate::EditorRequest]>),
     ) -> KeymapOutput {
         match keymap {
-            Keymap::Normal => normal::handle(ui, id, text),
-            Keymap::Vim => self.vim.handle(ui, id, text, view),
+            Keymap::Normal => normal::handle(ui, id, text, (self.comment, requests)),
+            Keymap::Vim => match normal::comment_key(ui, id, text, (self.comment, requests)) {
+                Some(output) => output,
+                None => self.vim.handle(ui, id, text, (view, requests.is_some())),
+            },
         }
     }
 
@@ -156,6 +196,15 @@ impl KeymapState {
         match keymap {
             Keymap::Normal => false,
             Keymap::Vim => self.vim.mode() != vim::Mode::Insert,
+        }
+    }
+
+    /// Vim's mode as key bindings name it (`vim.mode`), e.g. `normal`. `None` with the Normal keymap.
+    #[inline]
+    pub const fn vim_mode(&self, keymap: Keymap) -> Option<&'static str> {
+        match keymap {
+            Keymap::Normal => None,
+            Keymap::Vim => Some(self.vim.mode_name()),
         }
     }
 

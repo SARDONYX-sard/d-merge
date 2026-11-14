@@ -16,7 +16,7 @@
 //! | `Ctrl+G`                  | Go to line                                        |
 //! | `Esc`                     | Close                                             |
 //!
-//! Matching is the same as Vim's search: plain text, smartcase (see [`crate::search`]).
+//! Matching: text, or a regex with `.*` on; smartcase (see [`crate::search`]).
 
 use std::ops::Range;
 
@@ -24,7 +24,7 @@ use egui::{Key, Modifiers};
 
 use crate::{
     Keymap,
-    search::{Matcher, find_from, is_word},
+    search::{Matcher, is_word, next_match},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -47,12 +47,19 @@ pub(crate) struct FindBar {
     /// The match selected last. Remembered here because egui collapses the selection of an
     /// unfocused `TextEdit` to its end, so the editor's selection cannot tell where it starts.
     pub(crate) current: Option<Range<usize>>,
+    /// `.*`: the query is a regex (as VS Code's toggle). Off: text.
+    pub(crate) regex: bool,
 }
 
 impl FindBar {
+    /// The query as [`Self::regex`] says to read it.
+    pub(crate) fn matcher(&self) -> Option<Matcher> {
+        Matcher::with_options(&self.query, false, self.regex)
+    }
+
     /// The matches to highlight while the find bar is open.
     pub(crate) fn highlight(&self) -> Option<Matcher> {
-        (self.open == Some(Kind::Find)).then(|| Matcher::new(&self.query)).flatten()
+        (self.open == Some(Kind::Find)).then(|| self.matcher()).flatten()
     }
 
     /// Opens the find bar, pre-filled with a one-line selection like VS Code.
@@ -75,7 +82,17 @@ impl FindBar {
     /// Global keys. Call before the `TextEdit`. `editor_focus`: the editor has the keyboard.
     ///
     /// Only for [`Keymap::Normal`]: Vim uses these keys itself (e.g., `Ctrl+F` = page down).
-    pub(crate) fn handle_keys(&mut self, keymap: Keymap, ui: &egui::Ui, id: egui::Id, text: &str, editor_focus: bool) {
+    ///
+    /// With `requests` (see [`crate::CodeEditor::requests`]) `Ctrl+F` / `Ctrl+G` are the host's: what it
+    /// asked for. `F3` and its variants stay the find bar's.
+    pub(crate) fn handle_keys(
+        &mut self,
+        keymap: Keymap,
+        ui: &egui::Ui,
+        id: egui::Id,
+        text: &str,
+        (editor_focus, requests): (bool, Option<&[crate::EditorRequest]>),
+    ) {
         if keymap != Keymap::Normal {
             self.open = None; // e.g., switched to Vim while the bar was open
             return;
@@ -84,10 +101,19 @@ impl FindBar {
             return;
         }
         // NOTE: `consume_key` ignores extra Shift/Alt: the Shift variant must be tried first.
+        let own = requests.is_none();
         let (find, goto, word, prev, next, escape) = ui.input_mut(|i| {
             (
-                i.consume_key(Modifiers::COMMAND, Key::F),
-                i.consume_key(Modifiers::COMMAND, Key::G),
+                if own {
+                    i.consume_key(Modifiers::COMMAND, Key::F)
+                } else {
+                    crate::request::asked(requests, crate::EditorRequest::Find)
+                },
+                if own {
+                    i.consume_key(Modifiers::COMMAND, Key::G)
+                } else {
+                    crate::request::asked(requests, crate::EditorRequest::GoToLine)
+                },
                 i.consume_key(Modifiers::COMMAND, Key::F3),
                 i.consume_key(Modifiers::SHIFT, Key::F3),
                 i.consume_key(Modifiers::NONE, Key::F3),
@@ -128,26 +154,21 @@ impl FindBar {
 
     /// While typing: select the first match at or after where the search started.
     pub(crate) fn select_from_origin(&mut self, ctx: &egui::Context, id: egui::Id, text: &str) {
-        let Some(matcher) = Matcher::new(&self.query) else { return };
-        let chars: Vec<char> = text.chars().collect();
-        let at = if matcher.matches_at(&chars, self.origin) {
-            Some(self.origin)
-        } else {
-            find_from(&matcher, &chars, self.origin, true)
-        };
-        if let Some(at) = at {
-            self.select(ctx, id, at..at + self.query.chars().count());
+        let Some(matcher) = self.matcher() else { return };
+        let matches = matcher.find_all(text);
+        let at = matches.iter().find(|m| m.start >= self.origin).or_else(|| matches.first());
+        if let Some(range) = at.cloned() {
+            self.select(ctx, id, range);
         }
     }
 
     /// Selects the next (`forward`) or previous match, wrapping around. It starts from the
     /// current match, or from the cursor once the user moved it.
     pub(crate) fn jump(&mut self, ctx: &egui::Context, id: egui::Id, text: &str, forward: bool) {
-        let Some(matcher) = Matcher::new(&self.query) else { return };
-        let chars: Vec<char> = text.chars().collect();
+        let Some(matcher) = self.matcher() else { return };
         let from = self.current_match(ctx, id, text).or_else(|| selection(ctx, id)).map_or(0, |r| r.start);
-        if let Some(at) = find_from(&matcher, &chars, from, forward) {
-            self.select(ctx, id, at..at + self.query.chars().count());
+        if let Some(range) = next_match(&matcher.find_all(text), from, forward) {
+            self.select(ctx, id, range);
         }
     }
 
@@ -160,10 +181,8 @@ impl FindBar {
     /// user) and the text there still matches.
     pub(crate) fn current_match(&self, ctx: &egui::Context, id: egui::Id, text: &str) -> Option<Range<usize>> {
         let current = self.current.clone()?;
-        let matcher = Matcher::new(&self.query)?;
         let cursor = selection(ctx, id)?;
-        let chars: Vec<char> = text.chars().collect();
-        (cursor.end == current.end && matcher.matches_at(&chars, current.start)).then_some(current)
+        (cursor.end == current.end && self.matcher()?.find_all(text).contains(&current)).then_some(current)
     }
 }
 

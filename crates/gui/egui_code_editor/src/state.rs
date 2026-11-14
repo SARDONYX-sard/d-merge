@@ -34,8 +34,11 @@ pub struct CodeEditorState {
     pub(crate) indent: Indent,
     /// The Vim key that waits for another, and since when.
     pub(crate) which_key_waiting: ui::which_key::Waiting,
-    /// `(errors, warnings)` for the status bar.
+    /// `(errors, warnings)` of the editor's own diagnostics, for the status bar.
     pub(crate) status_problems: (usize, usize),
+    /// What the host shows in their place: e.g. the patch editor, the problems of a whole work. See
+    /// [`Self::set_status_problems`].
+    pub(crate) host_problems: Option<(usize, usize)>,
     /// The cursor and how many chars are selected, for the status bar (drawn before the editor).
     pub(crate) status_cursor: Option<(LinePos, usize)>,
     /// The menu's Paste asked the OS for the clipboard, at this time (seconds). The text arrives as
@@ -44,6 +47,14 @@ pub struct CodeEditorState {
 }
 
 impl CodeEditorState {
+    /// The `(errors, warnings)` the status bar shows in place of the editor's own: what the host checks
+    /// is more than the open text (e.g. a whole work, of which the open text is a part). `None`: the
+    /// editor's own. Set before [`crate::status_line`] each frame.
+    #[inline]
+    pub const fn set_status_problems(&mut self, counts: Option<(usize, usize)>) {
+        self.host_problems = counts;
+    }
+
     /// Opens what the keys or the palette asked for: the find bar, the quick fix menu.
     pub(crate) fn open_requested_menus(
         &mut self,

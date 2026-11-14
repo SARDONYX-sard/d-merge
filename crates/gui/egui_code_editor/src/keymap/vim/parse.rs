@@ -58,12 +58,10 @@ pub(super) fn parse(keys: &[VimKey]) -> Parse {
     match after_count {
         [VimKey::Char(' ')] => return Parse::Incomplete,
         [VimKey::Char(' '), VimKey::Char('e'), ..] => return done(Command::Simple(Simple::ToggleExplorer), None),
-        [VimKey::Char(' '), VimKey::Char('l'), ..] => {
-            return done(Command::Simple(Simple::Ask(EditorCommand::NextTab)), None);
+        [VimKey::Char(' '), VimKey::Char('V'), ..] => {
+            return done(Command::Simple(Simple::Ask(EditorCommand::RevealFile)), None);
         }
-        [VimKey::Char(' '), VimKey::Char('h'), ..] => {
-            return done(Command::Simple(Simple::Ask(EditorCommand::PreviousTab)), None);
-        }
+
         [VimKey::Char(' '), VimKey::Char('f'), ..] => {
             return done(Command::Simple(Simple::Format { save: false }), None);
         }
@@ -142,6 +140,7 @@ const fn operator(keys: &[VimKey]) -> OpParse {
         [VimKey::Char('g'), VimKey::Char('u'), ..] => return OpParse::Op(Operator::Lower, 2),
         [VimKey::Char('g'), VimKey::Char('U'), ..] => return OpParse::Op(Operator::Upper, 2),
         [VimKey::Char('g'), VimKey::Char('~'), ..] => return OpParse::Op(Operator::ToggleCase, 2),
+        [VimKey::Char('g'), VimKey::Char('c'), ..] => return OpParse::Op(Operator::Comment, 2),
         _ => return OpParse::None,
     };
     OpParse::Op(op, 1)
@@ -281,7 +280,9 @@ const fn simple(keys: &[VimKey]) -> Step<Command> {
         [Ctrl('w'), ..] => Simple::Nop,
 
         // Two keys
-        [Char('r' | 'm' | 'q' | '@' | 'g' | 'z')] => return Step::NeedMore,
+        [Char('r' | 'm' | 'q' | '@' | 'g' | 'z' | ']' | '[')] => return Step::NeedMore,
+        [Char(']'), Char('c'), ..] => Simple::Ask(EditorCommand::NextChange),
+        [Char('['), Char('c'), ..] => Simple::Ask(EditorCommand::PreviousChange),
         [Char('r'), Char(c), ..] => Simple::Replace(*c),
         [Char('m'), Char(c), ..] => Simple::SetMark(*c),
         [Char('q'), Char(c), ..] => Simple::Record(*c),
@@ -333,6 +334,7 @@ mod tests {
     fn space_is_a_leader_key() {
         assert_eq!(parse(&keys(" ")), Parse::Incomplete);
         assert_eq!(command(" e"), Command::Simple(Simple::ToggleExplorer));
+        assert_eq!(command(" V"), Command::Simple(Simple::Ask(EditorCommand::RevealFile)));
         assert_eq!(parse(&keys(" x")), Parse::Invalid);
         // After an operator it is still a motion.
         assert_eq!(command("d "), Command::Operate(Operator::Delete, Target::Motion(Motion::Right)));
@@ -354,6 +356,7 @@ mod tests {
         );
         assert_eq!(command("gUU"), Command::Operate(Operator::Upper, Target::Line));
         assert_eq!(command("gugu"), Command::Operate(Operator::Lower, Target::Line));
+        assert_eq!(command("gcc"), Command::Operate(Operator::Comment, Target::Line));
         assert_eq!(command(">>"), Command::Operate(Operator::Indent, Target::Line));
         assert_eq!(
             command("da("),
@@ -381,18 +384,20 @@ mod tests {
         assert_eq!(command("gT"), Command::Simple(Simple::Ask(EditorCommand::PreviousTab)));
         assert_eq!(command(" f"), Command::Simple(Simple::Format { save: false }));
         assert_eq!(command(" w"), Command::Simple(Simple::Format { save: true }));
-        assert_eq!(command(" l"), Command::Simple(Simple::Ask(EditorCommand::NextTab)));
-        assert_eq!(command(" h"), Command::Simple(Simple::Ask(EditorCommand::PreviousTab)));
+
         assert_eq!(command(" c"), Command::Simple(Simple::Ask(EditorCommand::CloseTab)));
         assert_eq!(command(" p"), Command::Simple(Simple::Ask(EditorCommand::TogglePreview)));
         assert_eq!(command(" d"), Command::Simple(Simple::Ask(EditorCommand::ToggleInlineDiff)));
+        assert_eq!(command("]c"), Command::Simple(Simple::Ask(EditorCommand::NextChange)));
+        assert_eq!(command("[c"), Command::Simple(Simple::Ask(EditorCommand::PreviousChange)));
+        assert_eq!(parse(&keys("]x")), Parse::Invalid);
         assert_eq!(parse(&keys(" ")), Parse::Incomplete);
         assert_eq!(parse(&keys(" z")), Parse::Invalid);
     }
 
     #[test]
     fn incomplete_and_invalid() {
-        for pending in ["d", "g", "r", "f", "\"", "\"a", "di", "gu", "z", "'"] {
+        for pending in ["d", "g", "r", "f", "\"", "\"a", "di", "gu", "z", "'", "]", "["] {
             assert_eq!(parse(&keys(pending)), Parse::Incomplete, "{pending}");
         }
         assert_eq!(parse(&keys("Q")), Parse::Invalid);

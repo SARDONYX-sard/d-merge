@@ -16,8 +16,30 @@ let output = CodeEditor::new("my_editor", &mut text)
     .show(ui, &mut state);
 
 // Optional: the keymap status line, e.g. `[ NORMAL ]  recording @a` (colored by mode).
-egui_code_editor::status_line(ui, &state, Keymap::Vim);
+egui_code_editor::status_line(ui, &state, Keymap::Vim, &text);
 ```
+
+To see the parts together, as a small VS Code (explorer, preview tabs, editor, diff tab, search):
+
+```sh
+cargo run -p egui_code_editor --example vscode
+```
+
+## The parts around the editor
+
+Each is documented in its module; none needs the others.
+
+| Part                      | What it is (VS Code's)                                               |
+| ------------------------- | -------------------------------------------------------------------- |
+| `InlineDiff`              | the changes from an older text, shown in the editor; `▲ ▼ 2/5`, `]c` |
+| `DiffView`                | a read-only diff or blame (GitLens) in the editor                     |
+| `SearchView`              | the search of every document (`Ctrl+Shift+F`)                        |
+| `ReferenceList`           | the references window (`Shift+F12`)                                  |
+| `NavHistory`              | Go Back / Go Forward (`Alt+←` / `Alt+→`, mouse buttons)              |
+| `ProblemsPanel`, `StatusBar` | the Problems panel and the status bar                             |
+
+The tabs, the activity bar and other widgets are in `egui_widgets`; trees and lists driven by the
+keys in `egui_tree` (`cargo run -p egui_tree --example tree`).
 
 ## Editor keys (all keymaps)
 
@@ -31,6 +53,22 @@ egui_code_editor::status_line(ui, &state, Keymap::Vim);
 | `F12` / `Ctrl+click` | Go to definition (`Language::definition`) |
 | `Shift+F12`          | Find references (`Language::references`)  |
 | Mouse rest on a word | Hover (diagnostics + docs)                |
+
+## Problems panel
+
+`ProblemsPanel` (`problems` module) lists the host's diagnostics; `status_counts` shows `✖ 2  ⚠ 5`
+in the status bar, and a click on it shows or hides the panel. With `.cursor(&mut ProblemsCursor)`
+the keyboard works it too:
+
+| Key                          | Action                                        |
+| ---------------------------- | --------------------------------------------- |
+| `Ctrl+Shift+L`               | Show the panel with the keyboard / hide it    |
+| `j` `k`, `↓` `↑`             | Next / previous problem                       |
+| `g` `G`, `Home` `End`        | First / last problem                          |
+| `Enter`                      | Go to the problem (the editor gets the keys)  |
+| `Esc`                        | Back to the editor                            |
+
+`Ctrl+Shift+L` is the host's key binding (`problems.toggle` of the `keybinding` crate): the host owns the focus.
 
 ## Command palette and host API
 
@@ -65,6 +103,7 @@ Search is the same as Vim's `/` (plain text, smartcase).
 | `Shift+Alt+↑` / `Shift+Alt+↓` | Copy the line(s) up / down               | `yyP`   |
 | `Ctrl+Enter`                  | Insert a line below                      | `o`     |
 | `Ctrl+Shift+Enter`            | Insert a line above                      | `O`     |
+| `Ctrl+/`                      | Toggle line comment (Vim keymap too)     | `gcc`   |
 
 ## Vim
 
@@ -124,6 +163,7 @@ Used as `{operator}{motion}`, `{operator}{text object}` or doubled for whole lin
 | `y`         | Yank (also to the clipboard) |
 | `>` / `<`   | Indent / outdent lines       |
 | `gu` / `gU` | Lowercase / uppercase        |
+| `gc`        | Toggle comment (`gcc`: line) |
 | `g~`        | Toggle case                  |
 
 ### Text objects
@@ -244,6 +284,7 @@ All matches are highlighted; the status line shows the match count (e.g., `/foo 
 | `<Space>w`      | Format the document, then save (`EditorCommand::Save` for the host)                                                                                                                |
 | `<Space>p`      | Show or hide the host's preview (`EditorCommand::TogglePreview`)                                                                                                                   |
 | `<Space>d`      | Show or hide the inline diff (`EditorCommand::ToggleInlineDiff`)                                                                                                                   |
+| `]c` `[c`       | Next / previous change (`EditorCommand::NextChange` / `PreviousChange` for the host)                                                                                               |
 
 `Ctrl+O` / `Ctrl+I` past the ends of the jump list send `EditorCommand::JumpBack` / `JumpForward`, so the host can switch documents.
 
