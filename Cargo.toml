@@ -114,6 +114,7 @@ page_convert      = { path = "./crates/gui/page_convert" }
 page_hkanno       = { path = "./crates/gui/page_hkanno" }
 page_patch        = { path = "./crates/gui/page_patch" }
 page_patch_editor = { path = "./crates/gui/page_patch_editor" }
+patch_editor_core = { path = "./crates/gui/patch_editor_core" }
 serde_hkx_for_gui = { path = "./crates/gui/serde_hkx_for_gui" }
 skyrim_data_dir   = { path = "./crates/gui/skyrim_data_dir" }
 tracing_rotation  = { path = "./crates/gui/tracing_rotation" }

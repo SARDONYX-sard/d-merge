@@ -1,0 +1,40 @@
+[package]
+name        = "patch_editor_core"
+version     = "0.0.0"
+description = "D Merge GUI: what the Patch Editor edits, without its drawing (the work, the objects' trees, the patches, animation data)"
+
+authors.workspace      = true
+categories             = ["gui"]
+edition.workspace      = true
+keywords               = ["skyrim", "nemesis"]
+license                = "GPL-3.0-or-later"
+readme                 = "../../../README.md"
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+egui      = { workspace = true }
+phf       = { workspace = true }
+rayon     = { workspace = true }
+rmp-serde = { workspace = true }
+serde     = { workspace = true }
+sonic-rs  = { workspace = true }
+stdx      = { workspace = true }
+
+# workspace members
+behavior_merge_types = { workspace = true }
+egui_code_editor     = { workspace = true }
+egui_tree            = { workspace = true }
+egui_widgets         = { workspace = true }
+fast_hash            = { workspace = true }
+gui_shared           = { workspace = true }
+hkx_io               = { workspace = true }
+nemesis_diff         = { workspace = true }
+pandora_patch        = { workspace = true }
+serde_hkx_for_gui    = { workspace = true }
+skyrim_anim_data     = { workspace = true }
+skyrim_crc           = { workspace = true }
+winnow               = { workspace = true }
+
+[lints]
+workspace = true

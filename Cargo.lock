@@ -4082,6 +4082,7 @@ dependencies = [
  "keybinding",
  "nemesis_diff",
  "pandora_patch",
+ "patch_editor_core",
  "phf 0.14.0",
  "rayon",
  "regex",
@@ -4161,6 +4162,32 @@ name = "pastey"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35fb2e5f958ec131621fdd531e9fc186ed768cbe395337403ae56c17a74c68ec"
+
+[[package]]
+name = "patch_editor_core"
+version = "0.0.0"
+dependencies = [
+ "behavior_merge_types",
+ "egui",
+ "egui_code_editor",
+ "egui_tree",
+ "egui_widgets",
+ "fast_hash",
+ "gui_shared",
+ "hkx_io",
+ "nemesis_diff",
+ "pandora_patch",
+ "phf 0.14.0",
+ "rayon",
+ "rmp-serde",
+ "serde",
+ "serde_hkx_for_gui",
+ "skyrim_anim_data",
+ "skyrim_crc",
+ "sonic-rs",
+ "stdx",
+ "winnow",
+]
 
 [[package]]
 name = "pathfinder_geometry"

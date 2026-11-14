@@ -29,20 +29,12 @@
 //! bars      (functions)  top bar, start screen -> BarAsk        ui::top_bar
 //! ```
 
-mod anim;
-mod editor;
 mod editor_area;
-mod new_work;
 mod problems;
-mod repeat;
 mod side_area;
-mod template_tree;
 mod tool;
-mod tree;
 mod ui;
 mod user_patch;
-mod vars_edit;
-mod workspace;
 
 use std::path::PathBuf;
 
@@ -59,6 +51,7 @@ use gui_shared::{
         ui::editor::LspOptions,
     },
 };
+use patch_editor_core::{anim, editor, new_work, repeat, template_tree, tree, vars_edit, workspace};
 
 use self::{
     side_area::SideAsk,
