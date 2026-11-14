@@ -119,15 +119,19 @@ impl PatchTool {
                     egui_widgets::side_bar_title(ui, i18n.t(title));
                     // The events and variables are a behavior's: which one, here as well.
                     let behaviors = &self.work.workspace.behaviors;
-                    if let Some(at) = behavior_select(ui, i18n, behaviors, self.active) {
-                        self.active = at;
-                        self.selected = self.tabs.last_of(at).map(std::rc::Rc::from);
+                    if let Some(at) = behavior_select(ui, i18n, behaviors, self.sel.active) {
+                        self.sel.active = at;
+                        self.sel.selected = self.tabs.last_of(at).map(std::rc::Rc::from);
                     }
-                    let has_vars =
-                        self.work.workspace.behaviors.get(self.active).is_some_and(|behavior| !behavior.is_anim_data());
+                    let has_vars = self
+                        .work
+                        .workspace
+                        .behaviors
+                        .get(self.sel.active)
+                        .is_some_and(|behavior| !behavior.is_anim_data());
                     if has_vars {
                         let names = self.names();
-                        let behavior = &mut self.work.workspace.behaviors[self.active];
+                        let behavior = &mut self.work.workspace.behaviors[self.sel.active];
                         let changed = self.vars.show(ui, i18n, behavior, &names, &self.explorer.filter);
                         if !changed.is_empty() {
                             self.pane.opened = None; // the open object may be one of them

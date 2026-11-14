@@ -29,7 +29,7 @@ use crate::patch::{EditorResult, FocusAt, PatchTool, TabEvent, workspace::PANDOR
 impl PatchTool {
     /// Draws the editor of the selected object, or what takes its place.
     pub(in crate::patch) fn object_editor(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
-        let Some(id) = self.selected.clone() else {
+        let Some(id) = self.sel.selected.clone() else {
             egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisSelectObject)));
             return;
         };
@@ -117,7 +117,7 @@ impl PatchTool {
             return None;
         }
 
-        let behavior = &self.work.workspace.behaviors[self.active];
+        let behavior = &self.work.workspace.behaviors[self.sel.active];
         let is_new = behavior.added.contains_key(id) || behavior.is_ref(id) || id == PANDORA_DOC;
         if is_new || !self.pane.show_preview {
             return None;
@@ -149,7 +149,7 @@ impl PatchTool {
         if let Some((document, line)) = egui_code_editor::ReferenceList::window(ui.ctx(), &mut self.pane.references) {
             if *document != **id {
                 self.pane.history.visit(&**id);
-                self.selected = Some(document.into());
+                self.sel.selected = Some(document.into());
             }
             self.pane.focus = Some(FocusAt::Line(line));
         }

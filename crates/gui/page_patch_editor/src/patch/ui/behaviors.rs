@@ -61,7 +61,7 @@ impl PatchTool {
             let code = self.work.place.mod_code.trim();
             let code = if is_existing_mod_code(code) { code } else { "<code>" };
             let ext = self.work.workspace.export_format.is_ext();
-            let event = behavior_rows(ui, i18n, (&self.work.workspace.behaviors, self.active), (code, ext));
+            let event = behavior_rows(ui, i18n, (&self.work.workspace.behaviors, self.sel.active), (code, ext));
             self.apply_row_event(event);
         }
         ui.separator();
@@ -86,16 +86,16 @@ impl PatchTool {
     fn apply_row_event(&mut self, event: Option<RowEvent>) {
         match event {
             Some(RowEvent::Select(i)) => {
-                self.active = i;
+                self.sel.active = i;
                 // Back to where it was left in that behavior.
-                self.selected = self.tabs.last_of(i).map(Rc::from);
+                self.sel.selected = self.tabs.last_of(i).map(Rc::from);
             }
             Some(RowEvent::Remove(i)) => {
                 self.work.workspace.behaviors.remove(i);
                 self.reset_names(); // the numbers of the others shift
                 self.tabs.clear();
-                self.active = self.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
-                self.selected = None;
+                self.sel.active = self.sel.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
+                self.sel.selected = None;
                 self.pane.opened = None;
                 self.work.mark_dirty();
             }

@@ -29,8 +29,6 @@ mod user_patch;
 mod vars_edit;
 mod workspace;
 
-use std::rc::Rc;
-
 use egui_code_editor::EditorCommand;
 use egui_widgets::notify::Notification;
 use gui_shared::{
@@ -90,8 +88,8 @@ pub(crate) struct PatchTool {
     /// What `Edit...` proposed, until it is edited.
     draft: Option<user_patch::Draft>,
 
-    active: usize,
-    selected: Option<Rc<str>>,
+    /// What is shown: the behavior and the object. See [`tool::selection`].
+    sel: tool::selection::Selection,
     /// The objects of the explorer: the filters, the tree or the list, the keyboard in them. See [`tool::list`].
     explorer: tool::list::Explorer,
 
@@ -272,13 +270,13 @@ impl PatchTool {
 
     /// The "New object" window, if open: a class picked is a new object of it.
     fn class_picker(&mut self, ctx: &egui::Context, i18n: &I18nMap) {
-        let behavior = &self.work.workspace.behaviors[self.active];
+        let behavior = &self.work.workspace.behaviors[self.sel.active];
         let Some(class) = self.panels.class_picker.window(ctx, i18n, behavior) else { return };
 
         let code = self.work.place.mod_code.trim().to_owned();
-        if let Some(id) = self.work.workspace.behaviors[self.active].add_class(&code, &class) {
+        if let Some(id) = self.work.workspace.behaviors[self.sel.active].add_class(&code, &class) {
             self.object_changed(&id);
-            self.selected = Some(id.into());
+            self.sel.selected = Some(id.into());
             self.panels.class_picker.close();
         }
     }
@@ -294,10 +292,10 @@ impl PatchTool {
                 let Some(form) = self.panels.repeat.take() else { return };
                 let Some(behavior) = self.work.workspace.behaviors.get_mut(form.behavior()) else { return };
                 let first = form.create(behavior, &code);
-                self.active = form.behavior();
+                self.sel.active = form.behavior();
                 self.reset_names();
                 self.work.mark_dirty();
-                self.selected = first.map(Into::into);
+                self.sel.selected = first.map(Into::into);
             }
             None => {}
         }
@@ -331,7 +329,7 @@ impl PatchTool {
         self.new_clips_window(ui.ctx(), i18n);
         self.duplicate_window(ui.ctx(), i18n);
         self.repeat(ui.ctx(), i18n);
-        self.active = self.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
+        self.sel.active = self.sel.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
 
         // Like VS Code: the activity bar, the side bar, and the editor with what belongs to it.
         self.side_bar(ui, i18n, notify);
@@ -429,12 +427,12 @@ mod tests {
         let i18n = I18nMap::new();
 
         for active in 0..tool.work.workspace.behaviors.len() {
-            tool.active = active;
+            tool.sel.active = active;
             let behavior = &tool.work.workspace.behaviors[active];
             let ids: Vec<String> = behavior.edits.keys().chain(behavior.added.keys()).cloned().collect();
             for id in ids {
                 println!("{active} {id}");
-                tool.selected = Some(id.as_str().into());
+                tool.sel.selected = Some(id.as_str().into());
                 egui::__run_test_ui(|ui| {
                     tool.object_list(ui, &i18n, &mut egui_widgets::notify::Notification::default());
                     tool.object_editor(ui, &i18n);

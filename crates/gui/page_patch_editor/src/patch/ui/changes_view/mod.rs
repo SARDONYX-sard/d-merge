@@ -58,7 +58,7 @@ impl PatchTool {
             let input = list::ListInput {
                 workspace: &self.work.workspace,
                 scm: &self.scm,
-                selected: (self.active, self.selected.as_deref()),
+                selected: (self.sel.active, self.sel.selected.as_deref()),
                 cursor: (keys.cursor, keys.moved),
             };
             list::show(ui, i18n, &input)
@@ -117,11 +117,11 @@ impl PatchTool {
         match action {
             ChangeAction::Open(behavior, id) => {
                 self.views.list.active = None; // the object itself, not a diff of it
-                if behavior != self.active {
-                    self.active = behavior;
+                if behavior != self.sel.active {
+                    self.sel.active = behavior;
                     self.tabs.clear();
                 }
-                self.selected = Some(id.into());
+                self.sel.selected = Some(id.into());
             }
             ChangeAction::Compare(behavior, id, from, to) => self.open_compare(behavior, &id, from, to),
             ChangeAction::Blame(behavior, id) => self.open_blame(behavior, &id),

@@ -68,13 +68,13 @@ impl PatchTool {
         let mut toggle_problems = false;
         let mut problems = ProblemsOutput::default();
         egui::CentralPanel::default().show(ui, |ui| {
-            let behavior = &self.work.workspace.behaviors[self.active];
+            let behavior = &self.work.workspace.behaviors[self.sel.active];
             let input = super::toolbar::ToolbarInput {
                 pane: &mut self.pane,
                 tabs: &self.tabs,
                 views: &self.views,
                 problems: self.problems.list.as_deref(),
-                active: self.active,
+                active: self.sel.active,
                 id,
                 graph: &names.graph,
                 focused: editor_focused,
@@ -83,14 +83,14 @@ impl PatchTool {
             let toolbar = super::toolbar::show(ui, i18n, input);
             (result.walk_history, result.tab_event) = (toolbar.walk_history, toolbar.tab_event);
 
-            if self.work.workspace.behaviors[self.active].is_ref(id) {
+            if self.work.workspace.behaviors[self.sel.active].is_ref(id) {
                 ui.weak(i18n.t(I18nKey::NemesisRefReadOnly));
             }
 
             toggle_problems = self.pane.status_bar(ui, i18n, keymap, self.is_user_patch);
             problems = self.problems.panel_ui(ui, i18n, &self.work.workspace.behaviors, &problem_keys);
             let input = EditorInput {
-                behavior: (self.active, &self.work.workspace.behaviors[self.active]),
+                behavior: (self.sel.active, &self.work.workspace.behaviors[self.sel.active]),
                 id,
                 names: &names,
                 keymap,
@@ -147,11 +147,11 @@ impl PatchTool {
         }
 
         if let Some((behavior, object, line)) = problems.go_to {
-            if behavior != self.active {
-                self.active = behavior;
-                self.selected = None;
+            if behavior != self.sel.active {
+                self.sel.active = behavior;
+                self.sel.selected = None;
             }
-            let current = self.selected.clone().unwrap_or_default();
+            let current = self.sel.selected.clone().unwrap_or_default();
             self.open_location(&current, &object, line);
         }
     }

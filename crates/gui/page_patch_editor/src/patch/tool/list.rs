@@ -98,7 +98,7 @@ impl PatchTool {
         (action, id): (FileAction, &str),
         notify: &mut egui_widgets::notify::Notification,
     ) {
-        let behavior = &self.work.workspace.behaviors[self.active];
+        let behavior = &self.work.workspace.behaviors[self.sel.active];
         let file = object_file((behavior, id), &self.work.place, self.work.workspace.export_format);
         match action {
             FileAction::CopyPath => ctx.copy_text(file.display().to_string()),
@@ -115,7 +115,7 @@ impl PatchTool {
     pub(in crate::patch) fn file_keys(&mut self, ctx: &egui::Context, notify: &mut egui_widgets::notify::Notification) {
         use keybinding::commands::{FILE_COPY_PATH, FILE_REVEAL};
         let (copy, reveal) = (self.keys.take(FILE_COPY_PATH), self.keys.take(FILE_REVEAL));
-        let selected = self.selected.as_deref().map(str::to_owned);
+        let selected = self.sel.selected.as_deref().map(str::to_owned);
         let asked = [(copy, FileAction::CopyPath), (reveal, FileAction::Reveal)]
             .into_iter()
             .filter_map(|(on, action)| on.then_some(action).zip(selected.clone()));
@@ -151,13 +151,13 @@ impl PatchTool {
 
     /// Deletes a new object, or drops the edits of a template object.
     pub(in crate::patch) fn revert_or_delete(&mut self, id: &str) {
-        let behavior = &mut self.work.workspace.behaviors[self.active];
+        let behavior = &mut self.work.workspace.behaviors[self.sel.active];
         behavior.edits.remove(id);
         let is_pandora_doc = id == PANDORA_DOC && behavior.pandora_doc.take().is_some();
         if behavior.added.remove(id).is_some() || is_pandora_doc {
-            let neighbor = self.tabs.close(self.active, id);
-            if self.selected.as_deref() == Some(id) {
-                self.selected = neighbor.map(Rc::from);
+            let neighbor = self.tabs.close(self.sel.active, id);
+            if self.sel.selected.as_deref() == Some(id) {
+                self.sel.selected = neighbor.map(Rc::from);
             }
         }
         self.pane.opened = None;
@@ -167,9 +167,9 @@ impl PatchTool {
 
     pub(in crate::patch) fn new_object(&mut self, from: Option<&str>) {
         let code = self.work.place.mod_code.trim().to_string();
-        let id = self.work.workspace.behaviors[self.active].add_object(&code, from);
+        let id = self.work.workspace.behaviors[self.sel.active].add_object(&code, from);
         self.object_changed(&id);
-        self.selected = Some(id.into());
+        self.sel.selected = Some(id.into());
     }
 }
 

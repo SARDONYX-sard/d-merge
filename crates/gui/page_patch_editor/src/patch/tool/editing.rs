@@ -67,7 +67,7 @@ impl PatchTool {
     /// The next / previous tab, the views' after the objects'. `current`: the object shown, if no
     /// view is. See [`tab_events::step`].
     pub(in crate::patch) fn step_tab(&mut self, current: &str, forward: bool) {
-        let outcome = tab_events::step((&self.tabs, &mut self.views), self.active, current, forward);
+        let outcome = tab_events::step((&self.tabs, &mut self.views), self.sel.active, current, forward);
         self.apply_tab_outcome(outcome);
     }
 
@@ -75,8 +75,8 @@ impl PatchTool {
     pub(in crate::patch) fn walk_history(&mut self, older: bool, current: &str) {
         let mut current = current.to_string();
         while let Some(target) = self.pane.history.walk(older, &current) {
-            if self.work.workspace.behaviors[self.active].text(&target).is_some() {
-                self.selected = Some(target.into());
+            if self.work.workspace.behaviors[self.sel.active].text(&target).is_some() {
+                self.sel.selected = Some(target.into());
                 self.pane.focus = Some(FocusAt::Keep);
                 return;
             }
@@ -88,24 +88,24 @@ impl PatchTool {
     pub(in crate::patch) fn open_location(&mut self, current: &str, document: &str, line: usize) {
         if document != current {
             self.pane.history.visit(current);
-            self.selected = Some(document.into());
+            self.sel.selected = Some(document.into());
         }
         self.pane.focus = Some(FocusAt::Line(line));
     }
 
     /// Double click or menu in the tree and the list: shows `id` in a tab that stays.
     pub(in crate::patch) fn keep_open(&mut self, id: &str) {
-        let current = self.selected.as_deref().filter(|selected| *selected != id);
-        self.tabs.open(self.active, id, current);
-        self.tabs.pin(self.active, id);
-        self.selected = Some(id.into());
+        let current = self.sel.selected.as_deref().filter(|selected| *selected != id);
+        self.tabs.open(self.sel.active, id, current);
+        self.tabs.pin(self.sel.active, id);
+        self.sel.selected = Some(id.into());
     }
 
     /// What the editor shows, to find it again in another workspace: the behavior's `meshes_path`
     /// (e.g. `meshes/actors/character/behaviors/0_master.bin`) and the object id (e.g. `#0106`).
     pub(super) fn editor_place(&self) -> Option<(String, Rc<str>)> {
-        let behavior = self.work.workspace.behaviors.get(self.active)?;
-        Some((behavior.meshes_path.clone(), self.selected.clone()?))
+        let behavior = self.work.workspace.behaviors.get(self.sel.active)?;
+        Some((behavior.meshes_path.clone(), self.sel.selected.clone()?))
     }
 
     /// Shows the place of [`Self::editor_place`] again, if the work still has it, with the keyboard in
@@ -115,9 +115,9 @@ impl PatchTool {
         let Some(index) = found.filter(|&index| self.work.workspace.behaviors[index].text(id).is_some()) else {
             return;
         };
-        self.active = index;
+        self.sel.active = index;
         self.tabs.open(index, id, None);
-        self.selected = Some(Rc::clone(id));
+        self.sel.selected = Some(Rc::clone(id));
         self.pane.focus = Some(FocusAt::Keep);
     }
 
@@ -125,22 +125,22 @@ impl PatchTool {
     /// the work has changed so far.
     pub(in crate::patch) fn open_pandora_doc(&mut self) {
         let code = self.work.place.mod_code.trim().to_owned();
-        let behavior = &mut self.work.workspace.behaviors[self.active];
+        let behavior = &mut self.work.workspace.behaviors[self.sel.active];
         if behavior.pandora_doc.is_none() {
             let doc = workspace::pandora::draft_doc(behavior, &code);
             behavior.pandora_doc_ids = pandora_patch::doc::doc_object_ids(&doc);
             behavior.pandora_doc = Some(doc);
             self.work.mark_dirty();
         }
-        if let Some(current) = self.selected.as_deref().filter(|id| *id != PANDORA_DOC) {
+        if let Some(current) = self.sel.selected.as_deref().filter(|id| *id != PANDORA_DOC) {
             self.pane.history.visit(current);
         }
-        self.selected = Some(PANDORA_DOC.into());
+        self.sel.selected = Some(PANDORA_DOC.into());
     }
 
     /// Loads `id` into the editor if it is not the open object already.
     pub(in crate::patch) fn open_in_editor(&mut self, id: &str) {
-        if self.pane.opened.as_ref().is_some_and(|(active, open)| *active == self.active && open == id) {
+        if self.pane.opened.as_ref().is_some_and(|(active, open)| *active == self.sel.active && open == id) {
             return;
         }
         // The tab being left keeps its undo history and Vim state.
@@ -148,16 +148,16 @@ impl PatchTool {
         if let Some((behavior, left)) = &left {
             self.tabs.store_state(*behavior, left, std::mem::take(&mut self.pane.state));
         }
-        let current = left.as_ref().filter(|(behavior, _)| *behavior == self.active).map(|(_, id)| id.as_str());
-        self.tabs.open(self.active, id, current);
-        self.pane.state = self.tabs.take_state(self.active, id);
+        let current = left.as_ref().filter(|(behavior, _)| *behavior == self.sel.active).map(|(_, id)| id.as_str());
+        self.tabs.open(self.sel.active, id, current);
+        self.pane.state = self.tabs.take_state(self.sel.active, id);
         let template_dir = Path::new(&self.work.place.template_dir);
-        self.pane.refresh_trigger_names(&self.work.workspace.behaviors[self.active], template_dir);
+        self.pane.refresh_trigger_names(&self.work.workspace.behaviors[self.sel.active], template_dir);
 
-        let text = self.work.workspace.behaviors[self.active].text(id).unwrap_or_default();
+        let text = self.work.workspace.behaviors[self.sel.active].text(id).unwrap_or_default();
         text.clone_into(&mut self.pane.text);
         self.pane.preview = None;
-        self.pane.opened = Some((self.active, id.to_owned()));
+        self.pane.opened = Some((self.sel.active, id.to_owned()));
     }
 
     /// Recomputes the preview of `id` if it is due, and then the work's problems of it. See
@@ -172,7 +172,7 @@ impl PatchTool {
             parser_mode: self.work.parser_mode,
             export_format: self.work.workspace.export_format,
         };
-        if self.pane.refresh_preview(&self.work.workspace.behaviors[self.active], id, settings) {
+        if self.pane.refresh_preview(&self.work.workspace.behaviors[self.sel.active], id, settings) {
             self.refresh_problems(id);
         }
     }
@@ -181,8 +181,10 @@ impl PatchTool {
     pub(in crate::patch) fn apply_tab_event(&mut self, event: Option<TabEvent>, current: &str) {
         let tabs = (&mut self.tabs, &mut self.views);
         let outcome = match event {
-            Some(TabEvent::Object(action, id)) => tab_events::object_action(tabs, self.active, (action, id), current),
-            Some(TabEvent::View(action, at)) => tab_events::view_action(tabs, self.active, (action, at)),
+            Some(TabEvent::Object(action, id)) => {
+                tab_events::object_action(tabs, self.sel.active, (action, id), current)
+            }
+            Some(TabEvent::View(action, at)) => tab_events::view_action(tabs, self.sel.active, (action, at)),
             Some(TabEvent::File(action, id)) => {
                 self.file_asked = Some((action, id));
                 return;
@@ -196,8 +198,8 @@ impl PatchTool {
     fn apply_tab_outcome(&mut self, outcome: tab_events::TabOutcome) {
         match outcome.select {
             tab_events::Select::Keep => {}
-            tab_events::Select::Object(id) => self.selected = Some(id),
-            tab_events::Select::Nothing => self.selected = None,
+            tab_events::Select::Object(id) => self.sel.selected = Some(id),
+            tab_events::Select::Nothing => self.sel.selected = None,
         }
         if outcome.close_editor {
             self.pane.opened = None;
@@ -210,9 +212,9 @@ impl PatchTool {
     /// Does what the editor asked for. Returns whether the keyboard goes to the object tree.
     pub(in crate::patch) fn apply_editor_result(&mut self, result: EditorResult, id: &str) -> bool {
         if result.changed {
-            self.work.workspace.behaviors[self.active].set_text(id, &self.pane.text);
+            self.work.workspace.behaviors[self.sel.active].set_text(id, &self.pane.text);
             self.pane.typed_at = Some(Instant::now());
-            self.tabs.pin(self.active, id); // edited: it stays open
+            self.tabs.pin(self.sel.active, id); // edited: it stays open
             self.object_changed(id);
             self.note_pandora_edit(id);
         }
@@ -261,14 +263,14 @@ impl PatchTool {
 
     /// `↶` in the inline diff: puts a changed place back to the template.
     pub(in crate::patch) fn revert_inline(&mut self, id: &str, index: usize) {
-        let Some(template) = self.work.workspace.behaviors[self.active].template_object(id) else { return };
+        let Some(template) = self.work.workspace.behaviors[self.sel.active].template_object(id) else { return };
         let text = InlineDiff::revert(&template.text, &self.pane.text, index);
         self.replace_object_text(id, text);
     }
 
     /// `↶` in the preview: puts changed block `block` back to the template.
     pub(in crate::patch) fn revert_block(&mut self, id: &str, block: usize) {
-        let Some(template) = self.work.workspace.behaviors[self.active].template_object(id) else { return };
+        let Some(template) = self.work.workspace.behaviors[self.sel.active].template_object(id) else { return };
         let Some(text) = self.pane.reverted_block(&template.text, block) else { return };
         self.replace_object_text(id, text);
     }
@@ -276,7 +278,7 @@ impl PatchTool {
     /// Object `id` is `text` now, in the editor and in the work.
     fn replace_object_text(&mut self, id: &str, text: String) {
         self.pane.text = text;
-        self.work.workspace.behaviors[self.active].set_text(id, &self.pane.text);
+        self.work.workspace.behaviors[self.sel.active].set_text(id, &self.pane.text);
         self.pane.preview = None;
         self.object_changed(id);
         self.note_pandora_edit(id);
@@ -284,7 +286,7 @@ impl PatchTool {
 
     /// Object `id` was edited here: its part of the Pandora patch file follows at the next pause.
     fn note_pandora_edit(&mut self, id: &str) {
-        if self.work.workspace.behaviors[self.active].pandora_doc.is_some()
+        if self.work.workspace.behaviors[self.sel.active].pandora_doc.is_some()
             && !self.work.pandora_edited.iter().any(|edited| edited == id)
         {
             self.work.pandora_edited.push(id.to_owned());
@@ -295,7 +297,7 @@ impl PatchTool {
     /// patch file, the file to the objects. After a pause in typing, as it reads the whole file.
     pub(super) fn sync_pandora_doc(&mut self) {
         let edited = std::mem::take(&mut self.work.pandora_edited);
-        let active = self.active;
+        let active = self.sel.active;
         for id in edited {
             let Some(behavior) = self.work.workspace.behaviors.get_mut(active) else { continue };
             if id == PANDORA_DOC {
@@ -319,10 +321,10 @@ impl PatchTool {
     ///
     /// Asked for every frame: an `Rc`, so the thousands of strings are not copied each time.
     pub(in crate::patch) fn names(&mut self) -> Rc<editor::names::Names> {
-        if !self.work.names.is_of(self.active) {
+        if !self.work.names.is_of(self.sel.active) {
             self.reset_names(); // another behavior: what was found of this one goes too
         }
-        self.work.names.get(self.active, &self.work.workspace.behaviors[self.active])
+        self.work.names.get(self.sel.active, &self.work.workspace.behaviors[self.sel.active])
     }
 
     /// The behaviors themselves changed (loaded, closed): `names` starts over.
@@ -354,18 +356,18 @@ mod tests {
     fn the_editor_place_comes_back() {
         let mut tool = PatchTool::default();
         tool.work.workspace.behaviors.push(clip_data(&["M~1/a.txt"]));
-        tool.selected = Some("M~1/a.txt".into());
+        tool.sel.selected = Some("M~1/a.txt".into());
         let place = tool.editor_place().unwrap();
 
-        tool.selected = None;
+        tool.sel.selected = None;
         tool.reopen_editor_place(&place);
-        assert_eq!(tool.selected.as_deref(), Some("M~1/a.txt"));
+        assert_eq!(tool.sel.selected.as_deref(), Some("M~1/a.txt"));
         assert!(matches!(tool.pane.focus, Some(FocusAt::Keep)));
 
         // Gone from the mod: nothing is opened.
         tool.work.workspace.behaviors[0] = clip_data(&[]);
-        tool.selected = None;
+        tool.sel.selected = None;
         tool.reopen_editor_place(&place);
-        assert_eq!(tool.selected, None);
+        assert_eq!(tool.sel.selected, None);
     }
 }

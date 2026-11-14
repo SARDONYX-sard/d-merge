@@ -50,7 +50,7 @@ impl PatchTool {
                 self.pane.merge_accepted = accepted;
             }
             self.pane.text = merged.text;
-            self.work.workspace.behaviors[self.active].set_text(id, &self.pane.text);
+            self.work.workspace.behaviors[self.sel.active].set_text(id, &self.pane.text);
             self.pane.preview = None;
             self.object_changed(id);
             self.pane.focus = Some(FocusAt::Line(merged.line));

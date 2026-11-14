@@ -62,16 +62,16 @@ impl PatchTool {
         let Some(editor::resolve::Resolved { behavior, id, line }) = shown else { return };
         self.work.workspace.reload_refs(); // a behavior may have been opened
         self.reset_names();
-        self.active = behavior;
+        self.sel.active = behavior;
         self.pane.opened = None;
         self.draft = Some(before.with_proposal(&self.work.workspace, behavior, &id));
         self.pane.merge_values = editor::resolve::merge_values(&request, &id);
         self.pane.merge_accepted.clear();
         self.reuse_resolution(behavior, &id, notify, i18n);
-        self.selected = Some(id.into());
+        self.sel.selected = Some(id.into());
         // What is shown is no change of the work yet.
         self.work.autosave.restore(since);
-        self.work.autosave.seen_at(self.active, self.selected.as_ref());
+        self.work.autosave.seen_at(self.sel.active, self.sel.selected.as_ref());
         // Picking another value of the object shown has no other sign of having gone anywhere.
         self.pane.focus = line.map(FocusAt::Line);
     }
@@ -124,7 +124,7 @@ impl PatchTool {
 
         // What is open is part of the work: back to it when it is opened again.
         let has_work = self.work.place.is_open() && !self.work.workspace.behaviors.is_empty();
-        self.work.autosave.look_at(self.active, self.selected.as_ref(), has_work);
+        self.work.autosave.look_at(self.sel.active, self.sel.selected.as_ref(), has_work);
 
         if self.work.autosave.is_due() {
             self.save_now(notify, i18n);
@@ -151,7 +151,7 @@ impl PatchTool {
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage))),
         }
         self.pane.opened = None;
-        self.selected = None;
+        self.sel.selected = None;
         self.restore_session();
         remember_recent(
             &mut self.work.recent,
@@ -169,7 +169,7 @@ impl PatchTool {
         if !self.work.autosave.take() {
             return;
         }
-        let open = (self.active, self.selected.as_deref());
+        let open = (self.sel.active, self.sel.selected.as_deref());
         self.work.workspace.session =
             super::session::of(&self.work.workspace.behaviors, &self.tabs, open, &self.work.place);
         // It has no `Export`: what is edited is what the next merge gets.
@@ -201,8 +201,8 @@ impl PatchTool {
         let session = std::mem::take(&mut self.work.workspace.session);
         let restored = super::session::restore(session, &self.work.workspace.behaviors, &mut self.tabs);
 
-        self.active = restored.active;
-        self.selected = restored.selected;
+        self.sel.active = restored.active;
+        self.sel.selected = restored.selected;
         if !restored.mod_dir.is_empty() {
             self.work.place.mod_dir = restored.mod_dir;
         }
@@ -210,7 +210,7 @@ impl PatchTool {
         if !restored.output.is_empty() && !self.is_user_patch {
             self.work.place.output = restored.output;
         }
-        self.work.autosave.seen_at(self.active, self.selected.as_ref());
+        self.work.autosave.seen_at(self.sel.active, self.sel.selected.as_ref());
     }
 
     /// Opens a work of the list of recent ones. If its cache is gone, the mod it was exported to is
@@ -236,8 +236,8 @@ impl PatchTool {
         self.work.place.mod_code.clear();
         self.work.place.output.clear();
         self.work.place.mod_dir.clear();
-        self.active = 0;
-        self.selected = None;
+        self.sel.active = 0;
+        self.sel.selected = None;
         self.pane.opened = None;
         self.panels.project_open = false;
     }
@@ -368,8 +368,8 @@ impl PatchTool {
         }
         self.reset_names();
         self.work.mark_dirty();
-        self.active = 0;
-        self.selected = None;
+        self.sel.active = 0;
+        self.sel.selected = None;
         self.pane.opened = None;
         if let Some(Some(place)) = was_open {
             self.reopen_editor_place(&place);
@@ -395,13 +395,13 @@ impl PatchTool {
         match Behavior::open(path) {
             Ok(behavior) => {
                 if let Some(at) = self.work.workspace.behaviors.iter().position(|b| b.name == behavior.name) {
-                    self.active = at; // already there
+                    self.sel.active = at; // already there
                     return;
                 }
                 self.work.workspace.behaviors.push(behavior);
                 self.work.workspace.reload_refs();
-                self.active = self.work.workspace.behaviors.len() - 1;
-                self.selected = None; // an id of the other behavior
+                self.sel.active = self.work.workspace.behaviors.len() - 1;
+                self.sel.selected = None; // an id of the other behavior
                 self.work.mark_dirty();
             }
             Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage))),

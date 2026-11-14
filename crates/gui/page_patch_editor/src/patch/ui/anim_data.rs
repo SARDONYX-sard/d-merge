@@ -216,8 +216,8 @@ impl PatchTool {
     /// Goes to the generated files of the behavior named `name`.
     fn show_anim_data_result(&mut self, name: &str) {
         self.reset_names();
-        self.active = self.work.workspace.behaviors.iter().position(|b| b.name == name).unwrap_or(self.active);
-        self.selected = None;
+        self.sel.active = self.work.workspace.behaviors.iter().position(|b| b.name == name).unwrap_or(self.sel.active);
+        self.sel.selected = None;
         self.pane.opened = None;
         self.work.mark_dirty();
     }
@@ -481,12 +481,12 @@ impl PatchTool {
 
     /// Where a file of the open animation data can go. The template's are read once.
     pub(super) fn anim_projects(&mut self) -> Vec<String> {
-        let is_adsf = self.work.workspace.behaviors[self.active].adsf;
+        let is_adsf = self.work.workspace.behaviors[self.sel.active].adsf;
         if is_adsf && self.work.template_projects.is_none() {
             self.work.template_projects = Some(data::template_projects(Path::new(&self.work.place.template_dir)));
         }
         let template = if is_adsf { self.work.template_projects.as_deref().unwrap_or_default() } else { &[] };
-        data::project_folders(&self.work.workspace.behaviors[self.active], template)
+        data::project_folders(&self.work.workspace.behaviors[self.sel.active], template)
     }
 
     /// The window of [`NewClipsForm`]; `Create` adds the clips.
@@ -502,10 +502,10 @@ impl PatchTool {
     fn create_new_clips(&mut self) {
         let Some(form) = self.panels.new_clips.take() else { return };
         let code = self.work.place.mod_code.trim().to_owned();
-        let adsf = &mut self.work.workspace.behaviors[self.active];
+        let adsf = &mut self.work.workspace.behaviors[self.sel.active];
         let added = data::add_numbered_clips(adsf, &code, form.folder.trim(), form.name.trim(), form.count);
         if let Some(first) = added.first() {
-            self.selected = Some(first.as_str().into());
+            self.sel.selected = Some(first.as_str().into());
         }
         for id in &added {
             self.object_changed(id);

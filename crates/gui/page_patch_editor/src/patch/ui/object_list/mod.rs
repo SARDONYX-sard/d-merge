@@ -34,11 +34,11 @@ use crate::patch::{
 
 impl PatchTool {
     pub(in crate::patch) fn object_list(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
-        let anim = self.work.workspace.behaviors[self.active].is_anim_data();
+        let anim = self.work.workspace.behaviors[self.sel.active].is_anim_data();
         let mut open = !self.side.objects_closed;
         let asked = {
-            let behavior = &self.work.workspace.behaviors[self.active];
-            let selected = self.selected.as_ref();
+            let behavior = &self.work.workspace.behaviors[self.sel.active];
+            let selected = self.sel.selected.as_ref();
             let title = title::Title {
                 anim,
                 adsf: behavior.adsf,
@@ -85,13 +85,13 @@ impl PatchTool {
         // A tree from the root container, unless filtering: a filter wants the flat list.
         let output = if anim {
             let projects = self.anim_projects();
-            let is_adsf = self.work.workspace.behaviors[self.active].adsf;
-            self.explorer.anim(ui, i18n, (graph, is_adsf, &projects), &keys, &mut self.selected)
+            let is_adsf = self.work.workspace.behaviors[self.sel.active].adsf;
+            self.explorer.anim(ui, i18n, (graph, is_adsf, &projects), &keys, &mut self.sel.selected)
         } else if self.explorer.tree_view && self.explorer.filter.is_empty() && !self.explorer.unlinked_only {
-            let path = &self.work.workspace.behaviors[self.active].meshes_path;
-            self.explorer.tree(ui, i18n, (graph, path), &keys, &mut self.selected)
+            let path = &self.work.workspace.behaviors[self.sel.active].meshes_path;
+            self.explorer.tree(ui, i18n, (graph, path), &keys, &mut self.sel.selected)
         } else {
-            self.explorer.flat(ui, i18n, graph, &keys, &mut self.selected)
+            self.explorer.flat(ui, i18n, graph, &keys, &mut self.sel.selected)
         };
         self.apply_list_output(ui, graph, output, notify);
     }
@@ -104,7 +104,7 @@ impl PatchTool {
         self.apply_row_action(ui, graph, output.menu, notify);
 
         if let Some((pick, files, from)) = output.duplicate {
-            let behavior = &self.work.workspace.behaviors[self.active];
+            let behavior = &self.work.workspace.behaviors[self.sel.active];
             let files = match files {
                 Files::ChangedOf(folder) => data::changed_files(behavior, &folder),
                 Files::WithMotion(id) => data::with_motion(behavior, &id),
@@ -132,9 +132,9 @@ impl PatchTool {
             TitleAsk::Duplicate(id) => self.new_object(Some(&id)),
             TitleAsk::RevertOrDelete(id) => self.revert_or_delete(&id),
 
-            TitleAsk::New if self.work.workspace.behaviors[self.active].adsf => {
+            TitleAsk::New if self.work.workspace.behaviors[self.sel.active].adsf => {
                 let projects = self.anim_projects();
-                self.panels.new_clips = Some(NewClipsForm::new(self.selected.as_deref(), projects));
+                self.panels.new_clips = Some(NewClipsForm::new(self.sel.selected.as_deref(), projects));
             }
             TitleAsk::New => {
                 self.panels.class_picker.open();
@@ -145,7 +145,7 @@ impl PatchTool {
     /// The files go to the other project, which opens to show them.
     fn duplicate_anim_files(&mut self) {
         let Some((files, to)) = self.panels.pending_duplicate.take() else { return };
-        let made = data::duplicate_to(&mut self.work.workspace.behaviors[self.active], &files, &to);
+        let made = data::duplicate_to(&mut self.work.workspace.behaviors[self.sel.active], &files, &to);
         for id in &made {
             self.object_changed(id);
         }
@@ -168,8 +168,8 @@ impl PatchTool {
             }
             RowAction::Duplicate => self.new_object(Some(id)),
             RowAction::Repeat => {
-                let behavior = &self.work.workspace.behaviors[self.active];
-                self.panels.repeat = super::repeat::RepeatForm::of(self.active, behavior, id);
+                let behavior = &self.work.workspace.behaviors[self.sel.active];
+                self.panels.repeat = super::repeat::RepeatForm::of(self.sel.active, behavior, id);
             }
             RowAction::CopyId => ui.ctx().copy_text(id.to_owned()),
             RowAction::RevertOrDelete => self.revert_or_delete(id),

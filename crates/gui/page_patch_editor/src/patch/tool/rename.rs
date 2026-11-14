@@ -60,7 +60,7 @@ impl PatchTool {
         self.work.place.loaded_for = Some(new.to_owned());
         self.reset_names();
         self.tabs.clear();
-        self.selected = None;
+        self.sel.selected = None;
         self.pane.opened = None;
         self.pane.preview = None;
         self.restore_session();

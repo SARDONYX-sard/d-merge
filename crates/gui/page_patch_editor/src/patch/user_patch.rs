@@ -339,12 +339,12 @@ impl PatchTool {
         self.reset_names();
         self.pane.opened = None;
         self.pane.preview = None;
-        self.active = self.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
-        if self.work.workspace.behaviors.get(self.active).is_none_or(|behavior| behavior.text(&id).is_none()) {
+        self.sel.active = self.sel.active.min(self.work.workspace.behaviors.len().saturating_sub(1));
+        if self.work.workspace.behaviors.get(self.sel.active).is_none_or(|behavior| behavior.text(&id).is_none()) {
             self.tabs.clear();
-            self.selected = None;
+            self.sel.selected = None;
         }
-        self.work.autosave.seen_at(self.active, self.selected.as_ref());
+        self.work.autosave.seen_at(self.sel.active, self.sel.selected.as_ref());
         // Something saved meanwhile (another object) had it in: the disk goes back too.
         if self.work.mod_written {
             self.work.autosave.changed();
@@ -358,8 +358,8 @@ impl PatchTool {
         self.work.workspace.ref_mods.clear();
         self.reset_names();
         self.tabs.clear();
-        self.active = 0;
-        self.selected = None;
+        self.sel.active = 0;
+        self.sel.selected = None;
         self.pane.opened = None;
         self.pane.preview = None;
         match self.write_user_patch() {

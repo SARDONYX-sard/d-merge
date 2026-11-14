@@ -15,8 +15,8 @@ use crate::patch::PatchTool;
 impl PatchTool {
     pub(super) fn search_panel(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         let generation = self.names().graph.generation();
-        let behavior = &self.work.workspace.behaviors[self.active];
-        self.search.refresh((self.active, generation), behavior.texts().map(|object| (object.id, object.text)));
+        let behavior = &self.work.workspace.behaviors[self.sel.active];
+        self.search.refresh((self.sel.active, generation), behavior.texts().map(|object| (object.id, object.text)));
 
         let labels = SearchLabels {
             hint: i18n.t(I18nKey::NemesisSearchHint),
@@ -44,7 +44,7 @@ impl PatchTool {
         };
 
         if let Some((object, line)) = self.search.show(ui, &labels, &Xml, label) {
-            let current = self.selected.clone().unwrap_or_default();
+            let current = self.sel.selected.clone().unwrap_or_default();
             self.open_location(&current, &object, line);
         }
     }

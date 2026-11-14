@@ -195,7 +195,7 @@ impl PatchTool {
 
     /// The object's name as its tab says it. e.g. `GetUpModList`; its id if it has none.
     fn object_name(&mut self, behavior: usize, id: &str) -> String {
-        if behavior != self.active {
+        if behavior != self.sel.active {
             return id.to_owned();
         }
         let names = self.names();
@@ -205,11 +205,11 @@ impl PatchTool {
 
     /// Opens a tab of object `id` with `body`, or shows the one open with that title.
     fn show_in_editor(&mut self, behavior: usize, id: &str, title: String, body: Box<DiffView>) {
-        if behavior != self.active {
-            self.active = behavior;
+        if behavior != self.sel.active {
+            self.sel.active = behavior;
             self.tabs.clear();
         }
-        self.selected = Some(id.into());
+        self.sel.selected = Some(id.into());
         let at = match self.views.list.find(behavior, |known| known.title == title) {
             Some(at) => at,
             None => self.views.list.open(behavior, RevisionView { id: id.to_owned(), title, body }, |_| false, None),
@@ -220,16 +220,19 @@ impl PatchTool {
     /// Draws the view shown, with the tabs, in the editor's place. Returns whether one is shown.
     pub(super) fn views_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> bool {
         // Another object selected (the tree, the list): its editor, the view's tab stays.
-        let selected = self.selected.as_deref();
+        let selected = self.sel.selected.as_deref();
         let shown = self.views.list.active.filter(|&at| {
-            self.views.list.get(at).is_some_and(|view| view.group == self.active && selected == Some(view.id.as_str()))
+            self.views
+                .list
+                .get(at)
+                .is_some_and(|view| view.group == self.sel.active && selected == Some(view.id.as_str()))
         });
         self.views.list.active = shown;
         let Some(at) = shown else { return false };
 
         let keymap = Keymap::from_vim(self.pane.mode.is_vim());
         let names = self.names();
-        let output = self.views.show_at(ui, i18n, at, (&self.tabs, &names.graph, self.active), keymap);
+        let output = self.views.show_at(ui, i18n, at, (&self.tabs, &names.graph, self.sel.active), keymap);
         // What the key bindings see (`editorFocus`): this editor, as the object's is seen.
         self.pane.had_focus = output.has_focus;
 
@@ -239,7 +242,7 @@ impl PatchTool {
         let next = self.keys.take(keybinding::commands::TABS_NEXT) || command == Some(EditorCommand::NextTab);
         let previous =
             self.keys.take(keybinding::commands::TABS_PREVIOUS) || command == Some(EditorCommand::PreviousTab);
-        let current = self.selected.as_deref().unwrap_or_default().to_owned();
+        let current = self.sel.selected.as_deref().unwrap_or_default().to_owned();
         if close {
             self.views.list.close(at);
         } else if next || previous {
@@ -273,12 +276,16 @@ mod tests {
         let mut view = blank_view("Blame a");
         view.id = "#a".to_owned();
         tool.views.list.push(view);
-        tool.selected = Some("#b".into());
+        tool.sel.selected = Some("#b".into());
 
         tool.step_tab("#b", true);
-        assert_eq!((tool.views.list.active, tool.selected.as_deref()), (Some(0), Some("#a")), "the view after `#b`");
+        assert_eq!(
+            (tool.views.list.active, tool.sel.selected.as_deref()),
+            (Some(0), Some("#a")),
+            "the view after `#b`"
+        );
         tool.step_tab("#a", true);
-        assert_eq!((tool.views.list.active, tool.selected.as_deref()), (None, Some("#a")), "around the end");
+        assert_eq!((tool.views.list.active, tool.sel.selected.as_deref()), (None, Some("#a")), "around the end");
         tool.step_tab("#a", false);
         assert_eq!(tool.views.list.active, Some(0), "back around the start");
     }

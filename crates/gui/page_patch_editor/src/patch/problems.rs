@@ -150,9 +150,9 @@ impl PatchTool {
 
     /// The object `id` of the active behavior changed: see [`Problems::refresh_object`].
     pub(super) fn refresh_problems(&mut self, id: &str) {
-        let Some(behavior) = self.work.workspace.behaviors.get(self.active) else { return };
+        let Some(behavior) = self.work.workspace.behaviors.get(self.sel.active) else { return };
         let settings = (self.work.place.mod_code.trim(), self.work.parser_mode);
-        self.problems.refresh_object((self.active, behavior), id, settings);
+        self.problems.refresh_object((self.sel.active, behavior), id, settings);
     }
 }
 
