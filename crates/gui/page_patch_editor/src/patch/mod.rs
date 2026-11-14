@@ -283,7 +283,7 @@ impl PatchTool {
         if let Some(reshow) = self.work.poll_job(shown, notify, i18n) {
             self.reshow(reshow);
         }
-        if self.work.job.is_some() {
+        if self.work.job().is_some() {
             ctx.request_repaint();
         }
     }
@@ -321,7 +321,7 @@ impl PatchTool {
     /// The bar, the side bar and the editor; or the start screen, or how far a job is.
     fn draw(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
         // The work is on another thread: only how far it is.
-        if let Some(job) = &self.work.job {
+        if let Some(job) = self.work.job() {
             ui::job_progress(ui, i18n, job);
             return;
         }
@@ -989,7 +989,7 @@ mod user_patch_tests {
         let (mut main, mut notify, i18n) = proposed(&dir);
         let tool = main.user_patch.tool.as_mut().unwrap();
         assert_eq!(tool.work.workspace.behaviors[0].text("D~1/Idle~m$0.txt"), Some("theirs\n"), "it shows the value");
-        assert!(!tool.work.autosave.is_dirty(), "nothing to save yet");
+        assert_eq!(tool.work.change_mark(), None, "nothing to save yet");
 
         main.close_user_patch(&mut notify, &i18n);
         let tool = main.user_patch.tool.as_ref().unwrap();

@@ -28,17 +28,17 @@ pub(in crate::patch) struct Autosave {
 
 impl Autosave {
     /// Something changed: it is saved [`SAVE_DELAY`] after the first change not saved yet.
-    pub(in crate::patch) fn changed(&mut self) {
+    pub(super) fn changed(&mut self) {
         self.since.get_or_insert_with(Instant::now);
     }
 
     /// `Ctrl+S`: saved on the next frame.
-    pub(in crate::patch) fn save_soon(&mut self) {
+    pub(super) fn save_soon(&mut self) {
         self.since = Instant::now().checked_sub(SAVE_DELAY);
     }
 
     /// Is there something to save?
-    pub(in crate::patch) const fn is_dirty(&self) -> bool {
+    pub(super) const fn is_dirty(&self) -> bool {
         self.since.is_some()
     }
 
@@ -54,11 +54,11 @@ impl Autosave {
 
     /// What `since` is, to put back with [`Self::restore`]: around something that must not count as
     /// a change (e.g. a proposal shown, not taken yet).
-    pub(in crate::patch) const fn since(&self) -> Option<Instant> {
+    pub(super) const fn since(&self) -> Option<Instant> {
         self.since
     }
 
-    pub(in crate::patch) const fn restore(&mut self, since: Option<Instant>) {
+    pub(super) const fn restore(&mut self, since: Option<Instant>) {
         self.since = since;
     }
 

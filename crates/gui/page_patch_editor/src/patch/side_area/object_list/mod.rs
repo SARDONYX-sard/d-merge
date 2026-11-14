@@ -25,10 +25,7 @@ use crate::patch::{
     anim::data,
     tool::{file::FileAction, keys::Keys, selection::Selection, work_state::Work},
     tree::Graph,
-    ui::{
-        anim_data::{anim_projects, duplicate_files},
-        windows::WindowAsk,
-    },
+    ui::{anim_data::duplicate_files, windows::WindowAsk},
     workspace::PANDORA_DOC,
 };
 
@@ -77,7 +74,7 @@ impl SideArea {
 
         // A tree from the root container, unless filtering: a filter wants the flat list.
         let output = if anim {
-            let projects = anim_projects(work, sel.active);
+            let projects = work.anim_projects(sel.active);
             let is_adsf = work.workspace.behaviors[sel.active].adsf;
             self.explorer.anim(ui, i18n, (graph, is_adsf, &projects), &tree_keys, &mut sel.selected)
         } else if self.explorer.tree_view && self.explorer.filter.is_empty() && !self.explorer.unlinked_only {
@@ -146,7 +143,7 @@ impl SideArea {
                 self.explorer.anim_tree.open.insert(to); // it opens to show them
             }
             DuplicatePick::Choose => {
-                let projects = anim_projects(work, sel.active);
+                let projects = work.anim_projects(sel.active);
                 asks.push(SideAsk::Window(WindowAsk::Duplicate(files, projects, from)));
             }
         }
@@ -166,7 +163,7 @@ impl SideArea {
             TitleAsk::RevertOrDelete(id) => return Some(SideAsk::RevertOrDelete(id.to_string())),
 
             TitleAsk::New if work.workspace.behaviors[sel.active].adsf => {
-                let projects = anim_projects(work, sel.active);
+                let projects = work.anim_projects(sel.active);
                 let selected = sel.selected.as_deref().map(str::to_owned);
                 return Some(SideAsk::Window(WindowAsk::NewClips(selected, projects)));
             }

@@ -208,7 +208,10 @@ pub(super) fn work_of(paths: PatchPaths<'_>) -> Work {
         template_dir: paths.template_dir.to_owned(),
         ..Default::default()
     };
-    Work { workspace, place, restored: true, parser_mode: paths.parser_mode, user_patch: true, ..Default::default() }
+    let mut work = Work::default();
+    (work.workspace, work.place, work.parser_mode) = (workspace, place, paths.parser_mode);
+    (work.restored, work.user_patch) = (true, true);
+    work
 }
 
 impl Work {
@@ -218,7 +221,7 @@ impl Work {
         self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
         let invalid = self.workspace.export(Path::new(&self.place.output), USER_PATCH_CODE, self.parser_mode)?.1;
         self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
-        self.autosave.take();
+        self.saved();
         Ok(invalid)
     }
 
@@ -269,7 +272,7 @@ pub(super) fn take_in_resolution(
 ) {
     undo_unedited_draft((work, editor, sel));
     let before = Draft::before(&work.workspace);
-    let since = work.autosave.since();
+    let mark = work.change_mark();
     if work.workspace.info.name.is_empty() {
         i18n.t(I18nKey::UserPatchTitle).clone_into(&mut work.workspace.info.name);
     }
@@ -302,8 +305,7 @@ pub(super) fn take_in_resolution(
     sel.selected = Some(id.into());
 
     // What is shown is no change of the work yet.
-    work.autosave.restore(since);
-    work.autosave.seen_at(sel.active, sel.selected.as_ref());
+    work.not_changed(mark, sel);
 }
 
 /// The conflict of `values` just taken in was resolved before, by the same mods with the same
@@ -344,10 +346,10 @@ pub(super) fn undo_unedited_draft((work, editor, sel): (&mut Work, &mut EditorAr
         editor.behaviors_changed();
         sel.selected = None;
     }
-    work.autosave.seen_at(sel.active, sel.selected.as_ref());
+    work.seen(sel);
     // Something saved meanwhile (another object) had it in: the disk goes back too.
     if work.mod_written {
-        work.autosave.changed();
+        work.mark_dirty();
     }
 }
 

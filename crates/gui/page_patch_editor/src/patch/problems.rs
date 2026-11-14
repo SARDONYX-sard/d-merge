@@ -135,11 +135,11 @@ impl Problems {
     /// Checks `work` again if it changed as a whole, unless a job has it or none is open. Call each
     /// frame.
     pub(super) fn diagnose(&mut self, work: &Work) {
-        if work.job.is_some() || !work.place.is_open() || self.checked == Some(work.reloads) {
+        if work.job().is_some() || !work.place.is_open() || self.checked == Some(work.reloads()) {
             return;
         }
         self.check_work(&work.workspace.behaviors, (work.place.mod_code.trim(), work.parser_mode));
-        self.checked = Some(work.reloads);
+        self.checked = Some(work.reloads());
     }
 
     /// The object `id` of behavior `active` changed: see [`Self::refresh_object`].

@@ -439,16 +439,6 @@ impl DuplicateForm {
     }
 }
 
-/// Where a file of the animation data `active` of `work` can go. The template's are read once.
-pub(in crate::patch) fn anim_projects(work: &mut Work, active: usize) -> Vec<String> {
-    let is_adsf = work.workspace.behaviors[active].adsf;
-    if is_adsf && work.template_projects.is_none() {
-        work.template_projects = Some(data::template_projects(Path::new(&work.place.template_dir)));
-    }
-    let template = if is_adsf { work.template_projects.as_deref().unwrap_or_default() } else { &[] };
-    data::project_folders(&work.workspace.behaviors[active], template)
-}
-
 /// `files` of the animation data `active` of `work` go to project `to`.
 pub(in crate::patch) fn duplicate_files(work: &mut Work, active: usize, (files, to): (&[String], &str)) {
     let made = data::duplicate_to(&mut work.workspace.behaviors[active], files, to);

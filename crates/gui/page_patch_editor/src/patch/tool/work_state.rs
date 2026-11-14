@@ -19,7 +19,7 @@ use gui_shared::settings::pages::{patch::behavior::ParserMode, patch_editor::Rec
 
 use crate::patch::{
     editor::names::{Names, NamesCache},
-    tool::{autosave::Autosave, job::Job, place::WorkPlace},
+    tool::{autosave::Autosave, job::Job, place::WorkPlace, selection::Selection},
     user_patch::Draft,
     workspace::{PANDORA_DOC, Workspace, pandora},
 };
@@ -31,15 +31,15 @@ pub(in crate::patch) struct Work {
     /// Which work is open, and where its files are.
     pub(in crate::patch) place: WorkPlace,
     /// When the work is saved next.
-    pub(in crate::patch) autosave: Autosave,
+    pub(super) autosave: Autosave,
     /// What runs on another thread: reading a mod, renaming its code. See [`crate::patch::tool::job`].
-    pub(in crate::patch) job: Option<Job>,
+    pub(super) job: Option<Job>,
     /// The names of the events / variables panel and the completion.
-    pub(in crate::patch) names: NamesCache,
+    pub(super) names: NamesCache,
     /// Edits made, counted: what is found anew after one, e.g. [`crate::patch::side_area::changes::Pending`].
-    pub(in crate::patch) edits: u64,
+    pub(super) edits: u64,
     /// The work changed as a whole, counted: see [`Self::reset_names`].
-    pub(in crate::patch) reloads: u64,
+    pub(super) reloads: u64,
     /// The patch page's parser mode: what d-merge will accept, so what is checked here.
     pub(in crate::patch) parser_mode: ParserMode,
     /// The works opened lately, the last one first. From the settings.
@@ -49,9 +49,9 @@ pub(in crate::patch) struct Work {
     /// A mod was written since the conflict check last asked.
     pub(in crate::patch) mod_written: bool,
     /// What was edited of the active behavior since the Pandora file was last synced.
-    pub(in crate::patch) pandora_edited: Vec<String>,
+    pub(super) pandora_edited: Vec<String>,
     /// The projects of the clip data template, read once. See [`crate::patch::anim::data::template_projects`].
-    pub(in crate::patch) template_projects: Option<Vec<String>>,
+    pub(super) template_projects: Option<Vec<String>>,
     /// This is the user patch's work, in its window: see [`crate::patch::user_patch`].
     pub(in crate::patch) user_patch: bool,
     /// What `Edit...` proposed, until it is edited. See [`Draft`].
@@ -66,6 +66,60 @@ impl Work {
     pub(in crate::patch) fn mark_dirty(&mut self) {
         self.autosave.changed();
         self.edits += 1;
+    }
+
+    /// `Ctrl+S` / Vim `:w`: saved on the next frame.
+    pub(in crate::patch) fn save_soon(&mut self) {
+        self.autosave.save_soon();
+    }
+
+    /// It was written by other means: nothing is left to save.
+    pub(in crate::patch) const fn saved(&mut self) {
+        self.autosave.take();
+    }
+
+    /// When the first change not saved yet was: give it to [`Self::not_changed`] around what must not
+    /// count as a change (e.g. a proposal shown, not taken yet).
+    pub(in crate::patch) const fn change_mark(&self) -> Option<std::time::Instant> {
+        self.autosave.since()
+    }
+
+    /// Back to `mark` of [`Self::change_mark`]: what was done since is no change. `sel` is shown,
+    /// and that is no change either.
+    pub(in crate::patch) fn not_changed(&mut self, mark: Option<std::time::Instant>, sel: &Selection) {
+        self.autosave.restore(mark);
+        self.seen(sel);
+    }
+
+    /// `sel` is shown, and that is no change: e.g. the work was just opened there.
+    pub(in crate::patch) fn seen(&mut self, sel: &Selection) {
+        self.autosave.seen_at(sel.active, sel.selected.as_ref());
+    }
+
+    /// The job running, if any: see [`crate::patch::tool::job`].
+    pub(in crate::patch) const fn job(&self) -> Option<&Job> {
+        self.job.as_ref()
+    }
+
+    /// Edits made, counted: see [`Self::edits`].
+    pub(in crate::patch) const fn edits(&self) -> u64 {
+        self.edits
+    }
+
+    /// Whole changes of the work, counted: see [`Self::reset_names`].
+    pub(in crate::patch) const fn reloads(&self) -> u64 {
+        self.reloads
+    }
+
+    /// Where a file of the animation data `active` can go. The template's are read once.
+    pub(in crate::patch) fn anim_projects(&mut self, active: usize) -> Vec<String> {
+        let is_adsf = self.workspace.behaviors[active].adsf;
+        if is_adsf && self.template_projects.is_none() {
+            let dir = std::path::Path::new(&self.place.template_dir);
+            self.template_projects = Some(crate::patch::anim::data::template_projects(dir));
+        }
+        let template = if is_adsf { self.template_projects.as_deref().unwrap_or_default() } else { &[] };
+        crate::patch::anim::data::project_folders(&self.workspace.behaviors[active], template)
     }
 
     /// The text of object `id` changed, or it was added or deleted: `names` takes that one in.

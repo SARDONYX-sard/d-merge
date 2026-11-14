@@ -237,7 +237,7 @@ impl SideArea {
             .resizable(false)
             .exact_size(egui_widgets::ActivityBar::SIZE)
             .show(ui, |ui| {
-                self.scm.pending.refresh(&work.workspace, work.edits);
+                self.scm.pending.refresh(&work.workspace, work.edits());
                 activity_bar(ui, i18n, &self.bar, self.scm.pending.changes.len())
             })
             .inner;

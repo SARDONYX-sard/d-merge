@@ -53,7 +53,7 @@ impl SideArea {
         egui_widgets::side_bar_title(ui, i18n.t(I18nKey::SideChanges));
 
         let branch = header::branch_row(ui, i18n, &work.workspace.history, &mut self.scm.new_branch);
-        self.scm.pending.refresh(&work.workspace, work.edits);
+        self.scm.pending.refresh(&work.workspace, work.edits());
         let has_changes = !self.scm.pending.changes.is_empty();
         let commit = header::commit_box(ui, i18n, &mut self.scm.commit_message, has_changes);
 

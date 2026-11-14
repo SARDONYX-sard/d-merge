@@ -318,7 +318,7 @@ impl EditorArea {
         let mut walk = result.walk_history;
         match result.command {
             // Vim `:w`: save the work now.
-            Some(EditorCommand::Save) => work.autosave.save_soon(),
+            Some(EditorCommand::Save) => work.save_soon(),
             Some(EditorCommand::JumpBack) => walk = Some(true),
             Some(EditorCommand::JumpForward) => walk = Some(false),
             Some(EditorCommand::NextTab) => self.step_tab(sel, id, true),
