@@ -1,14 +1,13 @@
 {
+  "[toml]": {
+    "editor.defaultFormatter": "Dylan23691.toml-analyzer"
+  },
   "editor.codeActionsOnSave": {
     // "source.fixAll.oxc": "explicit",
     "source.fixAll.sortJSON": "never"
   },
-  "[toml]": {
-    "editor.defaultFormatter": "Dylan23691.toml-analyzer"
-  },
   "editor.formatOnSave": true,
   "editor.formatOnSaveMode": "file",
-  "toml.formatter.alignEntries": true,
   "files.associations": {
     "**/dummy/mods/**/*.txt": "xml"
   },
@@ -30,11 +29,20 @@
       "url": "https://github.com/SARDONYX-sard/serde-hkx/raw/refs/tags/1.0.0/assets/serde_hkx_schema.json"
     }
   ],
+  "rumdl.rules.disable": [
+    "MD033",
+    "MD013",
+    "MD007",
+    "no-hard-tabs"
+  ],
   "rust-analyzer.cargo.targetDir": true,
   "rust-analyzer.check.command": "clippy",
-  "rust-analyzer.linkedProjects": ["Cargo.toml"],
+  "rust-analyzer.linkedProjects": [
+    "Cargo.toml"
+  ],
   "rust-analyzer.runnables.extraTestBinaryArgs": [
     "--show-output",
     "--nocapture"
-  ]
+  ],
+  "toml.formatter.alignEntries": true
 }
