@@ -90,14 +90,14 @@ pub(super) fn tab_bar(
 /// `Copy id / Copy Path / Reveal in File Explorer` of object `id`, the end of a tab's menu.
 fn object_items(ui: &mut egui::Ui, i18n: &I18nMap, id: &str) -> Option<TabEvent> {
     let mut picked = None;
-    if ui.button(i18n.t(I18nKey::NemesisCopyId)).clicked() {
+    if ui.button(i18n.t(I18nKey::CopyId)).clicked() {
         ui.ctx().copy_text(id.to_owned());
         ui.close();
     }
     // As the explorer's menu: the file the object is in.
-    let hover = i18n.t(I18nKey::NemesisObjectFileHover);
+    let hover = i18n.t(I18nKey::ObjectFileHover);
     let files = [
-        (I18nKey::NemesisCopyPath, crate::patch::tool::file::FileAction::CopyPath),
+        (I18nKey::CopyPath, crate::patch::tool::file::FileAction::CopyPath),
         (gui_shared::i18n::REVEAL_IN_FILE_MANAGER, crate::patch::tool::file::FileAction::Reveal),
     ];
     for (label, action) in files {

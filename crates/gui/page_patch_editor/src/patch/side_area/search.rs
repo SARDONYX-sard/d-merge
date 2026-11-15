@@ -29,7 +29,7 @@ impl SideArea {
         self.search.refresh((sel.active, generation), behavior.texts().map(|object| (object.id, object.text)));
 
         let labels = SearchLabels {
-            hint: i18n.t(I18nKey::NemesisSearchHint),
+            hint: i18n.t(I18nKey::SearchTextHint),
             regex_hover: i18n.t(I18nKey::SearchRegexHover),
             results_in: i18n.t(I18nKey::SearchResultsIn),
             documents: i18n.t(I18nKey::SearchObjects),

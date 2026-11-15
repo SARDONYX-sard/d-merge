@@ -58,7 +58,7 @@ impl EditorArea {
     ) -> EditorOut {
         let mut out = EditorOut::default();
         let Some(id) = sel.selected.clone() else {
-            egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisSelectObject)));
+            egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::ObjectSelectHint)));
             return out;
         };
         if let Some(view) = self.views_ui(ui, i18n, (work, sel, keys)) {

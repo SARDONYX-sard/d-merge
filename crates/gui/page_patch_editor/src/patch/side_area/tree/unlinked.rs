@@ -18,8 +18,8 @@ pub(super) fn show(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Rc<st
         return;
     }
 
-    let title = format!("⚠ {} ({})", i18n.t(I18nKey::NemesisNotLinked), unlinked.len());
-    ui.colored_label(ui.visuals().warn_fg_color, title).on_hover_text(i18n.t(I18nKey::NemesisNotLinkedHover));
+    let title = format!("⚠ {} ({})", i18n.t(I18nKey::ExplorerNotLinked), unlinked.len());
+    ui.colored_label(ui.visuals().warn_fg_color, title).on_hover_text(i18n.t(I18nKey::ExplorerNotLinkedHover));
 
     egui::ScrollArea::vertical().id_salt("nemesis_unlinked").max_height(MAX_HEIGHT).show(ui, |ui| {
         for &node in unlinked {

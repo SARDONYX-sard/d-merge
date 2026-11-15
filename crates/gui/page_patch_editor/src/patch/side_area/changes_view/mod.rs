@@ -50,7 +50,7 @@ impl SideArea {
         (work, sel, keys): (&mut Work, &Selection, &mut Keys),
         notify: &mut Notification,
     ) -> Vec<SideAsk> {
-        egui_widgets::side_bar_title(ui, i18n.t(I18nKey::SideChanges));
+        egui_widgets::side_bar_title(ui, i18n.t(I18nKey::ChangesTab));
 
         let branch = header::branch_row(ui, i18n, &work.workspace.history, &mut self.scm.new_branch);
         self.scm.pending.refresh(&work.workspace, work.edits());
@@ -104,7 +104,7 @@ fn apply_branch(work: &mut Work, ask: BranchAsk, notify: &mut Notification, i18n
             if work.workspace.switch_branch(&name) {
                 return Some(work_restored(work));
             }
-            notify.warn(i18n.t(I18nKey::SideBranchHasChanges));
+            notify.warn(i18n.t(I18nKey::ChangesBranchHasChanges));
         }
         BranchAsk::Create(name) => {
             if work.workspace.history.create_branch(&name) {

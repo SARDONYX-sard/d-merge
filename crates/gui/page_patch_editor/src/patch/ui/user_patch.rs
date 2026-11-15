@@ -13,7 +13,10 @@ use egui_widgets::{
     notify::Notification,
     shadcn::{AlertDialog, AlertDialogChoice, Button, ComboBox, Icon},
 };
-use gui_shared::i18n::{I18nKey, I18nMap};
+use gui_shared::{
+    i18n::{I18nKey, I18nMap},
+    settings::pages::patch_editor::OutsideNemesis,
+};
 
 use super::top_bar::BarAsk;
 use crate::patch::{tool::work_state::Work, ui::panels::Panels};
@@ -28,9 +31,7 @@ pub(in crate::patch) fn user_patch_bar(
 ) -> Vec<BarAsk> {
     let mut asks = Vec::new();
     let outside: Vec<&str> = work.workspace.outside_nemesis().collect();
-    if panels.mod_export.window(ui.ctx(), i18n, notify, &outside) {
-        asks.push(BarAsk::ExportUserPatchAsMod);
-    }
+    asks.extend(panels.mod_export.window(ui.ctx(), i18n, notify, &outside));
 
     ui.horizontal(|ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -40,8 +41,8 @@ pub(in crate::patch) fn user_patch_bar(
             if super::top_bar::cache_button(ui, i18n, &work.place.cache_dir()) {
                 asks.push(BarAsk::OpenCache);
             }
-            let export = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::UserPatchExportMod));
-            if ui.add(export).on_hover_text(i18n.t(I18nKey::UserPatchExportModHover)).clicked() {
+            let export = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::UserPatchAsMod));
+            if ui.add(export).on_hover_text(i18n.t(I18nKey::UserPatchAsModHover)).clicked() {
                 panels.mod_export.open = true;
             }
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
@@ -50,6 +51,8 @@ pub(in crate::patch) fn user_patch_bar(
             });
         });
     });
+    // What it depends on: the mods its values were taken from, whose objects and names it uses.
+    asks.extend(super::top_bar::ref_mods_row(ui, i18n, &work.workspace.ref_mods));
     asks
 }
 
@@ -75,64 +78,115 @@ fn clear_button(ui: &mut egui::Ui, i18n: &I18nMap, confirm: &mut bool) -> bool {
     choice == Some(AlertDialogChoice::Action)
 }
 
+/// The export / import window is at least this wide: its path and the format's list fit on their
+/// rows, and its description does not wrap at every few words.
+const MOD_WINDOW_WIDTH: f32 = 560.0;
+
 impl crate::patch::user_patch::ModExport {
-    /// Draws the window, if open: `Output: [...] [Select]  Format: [Nemesis Ext ▼]  [Export]`, and a
-    /// note of the templates Nemesis does not know (`outside`) for its format. Returns whether to
-    /// export.
+    /// Draws the window, if open: where, the format, a note of the templates Nemesis does not know
+    /// (`outside`), `[Export]`, and `[Import (replace)] [Import (add)]` to read the mod there back.
+    /// Returns what was asked.
     pub(super) fn window(
         &mut self,
         ctx: &egui::Context,
         i18n: &I18nMap,
         notify: &mut Notification,
         outside: &[&str],
-    ) -> bool {
+    ) -> Option<BarAsk> {
         use crate::patch::workspace::ExportFormat;
         if !self.open {
-            return false;
+            return None;
         }
 
-        let (mut open, mut export) = (true, false);
-        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::UserPatchExportMod)).open(&mut open);
+        let (mut open, mut asked) = (true, None);
+        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::UserPatchAsMod))
+            .min_width(MOD_WINDOW_WIDTH)
+            .open(&mut open);
         window.show(ctx, |ui| {
-            let path = super::top_bar::PATH_ACTIONS;
-            let row = egui_widgets::PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), path)
-                .help(i18n.t(I18nKey::UserPatchExportModHover))
-                .show(ui, &mut self.output);
-            if let Some(err) = row.open_error {
-                notify.error(err);
-            }
+            ui.label(i18n.t(I18nKey::UserPatchAsModHover));
+            self.place_ui(ui, i18n, notify);
 
-            ui.horizontal(|ui| {
-                ui.label(i18n.t(I18nKey::OutputFormatLabel));
-                let label =
-                    ExportFormat::ALL.iter().find(|(known, _)| *known == self.format).map_or("", |(_, label)| *label);
-                ComboBox::from_id_salt("user_patch_mod_format").selected_text(label).show_ui(ui, |ui| {
-                    for &(format, text) in &ExportFormat::ALL {
-                        ui.selectable_value(&mut self.format, format, text);
-                    }
-                });
-            });
+            {
+                let mut selected = ExportFormat::ALL.iter().position(|known| *known == self.format).unwrap_or(0);
+                let label = i18n.t(I18nKey::OutputFormatLabel);
+                ComboBox::new("user_patch_mod_format", label).label_first().show_index(
+                    ui,
+                    &mut selected,
+                    ExportFormat::ALL.len(),
+                    |at| ExportFormat::ALL[at].label(),
+                );
+                self.format = ExportFormat::ALL[selected];
+            }
+            if let Some(dir) = self.patch_dir() {
+                let to = egui::RichText::new(format!("→ {}", dir.display())).monospace().weak();
+                ui.add(egui::Label::new(to).truncate());
+            }
             if self.format == ExportFormat::Nemesis {
+                self.outside_nemesis_ui(ui, i18n);
                 outside_nemesis_note(ui, i18n, outside);
             }
 
-            let ready = !self.output.trim().is_empty();
-            let button = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::NemesisExport)).primary();
-            export = ui.add_enabled(ready, button).clicked();
+            let ready = self.mod_root().is_some();
+            asked = ui.horizontal(|ui| import_export_buttons(ui, i18n, ready)).inner;
         });
 
-        self.open = open && !export;
-        export
+        self.open = open && asked.is_none();
+        asked
     }
 }
 
-/// `⚠ Nemesis does not know these templates: ... (2)`, the templates on hover. Nothing if all are
-/// ones Nemesis knows. See `user_patch::ModExport`.
+impl crate::patch::user_patch::ModExport {
+    /// `Output dir: [D:/MO2/mods/My Patch] [Select]`: the mod's root.
+    fn place_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, notify: &mut Notification) {
+        let path = super::top_bar::PATH_ACTIONS;
+        let label = i18n.t(I18nKey::OutputDirLabel);
+        let row = egui_widgets::PathRow::new(label, i18n.t(I18nKey::SelectButton), path)
+            .help(i18n.t(I18nKey::ModOutputDirHover))
+            .show(ui, &mut self.place.output);
+        if let Some(err) = row.open_error {
+            notify.error(err);
+        }
+    }
+
+    /// `Templates Nemesis does not know: [Write to Nemesis_EngineExt ▼]`: see [`OutsideNemesis`].
+    fn outside_nemesis_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
+        let all = OutsideNemesis::ALL;
+        let mut selected = all.iter().position(|known| *known == self.place.outside_nemesis).unwrap_or(0);
+        let label = i18n.t(I18nKey::OutsideNemesisLabel);
+        ComboBox::new("user_patch_outside_nemesis", label).label_first().show_index(
+            ui,
+            &mut selected,
+            all.len(),
+            |at| i18n.t(all[at].i18n_key()),
+        );
+        self.place.outside_nemesis = all[selected];
+    }
+}
+
+/// `[Export] [Import (replace)] [Import (add)]`, enabled once there is a place (`ready`).
+fn import_export_buttons(ui: &mut egui::Ui, i18n: &I18nMap, ready: bool) -> Option<BarAsk> {
+    let export = Button::new(i18n.t(I18nKey::ExportButton)).primary();
+    if ui.add_enabled(ready, export).clicked() {
+        return Some(BarAsk::ExportUserPatchAsMod);
+    }
+    for (replace, text, hover) in [
+        (true, I18nKey::ImportReplace, I18nKey::ImportReplaceHover),
+        (false, I18nKey::ImportAppend, I18nKey::ImportAppendHover),
+    ] {
+        if ui.add_enabled(ready, Button::new(i18n.t(text))).on_hover_text(i18n.t(hover)).clicked() {
+            return Some(BarAsk::ImportUserPatch { replace });
+        }
+    }
+    None
+}
+
+/// `⚠ Templates Nemesis does not know: 2`, the templates on hover: what the setting above is for.
+/// Nothing if all are ones Nemesis knows. See `user_patch::ModExport`.
 fn outside_nemesis_note(ui: &mut egui::Ui, i18n: &I18nMap, outside: &[&str]) {
     if outside.is_empty() {
         return;
     }
-    let text = format!("⚠ {} ({})", i18n.t(I18nKey::UserPatchOutsideNemesis), outside.len());
+    let text = format!("⚠ {} {}", i18n.t(I18nKey::OutsideNemesisLabel), outside.len());
     ui.colored_label(ui.visuals().warn_fg_color, text).on_hover_ui(|ui| {
         for template in outside {
             ui.label(*template);

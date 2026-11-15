@@ -6,26 +6,94 @@ use snafu::ResultExt as _;
 
 use crate::error::{Error, *};
 
-/// A text of the UI. Its doc comment is the English text; `locales/egui/<lang>/translation.json` has
-/// the others, by the `snake_case` name of the variant.
-///
-/// # Rule: alphabetical order
-/// The variants here and the keys of every `translation.json` are always in alphabetical order of
-/// that `snake_case` name (`Invalid` excepted: it stays last). A new key goes where its name sorts,
-/// not after the others of its page: the names start with their page (`Nemesis*`, `Convert*`, ...),
-/// which groups them anyway. `translations_follow_the_alphabetical_order` checks both.
-///
-/// e.g. `NemesisAddBehavior` (`nemesis_add_behavior`) comes before `NemesisAnimData`
-/// (`nemesis_anim_data`), as `_` sorts before letters.
-///
-/// # Rule: Japanese (`ja-JP`)
-/// - No half-width space between Japanese and ASCII: `modのファイル`, `.hkxファイル`, `プレビュー(XML)`.
-///   A list marker keeps its own (`- 起動時`, `1. MOD`, `# 注意`).
-/// - "User Patch" is `ユーザーパッチ`; "behavior" and "actor" stay English (`behavior`, `actor`).
+/// A text of the UI: its doc comment is the English, `locales/egui/<lang>/translation.json` the others
+/// by its `snake_case` name. Rules (also in `locales/readme.md`):
+/// - Reuse a key first. One likely to be reused is named for no page from the start (`ModsDirLabel`).
+/// - Alphabetical order of the `snake_case` name, `Invalid` last (a test checks it).
+/// - Names end in `Label`, `Hover`, `Hint` by kind.
+/// - "directory" (`dir` in a label), never "folder".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(serde::Serialize, serde::Deserialize, gui_shared_derive::I18n)]
 #[serde(rename_all = "snake_case")]
 pub enum I18nKey {
+    /// Add
+    AddButton,
+
+    /// Clips (animationdatasinglefile)
+    AnimDataClips,
+
+    /// Generated animation data
+    AnimDataDone,
+
+    /// Files
+    AnimDataDuplicateFiles,
+
+    /// Generate
+    AnimDataGenerate,
+
+    /// New Clips
+    AnimDataNewClips,
+
+    /// New clips with numbered ids: the clip and motion files of each.
+    AnimDataNewClipsHover,
+
+    /// New project
+    AnimDataNewProject,
+
+    /// No clips: this work has no new or edited hkbClipGenerator.
+    AnimDataNoClips,
+
+    /// No hkx in an animations directory under meshes in this mod.
+    AnimDataNoHkx,
+
+    /// None
+    AnimDataNone,
+
+    /// Animation Data…
+    AnimDataOpen,
+
+    /// Uses the mod's root directory: generates the data of the clips of this work from their hkx (animationdatasinglefile), and adds the hkx you choose to the anim set files you choose (animationsetdatasinglefile).
+    AnimDataOpenHover,
+
+    /// Project:
+    AnimDataProject,
+
+    /// Anim sets (animationsetdatasinglefile)
+    AnimDataSet,
+
+    /// Adds every checked hkx to every checked txt: the hkx the game caches while that anim set is active. Checks in each project are kept.
+    AnimDataSetHover,
+
+    /// Clips
+    AnimKindClip,
+
+    /// Header
+    AnimKindHeader,
+
+    /// Motions
+    AnimKindMotion,
+
+    /// New Anim Sets
+    AnimKindNewSet,
+
+    /// Anim Sets
+    AnimKindSet,
+
+    /// Added the animations to the characters
+    AnimNamesAdded,
+
+    /// No character template for these actors
+    AnimNamesNoCharacter,
+
+    /// Also add the checked hkx to their characters
+    AnimNamesToCharacters,
+
+    /// A behavior plays a hkx only if its character lists it. Each checked hkx goes to the animationNames of the characters of its actor, told by its folder: e.g. meshes\actors\character\animations\Para\Equip.hkx -> Animations\Para\Equip.hkx in defaultmale and defaultfemale. Names already there are left.
+    AnimNamesToCharactersHover,
+
+    /// Apply
+    ApplyButton,
+
     /// Gets the bone count from each `skeleton.xml` distributed by mods such as
     /// XPMSSE and extends the corresponding character hkx based on that information.
     ///
@@ -117,6 +185,27 @@ pub enum I18nKey {
     /// Background
     BackgroundTitleLabel,
 
+    /// Add Behavior…
+    BehaviorsAdd,
+
+    /// Custom Template…
+    BehaviorsCustomXml,
+
+    /// Use your own template file (.xml, or a d-merge .bin). Its object ids must match the game's template.
+    BehaviorsCustomXmlHover,
+
+    /// Add a behavior (template xml) to start.
+    BehaviorsNone,
+
+    /// Remove from the work
+    BehaviorsRemove,
+
+    /// Removes this behavior and discards all its edits and new objects.
+    BehaviorsRemoveHover,
+
+    /// Behaviors
+    BehaviorsTitle,
+
     /// See Issues
     BugReportSeeIssues,
 
@@ -129,11 +218,92 @@ pub enum I18nKey {
     /// Change Log:
     ChangeLogLabel,
 
+    /// Changed only
+    ChangedOnly,
+
+    /// Blame
+    ChangesBlame,
+
+    /// Each line of this object with the revision that last changed it.
+    ChangesBlameHover,
+
+    /// The work has changes since its last revision: commit or discard them before switching the branch.
+    ChangesBranchHasChanges,
+
+    /// The branch the work is on. Another one puts the work as it is at its newest revision.
+    ChangesBranchHover,
+
+    /// Commit
+    ChangesCommit,
+
+    /// Keeps the changes as a revision of this work, with the message (Ctrl+Enter in the field). The history is in the work data, not in the mod.
+    ChangesCommitHover,
+
+    /// Message
+    ChangesCommitMessageHint,
+
+    /// Compare with the revision before
+    ChangesComparePrevious,
+
+    /// Compare with the work now
+    ChangesCompareWorking,
+
+    /// Discard changes
+    ChangesDiscard,
+
+    /// History
+    ChangesHistory,
+
+    /// New branch (Enter)
+    ChangesNewBranch,
+
+    /// No revision changed this object.
+    ChangesNoObjectHistory,
+
+    /// Nothing is changed yet.
+    ChangesNone,
+
+    /// Object history
+    ChangesObjectHistory,
+
+    /// Restore this object to this revision
+    ChangesRestoreObject,
+
+    /// Restore the work to this revision
+    ChangesRestoreRevision,
+
+    /// Puts every object as it was at this revision. The history stays: what differs from the last revision is a change, to commit or to discard.
+    ChangesRestoreRevisionHover,
+
+    /// Changes
+    ChangesTab,
+
+    /// Class of the new object (filter)
+    ClassFilterHint,
+
     /// Clear
     ClearButton,
 
+    /// Actor
+    ClipActor,
+
+    /// The project the clips go to: search among those there are, or type a new one, as <name>~<number>, e.g. DefaultMale~1. A new project also needs its place in the list of projects, $header$/$header$.txt.
+    ClipActorHover,
+
+    /// Count
+    ClipCount,
+
+    /// How many clips to add: their ids are numbered after what exists.
+    ClipCountHover,
+
+    /// The clip's name, e.g. Attack, without / \ ~ $. With a count of 2 or more: Attack_0, Attack_1, ...
+    ClipNameHover,
+
     /// Close
     CloseButton,
+
+    /// Collapse all below
+    CollapseAllBelow,
 
     /// Collapse all
     CollapseAllButton,
@@ -201,6 +371,9 @@ pub enum I18nKey {
     /// The value is in the user patch
     ConflictResolved,
 
+    /// Resolved in the user patch
+    ConflictResolvedHover,
+
     /// Check Conflicts
     ConflictScan,
 
@@ -215,6 +388,9 @@ pub enum I18nKey {
 
     /// A mod was turned on after the last check: check again.
     ConflictStale,
+
+    /// Could not take the conflict's value
+    ConflictTakeFailed,
 
     /// Conflicts
     ConflictTitle,
@@ -288,6 +464,12 @@ pub enum I18nKey {
     /// Converting...
     ConvertingButton,
 
+    /// Copy id
+    CopyId,
+
+    /// Copy path
+    CopyPath,
+
     /// Directory of a Nemesis patch mod (or drop it here)
     CrcModDirHint,
 
@@ -300,6 +482,9 @@ pub enum I18nKey {
     /// No .hkx files found.
     CrcNoHkx,
 
+    /// CRC32
+    CrcTab,
+
     /// e.g. meshes\actors\character\animations\mymod  or  ground_bite
     CrcTextHint,
 
@@ -308,6 +493,9 @@ pub enum I18nKey {
 
     /// Text / path:
     CrcTextLabel,
+
+    /// Create
+    CreateButton,
 
     /// Debug output
     DebugOutput,
@@ -319,6 +507,21 @@ pub enum I18nKey {
     /// - `<output directory>/.d_merge/.debug/meshes/.../0_master.json`
     /// - `<output directory>/.d_merge/.debug/patches/meshes/.../0_master.patch.json`
     DebugOutputHover,
+
+    /// Delete
+    DeleteButton,
+
+    /// Duplicate
+    DuplicateButton,
+
+    /// Duplicate to
+    DuplicateTo,
+
+    /// Copies this patch to another project. DefaultMale~1 and DefaultFemale~1 usually have the same patches. A clip goes with its motion.
+    DuplicateToHover,
+
+    /// Duplicate to...
+    DuplicateToOther,
 
     /// Close tab (Vim: Space c, :tabc, :q)
     EditorCloseTab,
@@ -353,9 +556,6 @@ pub enum I18nKey {
     /// Go to Line
     EditorGoToLine,
 
-    /// Hide Preview
-    EditorHidePreview,
-
     /// Next tab (Alt+L, Ctrl+PageDown; Vim: gt, :tabn)
     EditorNextTab,
 
@@ -377,20 +577,65 @@ pub enum I18nKey {
     /// Show Hover
     EditorShowHover,
 
-    /// Show Preview
-    EditorShowPreview,
-
-    /// Show or hide the preview (Vim: Space p, :preview)
-    EditorTogglePreview,
-
     /// Execution mode:
     ExecutionModeLabel,
+
+    /// Expand all below
+    ExpandAllBelow,
 
     /// Expand all
     ExpandAllButton,
 
+    /// Focus Object Tree
+    ExplorerFocusTree,
+
+    /// j / k: move, h / l: fold, o: open / close, t: tree / list, c: changed only, u: unlinked only, Enter: back to the editor
+    ExplorerKeysHint,
+
+    /// Show the selected object in the tree
+    ExplorerLocateSelected,
+
+    /// Not linked
+    ExplorerNotLinked,
+
+    /// New objects no object in the tree points to. Nemesis ignores them: add their #id to a pointer field somewhere.
+    ExplorerNotLinkedHover,
+
+    /// Objects
+    ExplorerObjects,
+
+    /// Explorer
+    ExplorerTab,
+
+    /// Show the objects as a tree from hkRootLevelContainer, following their #pointers. (A filter shows the flat list.)
+    ExplorerTreeViewHover,
+
+    /// Only the new objects nothing links to (Nemesis ignores them)
+    ExplorerUnlinkedOnly,
+
+    /// Export
+    ExportButton,
+
+    /// The root directory of the mod Export writes to, e.g. D:\MO2\mods\MyMod: by default the mod that was opened. Export writes <here>\Nemesis_Engine\mod\<mod code> (Nemesis_EngineExt for NemesisExt templates), replacing only the files this work read or wrote. The button on the left opens the directory.
+    ExportDirHover,
+
+    /// Set the output directory and add a behavior first.
+    ExportDisabledHover,
+
+    /// Export failed
+    ExportFailed,
+
+    /// What Export writes. Nemesis: Nemesis_Engine, and Nemesis_EngineExt for the templates Nemesis does not support. Nemesis Ext: every template to Nemesis_EngineExt (only d-merge reads it). Pandora v5: Pandora_Engine\mod\<mod code>\patches\*.xml and info.xml of Pandora Behaviour Engine v5, without the animation data. It is the same work: a mod read in one format can be written in another.
+    ExportFormatHover,
+
     /// Exported
     ExportedMessage,
+
+    /// Written for Pandora
+    ExportedPandora,
+
+    /// ⚠ NemesisExt is read by d-merge only (not by Nemesis or Pandora).
+    ExtOnlyWarning,
 
     /// File
     FileLabel,
@@ -436,6 +681,9 @@ pub enum I18nKey {
     /// Font
     FontTitleLabel,
 
+    /// Format
+    FormatButton,
+
     /// Generates a dummy FNIS.esp file.
     ///
     /// # Examples:
@@ -447,14 +695,17 @@ pub enum I18nKey {
     /// Gen FNIS.esp
     GenerateFnisEspLabel,
 
+    /// Go Back
+    GoBack,
+
+    /// Go Forward
+    GoForward,
+
     /// Help
     HelpButton,
 
     /// Annotation
     HkannoAnnotationLabel,
-
-    /// Apply
-    HkannoApplyButton,
 
     /// Drop .hkx / .xml files here
     HkannoDropHint,
@@ -468,44 +719,17 @@ pub enum I18nKey {
     /// Save the annotation text as a .txt file.
     HkannoExportTxtHover,
 
-    /// Format
-    HkannoFormatButton,
-
     /// Import .txt…
     HkannoImportTxt,
 
     /// Replace the annotations of this tab with a .txt file (hkanno text). A .txt dropped on the page does the same.
     HkannoImportTxtHover,
 
-    /// Imported
-    HkannoImported,
-
-    /// Open
-    HkannoOpenButton,
-
     /// Open .hkx / .xml files. (Drag & drop also works.)
     HkannoOpenHover,
 
-    /// Preview error
-    HkannoPreviewError,
-
-    /// Preview (XML)
-    HkannoPreviewTitle,
-
-    /// Problems
-    HkannoProblemsLabel,
-
     /// Discard the edits and restore the annotations of the original file?
     HkannoRevertConfirm,
-
-    /// Save
-    HkannoSaveButton,
-
-    /// Save failed
-    HkannoSaveFailed,
-
-    /// Saved successfully.
-    HkannoSaved,
 
     /// Copy Input Path
     HkannoTabCopyInputPath,
@@ -537,6 +761,27 @@ pub enum I18nKey {
     /// Create a new translation JSON file for the current application version with English default values.
     I18nWriteNewJsonHover,
 
+    /// Import (add)
+    ImportAppend,
+
+    /// Reads the mod in the directory above into the user patch, added to what it has: where both have a patch, the mod's wins.
+    ImportAppendHover,
+
+    /// Import (replace)
+    ImportReplace,
+
+    /// Reads the mod in the directory above into the user patch, in place of what it has.
+    ImportReplaceHover,
+
+    /// Imported
+    ImportedMessage,
+
+    /// Show the changes inside the editor: new lines in green, the old ones in red between them.
+    InlineDiffHover,
+
+    /// Show or hide the inline diff (Vim: Space d, :diff)
+    InlineDiffToggle,
+
     /// Report Issue
     IssueReportButton,
 
@@ -546,6 +791,28 @@ pub enum I18nKey {
     /// # Notes
     /// GitHub account required.
     IssueReportHover,
+
+    /// Previous / next change (Vim: [c, ]c)
+    JumpDiffHover,
+
+    /// Keep Open
+    KeepOpen,
+
+    /// # Nemesis special syntax: Empty Array push pattern
+    /// Adds elements to an array that is empty in the template. Its line stays as it is and the elements follow it, so the array is not replaced and several mods can add to it.
+    ///
+    /// # Example
+    /// ```xml
+    /// <hkparam name="eventNames" numelements="0"></hkparam>
+    /// <!-- MOD_CODE ~mymod~ OPEN -->
+    ///     <hkcstring>Hi</hkcstring>
+    /// </hkparam>
+    /// <!-- CLOSE -->
+    /// ```
+    ///
+    /// # Notes
+    /// - Not compatible with Pandora v4.
+    KeptArrayHover,
 
     /// Other commands with these keys:
     KeybindingAlsoBound,
@@ -561,9 +828,6 @@ pub enum I18nKey {
 
     /// Press the desired key combination and then press Enter. Esc cancels.
     KeybindingRecordHint,
-
-    /// Save
-    KeybindingSave,
 
     /// Key binding saved to keybindings.json
     KeybindingSaved,
@@ -625,12 +889,6 @@ pub enum I18nKey {
     /// Underline errors and warnings.
     LspDiagnosticsHover,
 
-    /// Keymap:
-    LspEditorMode,
-
-    /// Key bindings of the editor. In Vim mode, `:w` saves.
-    LspEditorModeHover,
-
     /// Formatter
     LspFormatter,
 
@@ -686,11 +944,98 @@ pub enum I18nKey {
     /// Puts this mod's lines in place of the conflict. The resolution is kept, and done again the next time this conflict comes.
     MergeAcceptHover,
 
+    /// What each mod has at this conflict. Put together in the editor what is wanted: with an array, the elements of several mods are often wanted. Closed with its x, the patch preview comes back.
+    MergeHover,
+
+    /// Puts it below the line of the cursor in the editor. What it replaces stays: delete it there if it is not wanted.
+    MergeInsertHover,
+
+    /// Original
+    MergeOriginal,
+
+    /// What this value points to, as this mod has it. Two mods pointing to their own objects differ in what those are: compare them before picking one.
+    MergePointedHover,
+
+    /// Neither this mod nor the template has this object.
+    MergePointedMissing,
+
+    /// It removes these lines.
+    MergeRemoves,
+
     /// Resolved as before: this conflict was resolved the same way the last time.
     MergeReused,
 
+    /// Values of the mods
+    MergeTitle,
+
+    /// Who made the mod (author in info.ini).
+    ModAuthorHover,
+
+    /// This mod has several mod codes: which one to open?
+    ModCodeChoose,
+
+    /// e.g. mymod
+    ModCodeHint,
+
+    /// What identifies the mod: 4-6 ASCII letters/digits, not "vanilla", and not used by another mod. It is the name of its folder and the prefix of its new objects (#mymod$0). Once the work is made, "Rename…" of the project details changes it, and those ids with it.
+    ModCodeHover,
+
+    /// A mod code is 4-6 ASCII letters/digits and not "vanilla".
+    ModCodeInvalid,
+
+    /// Mod code:
+    ModCodeLabel,
+
+    /// Rename…
+    ModCodeRename,
+
+    /// Renamed the mod code
+    ModCodeRenameDone,
+
+    /// Gives this work another mod code (4-6 letters or digits): the ids of its new objects and clips change with it. What was exported under the old code goes at the next Export.
+    ModCodeRenameHover,
+
+    /// Renaming the mod code
+    ModCodeRenameRunning,
+
+    /// The mod's name, as mod lists show it (name in info.ini).
+    ModNameHover,
+
+    /// Name:
+    ModNameLabel,
+
+    /// Not a Nemesis mod (no Nemesis_Engine/mod/<code>)
+    ModNotNemesis,
+
+    /// Open a mod…
+    ModOpen,
+
+    /// Open a Nemesis mod to edit it: its root (where Nemesis_Engine is), e.g. D:\MO2\mods\Paraglider, or its patch directory, e.g. ...\Nemesis_Engine\mod\para. If it has been opened before, the work goes on with its edits that are not exported yet.
+    ModOpenHover,
+
+    /// The mod's root directory: the patches are written below it, e.g. ./output/ -> ./output/Nemesis_Engine/mod/upatch/
+    ModOutputDirHover,
+
+    /// Reload from the mod
+    ModReload,
+
+    /// Reads the mod again. Discards the edits that are not exported.
+    ModReloadHover,
+
+    /// The URL of the mod's page (site in info.ini).
+    ModSiteHover,
+
+    /// Site:
+    ModSiteLabel,
+
     /// Mod Test Status:
     ModTestStatusLabel,
+
+    /// The mod's version now, e.g. 1.2.0. Written to the info.ini of Nemesis_EngineExt only, with the mod codes of the references as deps.
+    ModVersionHover,
+
+    /// Version:
+    ModVersionLabel,
 
     /// Updated mod list
     ModsListFetchStateDone,
@@ -714,501 +1059,11 @@ pub enum I18nKey {
     /// - FNIS: meshes/**/animations/*/FNIS_*_List.txt
     ModsListTitleHover,
 
-    /// Add
-    NemesisAdd,
-
-    /// Add Behavior…
-    NemesisAddBehavior,
-
-    /// Animation Data…
-    NemesisAnimData,
-
-    /// Clips (animationdatasinglefile)
-    NemesisAnimDataClips,
-
-    /// Generated animation data
-    NemesisAnimDataDone,
-
-    /// Generate
-    NemesisAnimDataGenerate,
-
-    /// Uses the mod's root directory: generates the data of the clips of this work from their hkx (animationdatasinglefile), and adds the hkx you choose to the anim set files you choose (animationsetdatasinglefile).
-    NemesisAnimDataHover,
-
-    /// No clips: this work has no new or edited hkbClipGenerator.
-    NemesisAnimDataNoClips,
-
-    /// No hkx in an animations directory under meshes in this mod.
-    NemesisAnimDataNoHkx,
+    /// No change
+    NoChange,
 
     /// None
-    NemesisAnimDataNone,
-
-    /// Project:
-    NemesisAnimDataProject,
-
-    /// Anim sets (animationsetdatasinglefile)
-    NemesisAnimDataSet,
-
-    /// Adds every checked hkx to every checked txt: the hkx the game caches while that anim set is active. Checks in each project are kept.
-    NemesisAnimDataSetHover,
-
-    /// Clips
-    NemesisAnimKindClip,
-
-    /// Header
-    NemesisAnimKindHeader,
-
-    /// Motions
-    NemesisAnimKindMotion,
-
-    /// New Anim Sets
-    NemesisAnimKindNewSet,
-
-    /// Anim Sets
-    NemesisAnimKindSet,
-
-    /// Added the animations to the characters
-    NemesisAnimNamesAdded,
-
-    /// No character template for these actors
-    NemesisAnimNamesNoCharacter,
-
-    /// Also add the checked hkx to their characters
-    NemesisAnimNamesToCharacters,
-
-    /// A behavior plays a hkx only if its character lists it. Each checked hkx goes to the animationNames of the characters of its actor, told by its folder: e.g. meshes\actors\character\animations\Para\Equip.hkx -> Animations\Para\Equip.hkx in defaultmale and defaultfemale. Names already there are left.
-    NemesisAnimNamesToCharactersHover,
-
-    /// Who made the mod (author in info.ini).
-    NemesisAuthorHover,
-
-    /// Behaviors
-    NemesisBehaviorsSection,
-
-    /// Where the work in progress is saved automatically, for each mod code: in the output directory of the Patch page. Decided by the app.
-    NemesisCacheDirHover,
-
-    /// Changed only
-    NemesisChangedOnly,
-
-    /// This mod has several mod codes: which one to open?
-    NemesisChooseModCode,
-
-    /// Class of the new object (filter)
-    NemesisClassFilterHint,
-
-    /// Actor
-    NemesisClipActor,
-
-    /// The project the clips go to: search among those there are, or type a new one, as <name>~<number>, e.g. DefaultMale~1. A new project also needs its place in the list of projects, $header$/$header$.txt.
-    NemesisClipActorHover,
-
-    /// Count
-    NemesisClipCount,
-
-    /// How many clips to add: their ids are numbered after what exists.
-    NemesisClipCountHover,
-
-    /// The clip's name, e.g. Attack, without / \ ~ $. With a count of 2 or more: Attack_0, Attack_1, ...
-    NemesisClipNameHover,
-
-    /// Close All
-    NemesisCloseAllTabs,
-
-    /// Close Others
-    NemesisCloseOtherTabs,
-
-    /// Close to the Right
-    NemesisCloseTabsRight,
-
-    /// Close
-    NemesisCloseWork,
-
-    /// Back to the start screen. The work is kept, and comes back from Open Recent.
-    NemesisCloseWorkHover,
-
-    /// Collapse all below
-    NemesisCollapseAllBelow,
-
-    /// Copy id
-    NemesisCopyId,
-
-    /// Copy path
-    NemesisCopyPath,
-
-    /// CRC32
-    NemesisCrcTab,
-
-    /// Create
-    NemesisCreate,
-
-    /// Custom Template…
-    NemesisCustomXml,
-
-    /// Use your own template file (.xml, or a d-merge .bin). Its object ids must match the game's template.
-    NemesisCustomXmlHover,
-
-    /// Delete
-    NemesisDeleteObject,
-
-    /// Delete this new object.
-    NemesisDeleteObjectHover,
-
-    /// Duplicate
-    NemesisDuplicate,
-
-    /// Files
-    NemesisDuplicateFiles,
-
-    /// Duplicate to
-    NemesisDuplicateTo,
-
-    /// Copies this patch to another project. DefaultMale~1 and DefaultFemale~1 usually have the same patches. A clip goes with its motion.
-    NemesisDuplicateToHover,
-
-    /// Duplicate to...
-    NemesisDuplicateToOther,
-
-    /// Events
-    NemesisEvents,
-
-    /// Expand all below
-    NemesisExpandAllBelow,
-
-    /// Export
-    NemesisExport,
-
-    /// Set the output directory and add a behavior first.
-    NemesisExportDisabledHover,
-
-    /// Export failed
-    NemesisExportFailed,
-
-    /// What Export writes. Nemesis: Nemesis_Engine, and Nemesis_EngineExt for the templates Nemesis does not support. Nemesis Ext: every template to Nemesis_EngineExt (only d-merge reads it). Pandora v5: Pandora_Engine\mod\<mod code>\patches\*.xml and info.xml of Pandora Behaviour Engine v5, without the animation data. It is the same work: a mod read in one format can be written in another.
-    NemesisExportFormatHover,
-
-    /// Written for Pandora
-    NemesisExportedPandora,
-
-    /// ⚠ NemesisExt is read by d-merge only (not by Nemesis or Pandora).
-    NemesisExtOnlyWarning,
-
-    /// Filter (id, class, name)
-    NemesisFilterHint,
-
-    /// Focus Object Tree
-    NemesisFocusTree,
-
-    /// Follow the cursor: the preview scrolls to the editor's cursor line and highlights it.
-    NemesisFollowCursor,
-
-    /// Go Back
-    NemesisGoBack,
-
-    /// Go Forward
-    NemesisGoForward,
-
-    /// Inline diff
-    NemesisInlineDiff,
-
-    /// Show the changes inside the editor: new lines in green, the old ones in red between them.
-    NemesisInlineDiffHover,
-
-    /// Previous / next change (Vim: [c, ]c)
-    NemesisJumpDiffHover,
-
-    /// Keep Open
-    NemesisKeepOpen,
-
-    /// # Nemesis special syntax: Empty Array push pattern
-    /// Adds elements to an array that is empty in the template. Its line stays as it is and the elements follow it, so the array is not replaced and several mods can add to it.
-    ///
-    /// # Example
-    /// ```xml
-    /// <hkparam name="eventNames" numelements="0"></hkparam>
-    /// <!-- MOD_CODE ~mymod~ OPEN -->
-    ///     <hkcstring>Hi</hkcstring>
-    /// </hkparam>
-    /// <!-- CLOSE -->
-    /// ```
-    ///
-    /// # Notes
-    /// - Not compatible with Pandora v4.
-    NemesisKeptArrayHover,
-
-    /// Show the selected object in the tree
-    NemesisLocateSelected,
-
-    /// What each mod has at this conflict. Put together in the editor what is wanted: with an array, the elements of several mods are often wanted. Closed with its x, the patch preview comes back.
-    NemesisMergeHover,
-
-    /// Puts it below the line of the cursor in the editor. What it replaces stays: delete it there if it is not wanted.
-    NemesisMergeInsertHover,
-
-    /// Original
-    NemesisMergeOriginal,
-
-    /// What this value points to, as this mod has it. Two mods pointing to their own objects differ in what those are: compare them before picking one.
-    NemesisMergePointedHover,
-
-    /// Neither this mod nor the template has this object.
-    NemesisMergePointedMissing,
-
-    /// It removes these lines.
-    NemesisMergeRemoves,
-
-    /// Values of the mods
-    NemesisMergeTitle,
-
-    /// e.g. mymod
-    NemesisModCodeHint,
-
-    /// What identifies the mod: 4-6 ASCII letters/digits, not "vanilla", and not used by another mod. It is the name of its folder and the prefix of its new objects (#mymod$0). Once the work is made, "Rename…" of the project details changes it, and those ids with it.
-    NemesisModCodeHover,
-
-    /// A mod code is 4-6 ASCII letters/digits and not "vanilla".
-    NemesisModCodeInvalid,
-
-    /// Mod code:
-    NemesisModCodeLabel,
-
-    /// Read from
-    NemesisModDirLabel,
-
-    /// The mod's name, as mod lists show it (name in info.ini).
-    NemesisNameHover,
-
-    /// Name:
-    NemesisNameLabel,
-
-    /// Set the output directory on the Patch page first: the works and the User Patch are kept in it. The Skyrim Data directory can be used too, but something may be overwritten unintentionally.
-    NemesisNeedPatchOutput,
-
-    /// New Clips
-    NemesisNewClips,
-
-    /// New clips with numbered ids: the clip and motion files of each.
-    NemesisNewClipsHover,
-
-    /// Event name
-    NemesisNewEventHint,
-
-    /// The new event's name, e.g. myEvent: no spaces, and not one that exists, whatever its case. Patches refer to it as $eventID[myEvent]$.
-    NemesisNewEventHover,
-
-    /// New
-    NemesisNewObject,
-
-    /// New project
-    NemesisNewProject,
-
-    /// Variable name
-    NemesisNewVariableHint,
-
-    /// The new variable's name, e.g. myVar: no spaces, and not one that exists, whatever its case. Patches refer to it as $variableID[myVar]$.
-    NemesisNewVariableHover,
-
-    /// The type of its value: BOOL, the whole numbers INT8 / INT16 / INT32, or REAL for decimals.
-    NemesisNewVariableTypeHover,
-
-    /// Its initial value, by type. BOOL: true or false. INT: a whole number, e.g. 1. REAL: a decimal, e.g. 0.2.
-    NemesisNewVariableValueHover,
-
-    /// New
-    NemesisNewWork,
-
-    /// Make a new patch mod.
-    NemesisNewWorkHover,
-
-    /// Add a behavior (template xml) to start.
-    NemesisNoBehavior,
-
-    /// No change
-    NemesisNoChange,
-
-    /// No template found for
-    NemesisNoTemplateFor,
-
-    /// No templates (.bin / .xml under meshes/) in the template directory. Check template_dir in the settings.
-    NemesisNoTemplates,
-
-    /// This template has no event / variable data (hkbBehaviorGraphStringData).
-    NemesisNoVars,
-
-    /// Not a Nemesis mod (no Nemesis_Engine/mod/<code>)
-    NemesisNotAMod,
-
-    /// Not linked
-    NemesisNotLinked,
-
-    /// New objects no object in the tree points to. Nemesis ignores them: add their #id to a pointer field somewhere.
-    NemesisNotLinkedHover,
-
-    /// The patch file of the object in the mod, if this work patches it (where the export writes it); else the template it is read from.
-    NemesisObjectFileHover,
-
-    /// Objects
-    NemesisObjectsTab,
-
-    /// Open work data
-    NemesisOpenCacheDir,
-
-    /// Open a mod…
-    NemesisOpenMod,
-
-    /// Open a Nemesis mod to edit it: its root (where Nemesis_Engine is), e.g. D:\MO2\mods\Paraglider, or its patch directory, e.g. ...\Nemesis_Engine\mod\para. If it has been opened before, the work goes on with its edits that are not exported yet.
-    NemesisOpenModHover,
-
-    /// Open Recent
-    NemesisOpenRecent,
-
-    /// Nothing opened yet.
-    NemesisOpenRecentEmpty,
-
-    /// The root directory of the mod Export writes to, e.g. D:\MO2\mods\MyMod: by default the mod that was opened. Export writes <here>\Nemesis_Engine\mod\<mod code> (Nemesis_EngineExt for NemesisExt templates), replacing only the files this work read or wrote. The button on the left opens the directory.
-    NemesisOutputHover,
-
-    /// Choose the output directory.
-    NemesisOutputMissing,
-
-    /// Open the Pandora patch of this template, to edit it as text. It follows the edits of the objects, and they follow it.
-    NemesisPandoraDocHover,
-
-    /// These operations of Pandora give the object as it is edited here.
-    NemesisPandoraOpsOk,
-
-    /// d-merge's Nemesis parser accepts this patch.
-    NemesisParserOk,
-
-    /// Patch preview
-    NemesisPatchPreview,
-
-    /// Reading
-    NemesisReadingWork,
-
-    /// Neither its work nor its mod is there any more, so it left the list
-    NemesisRecentMissing,
-
-    /// References:
-    NemesisRefMods,
-
-    /// The mods this one depends on (an add-on's base, the mods a user patch takes values from): the root of each, or its patch directory. Their new objects, events and variables can be pointed to and looked at. They are not edited or exported: they come with those mods when merging.
-    NemesisRefModsHover,
-
-    /// Read only: an object of a referenced mod.
-    NemesisRefReadOnly,
-
-    /// Some patches are rejected by d-merge's Nemesis parser
-    NemesisRejected,
-
-    /// Reload from the mod
-    NemesisReload,
-
-    /// Reads the mod again. Discards the edits that are not exported.
-    NemesisReloadHover,
-
-    /// Remove from the work
-    NemesisRemoveBehavior,
-
-    /// Removes this behavior and discards all its edits and new objects.
-    NemesisRemoveBehaviorHover,
-
-    /// Rename (the patches using it are updated too)
-    NemesisRename,
-
-    /// Rename…
-    NemesisRenameCode,
-
-    /// Renamed the mod code
-    NemesisRenameCodeDone,
-
-    /// The mod code could not be renamed
-    NemesisRenameCodeFailed,
-
-    /// Gives this work another mod code (4-6 letters or digits): the ids of its new objects and clips change with it. What was exported under the old code goes at the next Export.
-    NemesisRenameCodeHover,
-
-    /// Renaming the mod code
-    NemesisRenameCodeRunning,
-
-    /// Could not take the conflict's value
-    NemesisResolveFailed,
-
-    /// Discard the changes of this object (a new object is removed).
-    NemesisRevertHover,
-
-    /// Put this changed block back to the template's lines.
-    NemesisRevertHunkHover,
-
-    /// Failed to save the work in progress
-    NemesisSaveFailed,
-
-    /// Which templates this work can patch. It can't be changed later. Nemesis: only those Nemesis knows. Nemesis Ext / Pandora v5: all of them, and template files of your own. Either can be exported in any format.
-    NemesisScopeHover,
-
-    /// Templates
-    NemesisScopeLabel,
-
-    /// Only the templates Nemesis knows (this work is a Nemesis one).
-    NemesisScopeNemesisOnly,
-
-    /// Text of every object, e.g. $eventID[moveStart]$ (Ctrl+Shift+F)
-    NemesisSearchHint,
-
-    /// Select an object on the left.
-    NemesisSelectObject,
-
-    /// The URL of the mod's page (site in info.ini).
-    NemesisSiteHover,
-
-    /// Site:
-    NemesisSiteLabel,
-
-    /// The mod this work was read from. Click to open it.
-    NemesisSourceHover,
-
-    /// Make a new patch mod, or open an existing one to edit it.
-    NemesisStartHint,
-
-    /// Templates (Settings > template_dir):
-    NemesisTemplatesLabel,
-
-    /// Show or hide the inline diff (Vim: Space d, :diff)
-    NemesisToggleInlineDiff,
-
-    /// j / k: move, h / l: fold, o: open / close, t: tree / list, c: changed only, u: unlinked only, Enter: back to the editor
-    NemesisTreeKeysHint,
-
-    /// Tree
-    NemesisTreeView,
-
-    /// Show the objects as a tree from hkRootLevelContainer, following their #pointers. (A filter shows the flat list.)
-    NemesisTreeViewHover,
-
-    /// Only the new objects nothing links to (Nemesis ignores them)
-    NemesisUnlinkedOnly,
-
-    /// The User Patch is edited in its own window: the User Patch button.
-    NemesisUserPatchReserved,
-
-    /// Variables
-    NemesisVariables,
-
-    /// Events / Variables
-    NemesisVarsTab,
-
-    /// The mod's version now, e.g. 1.2.0. Written to the info.ini of Nemesis_EngineExt only, with the mod codes of the references as deps.
-    NemesisVersionHover,
-
-    /// Version:
-    NemesisVersionLabel,
-
-    /// There is already a work with this mod code: open it, or choose another code.
-    NemesisWorkExists,
-
-    /// A work on another mod had this mod code: it was replaced by this mod
-    NemesisWorkReplaced,
+    NoneText,
 
     /// Normalize
     NormalizeButton,
@@ -1235,8 +1090,20 @@ pub enum I18nKey {
     /// If you are not using the Steam version of Skyrim, please specify the Skyrim data directory manually.
     NotifyErrWindowsRegistryNotFound,
 
-    /// Updating Mod list…
-    NotifyInfoUpdatingModList,
+    /// The patch file of the object in the mod, if this work patches it (where the export writes it); else the template it is read from.
+    ObjectFileHover,
+
+    /// Filter (id, class, name)
+    ObjectFilterHint,
+
+    /// New
+    ObjectNew,
+
+    /// Select an object on the left.
+    ObjectSelectHint,
+
+    /// Open
+    OpenButton,
 
     /// Open Containing Folder
     OpenContainingFolder,
@@ -1252,6 +1119,30 @@ pub enum I18nKey {
 
     /// Output:
     OutputLabel,
+
+    /// Choose the output directory.
+    OutputMissing,
+
+    /// Do not export
+    OutsideNemesisCancel,
+
+    /// Nothing was exported: Nemesis does not support these templates
+    OutsideNemesisCancelled,
+
+    /// Templates Nemesis does not support:
+    OutsideNemesisLabel,
+
+    /// Left out, as Nemesis does not support these templates
+    OutsideNemesisLeftOut,
+
+    /// Leave them out
+    OutsideNemesisSkip,
+
+    /// Write to Nemesis_EngineExt
+    OutsideNemesisWriteExt,
+
+    /// Nemesis does not support these templates: their patches go to Nemesis_EngineExt, which only d-merge reads
+    OutsideNemesisWrittenToExt,
 
     /// Convert
     PageConvert,
@@ -1270,6 +1161,9 @@ pub enum I18nKey {
 
     /// The directory with Pandora's Settings.json and Pandora_Engine\ActiveMods.json. Import reads them from here and Export writes them here. Only used for these two buttons. The button on the left opens the directory.
     PandoraDirHover,
+
+    /// Open the Pandora patch of this template, to edit it as text. It follows the edits of the objects, and they follow it.
+    PandoraDocHover,
 
     /// Exports d-merge VFS settings to Pandora.
     ///
@@ -1342,23 +1236,62 @@ pub enum I18nKey {
     /// Strict
     ParserModeStrict,
 
+    /// Some patches are rejected by d-merge's Nemesis parser
+    ParserRejected,
+
     /// Patch
     PatchButton,
 
     /// Updating list...
     PatchFetchingButton,
 
+    /// These operations of Pandora give the object as it is edited here.
+    PatchPreviewPandoraOpsOk,
+
+    /// d-merge's Nemesis parser accepts this patch.
+    PatchPreviewParserOk,
+
+    /// Put this changed block back to the template's lines.
+    PatchPreviewRevertHunkHover,
+
+    /// Patch preview
+    PatchPreviewTitle,
+
+    /// Preview error
+    PreviewError,
+
+    /// Follow the cursor: the preview scrolls to the editor's cursor line and highlights it.
+    PreviewFollowCursor,
+
+    /// Hide Preview
+    PreviewHide,
+
+    /// Show Preview
+    PreviewShow,
+
+    /// Show or hide the preview (Vim: Space p, :preview)
+    PreviewToggle,
+
+    /// Problems
+    ProblemsLabel,
+
     /// No problems have been found in the work.
     ProblemsNone,
+
+    /// The mods this one depends on (an add-on's base, the mods a user patch takes values from): the root of each, or its patch directory. Their new objects, events and variables can be pointed to and looked at. They are not edited or exported: they come with those mods when merging.
+    RefModsHover,
+
+    /// References:
+    RefModsLabel,
+
+    /// Read only: an object of a referenced mod.
+    RefReadOnly,
 
     /// Reload
     ReloadButton,
 
     /// Removing the `<output_dir>/meshes` directory...
     RemovingMeshesMessage,
-
-    /// Create
-    RepeatCreate,
 
     /// Makes many new objects from this one, one per line of values: {{name}} in the template takes the value of the column name, {{i}} the line number from 0.
     RepeatHover,
@@ -1384,9 +1317,6 @@ pub enum I18nKey {
     /// Revert
     RevertButton,
 
-    /// Back to the editor
-    RevisionViewClose,
-
     /// Output format for hkx.
     /// - SkyrimLE/Enderal: win32
     /// - SkyrimSE/SkyrimVR/EnderalSE: amd64
@@ -1394,6 +1324,24 @@ pub enum I18nKey {
     /// # Notes
     /// For Windows ver. user: When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.
     RuntimeTargetHover,
+
+    /// Save
+    SaveButton,
+
+    /// Save failed
+    SaveFailed,
+
+    /// Saved successfully.
+    SavedMessage,
+
+    /// Which templates this work can patch. It can't be changed later. Nemesis: only those Nemesis knows. Nemesis Ext / Pandora v5: all of them, and template files of your own. Either can be exported in any format.
+    ScopeHover,
+
+    /// Templates
+    ScopeLabel,
+
+    /// Only the templates Nemesis knows (this work is a Nemesis one).
+    ScopeNemesisOnly,
 
     /// hits
     SearchHitsLabel,
@@ -1410,6 +1358,9 @@ pub enum I18nKey {
     /// results in
     SearchResultsIn,
 
+    /// Text of every object, e.g. $eventID[moveStart]$ (Ctrl+Shift+F)
+    SearchTextHint,
+
     /// Select All
     SelectAll,
 
@@ -1419,77 +1370,14 @@ pub enum I18nKey {
     /// selected
     SelectedLabel,
 
-    /// Blame
-    SideBlame,
-
-    /// Each line of this object with the revision that last changed it.
-    SideBlameHover,
-
-    /// The work has changes since its last revision: commit or discard them before switching the branch.
-    SideBranchHasChanges,
-
-    /// The branch the work is on. Another one puts the work as it is at its newest revision.
-    SideBranchHover,
-
-    /// Changes
-    SideChanges,
-
-    /// Commit
-    SideCommit,
-
-    /// Keeps the changes as a revision of this work, with the message (Ctrl+Enter in the field). The history is in the work data, not in the mod.
-    SideCommitHover,
-
-    /// Message
-    SideCommitMessageHint,
-
-    /// Compare with the revision before
-    SideComparePrevious,
-
-    /// Compare with the work now
-    SideCompareWorking,
-
-    /// Discard changes
-    SideDiscard,
-
-    /// Explorer
-    SideExplorer,
-
-    /// History
-    SideHistory,
-
-    /// New branch (Enter)
-    SideNewBranch,
-
-    /// Nothing is changed yet.
-    SideNoChanges,
-
-    /// No revision changed this object.
-    SideNoObjectHistory,
-
-    /// Animation data has no events or variables.
-    SideNoVariables,
-
-    /// Object history
-    SideObjectHistory,
-
-    /// Restore this object to this revision
-    SideRestoreObject,
-
-    /// Restore the work to this revision
-    SideRestoreRevision,
-
-    /// Puts every object as it was at this revision. The history stays: what differs from the last revision is a change, to commit or to discard.
-    SideRestoreRevisionHover,
-
-    /// Template:
-    SideTemplate,
-
     /// Skyrim Data dir:
     SkyrimDataDirLabel,
 
     /// Source Code:
     SourceCodeLabel,
+
+    /// Make a new patch mod, or open an existing one to edit it.
+    StartHint,
 
     /// Applying patches...
     StatusApplyingPatches,
@@ -1510,10 +1398,28 @@ pub enum I18nKey {
     StatusParsingPatches,
 
     /// files:
-    StatusReadFiles,
+    StatusReadFilesLabel,
 
     /// Reading templates and patches...
     StatusReadingPatches,
+
+    /// Close All
+    TabsCloseAll,
+
+    /// Close Others
+    TabsCloseOthers,
+
+    /// Close to the Right
+    TabsCloseRight,
+
+    /// Template:
+    TemplateLabel,
+
+    /// No template found for
+    TemplateNotFound,
+
+    /// No templates (.bin / .xml under meshes/) in the template directory. Check template_dir in the settings.
+    TemplatesNone,
 
     /// 🎨 Edit
     ThemeEditorButton,
@@ -1545,6 +1451,12 @@ pub enum I18nKey {
     /// Merges what the conflict tool decided, kept in <output>/.d_merge/user_patch, after every mod, and leaves out the operations hidden there. It is not in the mod list: it always loads last, like MO2's overwrite, and belongs to this output directory.
     UserPatchApplyHover,
 
+    /// Export / Import as mod…
+    UserPatchAsMod,
+
+    /// Writes the user patch as a mod of its own (code upatch) as Nemesis, Nemesis Ext or Pandora v5, e.g. into MO2's mods to share it or use it with another patching tool, or reads such a mod back. In the mod list it is a mod like the others.
+    UserPatchAsModHover,
+
     /// Delete all
     UserPatchClear,
 
@@ -1554,29 +1466,110 @@ pub enum I18nKey {
     /// Takes everything out of the User Patch and writes that: each conflict goes back to the mod that wins by the load order. Hidden operations stay. It cannot be undone.
     UserPatchClearHover,
 
-    /// Export as mod…
-    UserPatchExportMod,
-
-    /// Writes the user patch as a mod of its own (code upatch) to the folder chosen, e.g. into MO2's mods to manage or share it there: as Nemesis, Nemesis Ext or Pandora v5. Its own place and what is merged stay as they are.
-    UserPatchExportModHover,
-
     /// All that the user patch has: the values chosen in conflicts and what was edited by hand.
     UserPatchHover,
 
     /// Decided by the output directory of the Patch page, as each profile has its own conflicts. It cannot be changed here. Edits are written a moment later.
     UserPatchOutputHover,
 
-    /// Nemesis does not know these templates: their patches go to Nemesis_EngineExt, which only d-merge reads
-    UserPatchOutsideNemesis,
+    /// The User Patch is edited in its own window: the User Patch button.
+    UserPatchReserved,
 
     /// User Patch
     UserPatchTitle,
+
+    /// Events
+    VarsEvents,
+
+    /// Event name
+    VarsNewEventHint,
+
+    /// The new event's name, e.g. myEvent: no spaces, and not one that exists, whatever its case. Patches refer to it as $eventID[myEvent]$.
+    VarsNewEventHover,
+
+    /// Variable name
+    VarsNewVariableHint,
+
+    /// The new variable's name, e.g. myVar: no spaces, and not one that exists, whatever its case. Patches refer to it as $variableID[myVar]$.
+    VarsNewVariableHover,
+
+    /// The type of its value: BOOL, the whole numbers INT8 / INT16 / INT32, or REAL for decimals.
+    VarsNewVariableTypeHover,
+
+    /// Its initial value, by type. BOOL: true or false. INT: a whole number, e.g. 1. REAL: a decimal, e.g. 0.2.
+    VarsNewVariableValueHover,
+
+    /// This template has no event / variable data (hkbBehaviorGraphStringData).
+    VarsNone,
+
+    /// Animation data has no events or variables.
+    VarsNoneInAnimData,
+
+    /// Rename (the patches using it are updated too)
+    VarsRename,
+
+    /// Events / Variables
+    VarsTab,
+
+    /// Variables
+    VarsVariables,
 
     /// VFS
     VfsMode,
 
     /// When booting using MO2's VFS, etc.
     VfsModeHover,
+
+    /// Where the work in progress is saved automatically, for each mod code: in the output directory of the Patch page. Decided by the app.
+    WorkCacheDirHover,
+
+    /// Close
+    WorkClose,
+
+    /// Back to the start screen. The work is kept, and comes back from Open Recent.
+    WorkCloseHover,
+
+    /// There is already a work with this mod code: open it, or choose another code.
+    WorkExists,
+
+    /// Set the output directory on the Patch page first: the works and the User Patch are kept in it. The Skyrim Data directory can be used too, but something may be overwritten unintentionally.
+    WorkNeedPatchOutput,
+
+    /// New
+    WorkNew,
+
+    /// Make a new patch mod.
+    WorkNewHover,
+
+    /// Open work data
+    WorkOpenCacheDir,
+
+    /// Open Recent
+    WorkOpenRecent,
+
+    /// Nothing opened yet.
+    WorkOpenRecentEmpty,
+
+    /// Reading
+    WorkReading,
+
+    /// Neither its work nor its mod is there any more, so it left the list
+    WorkRecentMissing,
+
+    /// A work on another mod had this mod code: it was replaced by this mod
+    WorkReplaced,
+
+    /// Failed to save the work in progress
+    WorkSaveFailed,
+
+    /// The mod this work was read from. Click to open it.
+    WorkSourceHover,
+
+    /// Read from
+    WorkSourceLabel,
+
+    /// XML preview
+    XmlPreviewTitle,
 
     // NOTE: Using `skip_serializing` causes an error when attempting to serialize `Invalid`.
     /// Invalid key comes here when deserializing unknown strings.
@@ -1669,11 +1662,11 @@ pub const REVEAL_IN_FILE_MANAGER: I18nKey = if cfg!(windows) {
 /// takes them: Keep Open, Close, Close Others, Close to the Right, Close All.
 pub fn tab_menu_texts(i18n: &I18nMap) -> [&str; 5] {
     [
-        i18n.t(I18nKey::NemesisKeepOpen),
+        i18n.t(I18nKey::KeepOpen),
         i18n.t(I18nKey::CloseButton),
-        i18n.t(I18nKey::NemesisCloseOtherTabs),
-        i18n.t(I18nKey::NemesisCloseTabsRight),
-        i18n.t(I18nKey::NemesisCloseAllTabs),
+        i18n.t(I18nKey::TabsCloseOthers),
+        i18n.t(I18nKey::TabsCloseRight),
+        i18n.t(I18nKey::TabsCloseAll),
     ]
 }
 
@@ -1706,7 +1699,7 @@ pub fn editor_label_texts(i18n: &I18nMap) -> [&str; 16] {
 mod tests {
     use super::*;
 
-    /// The `snake_case` name of `key`, as `translation.json` has it. e.g. `NemesisAddBehavior` -> `nemesis_add_behavior`
+    /// The `snake_case` name of `key`, as `translation.json` has it. e.g. `BehaviorsAdd` -> `behaviors_add`
     fn name_of(key: I18nKey) -> String {
         sonic_rs::to_string(&key).unwrap().trim_matches('"').to_owned()
     }

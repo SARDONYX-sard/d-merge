@@ -181,9 +181,9 @@ impl SideBar {
 /// search.
 const VIEWS: [(SideView, Icon, I18nKey, &str); 4] = [
     (SideView::Search, Icon::Search, I18nKey::SearchLabel, "Ctrl+Shift+F"),
-    (SideView::Changes, Icon::Diff, I18nKey::SideChanges, "Ctrl+Shift+G"),
-    (SideView::Explorer, Icon::FolderOpen, I18nKey::SideExplorer, "Ctrl+Shift+E"),
-    (SideView::Variables, Icon::Layers, I18nKey::NemesisVarsTab, ""),
+    (SideView::Changes, Icon::Diff, I18nKey::ChangesTab, "Ctrl+Shift+G"),
+    (SideView::Explorer, Icon::FolderOpen, I18nKey::ExplorerTab, "Ctrl+Shift+E"),
+    (SideView::Variables, Icon::Layers, I18nKey::VarsTab, ""),
 ];
 
 /// What the side bar asks of the rest: the editor shows something, the keyboard goes to it, a file.
@@ -279,7 +279,7 @@ impl SideArea {
 
         let has_vars = work.workspace.behaviors.get(active).is_some_and(|behavior| !behavior.is_anim_data());
         if !has_vars {
-            ui.weak(i18n.t(I18nKey::SideNoVariables));
+            ui.weak(i18n.t(I18nKey::VarsNoneInAnimData));
             return asks;
         }
 
@@ -387,7 +387,7 @@ fn behavior_select(
     let current = behaviors.get(active).map_or("", |behavior| behavior.name.as_str());
     let mut picked = None;
     ui.horizontal(|ui| {
-        ui.label(i18n.t(I18nKey::SideTemplate));
+        ui.label(i18n.t(I18nKey::TemplateLabel));
         let combo = egui_widgets::shadcn::ComboBox::from_id_salt("side_vars_behavior").selected_text(current);
         combo.show_ui(ui, |ui| {
             let shown = behaviors.iter().enumerate().filter(|(_, behavior)| !behavior.is_anim_data());

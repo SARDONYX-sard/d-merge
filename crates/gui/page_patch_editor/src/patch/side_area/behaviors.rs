@@ -55,14 +55,9 @@ impl SideArea {
         let mut asks = Vec::new();
         let mut add = None;
         let scope = work.workspace.scope;
-        egui_widgets::section_header(
-            ui,
-            &mut self.bar.behaviors_open,
-            i18n.t(I18nKey::NemesisBehaviorsSection),
-            |ui| {
-                add = add_menu(ui, scope, i18n);
-            },
-        );
+        egui_widgets::section_header(ui, &mut self.bar.behaviors_open, i18n.t(I18nKey::BehaviorsTitle), |ui| {
+            add = add_menu(ui, scope, i18n);
+        });
         match add {
             Some(AddEvent::Template) => asks.push(SideAsk::Window(WindowAsk::TemplatePicker)),
             Some(AddEvent::File) => add_custom_template((work, sel), notify, i18n),
@@ -121,9 +116,9 @@ fn add_menu(ui: &mut egui::Ui, scope: TemplateScope, i18n: &I18nMap) -> Option<A
     let mut event = None;
 
     let items = [
-        (I18nKey::NemesisAddBehavior, None, AddEvent::Template),
-        (I18nKey::NemesisCustomXml, Some(I18nKey::NemesisCustomXmlHover), AddEvent::File),
-        (I18nKey::NemesisAnimData, Some(I18nKey::NemesisAnimDataHover), AddEvent::AnimData),
+        (I18nKey::BehaviorsAdd, None, AddEvent::Template),
+        (I18nKey::BehaviorsCustomXml, Some(I18nKey::BehaviorsCustomXmlHover), AddEvent::File),
+        (I18nKey::AnimDataOpen, Some(I18nKey::AnimDataOpenHover), AddEvent::AnimData),
     ];
     ui.menu_button("+", |ui| {
         for (label, hover, item) in items {
@@ -152,7 +147,7 @@ fn behavior_rows(
     (code, ext): (&str, bool),
 ) -> Option<RowEvent> {
     if behaviors.is_empty() {
-        ui.weak(i18n.t(I18nKey::NemesisNoBehavior));
+        ui.weak(i18n.t(I18nKey::BehaviorsNone));
         return None;
     }
 
@@ -193,7 +188,7 @@ fn row_hover(behavior: &Behavior, code: &str, ext: bool, i18n: &I18nMap) -> Stri
     let mut hover = format!("{}\n→ {}", behavior.template_path.display(), to.display());
     if is_ext_only(behavior, ext) {
         hover.push('\n');
-        hover.push_str(i18n.t(I18nKey::NemesisExtOnlyWarning));
+        hover.push_str(i18n.t(I18nKey::ExtOnlyWarning));
     }
     hover
 }
@@ -201,8 +196,8 @@ fn row_hover(behavior: &Behavior, code: &str, ext: bool, i18n: &I18nMap) -> Stri
 /// `Remove`. Where it is written is the export's choice: see `ExportFormat`.
 fn row_menu(ui: &mut egui::Ui, index: usize, i18n: &I18nMap) -> Option<RowEvent> {
     let mut event = None;
-    let remove = Button::new(i18n.t(I18nKey::NemesisRemoveBehavior)).destructive().icon(Icon::Trash);
-    if ui.add(remove).on_hover_text(i18n.t(I18nKey::NemesisRemoveBehaviorHover)).clicked() {
+    let remove = Button::new(i18n.t(I18nKey::BehaviorsRemove)).destructive().icon(Icon::Trash);
+    if ui.add(remove).on_hover_text(i18n.t(I18nKey::BehaviorsRemoveHover)).clicked() {
         event = Some(RowEvent::Remove(index));
         ui.close();
     }

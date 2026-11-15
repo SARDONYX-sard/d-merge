@@ -64,6 +64,11 @@ pub(in crate::patch) enum BarAsk {
     ClearUserPatch,
     /// The user patch's `Export as a mod`.
     ExportUserPatchAsMod,
+    /// The mod "Export as mod" names, read back into the user patch: in place of what it has, or
+    /// added to it.
+    ImportUserPatch {
+        replace: bool,
+    },
 }
 
 /// What the editor shows after a [`BarAsk`].
@@ -119,7 +124,7 @@ fn project_form(
     let mut asks = Vec::new();
 
     let output = PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
-        .help(i18n.t(I18nKey::NemesisOutputHover))
+        .help(i18n.t(I18nKey::ExportDirHover))
         .show(ui, &mut work.place.output);
     if let Some(err) = output.open_error {
         notify.error(err);
@@ -133,8 +138,8 @@ fn project_form(
 
     ui.horizontal_wrapped(|ui| {
         // It is in the ids of the new objects and the names of the folders: renamed, not typed over.
-        let hover = i18n.t(I18nKey::NemesisModCodeHover);
-        ui.label(i18n.t(I18nKey::NemesisModCodeLabel)).on_hover_text(hover);
+        let hover = i18n.t(I18nKey::ModCodeHover);
+        ui.label(i18n.t(I18nKey::ModCodeLabel)).on_hover_text(hover);
         ui.strong(work.place.mod_code.trim()).on_hover_text(hover);
         if !work.user_patch {
             let old = work.place.loaded_for.as_deref().unwrap_or_default();
@@ -204,6 +209,10 @@ pub(in crate::patch) fn apply(
         BarAsk::ExportUserPatchAsMod => {
             crate::patch::user_patch::export_as_mod(work, &panels.mod_export, notify, i18n);
         }
+        BarAsk::ImportUserPatch { replace } => {
+            crate::patch::user_patch::import_as_user_patch(work, &panels.mod_export, replace, notify, i18n);
+            return Some(refs_changed(work)); // names, the save and the views, as for new references
+        }
     }
     None
 }
@@ -230,8 +239,8 @@ fn file_menu(ui: &mut egui::Ui, i18n: &I18nMap, recent: &[RecentWork]) -> Option
     let button = egui::Button::new(format!("{} ▾", i18n.t(I18nKey::FileLabel)));
     egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
         let items = [
-            (I18nKey::NemesisNewWork, I18nKey::NemesisNewWorkHover, BarAsk::NewWork),
-            (I18nKey::NemesisOpenMod, I18nKey::NemesisOpenModHover, BarAsk::OpenMod),
+            (I18nKey::WorkNew, I18nKey::WorkNewHover, BarAsk::NewWork),
+            (I18nKey::ModOpen, I18nKey::ModOpenHover, BarAsk::OpenMod),
         ];
         for (label, hover, ask) in items {
             if ui.button(i18n.t(label)).on_hover_text(i18n.t(hover)).clicked() {
@@ -239,14 +248,14 @@ fn file_menu(ui: &mut egui::Ui, i18n: &I18nMap, recent: &[RecentWork]) -> Option
             }
         }
 
-        ui.menu_button(i18n.t(I18nKey::NemesisOpenRecent), |ui| {
+        ui.menu_button(i18n.t(I18nKey::WorkOpenRecent), |ui| {
             if let Some(work) = recent_list(ui, recent, i18n) {
                 asked = Some(BarAsk::OpenRecent(work));
             }
         });
 
         ui.separator();
-        let close = ui.button(i18n.t(I18nKey::NemesisCloseWork)).on_hover_text(i18n.t(I18nKey::NemesisCloseWorkHover));
+        let close = ui.button(i18n.t(I18nKey::WorkClose)).on_hover_text(i18n.t(I18nKey::WorkCloseHover));
         if close.clicked() {
             asked = Some(BarAsk::CloseWork);
         }
@@ -261,30 +270,30 @@ fn file_menu(ui: &mut egui::Ui, i18n: &I18nMap, recent: &[RecentWork]) -> Option
 /// `[Nemesis ▾] [Export]`, right to left. `ready`: there is an output and something to export.
 fn export_buttons(ui: &mut egui::Ui, i18n: &I18nMap, ready: bool, format: ExportFormat) -> Option<BarAsk> {
     let export = ui
-        .add_enabled(ready, Button::new(i18n.t(I18nKey::NemesisExport)).primary())
-        .on_disabled_hover_text(i18n.t(I18nKey::NemesisExportDisabledHover))
+        .add_enabled(ready, Button::new(i18n.t(I18nKey::ExportButton)).primary())
+        .on_disabled_hover_text(i18n.t(I18nKey::ExportDisabledHover))
         .clicked();
 
     // What `Export` writes: beside it, as it belongs to it and not to what opens something.
-    let mut selected = ExportFormat::ALL.iter().position(|(known, _)| *known == format).unwrap_or(0);
+    let mut selected = ExportFormat::ALL.iter().position(|known| *known == format).unwrap_or(0);
     let format_box = ComboBox::from_id_salt("nemesis_export_format").width(EXPORT_FORMAT_WIDTH).show_index(
         ui,
         &mut selected,
         ExportFormat::ALL.len(),
-        |index| ExportFormat::ALL[index].1,
+        |index| ExportFormat::ALL[index].label(),
     );
-    let changed = format_box.on_hover_text(i18n.t(I18nKey::NemesisExportFormatHover)).changed();
+    let changed = format_box.on_hover_text(i18n.t(I18nKey::ExportFormatHover)).changed();
     ui.separator();
 
-    if export { Some(BarAsk::Export) } else { changed.then(|| BarAsk::ExportFormat(ExportFormat::ALL[selected].0)) }
+    if export { Some(BarAsk::Export) } else { changed.then(|| BarAsk::ExportFormat(ExportFormat::ALL[selected])) }
 }
 
 /// `Open work data`, always in reach. Its hover says where that is (`dir`). Returns whether it was
 /// clicked.
 pub(super) fn cache_button(ui: &mut egui::Ui, i18n: &I18nMap, dir: &Path) -> bool {
-    let button = Button::new(i18n.t(I18nKey::NemesisOpenCacheDir)).icon(Icon::FolderOpen);
+    let button = Button::new(i18n.t(I18nKey::WorkOpenCacheDir)).icon(Icon::FolderOpen);
     let response = ui.add(button).on_hover_ui(|ui| {
-        ui.label(i18n.t(I18nKey::NemesisCacheDirHover));
+        ui.label(i18n.t(I18nKey::WorkCacheDirHover));
         ui.monospace(dir.to_string_lossy());
     });
     response.clicked()
@@ -304,11 +313,11 @@ fn source_row(ui: &mut egui::Ui, i18n: &I18nMap, mod_dir: &str, notify: &mut Not
     }
 
     let mut reload = false;
-    let error = PathRow::new(i18n.t(I18nKey::NemesisModDirLabel), "", PATH_ACTIONS)
-        .hover(i18n.t(I18nKey::NemesisSourceHover))
+    let error = PathRow::new(i18n.t(I18nKey::WorkSourceLabel), "", PATH_ACTIONS)
+        .hover(i18n.t(I18nKey::WorkSourceHover))
         .show_read_only(ui, mod_dir, |ui| {
-            let button = Button::new(i18n.t(I18nKey::NemesisReload)).icon(Icon::RefreshCcw);
-            reload = ui.add(button).on_hover_text(i18n.t(I18nKey::NemesisReloadHover)).clicked();
+            let button = Button::new(i18n.t(I18nKey::ModReload)).icon(Icon::RefreshCcw);
+            reload = ui.add(button).on_hover_text(i18n.t(I18nKey::ModReloadHover)).clicked();
         });
     if let Some(err) = error {
         notify.error(err);
@@ -316,20 +325,23 @@ fn source_row(ui: &mut egui::Ui, i18n: &I18nMap, mod_dir: &str, notify: &mut Not
     reload.then_some(BarAsk::ReloadFromMod)
 }
 
-/// `References: [amco ✖] [+]`: the mods this one depends on, see `Workspace::ref_mods`.
-fn ref_mods_row(ui: &mut egui::Ui, i18n: &I18nMap, ref_mods: &[String]) -> Option<BarAsk> {
+/// `References: [Flinching (flinch) ✖] [+]`, or `None`: the mods this one depends on, see
+/// `Workspace::ref_mods`. The path is on hover.
+pub(super) fn ref_mods_row(ui: &mut egui::Ui, i18n: &I18nMap, ref_mods: &[String]) -> Option<BarAsk> {
     let mut asked = None;
     ui.horizontal_wrapped(|ui| {
-        ui.label(i18n.t(I18nKey::NemesisRefMods)).on_hover_text(i18n.t(I18nKey::NemesisRefModsHover));
+        ui.label(i18n.t(I18nKey::RefModsLabel)).on_hover_text(i18n.t(I18nKey::RefModsHover));
+        if ref_mods.is_empty() {
+            ui.weak(i18n.t(I18nKey::NoneText));
+        }
 
         for (at, dir) in ref_mods.iter().enumerate() {
-            let code = Path::new(dir).file_name().map_or_else(|| dir.as_str().into(), |name| name.to_string_lossy());
-            if ui.add(Button::new(format!("{code} ✖")).small()).on_hover_text(dir).clicked() {
+            if ui.add(Button::new(format!("{} ✖", ref_mod_name(dir))).small()).on_hover_text(dir).clicked() {
                 asked = Some(BarAsk::RemoveRef(at));
             }
         }
 
-        let add = ui.add(Button::new("").icon(Icon::Plus).small()).on_hover_text(i18n.t(I18nKey::NemesisRefModsHover));
+        let add = ui.add(Button::new("").icon(Icon::Plus).small()).on_hover_text(i18n.t(I18nKey::RefModsHover));
         if add.clicked()
             && let Some(dir) = gui_shared::rfd::FileDialog::new().pick_folder()
         {
@@ -337,6 +349,25 @@ fn ref_mods_row(ui: &mut egui::Ui, i18n: &I18nMap, ref_mods: &[String]) -> Optio
         }
     });
     asked
+}
+
+/// What a referenced mod is shown as: the name of its directory in the mods, and its code. Only the
+/// path is looked at: it is drawn every frame.
+///
+/// e.g. `D:/MO2/mods/Flinching/Nemesis_Engine/mod/flinch` -> `Flinching (flinch)`; a path not of that
+/// shape -> its last name, e.g. `flinch`
+fn ref_mod_name(dir: &str) -> String {
+    fn name_of(path: &Path) -> Option<std::borrow::Cow<'_, str>> {
+        path.file_name().map(|name| name.to_string_lossy())
+    }
+
+    let path = Path::new(dir);
+    let code = name_of(path).unwrap_or_else(|| dir.into());
+    let is_mod_dir = path.parent().and_then(name_of).is_some_and(|name| name.eq_ignore_ascii_case("mod"));
+    match path.ancestors().nth(3).and_then(name_of) {
+        Some(mod_name) if is_mod_dir => format!("{mod_name} ({code})"),
+        _ => code.into_owned(),
+    }
 }
 
 /// `[Rename…]`, then `[newc] [Rename] [Cancel] why not`. See [`crate::patch::tool::rename`].
@@ -348,22 +379,22 @@ fn rename_form(
     (old, cache_root): (&str, &Path),
 ) -> Option<BarAsk> {
     let Some(new) = rename_to else {
-        let start = Button::new(i18n.t(I18nKey::NemesisRenameCode)).small();
-        if ui.add(start).on_hover_text(i18n.t(I18nKey::NemesisRenameCodeHover)).clicked() {
+        let start = Button::new(i18n.t(I18nKey::ModCodeRename)).small();
+        if ui.add(start).on_hover_text(i18n.t(I18nKey::ModCodeRenameHover)).clicked() {
             *rename_to = Some(String::new());
         }
         return None;
     };
 
-    ui.add(TextEdit::singleline(new).hint_text(i18n.t(I18nKey::NemesisModCodeHint)).desired_width(90.0));
+    ui.add(TextEdit::singleline(new).hint_text(i18n.t(I18nKey::ModCodeHint)).desired_width(90.0));
     let problem = rename_problem(old, new, |code| Workspace::exists(cache_root, code));
-    let rename = ui.add_enabled(problem.is_none(), Button::new(i18n.t(I18nKey::NemesisRenameCode)).small().primary());
+    let rename = ui.add_enabled(problem.is_none(), Button::new(i18n.t(I18nKey::ModCodeRename)).small().primary());
     let cancel = ui.add(Button::new(i18n.t(I18nKey::CancelButton)).small()).clicked();
     if let Some(problem) = problem.filter(|_| !new.is_empty()) {
         ui.colored_label(ui.visuals().warn_fg_color, i18n.t(problem));
     }
 
-    if rename.on_hover_text(i18n.t(I18nKey::NemesisRenameCodeHover)).clicked() {
+    if rename.on_hover_text(i18n.t(I18nKey::ModCodeRenameHover)).clicked() {
         let new = std::mem::take(new);
         *rename_to = None;
         return Some(BarAsk::Rename(new));
@@ -377,10 +408,10 @@ fn rename_form(
 /// The mod's `info.ini`: name, author, site, version. Returns whether one was edited.
 fn info_fields(ui: &mut egui::Ui, i18n: &I18nMap, info: &mut ModInfo) -> bool {
     let fields = [
-        (I18nKey::NemesisNameLabel, I18nKey::NemesisNameHover, &mut info.name, 260.0),
-        (I18nKey::AuthorLabel, I18nKey::NemesisAuthorHover, &mut info.author, 130.0),
-        (I18nKey::NemesisSiteLabel, I18nKey::NemesisSiteHover, &mut info.site, 320.0),
-        (I18nKey::NemesisVersionLabel, I18nKey::NemesisVersionHover, &mut info.version, 70.0),
+        (I18nKey::ModNameLabel, I18nKey::ModNameHover, &mut info.name, 260.0),
+        (I18nKey::AuthorLabel, I18nKey::ModAuthorHover, &mut info.author, 130.0),
+        (I18nKey::ModSiteLabel, I18nKey::ModSiteHover, &mut info.site, 320.0),
+        (I18nKey::ModVersionLabel, I18nKey::ModVersionHover, &mut info.version, 70.0),
     ];
     let mut changed = false;
     for (label, hover, value, width) in fields {
@@ -394,7 +425,7 @@ fn info_fields(ui: &mut egui::Ui, i18n: &I18nMap, info: &mut ModInfo) -> bool {
 /// The works opened lately. Returns the one clicked.
 pub(super) fn recent_list(ui: &mut egui::Ui, recent: &[RecentWork], i18n: &I18nMap) -> Option<RecentWork> {
     if recent.is_empty() {
-        ui.weak(i18n.t(I18nKey::NemesisOpenRecentEmpty));
+        ui.weak(i18n.t(I18nKey::WorkOpenRecentEmpty));
     }
     let mut picked = None;
     for work in recent {
@@ -403,4 +434,16 @@ pub(super) fn recent_list(ui: &mut egui::Ui, recent: &[RecentWork], i18n: &I18nM
         }
     }
     picked
+}
+
+#[cfg(test)]
+mod ref_mod_name_tests {
+    use super::ref_mod_name;
+
+    /// The function docs' examples.
+    #[test]
+    fn a_referenced_mod_shows_its_mod_s_name_and_code() {
+        assert_eq!(ref_mod_name("D:/MO2/mods/Flinching/Nemesis_Engine/mod/flinch"), "Flinching (flinch)");
+        assert_eq!(ref_mod_name("flinch"), "flinch");
+    }
 }

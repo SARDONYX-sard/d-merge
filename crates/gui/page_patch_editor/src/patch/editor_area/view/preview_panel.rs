@@ -29,7 +29,7 @@ impl EditorPane {
             .show(ui, |ui| {
                 self.preview_header(ui, i18n)?;
                 let view = self.preview_view.as_mut()?;
-                super::preview::lines_ui(view, ui, i18n.t(I18nKey::NemesisRevertHunkHover))
+                super::preview::lines_ui(view, ui, i18n.t(I18nKey::PatchPreviewRevertHunkHover))
             })
             .inner
     }
@@ -40,17 +40,17 @@ impl EditorPane {
         let is_pandora = self.preview_view.as_ref().is_some_and(|view| view.is_pandora());
 
         ui.horizontal(|ui| {
-            ui.strong(i18n.t(I18nKey::NemesisPatchPreview));
+            ui.strong(i18n.t(I18nKey::PatchPreviewTitle));
             if let Some(view) = &mut self.preview_view {
-                super::preview::nav_ui(view, ui, i18n.t(I18nKey::NemesisJumpDiffHover));
+                super::preview::nav_ui(view, ui, i18n.t(I18nKey::JumpDiffHover));
             }
 
             match check {
                 _ if patch.is_none() => {
-                    ui.weak(i18n.t(I18nKey::NemesisNoChange));
+                    ui.weak(i18n.t(I18nKey::NoChange));
                 }
                 Ok(()) => {
-                    let ok = if is_pandora { I18nKey::NemesisPandoraOpsOk } else { I18nKey::NemesisParserOk };
+                    let ok = if is_pandora { I18nKey::PatchPreviewPandoraOpsOk } else { I18nKey::PatchPreviewParserOk };
                     ui.colored_label(egui::Color32::from_rgb(100, 200, 120), "✔").on_hover_text(i18n.t(ok));
                 }
                 // The details are in the Problems panel: a long text here would widen this panel.
@@ -61,7 +61,7 @@ impl EditorPane {
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let follow = Button::selectable(self.follow_preview, "").icon(Icon::Crosshair).small();
-                if ui.add(follow).on_hover_text(i18n.t(I18nKey::NemesisFollowCursor)).clicked() {
+                if ui.add(follow).on_hover_text(i18n.t(I18nKey::PreviewFollowCursor)).clicked() {
                     self.follow_preview = !self.follow_preview;
                 }
             });

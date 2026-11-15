@@ -272,7 +272,11 @@ impl PatchView<'_> {
                                 RowConflicts {
                                     scan: &self.page.conflicts,
                                     label: i18n.t(I18nKey::ConflictShow),
-                                    hovers: (i18n.t(I18nKey::ConflictWinsHover), i18n.t(I18nKey::ConflictLosesHover)),
+                                    hovers: (
+                                        i18n.t(I18nKey::ConflictWinsHover),
+                                        i18n.t(I18nKey::ConflictLosesHover),
+                                        i18n.t(I18nKey::ConflictResolvedHover),
+                                    ),
                                     dead_hover: i18n.t(I18nKey::ConflictDeadHover),
                                     asked: None,
                                     links: Links::default(),

@@ -156,6 +156,12 @@ impl PatchPage {
         }
     }
 
+    /// The user patch was written ("Use this", or its window): the conflict check reads only it again,
+    /// not every mod. See `ConflictScan::read_user_patch`.
+    pub fn follow_written_user_patch(&mut self, settings: &PatchSettings) {
+        self.conflicts.read_user_patch(user_patch_scanned(settings));
+    }
+
     /// A mod was written: the check follows in the background, as it was asked for with these mods.
     ///
     /// The mod list needs no check at all: a new load order or a mod turned off only changes the
@@ -211,12 +217,7 @@ impl PatchPage {
         });
         let mut mods: Vec<ScannedMod> = mods.collect();
         if run::uses_user_patch(settings) {
-            mods.push(ScannedMod {
-                id: USER_PATCH_ID.to_owned(),
-                name: "User Patch".to_owned(),
-                priority: run::user_patch_priority(settings.mod_list()),
-                dir: Some(user_patch_mod_dir(settings.current_output_dir()).display().to_string()),
-            });
+            mods.push(user_patch_scanned(settings));
         }
         self.conflicts.wait_for(conflicts::debug_patches_dir(settings.current_output_dir()), mods);
         self.run.start_patch_json(egui_ctx, settings, runtime, quiet);
@@ -303,5 +304,15 @@ impl PatchPage {
                 notify.error(message.to_owned());
             }
         }
+    }
+}
+
+/// The user patch as a mod of the conflict check: it loads last.
+fn user_patch_scanned(settings: &PatchSettings) -> ScannedMod {
+    ScannedMod {
+        id: USER_PATCH_ID.to_owned(),
+        name: "User Patch".to_owned(),
+        priority: run::user_patch_priority(settings.mod_list()),
+        dir: Some(user_patch_mod_dir(settings.current_output_dir()).display().to_string()),
     }
 }

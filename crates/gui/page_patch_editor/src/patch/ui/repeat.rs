@@ -66,10 +66,10 @@ impl RepeatForm {
             self.fields(ui, i18n);
             ui.horizontal(|ui| {
                 ui.weak(format!("{rows} {}", i18n.t(I18nKey::RepeatObjects)));
-                let button = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::RepeatCreate)).primary();
+                let button = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::CreateButton)).primary();
                 create = ui
                     .add_enabled(rows > 0 && code_ok, button)
-                    .on_disabled_hover_text(i18n.t(I18nKey::NemesisModCodeInvalid))
+                    .on_disabled_hover_text(i18n.t(I18nKey::ModCodeInvalid))
                     .clicked();
             });
         });

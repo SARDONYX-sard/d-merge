@@ -159,6 +159,9 @@ impl App {
         if self.patch_editor.take_mod_written() {
             self.patch.follow_written_mod();
         }
+        if self.patch_editor.take_user_patch_written() {
+            self.patch.follow_written_user_patch(&self.settings.pages.patch);
+        }
         let patch_ctx = PatchPollCtx {
             settings: &mut self.settings.pages.patch,
             i18n: &self.i18n,

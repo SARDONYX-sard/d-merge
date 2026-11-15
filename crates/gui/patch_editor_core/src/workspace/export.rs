@@ -41,7 +41,7 @@ impl Workspace {
     /// e.g. `meshes/actors/troll/behaviors/trollbehavior.bin`
     pub fn outside_nemesis(&self) -> impl Iterator<Item = &str> {
         let patched = |behavior: &&super::Behavior| !(behavior.edits.is_empty() && behavior.added.is_empty());
-        let unknown = |behavior: &&super::Behavior| !behavior.is_anim_data() && behavior.nemesis.is_none();
+        let unknown = |behavior: &&super::Behavior| behavior.is_outside_nemesis();
         self.behaviors.iter().filter(patched).filter(unknown).map(|behavior| behavior.meshes_path.as_str())
     }
 
@@ -80,6 +80,20 @@ impl Workspace {
     /// # Errors
     /// A file could not be written.
     pub fn export(&mut self, output: &Path, code: &str) -> Result<(usize, Vec<String>), String> {
+        self.export_only(output, code, |_| true)
+    }
+
+    /// [`Self::export`] of the behaviors `keep` says, e.g. without those Nemesis does not know
+    /// ([`super::Behavior::is_outside_nemesis`]). The others are written nowhere.
+    ///
+    /// # Errors
+    /// A file could not be written.
+    pub fn export_only(
+        &mut self,
+        output: &Path,
+        code: &str,
+        keep: impl Fn(&super::Behavior) -> bool,
+    ) -> Result<(usize, Vec<String>), String> {
         for file in &self.owned {
             remove_owned(output, file)?;
         }
@@ -88,7 +102,7 @@ impl Workspace {
 
         let (mut written, mut invalid) = (0, Vec::new());
         let ext = self.export_format.is_ext();
-        for behavior in &self.behaviors {
+        for behavior in self.behaviors.iter().filter(|behavior| keep(behavior)) {
             let relative = behavior.patch_dir(code, ext);
             for id in behavior.edits.keys().chain(behavior.added.keys()) {
                 let Some(patch) = behavior.patch(code, id) else { continue };

@@ -18,6 +18,7 @@ use egui_widgets::notify::Notification;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     patch::{ResolveRequest, USER_PATCH_CODE, user_patch_output},
+    settings::pages::patch_editor::OutsideNemesis,
 };
 
 use super::{
@@ -110,77 +111,157 @@ impl Draft {
 /// to `output`, as `format`. Its own place (`<output>/.d_merge/user_patch`, NemesisExt) and what it
 /// wrote there stay as they are.
 ///
-/// As `Nemesis`, the templates Nemesis does not know can't be in `Nemesis_Engine`: they go to
-/// `Nemesis_EngineExt` as always ([`workspace::Workspace::outside_nemesis`]), and the window says so.
+/// As `Nemesis`, the templates Nemesis does not know ([`workspace::Workspace::outside_nemesis`]) can't
+/// be in `Nemesis_Engine`: the setting [`OutsideNemesis`] says whether they go to `Nemesis_EngineExt`,
+/// are left out, or nothing is written. The window lists them.
 ///
 /// ```text
-/// [Export as mod…] -> Output: [D:/MO2/mods/My Patch] [Select]   Format: [Nemesis ▼]   [Export]
-///                     ⚠ Nemesis does not know these templates: ... (1)   <- only as Nemesis
+/// [Export / Import as mod…] -> Output dir: [D:/MO2/mods/My Patch] [Select]
+///                     Format: [Nemesis ▼]
+///                     → D:/MO2/mods/My Patch/Nemesis_Engine/mod/upatch
+///                     Templates Nemesis does not know: [Write to Nemesis_EngineExt ▼]  <- only as Nemesis
+///                     ⚠ Templates Nemesis does not know: 1
+///                     [Export]
 /// ```
 #[derive(Debug, Default)]
 pub(super) struct ModExport {
     pub(super) open: bool,
-    /// The mod's root, e.g. `D:/MO2/mods/My Patch`.
-    pub(super) output: String,
+    /// See [`gui_shared::settings::pages::patch_editor::UserPatchExport`].
+    pub(super) place: gui_shared::settings::pages::patch_editor::UserPatchExport,
     /// Any of them. See the struct docs for `Nemesis`.
     pub(super) format: workspace::ExportFormat,
+    /// `place` was taken from the settings.
+    restored: bool,
+}
+
+impl ModExport {
+    /// The mod's root, the output directory. `None`: it is not set.
+    pub(super) fn mod_root(&self) -> Option<&Path> {
+        let output = self.place.output.trim();
+        (!output.is_empty()).then(|| Path::new(output))
+    }
+
+    /// Where the patches go: `<mod root>/<engine>/mod/upatch`.
+    pub(super) fn patch_dir(&self) -> Option<PathBuf> {
+        let root = self.mod_root()?;
+        Some(workspace::joined(root, &[self.format.to_static_str(), "mod", USER_PATCH_CODE]))
+    }
+
+    /// Takes the place from the settings the first time, then keeps it there.
+    pub(super) fn sync_settings(
+        &mut self,
+        settings: &mut gui_shared::settings::pages::patch_editor::PatchEditorSettings,
+    ) {
+        if !std::mem::replace(&mut self.restored, true) {
+            self.place.clone_from(&settings.user_patch_export);
+        } else if settings.user_patch_export != self.place {
+            settings.user_patch_export.clone_from(&self.place);
+        }
+    }
 }
 
 /// What [`write_as_mod`] wrote.
 struct ModExported<'a> {
-    output: &'a str,
+    /// The mod's root.
+    output: &'a Path,
     /// The patches d-merge's parser rejects, or why nothing was written.
     written: Result<Vec<String>, String>,
-    /// For the Nemesis format: the templates Nemesis does not know (their patches are of no use there).
-    outside: Vec<&'a str>,
+    /// As Nemesis: the templates Nemesis does not know (their patches are of no use there), and what
+    /// was done with them.
+    outside: Option<(Vec<&'a str>, OutsideNemesis)>,
 }
 
 /// Writes the user patch of `work` as a mod, where and how `export` says. `None`: no output yet.
 fn write_as_mod<'a>(work: &'a mut Workspace, export: &'a ModExport) -> Option<ModExported<'a>> {
-    let output = export.output.trim();
-    if output.is_empty() {
-        return None;
-    }
+    use workspace::ExportFormat;
 
-    let root = Path::new(output);
-    let chosen = export.format;
-    let written = if chosen == workspace::ExportFormat::PandoraV5 {
-        work.export_pandora(root, USER_PATCH_CODE).map(|export| export.problems)
-    } else {
-        // The files of its own place are what its next save replaces: not those of this mod.
-        let owned = std::mem::take(&mut work.owned);
-        let format = std::mem::replace(&mut work.export_format, chosen);
-        let written = work.export(root, USER_PATCH_CODE).map(|(_, invalid)| invalid);
-        (work.owned, work.export_format) = (owned, format);
-        written
+    let output = export.mod_root()?;
+    let policy = export.place.outside_nemesis;
+
+    let written = match export.format {
+        ExportFormat::PandoraV5 => work.export_pandora(output, USER_PATCH_CODE).map(|export| export.problems),
+        // Nothing is written: the report says why.
+        ExportFormat::Nemesis if policy == OutsideNemesis::Cancel && work.outside_nemesis().next().is_some() => {
+            Ok(Vec::new())
+        }
+        ExportFormat::Nemesis => write_nemesis(work, output, ExportFormat::Nemesis, policy == OutsideNemesis::Skip),
+        ExportFormat::NemesisExt => write_nemesis(work, output, ExportFormat::NemesisExt, false),
     };
 
-    let outside = match chosen {
-        workspace::ExportFormat::Nemesis => work.outside_nemesis().collect(),
-        _ => Vec::new(),
-    };
+    let outside = (export.format == ExportFormat::Nemesis).then(|| (work.outside_nemesis().collect(), policy));
     Some(ModExported { output, written, outside })
 }
 
-/// Tells how [`write_as_mod`] went: written, written with templates Nemesis does not know,
-/// rejected patches, or failed.
+/// The user patch written as `format` to the mod at `output`. `leave_out`: without the templates
+/// Nemesis does not know. Returns the patches d-merge's parser rejects.
+fn write_nemesis(
+    work: &mut Workspace,
+    output: &Path,
+    format: workspace::ExportFormat,
+    leave_out: bool,
+) -> Result<Vec<String>, String> {
+    // The files of its own place are what its next save replaces: not those of this mod.
+    let owned = std::mem::take(&mut work.owned);
+    let own_format = std::mem::replace(&mut work.export_format, format);
+
+    let keep = |behavior: &workspace::Behavior| !(leave_out && behavior.is_outside_nemesis());
+    let written = work.export_only(output, USER_PATCH_CODE, keep).map(|(_, invalid)| invalid);
+
+    (work.owned, work.export_format) = (owned, own_format);
+    written
+}
+
+/// Tells how [`write_as_mod`] went: written, written with templates Nemesis does not know (or
+/// without them), not written for them, rejected patches, or failed.
 fn report_mod_export(notify: &mut Notification, i18n: &I18nMap, exported: &ModExported<'_>) {
     let ModExported { output, written, outside } = exported;
+    let output = output.display();
+    let (outside, policy) = outside
+        .as_ref()
+        .map_or((&[][..], OutsideNemesis::WriteExt), |(templates, policy)| (templates.as_slice(), *policy));
+    let list = |key: I18nKey| format!("{} ({}):\n{}", i18n.t(key), outside.len(), outside.join("\n"));
+
     match written {
         Ok(problems) if problems.is_empty() && outside.is_empty() => {
             notify.success(format!("{}: {output}", i18n.t(I18nKey::ExportedMessage)));
         }
-        Ok(problems) if problems.is_empty() => notify.warn(format!(
-            "{}: {output}\n{} ({}):\n{}",
-            i18n.t(I18nKey::ExportedMessage),
-            i18n.t(I18nKey::UserPatchOutsideNemesis),
-            outside.len(),
-            outside.join("\n")
-        )),
-        Ok(problems) => {
-            notify.warn(format!("{} ({}):\n{}", i18n.t(I18nKey::NemesisRejected), problems.len(), problems.join("\n")));
+        Ok(_) if policy == OutsideNemesis::Cancel => notify.error(list(I18nKey::OutsideNemesisCancelled)),
+        Ok(problems) if problems.is_empty() => {
+            let key = match policy {
+                OutsideNemesis::Skip => I18nKey::OutsideNemesisLeftOut,
+                OutsideNemesis::WriteExt | OutsideNemesis::Cancel => I18nKey::OutsideNemesisWrittenToExt,
+            };
+            notify.warn(format!("{}: {output}\n{}", i18n.t(I18nKey::ExportedMessage), list(key)));
         }
-        Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+        Ok(problems) => {
+            notify.warn(format!("{} ({}):\n{}", i18n.t(I18nKey::ParserRejected), problems.len(), problems.join("\n")));
+        }
+        Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::ExportFailed))),
+    }
+}
+
+/// Reads the mod at the place of `export` into the user patch of `work`: in place of what it has
+/// (`replace`), or added to it, the mod's patch winning where both have one. A mod of another code
+/// gets the user patch's first. The user decides which: the window has a button for each.
+pub(super) fn import_as_user_patch(
+    work: &mut Work,
+    export: &ModExport,
+    replace: bool,
+    notify: &mut Notification,
+    i18n: &I18nMap,
+) {
+    let Some(root) = export.mod_root() else { return };
+    let templates = PathBuf::from(&work.place.template_dir);
+    match Workspace::import(root, &templates) {
+        Ok((mut imported, code, _)) => {
+            if !code.eq_ignore_ascii_case(USER_PATCH_CODE) {
+                imported.rename_code(&code, USER_PATCH_CODE, &std::sync::atomic::AtomicUsize::new(0));
+            }
+            work.draft = None; // what was proposed is part of it now
+            work.workspace.take_in(imported, replace);
+            notify.success(format!("{}: {}", i18n.t(I18nKey::ImportedMessage), root.display()));
+        }
+        Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::LoadFailedMessage))),
     }
 }
 
@@ -252,7 +333,7 @@ impl Work {
         self.reset_names();
         match self.write_user_patch() {
             Ok(_) => self.mod_written = true,
-            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::ExportFailed))),
         }
         Reshow::Nothing
     }
@@ -282,7 +363,7 @@ pub(super) fn take_in_resolution(
     let root = PathBuf::from(&work.place.template_dir);
     let shown = resolve::apply(&mut work.workspace, &root, request).map_or_else(
         |err| {
-            notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisResolveFailed)));
+            notify.error(format!("{}: {err}", i18n.t(I18nKey::ConflictTakeFailed)));
             // It is for the user to edit: all the more if it could not be taken in.
             resolve::object_of(&mut work.workspace, &root, request)
         },
@@ -355,6 +436,55 @@ mod tests {
 
     fn paths(output: &str) -> PatchPaths<'_> {
         PatchPaths { patch_output_dir: output, template_dir: "" }
+    }
+
+    /// The struct docs' example: the patches go below the output directory, by the format.
+    #[test]
+    fn an_export_goes_below_the_output_dir() {
+        let mut export = ModExport::default();
+        assert_eq!(export.mod_root(), None, "nothing chosen yet");
+
+        export.place.output = " D:/MO2/mods/My Patch ".to_owned();
+        assert_eq!(export.mod_root(), Some(Path::new("D:/MO2/mods/My Patch")));
+        let to = export.patch_dir().unwrap().display().to_string().replace('\\', "/");
+        assert_eq!(to, "D:/MO2/mods/My Patch/Nemesis_Engine/mod/upatch");
+        export.format = workspace::ExportFormat::PandoraV5;
+        assert!(export.patch_dir().unwrap().starts_with("D:/MO2/mods/My Patch/Pandora_Engine"));
+    }
+
+    /// As Nemesis, a template Nemesis does not know goes to `Nemesis_EngineExt`, is left out, or stops
+    /// the export, as [`OutsideNemesis`] says.
+    #[test]
+    fn a_template_nemesis_does_not_know_is_done_as_the_setting_says() {
+        let dir = std::env::temp_dir().join(format!("d_merge_outside_nemesis_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let template = dir.join("x.xml");
+        let object = "\t\t<hkobject name=\"#0100\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">\n\t\t\t<hkparam name=\"userData\">0</hkparam>\n\t\t</hkobject>\n";
+        std::fs::write(&template, format!("<hkpackfile>\n{object}</hkpackfile>\n")).unwrap();
+        let mut work = Workspace::default();
+        work.behaviors.push(workspace::Behavior::open(&template).unwrap());
+        work.behaviors[0].set_text("#0100", &object.replace(">0<", ">1<"));
+        assert_eq!(work.outside_nemesis().count(), 1, "a template of no Nemesis name");
+
+        let export_with = |work: &mut Workspace, outside_nemesis, name: &str| {
+            let place = gui_shared::settings::pages::patch_editor::UserPatchExport {
+                output: dir.join("mods").join(name).display().to_string(),
+                outside_nemesis,
+            };
+            let export = ModExport { place, format: workspace::ExportFormat::Nemesis, ..ModExport::default() };
+            let written = write_as_mod(work, &export).unwrap().written;
+            assert_eq!(written, Ok(Vec::new()));
+            let root = export.mod_root().unwrap();
+            (root.join("Nemesis_EngineExt").is_dir(), root.is_dir())
+        };
+        let ext = export_with(&mut work, OutsideNemesis::WriteExt, "ext");
+        let skip = export_with(&mut work, OutsideNemesis::Skip, "skip");
+        let cancel = export_with(&mut work, OutsideNemesis::Cancel, "cancel");
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(ext, (true, true));
+        assert!(!skip.0, "left out");
+        assert_eq!(cancel, (false, false), "nothing written");
     }
 
     #[test]

@@ -85,7 +85,7 @@ impl AnimDataDialog {
     /// Draws the window. Returns what was asked.
     pub(super) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
         let mut open = true;
-        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisAnimData)).open(&mut open);
+        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::AnimDataOpen)).open(&mut open);
         let generate =
             window.default_width(720.0).show(ctx, |ui| dialog_ui(ui, i18n, self)).and_then(|shown| shown.inner);
 
@@ -147,7 +147,7 @@ impl AnimDataDialog {
         };
         let summary = format!(
             "{}: {} clips, {} hkx -> {} txt",
-            i18n.t(I18nKey::NemesisAnimDataDone),
+            i18n.t(I18nKey::AnimDataDone),
             request.clips.len(),
             request.push.hkx.len(),
             request.push.sets.len(),
@@ -183,10 +183,10 @@ fn add_names_to_characters(work: &mut Work, (root, hkx): (&Path, &[&str]), i18n:
     };
 
     if !done.characters.is_empty() {
-        notify.success(format!("{}: {}", i18n.t(I18nKey::NemesisAnimNamesAdded), done.characters.join(", ")));
+        notify.success(format!("{}: {}", i18n.t(I18nKey::AnimNamesAdded), done.characters.join(", ")));
     }
     if !done.no_character.is_empty() {
-        notify.warn(format!("{}: {}", i18n.t(I18nKey::NemesisAnimNamesNoCharacter), done.no_character.join(", ")));
+        notify.warn(format!("{}: {}", i18n.t(I18nKey::AnimNamesNoCharacter), done.no_character.join(", ")));
     }
     work.reset_names();
 }
@@ -199,23 +199,23 @@ fn project_set_ids(project: &SetProject) -> impl Iterator<Item = String> + '_ {
 /// The window's contents. Returns whether `Generate` was clicked.
 fn dialog_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) -> bool {
     ui.weak(dialog.root.to_string_lossy().as_ref());
-    egui::CollapsingHeader::new(i18n.t(I18nKey::NemesisAnimDataClips)).default_open(true).show(ui, |ui| {
+    egui::CollapsingHeader::new(i18n.t(I18nKey::AnimDataClips)).default_open(true).show(ui, |ui| {
         clips_ui(ui, i18n, &mut dialog.rows);
     });
-    egui::CollapsingHeader::new(i18n.t(I18nKey::NemesisAnimDataSet))
+    egui::CollapsingHeader::new(i18n.t(I18nKey::AnimDataSet))
         .default_open(true)
         .show(ui, |ui| {
             anim_sets_ui(ui, i18n, dialog);
         })
         .header_response
-        .on_hover_text(i18n.t(I18nKey::NemesisAnimDataSetHover));
+        .on_hover_text(i18n.t(I18nKey::AnimDataSetHover));
     ui.separator();
-    ui.add_enabled(dialog.can_generate(), Button::new(i18n.t(I18nKey::NemesisAnimDataGenerate)).primary()).clicked()
+    ui.add_enabled(dialog.can_generate(), Button::new(i18n.t(I18nKey::AnimDataGenerate)).primary()).clicked()
 }
 
 fn clips_ui(ui: &mut egui::Ui, i18n: &I18nMap, rows: &mut [ClipRow]) {
     if rows.is_empty() {
-        ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisAnimDataNoClips));
+        ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::AnimDataNoClips));
         return;
     }
     egui::ScrollArea::vertical().id_salt("nemesis_anim_clips").max_height(200.0).show(ui, |ui| {
@@ -227,18 +227,18 @@ fn clips_ui(ui: &mut egui::Ui, i18n: &I18nMap, rows: &mut [ClipRow]) {
 
 /// The project, and side by side the hkx and the txt of that project.
 fn anim_sets_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) {
-    ui.checkbox(&mut dialog.add_names, i18n.t(I18nKey::NemesisAnimNamesToCharacters))
-        .on_hover_text(i18n.t(I18nKey::NemesisAnimNamesToCharactersHover));
+    ui.checkbox(&mut dialog.add_names, i18n.t(I18nKey::AnimNamesToCharacters))
+        .on_hover_text(i18n.t(I18nKey::AnimNamesToCharactersHover));
     project_combo(ui, i18n, dialog);
     let AnimDataDialog { hkx, projects, project, .. } = dialog;
     let labels = ChecklistLabels {
         all: i18n.t(I18nKey::FilterTextAll),
-        none: i18n.t(I18nKey::NemesisAnimDataNone),
+        none: i18n.t(I18nKey::AnimDataNone),
         filter: i18n.t(I18nKey::FilterLabel),
     };
     ui.columns(2, |columns| {
         if hkx.is_empty() {
-            columns[0].colored_label(columns[0].visuals().warn_fg_color, i18n.t(I18nKey::NemesisAnimDataNoHkx));
+            columns[0].colored_label(columns[0].visuals().warn_fg_color, i18n.t(I18nKey::AnimDataNoHkx));
         } else {
             hkx.show(&mut columns[0], "hkx", &labels, LIST_HEIGHT);
         }
@@ -256,7 +256,7 @@ fn project_combo(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog)
         count => format!("{} ({count})", project.folder),
     };
     ui.horizontal(|ui| {
-        ui.label(i18n.t(I18nKey::NemesisAnimDataProject));
+        ui.label(i18n.t(I18nKey::AnimDataProject));
         let projects = &dialog.projects;
         ComboBox::from_id_salt("nemesis_anim_project")
             .search_hint(i18n.t(I18nKey::SearchLabel))
@@ -317,10 +317,10 @@ impl NewClipsForm {
     pub(super) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let mut create = false;
-        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisNewClips)).open(&mut open);
+        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::AnimDataNewClips)).open(&mut open);
         window.collapsible(false).show(ctx, |ui| {
             self.fields(ui, i18n);
-            create = ui.add_enabled(self.is_valid(), Button::new(i18n.t(I18nKey::NemesisCreate)).primary()).clicked();
+            create = ui.add_enabled(self.is_valid(), Button::new(i18n.t(I18nKey::CreateButton)).primary()).clicked();
         });
 
         if create { Some(FormAsk::Done) } else { (!open).then_some(FormAsk::Close) }
@@ -329,18 +329,18 @@ impl NewClipsForm {
     /// `Actor [..]  Name [..]  Count [..]`, each with its hover.
     fn fields(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         egui::Grid::new("nemesis_new_clips").num_columns(2).show(ui, |ui| {
-            let hover = i18n.t(I18nKey::NemesisClipActorHover);
-            ui.label(i18n.t(I18nKey::NemesisClipActor)).on_hover_text(hover);
+            let hover = i18n.t(I18nKey::ClipActorHover);
+            ui.label(i18n.t(I18nKey::ClipActor)).on_hover_text(hover);
             actor_field(ui, i18n, &mut self.folder, &self.projects, hover);
             ui.end_row();
 
-            let hover = i18n.t(I18nKey::NemesisClipNameHover);
+            let hover = i18n.t(I18nKey::ClipNameHover);
             ui.label(i18n.t(I18nKey::ColumnName)).on_hover_text(hover);
             ui.add(TextEdit::singleline(&mut self.name).desired_width(220.0)).on_hover_text(hover);
             ui.end_row();
 
-            let hover = i18n.t(I18nKey::NemesisClipCountHover);
-            ui.label(i18n.t(I18nKey::NemesisClipCount)).on_hover_text(hover);
+            let hover = i18n.t(I18nKey::ClipCountHover);
+            ui.label(i18n.t(I18nKey::ClipCount)).on_hover_text(hover);
             ui.add(egui::DragValue::new(&mut self.count).range(1..=999)).on_hover_text(hover);
             ui.end_row();
         });
@@ -374,7 +374,7 @@ fn actor_field(ui: &mut egui::Ui, i18n: &I18nMap, folder: &mut String, projects:
     }
     let mut index = projects.iter().position(|project| project == folder).unwrap_or(usize::MAX);
     let mut created = None;
-    let new_label = i18n.t(I18nKey::NemesisNewProject);
+    let new_label = i18n.t(I18nKey::AnimDataNewProject);
     let picked = ComboBox::from_id_salt("nemesis_clip_actor")
         .selected_text(folder.as_str())
         .search_hint(i18n.t(I18nKey::SearchLabel))
@@ -403,9 +403,9 @@ impl DuplicateForm {
     pub(super) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
         let mut go = false;
-        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::NemesisDuplicateTo)).open(&mut open);
+        let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::DuplicateTo)).open(&mut open);
         window.collapsible(false).resizable(false).show(ctx, |ui| {
-            ui.label(format!("{}: {}", i18n.t(I18nKey::NemesisDuplicateFiles), self.files.len()))
+            ui.label(format!("{}: {}", i18n.t(I18nKey::AnimDataDuplicateFiles), self.files.len()))
                 .on_hover_text(self.files.join("\n"));
             ui.horizontal(|ui| {
                 let projects = &self.projects;
@@ -415,7 +415,7 @@ impl DuplicateForm {
                     projects.len(),
                     |i| projects[i].as_str(),
                 );
-                let button = Button::new(i18n.t(I18nKey::NemesisDuplicate)).primary();
+                let button = Button::new(i18n.t(I18nKey::DuplicateButton)).primary();
                 go = ui.add_enabled(!projects.is_empty(), button).clicked();
             });
         });

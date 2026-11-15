@@ -20,13 +20,13 @@ impl NewWork {
     pub fn problem(&self, exists: impl FnOnce(&str) -> bool) -> Option<I18nKey> {
         let code = self.code.trim();
         if !is_valid_mod_code(code) {
-            return Some(I18nKey::NemesisModCodeInvalid);
+            return Some(I18nKey::ModCodeInvalid);
         }
         // The conflict tool's own, which would be overwritten by it.
         if code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE) || exists(code) {
-            return Some(I18nKey::NemesisWorkExists);
+            return Some(I18nKey::WorkExists);
         }
-        self.output.trim().is_empty().then_some(I18nKey::NemesisOutputMissing)
+        self.output.trim().is_empty().then_some(I18nKey::OutputMissing)
     }
 }
 
@@ -42,10 +42,10 @@ mod tests {
     fn a_new_work_needs_a_free_code_and_an_output() {
         assert_eq!(problem("mymod", "D:/out", false), None);
         assert_eq!(problem(" mymod ", "D:/out", false), None);
-        assert_eq!(problem("", "D:/out", false), Some(I18nKey::NemesisModCodeInvalid));
-        assert_eq!(problem("toolongcode", "D:/out", false), Some(I18nKey::NemesisModCodeInvalid));
-        assert_eq!(problem("mymod", "D:/out", true), Some(I18nKey::NemesisWorkExists));
-        assert_eq!(problem("upatch", "D:/out", false), Some(I18nKey::NemesisWorkExists));
-        assert_eq!(problem("mymod", "  ", false), Some(I18nKey::NemesisOutputMissing));
+        assert_eq!(problem("", "D:/out", false), Some(I18nKey::ModCodeInvalid));
+        assert_eq!(problem("toolongcode", "D:/out", false), Some(I18nKey::ModCodeInvalid));
+        assert_eq!(problem("mymod", "D:/out", true), Some(I18nKey::WorkExists));
+        assert_eq!(problem("upatch", "D:/out", false), Some(I18nKey::WorkExists));
+        assert_eq!(problem("mymod", "  ", false), Some(I18nKey::OutputMissing));
     }
 }

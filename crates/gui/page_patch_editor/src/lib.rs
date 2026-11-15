@@ -73,6 +73,12 @@ impl PatchEditorPage {
         self.patch.take_mod_written()
     }
 
+    /// The user patch was written since the last call: only it is for the conflict check to read again.
+    #[inline]
+    pub const fn take_user_patch_written(&mut self) -> bool {
+        self.patch.take_user_patch_written()
+    }
+
     /// Opens or closes the window of the user patch.
     #[inline]
     pub const fn toggle_user_patch(&mut self) {
@@ -112,7 +118,7 @@ impl PatchEditorPage {
             // Always-visible scroll bars (like the hkanno page): you see where you are in a long object.
             ui.spacing_mut().scroll = egui::style::ScrollStyle::solid();
             ui.horizontal(|ui| {
-                for (tool, label) in [(Tool::Patch, I18nKey::PagePatch), (Tool::Crc, I18nKey::NemesisCrcTab)] {
+                for (tool, label) in [(Tool::Patch, I18nKey::PagePatch), (Tool::Crc, I18nKey::CrcTab)] {
                     if ui.add(Button::selectable(self.tool == tool, i18n.t(label))).clicked() {
                         self.tool = tool;
                     }

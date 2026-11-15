@@ -163,11 +163,11 @@ fn folder_row(
     let mut event = response.clicked().then(|| AnimEvent::Toggle(name.to_owned()));
 
     response.context_menu(|ui| {
-        if ui.button(i18n.t(I18nKey::NemesisExpandAllBelow)).clicked() {
+        if ui.button(i18n.t(I18nKey::ExpandAllBelow)).clicked() {
             event = Some(AnimEvent::ExpandBelow(name.to_owned()));
             ui.close();
         }
-        if ui.button(i18n.t(I18nKey::NemesisCollapseAllBelow)).clicked() {
+        if ui.button(i18n.t(I18nKey::CollapseAllBelow)).clicked() {
             event = Some(AnimEvent::CollapseBelow(name.to_owned()));
             ui.close();
         }
@@ -211,17 +211,17 @@ fn file_row(ui: &mut egui::Ui, i18n: &I18nMap, node: Node, name: &str, input: &L
 /// `Duplicate to DefaultFemale~1`, the project that usually has the same patches, if there is one, and
 /// `Duplicate to...`, which asks. `current`: the project it is in.
 fn duplicate_items(ui: &mut egui::Ui, i18n: &I18nMap, projects: &[String], current: &str) -> Option<DuplicatePick> {
-    let hover = i18n.t(I18nKey::NemesisDuplicateToHover);
+    let hover = i18n.t(I18nKey::DuplicateToHover);
     let mut picked = None;
 
     let partner = data::partner_of(current);
     if partner != current && projects.contains(&partner) {
-        let label = format!("{} {partner}", i18n.t(I18nKey::NemesisDuplicateTo));
+        let label = format!("{} {partner}", i18n.t(I18nKey::DuplicateTo));
         if ui.button(label).on_hover_text(hover).clicked() {
             picked = Some(DuplicatePick::To(partner));
         }
     }
-    if ui.button(i18n.t(I18nKey::NemesisDuplicateToOther)).on_hover_text(hover).clicked() {
+    if ui.button(i18n.t(I18nKey::DuplicateToOther)).on_hover_text(hover).clicked() {
         picked = Some(DuplicatePick::Choose);
     }
 
@@ -246,10 +246,10 @@ fn group_row(
 
 const fn kind_label(kind: FileKind) -> I18nKey {
     match kind {
-        FileKind::Header => I18nKey::NemesisAnimKindHeader,
-        FileKind::Clip => I18nKey::NemesisAnimKindClip,
-        FileKind::Motion => I18nKey::NemesisAnimKindMotion,
-        FileKind::Set => I18nKey::NemesisAnimKindSet,
-        FileKind::NewSet => I18nKey::NemesisAnimKindNewSet,
+        FileKind::Header => I18nKey::AnimKindHeader,
+        FileKind::Clip => I18nKey::AnimKindClip,
+        FileKind::Motion => I18nKey::AnimKindMotion,
+        FileKind::Set => I18nKey::AnimKindSet,
+        FileKind::NewSet => I18nKey::AnimKindNewSet,
     }
 }

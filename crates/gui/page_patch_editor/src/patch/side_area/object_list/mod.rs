@@ -43,7 +43,7 @@ impl SideArea {
         let asked = {
             let title = self.title(work, sel, anim);
             let mut asked = None;
-            egui_widgets::section_header(ui, &mut open, i18n.t(I18nKey::NemesisObjectsTab), |ui| {
+            egui_widgets::section_header(ui, &mut open, i18n.t(I18nKey::ExplorerObjects), |ui| {
                 asked = title::buttons(ui, i18n, title);
             });
             asked
@@ -58,7 +58,7 @@ impl SideArea {
 
         ui.add(
             TextEdit::singleline(&mut self.explorer.filter)
-                .hint_text(i18n.t(I18nKey::NemesisFilterHint))
+                .hint_text(i18n.t(I18nKey::ObjectFilterHint))
                 .desired_width(ui.available_width()),
         );
         // Clicking any text field takes the keyboard out of the tree.
@@ -215,18 +215,18 @@ pub(super) const REVEAL_LABEL: I18nKey = gui_shared::i18n::REVEAL_IN_FILE_MANAGE
 /// `Keep Open / New / Duplicate / Repeat / Copy id / Copy path / Reveal in File Explorer / Revert (or Delete for a new object)`, for the flat list and
 /// the tree alike.
 pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> Option<RowAction> {
-    let keep_open = ui.button(i18n.t(I18nKey::NemesisKeepOpen)).clicked();
+    let keep_open = ui.button(i18n.t(I18nKey::KeepOpen)).clicked();
     ui.separator();
-    let new = ui.button(i18n.t(I18nKey::NemesisNewObject)).clicked();
-    let duplicate = ui.button(i18n.t(I18nKey::NemesisDuplicate)).clicked();
+    let new = ui.button(i18n.t(I18nKey::ObjectNew)).clicked();
+    let duplicate = ui.button(i18n.t(I18nKey::DuplicateButton)).clicked();
     let repeat = ui.button(i18n.t(I18nKey::RepeatTitle)).on_hover_text(i18n.t(I18nKey::RepeatHover)).clicked();
-    let copy = ui.button(i18n.t(I18nKey::NemesisCopyId)).clicked();
-    let hover = i18n.t(I18nKey::NemesisObjectFileHover);
-    let copy_path = ui.button(i18n.t(I18nKey::NemesisCopyPath)).on_hover_text(hover).clicked();
+    let copy = ui.button(i18n.t(I18nKey::CopyId)).clicked();
+    let hover = i18n.t(I18nKey::ObjectFileHover);
+    let copy_path = ui.button(i18n.t(I18nKey::CopyPath)).on_hover_text(hover).clicked();
     let reveal = ui.button(i18n.t(REVEAL_LABEL)).on_hover_text(hover).clicked();
     let revert = changed && {
         ui.separator();
-        let label = if is_new { I18nKey::NemesisDeleteObject } else { I18nKey::RevertButton };
+        let label = if is_new { I18nKey::DeleteButton } else { I18nKey::RevertButton };
         ui.add(Button::new(i18n.t(label)).destructive()).clicked()
     };
     [

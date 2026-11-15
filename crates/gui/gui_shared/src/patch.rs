@@ -113,7 +113,7 @@ impl PatchProgress {
             let (step, label, index, total) = (snapshot.phase, i18n.t(key), snapshot.index, snapshot.total);
             // e.g. `[2/6] Reading templates and patches... (12/69, files: 8421)`
             if step == phase::READING_PATCHES {
-                let files = i18n.t(I18nKey::StatusReadFiles);
+                let files = i18n.t(I18nKey::StatusReadFilesLabel);
                 return format!("[{step}/{steps}] {label} ({index}/{total}, {files} {})", snapshot.files);
             }
             return format!("[{step}/{steps}] {label} ({index}/{total})");
@@ -164,12 +164,18 @@ pub fn user_patch_output(output_dir: &str) -> std::path::PathBuf {
     stdx::path::joined(std::path::Path::new(output_dir), &[".d_merge", "user_patch"])
 }
 
-/// The user patch's patch directory. e.g. `D:/out/.d_merge/user_patch/Nemesis_Engine/mod/upatch`
+/// The user patch's patch directory, which the merge reads as a mod.
+///
+/// d-merge always writes and reads it as NemesisExt (`Workspace::use_user_patch_format` of the Patch
+/// Editor): its own place, for no other tool. Writing it for another patching tool is the Patch
+/// Editor's "Export as mod".
+///
+/// e.g. `D:/out` -> `D:/out/.d_merge/user_patch/Nemesis_EngineExt/mod/upatch`
 #[inline]
 pub fn user_patch_mod_dir(output_dir: &str) -> std::path::PathBuf {
     stdx::path::joined(
         std::path::Path::new(output_dir),
-        &[".d_merge", "user_patch", "Nemesis_Engine", "mod", USER_PATCH_CODE],
+        &[".d_merge", "user_patch", "Nemesis_EngineExt", "mod", USER_PATCH_CODE],
     )
 }
 
@@ -221,5 +227,17 @@ mod event_array_tests {
         assert!(is_event_array_conflict("#1821/hkbStateMachineStateInfo/enterNotifyEvents"));
         assert!(is_event_array_conflict("#1821/hkbStateMachineStateInfo/exitNotifyEvents"));
         assert!(!is_event_array_conflict("#0106/hkbModifierList/enable"));
+    }
+}
+
+#[cfg(test)]
+mod user_patch_tests {
+    use super::*;
+
+    /// Where the Patch Editor writes it (NemesisExt) is where the merge reads it.
+    #[test]
+    fn its_folder_is_the_one_it_is_written_to() {
+        let dir = user_patch_mod_dir("D:/out").display().to_string().replace('\\', "/");
+        assert_eq!(dir, "D:/out/.d_merge/user_patch/Nemesis_EngineExt/mod/upatch");
     }
 }

@@ -116,6 +116,7 @@ fn conflict_ui(ui: &mut egui::Ui, i18n: &I18nMap, scan: &mut ConflictScan, mod_i
         ui.colored_label(WINNER_COLOR, format!("+ {}", mark.wins)).on_hover_text(i18n.t(I18nKey::ConflictWinsHover));
         ui.colored_label(ui.visuals().error_fg_color, format!("- {}", mark.loses))
             .on_hover_text(i18n.t(I18nKey::ConflictLosesHover));
+        ui.weak(format!("✓ {}", mark.resolved)).on_hover_text(i18n.t(I18nKey::ConflictResolvedHover));
         if scan.has_hidden()
             && ui
                 .add(Button::new(i18n.t(I18nKey::ConflictUnhideAll)).small())

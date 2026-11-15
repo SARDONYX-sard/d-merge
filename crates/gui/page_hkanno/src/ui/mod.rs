@@ -42,7 +42,7 @@ impl HkannoPage {
             edit_json: ctx.i18n.t(I18nKey::KeybindingEditInJson),
             labels: egui_code_editor::EditorLabels::from_texts(gui_shared::i18n::editor_label_texts(ctx.i18n)),
             unsaved: ctx.i18n.t(I18nKey::KeybindingUnsaved),
-            save: ctx.i18n.t(I18nKey::KeybindingSave),
+            save: ctx.i18n.t(I18nKey::SaveButton),
             dont_save: ctx.i18n.t(I18nKey::KeybindingDontSave),
             cancel: ctx.i18n.t(I18nKey::CancelButton),
         };
@@ -125,7 +125,7 @@ impl HkannoPage {
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui
-                    .add(Button::new(ctx.i18n.t(I18nKey::HkannoOpenButton)))
+                    .add(Button::new(ctx.i18n.t(I18nKey::OpenButton)))
                     .on_hover_text(ctx.i18n.t(I18nKey::HkannoOpenHover))
                     .clicked()
                 {
@@ -276,8 +276,8 @@ impl HkannoPage {
 
     /// Right pane: XML preview of the active tab.
     fn preview(&mut self, ui: &mut egui::Ui, ctx: &HkannoPageCtx<'_>) {
-        let title = ctx.i18n.t(I18nKey::HkannoPreviewTitle);
-        let error_title = ctx.i18n.t(I18nKey::HkannoPreviewError);
+        let title = ctx.i18n.t(I18nKey::XmlPreviewTitle);
+        let error_title = ctx.i18n.t(I18nKey::PreviewError);
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
 
         // Split borrows: the closure reads the document while `preview` is mutated.
@@ -296,7 +296,7 @@ impl HkannoPage {
     /// Bottom pane: diagnostics of the active tab with quick fixes.
     fn problems(&mut self, ui: &mut egui::Ui, ctx: &HkannoPageCtx<'_>) {
         let (show_diagnostics, show_fixes) = (ctx.lsp_settings.diagnostics, ctx.lsp_settings.code_action);
-        let title = ctx.i18n.t(I18nKey::HkannoProblemsLabel);
+        let title = ctx.i18n.t(I18nKey::ProblemsLabel);
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
         let id = tab.editor_id();
         let cursor = &mut self.problems_cursor;
@@ -558,7 +558,7 @@ fn palette_actions<'a>(key_ui: &'a keybinding::KeyUi, i18n: &'a I18nMap) -> [egu
         act(EditorCommand::NextTab.action(""), I18nKey::EditorNextTab),
         act(EditorCommand::PreviousTab.action(""), I18nKey::EditorPreviousTab),
         act(EditorCommand::CloseTab.action(""), I18nKey::EditorCloseTab),
-        act(EditorCommand::TogglePreview.action(""), I18nKey::EditorTogglePreview),
+        act(EditorCommand::TogglePreview.action(""), I18nKey::PreviewToggle),
         act(EditorCommand::RevealFile.action(""), gui_shared::i18n::REVEAL_IN_FILE_MANAGER),
         act(egui_code_editor::EditorAction::new(keybinding::host::OPEN_JSON_ACTION, ""), I18nKey::KeybindingOpenJson),
     ]

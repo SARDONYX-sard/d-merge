@@ -10,6 +10,7 @@ use gui_shared::settings::pages::patch::behavior::ParserMode;
 use nemesis_diff::{View, XmlObject, normalize, object_patch, objects, resolve};
 
 use super::{
+    ExportFormat,
     locations::{file_name_of, file_stem, joined, meshes_path, nemesis_folder},
     read_dir, read_text,
 };
@@ -265,6 +266,14 @@ impl Behavior {
         }
     }
 
+    /// A template Nemesis does not know: as [`super::ExportFormat::Nemesis`], its patches go to
+    /// `Nemesis_EngineExt`, which only d-merge reads. Animation data is no such one.
+    ///
+    /// e.g. `meshes/actors/troll/behaviors/trollbehavior.bin`
+    pub const fn is_outside_nemesis(&self) -> bool {
+        !self.is_anim_data() && self.nemesis.is_none()
+    }
+
     /// `ext`: the work is exported as NemesisExt ([`super::ExportFormat::NemesisExt`]), so even the
     /// templates Nemesis knows go there.
     pub fn target(&self, ext: bool) -> Target {
@@ -275,22 +284,25 @@ impl Behavior {
     }
 
     /// The patch folder of this behavior under `<output>`. `ext`: see [`Self::target`]. Animation data
-    /// has only the Nemesis folder.
+    /// is in the code's folder of the engine: `Nemesis_EngineExt` as NemesisExt, which only d-merge
+    /// reads (as the user patch), else `Nemesis_Engine`.
     ///
     /// e.g. `Nemesis_Engine/mod/mymod/_1stperson/0_master`,
-    /// `Nemesis_EngineExt/mod/mymod/meshes/actors/troll/behaviors/trollbehavior.bin`
+    /// `Nemesis_EngineExt/mod/mymod/meshes/actors/troll/behaviors/trollbehavior.bin`,
+    /// `Nemesis_EngineExt/mod/mymod/animationdatasinglefile` (`ext`)
     pub fn patch_dir(&self, code: &str, ext: bool) -> PathBuf {
-        let nemesis = Path::new("Nemesis_Engine");
+        let (nemesis, nemesis_ext) = (ExportFormat::Nemesis.to_static_str(), ExportFormat::NemesisExt.to_static_str());
+        let (nemesis, anim_engine) = (Path::new(nemesis), Path::new(if ext { nemesis_ext } else { nemesis }));
         if self.asdsf {
-            return joined(nemesis, &["mod", code, ASDSF]);
+            return joined(anim_engine, &["mod", code, ASDSF]);
         }
         if self.adsf {
-            return joined(nemesis, &["mod", code, ADSF]);
+            return joined(anim_engine, &["mod", code, ADSF]);
         }
         match self.target(ext) {
             Target::Nemesis { name, first_person: true } => joined(nemesis, &["mod", code, "_1stperson", &name]),
             Target::Nemesis { name, first_person: false } => joined(nemesis, &["mod", code, &name]),
-            Target::Ext => joined(Path::new("Nemesis_EngineExt"), &["mod", code, &self.meshes_path]),
+            Target::Ext => joined(Path::new(nemesis_ext), &["mod", code, &self.meshes_path]),
         }
     }
 
@@ -334,6 +346,9 @@ impl Behavior {
     /// Takes in what the referenced mod at `mod_dir` adds to this template: its new objects, and the
     /// events and variables in its patch of the names object. Its edits of template objects are
     /// not: those are its own business, and it is merged with this mod anyway.
+    ///
+    /// Its names object is kept too, as `#0083@amco` (see [`Self::ref_names_objects`]): where its
+    /// events and variables are defined, for `$eventID[x]$` to go to.
     pub fn read_ref(&mut self, mod_dir: &Path) {
         if self.is_anim_data() {
             return;
@@ -350,7 +365,13 @@ impl Behavior {
             let Ok(text) = read_text(&file) else { continue };
             let id = file_stem(&file);
             if self.template_object(&id).is_some_and(|object| object.class == STRING_DATA) {
-                self.read_ref_names(&text);
+                let names = resolve(&text, View::Mod);
+                self.read_ref_names(&names);
+                let ref_id = format!("{id}@{code}");
+                // Its own id in its text: nothing takes it for the template's object it patches.
+                let text = names.replacen(&format!("name=\"{id}\""), &format!("name=\"{ref_id}\""), 1);
+                let object = RefObject { class: STRING_DATA.to_owned(), label: format!("ref: {code}"), text };
+                self.refs.insert(ref_id, object);
             } else if self.template_object(&id).is_none() {
                 let (class, label) = (class_attribute(&text).to_owned(), format!("ref: {code}"));
                 self.refs.insert(id, RefObject { class, label, text });
@@ -358,19 +379,26 @@ impl Behavior {
         }
     }
 
-    /// The names in `patch` (of the names object) that the template does not have.
-    fn read_ref_names(&mut self, patch: &str) {
+    /// The names in `text` (the names object, as a referenced mod has it) that the template does not
+    /// have.
+    fn read_ref_names(&mut self, text: &str) {
         let Some(id) = self.object_of_class(STRING_DATA) else { return };
         let template = self.template_object(id).map_or("", |object| &object.text);
-        let text = resolve(patch, View::Mod);
         let new_names = |field: &str| {
             let known = nemesis_diff::vars::names(template, field);
-            let names = nemesis_diff::vars::names(&text, field);
+            let names = nemesis_diff::vars::names(text, field);
             names.into_iter().filter(|name| !known.contains(name)).map(str::to_owned).collect::<Vec<String>>()
         };
         let (events, variables) = (new_names("eventNames"), new_names("variableNames"));
         self.ref_events.extend(events);
         self.ref_variables.extend(variables);
+    }
+
+    /// The names objects of the referenced mods, `(id, text)`: where the events and variables they add
+    /// are defined. e.g. `("#0083@amco", "<hkobject name=\"#0083@amco\" ...")`
+    pub fn ref_names_objects(&self) -> impl Iterator<Item = (&str, &str)> {
+        let names = self.refs.iter().filter(|(_, object)| object.class == STRING_DATA);
+        names.map(|(id, object)| (id.as_str(), object.text.as_str()))
     }
 
     /// One object with its current text, if it exists.

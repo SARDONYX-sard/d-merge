@@ -134,7 +134,7 @@ fn menu(ui: &mut egui::Ui, graph: &Graph, (row, index): (Row, usize), i18n: &I18
     }
 
     ui.separator();
-    let below = [(I18nKey::NemesisExpandAllBelow, true), (I18nKey::NemesisCollapseAllBelow, false)];
+    let below = [(I18nKey::ExpandAllBelow, true), (I18nKey::CollapseAllBelow, false)];
     let mut picked = None;
     for (label, open) in below {
         if ui.button(i18n.t(label)).clicked() {

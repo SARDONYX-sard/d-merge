@@ -45,7 +45,7 @@ impl ClassPicker {
         }
 
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
-        let window = egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisNewObject)).open(&mut open);
+        let window = egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::ObjectNew)).open(&mut open);
         let picked = window.show(ctx, |ui| self.contents(ui, i18n, behavior)).and_then(|shown| shown.inner).flatten();
 
         self.is_open &= open;
@@ -55,7 +55,7 @@ impl ClassPicker {
     /// The filter and the classes.
     fn contents(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, behavior: &Behavior) -> Option<String> {
         let field = TextEdit::singleline(&mut self.filter)
-            .hint_text(i18n.t(I18nKey::NemesisClassFilterHint))
+            .hint_text(i18n.t(I18nKey::ClassFilterHint))
             .desired_width(ui.available_width());
         let field = ui.add(field);
         if std::mem::take(&mut self.focus) {

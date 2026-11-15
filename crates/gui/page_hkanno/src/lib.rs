@@ -150,9 +150,11 @@ impl HkannoPage {
     pub(crate) fn save_active(&mut self, ctx: &mut HkannoPageCtx<'_>) {
         let Some(tab) = self.active_tab() else { return };
         match tab.save() {
-            Ok(()) => ctx.notify.success(format!("{}: {}", ctx.i18n.t(I18nKey::HkannoSaved), tab.settings.output_path)),
+            Ok(()) => {
+                ctx.notify.success(format!("{}: {}", ctx.i18n.t(I18nKey::SavedMessage), tab.settings.output_path));
+            }
             Err(err) => {
-                let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::HkannoSaveFailed));
+                let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::SaveFailed));
                 tracing::error!("{msg}");
                 ctx.notify.error(msg);
             }
@@ -163,7 +165,7 @@ impl HkannoPage {
     pub(crate) fn import_txt(&mut self, path: &std::path::Path, ctx: &mut HkannoPageCtx<'_>) {
         let Some(tab) = self.active_tab() else { return };
         match tab.import_txt(path) {
-            Ok(()) => ctx.notify.success(format!("{}: {}", ctx.i18n.t(I18nKey::HkannoImported), path.display())),
+            Ok(()) => ctx.notify.success(format!("{}: {}", ctx.i18n.t(I18nKey::ImportedMessage), path.display())),
             Err(err) => {
                 let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::LoadFailedMessage));
                 tracing::error!("{msg}");
