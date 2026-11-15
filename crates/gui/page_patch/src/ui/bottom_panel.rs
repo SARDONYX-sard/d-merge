@@ -32,8 +32,10 @@ impl PatchView<'_> {
                 });
 
                 let is_fetching = self.page.fetch.is_fetching();
+                let busy = is_fetching || self.page.conflicts.is_scanning() || self.page.run.is_running();
+
                 // A check is a merge too, and there is one at a time.
-                ui.add_enabled_ui(!is_fetching && !self.page.conflicts.is_scanning(), |ui| {
+                ui.add_enabled_ui(!busy, |ui| {
                     let label = if is_fetching {
                         self.ctx.i18n.t(I18nKey::PatchFetchingButton)
                     } else {
