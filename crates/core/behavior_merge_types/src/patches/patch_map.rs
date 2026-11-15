@@ -72,9 +72,9 @@ impl<'a> OnePatchMap<'a> {
     ///
     /// If the path already exists, the patch with the highest priority is kept.
     ///
-    /// Additionally, top-level class-add patches (`/#0000/ClassName`) are
-    /// treated as unique per object id. When multiple class-add patches target
-    /// the same object id, only the highest-priority patch is retained.
+    /// A new object goes by its id alone (`/#aaaa$1`, its class in the value: see
+    /// `nemesis_xml::patch`). So two mods adding one id as other classes (e.g. two versions of one
+    /// mod) meet at one path: only the highest priority is the object, the other is in `overridden`.
     ///
     /// This method is safe to call concurrently.
     #[inline]
@@ -344,6 +344,26 @@ mod tests {
         map.merge(other);
         assert_eq!(map.patches.get(&path).unwrap().priority, 20);
         assert!(map.overridden.0.get(&path).unwrap().iter().any(|v| v.priority == 9));
+    }
+
+    /// Two versions of a mod add `#aaaa$1` as other classes: one path, so one object.
+    #[test]
+    fn an_object_added_as_two_classes_is_one_of_them() {
+        let class = |class: &'static str, priority| ValueWithPriority {
+            patch: json_patch::JsonPatch {
+                action: json_patch::Action::Pure { op: json_patch::Op::Add },
+                value: class.into(), // in a patch, `{ class: { ..fields } }`
+            },
+            priority,
+        };
+        let map = OnePatchMap::default();
+        let path = json_patch::json_path!["#aaaa$1"];
+        map.insert(path.clone(), class("SomeClass", 9));
+        map.insert(path.clone(), class("OtherSomeClass", 3));
+
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.patches.get(&path).unwrap().priority, 9);
+        assert_eq!(map.overridden.0.get(&path).unwrap().len(), 1, "a conflict a check sees");
     }
 
     #[test]
