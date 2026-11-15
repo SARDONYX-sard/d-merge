@@ -101,6 +101,28 @@ impl Mark {
     }
 }
 
+/// What another mod is to the mod picked in the list, like MO2's colors when a mod is selected.
+///
+/// ```text
+/// picked: B (priority 5)
+/// A (3): B puts other values than A's at 12 places -> overridden_by_picked 12   (green)
+/// C (8): C puts other values than B's at 2 places  -> overrides_picked 2        (red)
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Relation {
+    /// Places where the picked mod's value replaces this mod's: it comes later.
+    pub(crate) overridden_by_picked: u32,
+    /// Places where this mod's value replaces the picked mod's.
+    pub(crate) overrides_picked: u32,
+}
+
+impl Relation {
+    /// How much they meet: what the color and the line are as strong as.
+    pub(crate) const fn count(self) -> u32 {
+        self.overridden_by_picked + self.overrides_picked
+    }
+}
+
 /// What a scan found. See the module docs.
 #[derive(Debug, Default)]
 pub(crate) struct Conflicts {
@@ -214,6 +236,48 @@ impl Conflicts {
         #[expect(clippy::cast_possible_truncation, reason = "far fewer than 4 billion mods")]
         let at = at as u32;
         self.points.iter().filter(|point| point.values.iter().any(|value| value.owner == at)).collect()
+    }
+
+    /// What each other mod is to `picked`, for the load order `priority_of` gives (`None`: off). Two
+    /// mods at a time, as MO2: where they put other values, the later one replaces the other, whoever
+    /// wins the place in the end. What is in `hidden` is as if the mod did not do it.
+    pub(crate) fn relations(
+        &self,
+        picked: &str,
+        priority_of: impl Fn(&str) -> Option<usize>,
+        hidden: Option<&HiddenPatches>,
+    ) -> HashMap<String, Relation> {
+        let mut relations: HashMap<String, Relation> = HashMap::default();
+
+        let Some(at) = self.mods.iter().position(|scanned| scanned.id == picked) else { return relations };
+        let Some(own_priority) = priority_of(picked) else { return relations };
+        let picked_mod = &self.mods[at];
+        #[expect(clippy::cast_possible_truncation, reason = "far fewer than 4 billion mods")]
+        let at = at as u32;
+
+        for point in &self.points {
+            let Some(own) = point.values.iter().find(|value| value.owner == at) else { continue };
+            if picked_mod.hides(point, hidden) {
+                continue;
+            }
+
+            for value in point.values.iter().filter(|value| value.owner != at && value.hash != own.hash) {
+                let other = &self.mods[value.owner as usize];
+                if other.hides(point, hidden) {
+                    continue;
+                }
+                let Some(priority) = priority_of(&other.id) else { continue };
+
+                let relation = relations.entry(other.id.clone()).or_default();
+                if own_priority > priority {
+                    relation.overridden_by_picked += 1;
+                } else {
+                    relation.overrides_picked += 1;
+                }
+            }
+        }
+
+        relations
     }
 }
 
@@ -451,6 +515,7 @@ fn push_if_different(target: &str, path: &str, mut values: Vec<Value>, owners: &
     // Several places of one mod are one value here: the others say the same about that mod.
     values.sort_unstable_by_key(|value| value.owner);
     values.dedup_by_key(|value| (value.owner, value.hash));
+
     let owners_differ = values.windows(2).any(|pair| pair[0].owner != pair[1].owner);
     let values_differ = values.windows(2).any(|pair| pair[0].hash != pair[1].hash);
     if owners_differ && values_differ {
@@ -481,6 +546,7 @@ fn read_anim_data(target: &str, json: &sonic_rs::Value, owners: &Owners, points:
         ) else {
             continue;
         };
+
         let Some(&owner) = owners.by_dir.get(&dir_key(id)) else { continue };
         for (kind, body) in patch.iter() {
             let name = ["name_clip", "clip_id", "index", "file_name"]
@@ -506,6 +572,7 @@ fn read_anim_data(target: &str, json: &sonic_rs::Value, owners: &Owners, points:
             }
         }
     }
+
     for (path, values) in places {
         push_if_different(target, &path, values, owners, points);
     }
@@ -577,6 +644,13 @@ pub(crate) struct ConflictScan {
     hidden_revision: u64,
     /// Why what is hidden could not be saved.
     pub(crate) hidden_error: Option<String>,
+    /// The mod picked in the list (a click on its row): the others are colored by what they are to it.
+    picked: Option<String>,
+    /// See [`Conflicts::relations`], for [`Self::picked`] and the load order `relations_for` tells.
+    relations: HashMap<String, Relation>,
+    /// The highest [`Relation::count`] of [`Self::relations`]: the strongest color.
+    relations_max: u32,
+    relations_for: u64,
 }
 
 impl ConflictScan {
@@ -682,12 +756,14 @@ impl ConflictScan {
     pub(crate) fn refresh_marks(&mut self, list: &[ModItem], user_patch: Option<usize>, hidden_applies: bool) {
         self.hidden_applies = hidden_applies;
         let Some(found) = &self.current else { return };
-        let mut hasher = DefaultHasher::new();
-        for item in list.iter().filter(|item| item.enabled) {
-            (&item.id, item.priority).hash(&mut hasher);
-        }
-        (user_patch, hidden_applies, self.hidden_revision).hash(&mut hasher);
-        let hash = hasher.finish() | 1; // never the 0 of "computed again"
+        let hash = {
+            let mut hasher = DefaultHasher::new();
+            for item in list.iter().filter(|item| item.enabled) {
+                (&item.id, item.priority).hash(&mut hasher);
+            }
+            (user_patch, hidden_applies, self.hidden_revision).hash(&mut hasher);
+            hasher.finish() | 1 // never the 0 of "computed again"
+        };
         if hash == self.marks_for {
             return;
         }
@@ -701,6 +777,44 @@ impl ConflictScan {
         self.marks = found.marks(|id| self.priorities.get(id).copied(), hidden);
         self.dead = found.dead_mods(&self.marks, |id| self.priorities.get(id).copied(), hidden);
         self.stale = self.priorities.keys().any(|id| !found.mods.iter().any(|scanned| scanned.id == *id));
+    }
+
+    /// A click on a mod's row: picks it, or puts it down if it is the one picked.
+    pub(crate) fn pick(&mut self, mod_id: &str) {
+        self.picked = if self.picked.as_deref() == Some(mod_id) { None } else { Some(mod_id.to_owned()) };
+    }
+
+    pub(crate) fn picked(&self) -> Option<&str> {
+        self.picked.as_deref()
+    }
+
+    /// What `mod_id` is to the picked mod, and the strongest of all: see [`Conflicts::relations`].
+    pub(crate) fn relation_of(&self, mod_id: &str) -> (Relation, u32) {
+        (self.relations.get(mod_id).copied().unwrap_or_default(), self.relations_max)
+    }
+
+    /// Finds [`Self::relation_of`] again if the mod picked, the load order or what is hidden changed.
+    /// Runs every frame after [`Self::refresh_marks`], and only compares a hash then.
+    pub(crate) fn refresh_relations(&mut self) {
+        let hash = {
+            let mut hasher = DefaultHasher::new();
+            (self.marks_for, &self.picked).hash(&mut hasher);
+            hasher.finish() | 1
+        };
+        if hash == self.relations_for {
+            return;
+        }
+        self.relations_for = hash;
+
+        let (Some(found), Some(picked)) = (&self.current, &self.picked) else {
+            self.relations.clear();
+            self.relations_max = 0;
+            return;
+        };
+
+        let hidden = self.hidden_applies.then_some(&self.hidden);
+        self.relations = found.relations(picked, |id| self.priorities.get(id).copied(), hidden);
+        self.relations_max = self.relations.values().map(|relation| relation.count()).max().unwrap_or(0);
     }
 
     pub(crate) fn is_selected(&self, point: &Point) -> bool {
@@ -755,6 +869,27 @@ mod tests {
                 dir: Some(format!("D:/mods/{id}")),
             })
             .collect()
+    }
+
+    /// As MO2's colors: the later mod replaces the other where they put other values.
+    #[test]
+    fn a_picked_mod_overrides_the_earlier_and_is_overridden_by_the_later() {
+        let found = read(&behavior("false", "true"), "meshes/m.bin");
+        let in_order = |id: &str| match id {
+            "low" => Some(1),
+            "high" => Some(2),
+            _ => None,
+        };
+
+        let of_low = found.relations("low", in_order, None);
+        assert_eq!(of_low["high"], Relation { overridden_by_picked: 0, overrides_picked: 1 });
+        let of_high = found.relations("high", in_order, None);
+        assert_eq!(of_high["low"], Relation { overridden_by_picked: 1, overrides_picked: 0 });
+
+        // A mod that is off is nothing to the others, and has nothing itself.
+        let low_off = |id: &str| (id != "low").then(|| in_order(id)).flatten();
+        assert!(found.relations("high", low_off, None).is_empty());
+        assert!(found.relations("low", low_off, None).is_empty());
     }
 
     /// MO2's lightning: all it does loses, and nothing of it is kept.
