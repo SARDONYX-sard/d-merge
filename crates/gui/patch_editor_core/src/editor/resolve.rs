@@ -261,6 +261,40 @@ pub struct MergeSide {
     pub name: String,
     /// Its lines there. e.g. `\t\t\t\t#para$3`. Empty: it removes them.
     pub lines: Vec<String>,
+    /// The objects `lines` point to, as this mod has them: two mods pointing to their own objects
+    /// differ in what those are, which the ids alone do not tell.
+    pub pointed: Vec<PointedObject>,
+}
+
+/// An object a value at a conflict points to.
+///
+/// e.g. `#flinch$2` of Flinching: `<hkobject name="#flinch$2" class="hkbClipGenerator" ...>`
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PointedObject {
+    /// e.g. `#flinch$2`, `#0338`
+    pub id: String,
+    /// The object as the mod has it, its patch applied. `None`: the mod has no file of it, so it is
+    /// the template's as it is (or not anywhere: a typo).
+    pub text: Option<String>,
+}
+
+/// The objects `lines` point to (each once, in order), as the mod at `mod_dir` has them: see
+/// [`PointedObject`]. `mod_dir`: `None` for the original, which is the template's.
+fn pointed_objects(lines: &[String], mod_dir: Option<&str>, target: &str) -> Vec<PointedObject> {
+    let mut ids: Vec<&str> = Vec::new();
+    for id in lines.iter().flat_map(|line| crate::tree::pointers(line, "")) {
+        if !ids.contains(&id) {
+            ids.push(id);
+        }
+    }
+
+    ids.into_iter()
+        .map(|id| {
+            let patch = mod_dir.and_then(|mod_dir| read_text(&patch_file(mod_dir, target, id)).ok());
+            let text = patch.map(|patch| resolve(&patch, View::Mod).into_owned());
+            PointedObject { id: id.to_owned(), text }
+        })
+        .collect()
 }
 
 /// What the mods have at a conflict, to make the result from in the editor: with an array, the elements
@@ -280,6 +314,8 @@ pub struct MergeValues {
     pub path: String,
     /// What the template has there, as the mods say.
     pub original: Vec<String>,
+    /// The objects `original` points to: the template's, so their `text` is `None`.
+    pub original_pointed: Vec<PointedObject>,
     pub sides: Vec<MergeSide>,
 }
 
@@ -304,11 +340,17 @@ pub fn merge_values(request: &ResolveRequest, id: &str) -> Option<MergeValues> {
             if original.is_empty() {
                 original = blocks.iter().flat_map(|block| lines_of(&block.original)).collect();
             }
-            let lines = blocks.iter().flat_map(|block| lines_of(&block.text)).collect();
-            Some(MergeSide { name: side.name.clone(), lines })
+            let lines: Vec<String> = blocks.iter().flat_map(|block| lines_of(&block.text)).collect();
+            let pointed = pointed_objects(&lines, Some(&side.mod_dir), &request.target);
+            Some(MergeSide { name: side.name.clone(), lines, pointed })
         })
         .collect();
-    (!sides.is_empty()).then(|| MergeValues { id: id.to_owned(), path: request.path.clone(), original, sides })
+    if sides.is_empty() {
+        return None;
+    }
+
+    let original_pointed = pointed_objects(&original, None, &request.target);
+    Some(MergeValues { id: id.to_owned(), path: request.path.clone(), original, original_pointed, sides })
 }
 
 /// `text` with `lines` after line `after`. Returns it, and the last line put in.
@@ -381,6 +423,11 @@ mod tests {
             ResolveSide { name: code.to_owned(), mod_dir: mod_dir.display().to_string() }
         };
         let flinch = side("flinch", "#flinch$2");
+        // Flinching's own object, which its value points to.
+        let clip = dir.join("flinch").join("0_master").join("#flinch$2.txt");
+        let clip_text =
+            "\t\t<hkobject name=\"#flinch$2\" class=\"hkbClipGenerator\" signature=\"0x333b85b9\">\n\t\t</hkobject>\n";
+        std::fs::write(&clip, clip_text).unwrap();
         let impact = side("neymar", "#neymar$1019");
         let gone = ResolveSide { name: "gone".to_owned(), mod_dir: dir.join("gone").display().to_string() };
         let request = |sides| ResolveRequest {
@@ -401,6 +448,13 @@ mod tests {
         assert_eq!(values.sides[0].name, "flinch");
         assert_eq!(values.sides[0].lines, ["\t\t\t\t#flinch$2"]);
         assert_eq!(values.sides[1].lines, ["\t\t\t\t#neymar$1019"]);
+
+        // What each points to: Flinching has its object; Impact's file is not there.
+        let flinch_clip = &values.sides[0].pointed[0];
+        assert_eq!(flinch_clip.id, "#flinch$2");
+        assert!(flinch_clip.text.as_deref().unwrap().contains("class=\"hkbClipGenerator\""));
+        assert_eq!(values.sides[1].pointed, [PointedObject { id: "#neymar$1019".to_owned(), text: None }]);
+        assert_eq!(values.original_pointed, [PointedObject { id: "#0338".to_owned(), text: None }]);
         assert_eq!(alone, None, "one mod: nothing to choose from");
     }
 
