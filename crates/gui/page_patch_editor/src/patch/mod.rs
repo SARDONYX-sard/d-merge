@@ -401,7 +401,7 @@ impl PatchTool {
 
             SideAsk::RevertOrDelete(id) => {
                 let gone = self.work.revert_or_delete(sel.active, &id);
-                self.problems.refresh_in(&self.work, sel.active, &id);
+                self.problems.refresh_in(&mut self.work, sel.active, &id);
                 editor.object_reverted(sel, &id, gone);
             }
             SideAsk::OpenPandoraDoc => {

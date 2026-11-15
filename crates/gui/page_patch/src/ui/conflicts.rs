@@ -93,6 +93,7 @@ fn conflict_ui(ui: &mut egui::Ui, i18n: &I18nMap, scan: &mut ConflictScan, mod_i
         });
         return None;
     }
+
     let found = scan.current.clone()?;
     if scan.is_stale() {
         ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::ConflictStale));
@@ -100,11 +101,13 @@ fn conflict_ui(ui: &mut egui::Ui, i18n: &I18nMap, scan: &mut ConflictScan, mod_i
     if let Some(err) = &scan.hidden_error {
         ui.colored_label(ui.visuals().error_fg_color, err.as_str());
     }
+
     let points = found.of_mod(mod_id);
     if points.is_empty() {
         ui.weak(i18n.t(I18nKey::ConflictNone));
         return None;
     }
+
     let mark = scan.mark_of(mod_id);
     ui.horizontal(|ui| {
         ui.add(
@@ -163,6 +166,7 @@ fn conflict_ui(ui: &mut egui::Ui, i18n: &I18nMap, scan: &mut ConflictScan, mod_i
             }
         },
     );
+
     // After this, so that nothing is drawn below a list that took all the height.
     let point = shown.iter().find(|point| scan.is_selected(point))?;
     let delta = egui_widgets::vertical_splitter(ui, SPLITTER_HEIGHT);
@@ -211,7 +215,7 @@ fn glyph_color(visuals: &egui::Visuals, glyph: &str) -> egui::Color32 {
     match glyph {
         "+" => WINNER_COLOR,
         "-" => visuals.error_fg_color,
-        _ => visuals.weak_text_color(),
+        _ => visuals.weak_text_color(), // default orange
     }
 }
 
@@ -220,12 +224,14 @@ fn glyph_color(visuals: &egui::Visuals, glyph: &str) -> egui::Color32 {
 fn row_text(ui: &egui::Ui, glyph: &str, point: &Point, winner: Option<&str>) -> egui::text::LayoutJob {
     let font = egui::TextStyle::Monospace.resolve(ui.style());
     let visuals = ui.visuals();
+
     let mut job = egui::text::LayoutJob::default();
     let mut add = |text: &str, color| job.append(text, 0.0, egui::TextFormat::simple(font.clone(), color));
     add(glyph, glyph_color(visuals, glyph));
     add(" ", visuals.text_color());
     add(&point.path, visuals.text_color());
     add("  ", visuals.text_color());
+
     if let Some(kind) = nemesis_diff::schema::type_of_path(&point.path) {
         add(&kind, egui_widgets::markdown::class_color(visuals));
     }
@@ -233,6 +239,7 @@ fn row_text(ui: &egui::Ui, glyph: &str, point: &Point, winner: Option<&str>) -> 
         add("  -> ", WINNER_COLOR);
         add(winner, WINNER_COLOR);
     }
+
     job
 }
 
@@ -310,6 +317,7 @@ fn point_ui(
         for (owner, value) in values {
             ui.horizontal_top(|ui| {
                 let is_hidden = scan.is_hidden(owner, point);
+
                 if is_hidden {
                     ui.label(egui::RichText::new(&owner.name).strikethrough().weak());
                     ui.weak(i18n.t(I18nKey::ConflictHidden));
@@ -318,10 +326,12 @@ fn point_ui(
                 } else {
                     ui.strong(&owner.name);
                 }
+
                 if Some(owner.id.as_str()) == winner {
                     ui.colored_label(WINNER_COLOR, i18n.t(I18nKey::ConflictKept))
                         .on_hover_text(i18n.t(I18nKey::ConflictKeptHover));
                 }
+
                 let hover = if owner.dir.is_some() { I18nKey::ConflictUseHover } else { I18nKey::ConflictFnisHover };
                 let usable = owner.dir.is_some();
                 if ui
@@ -332,11 +342,13 @@ fn point_ui(
                 {
                     request = owner.dir.as_ref().map(|dir| resolve_request(point, dir, None));
                 }
+
                 let (label, hide_hover) = if is_hidden {
                     (I18nKey::ConflictUnhide, I18nKey::ConflictUnhideHover)
                 } else {
                     (I18nKey::ConflictHide, I18nKey::ConflictHideHover)
                 };
+
                 let hide_hover = if usable { hide_hover } else { I18nKey::ConflictFnisHover };
                 if ui
                     .add_enabled(usable, Button::new(i18n.t(label)).small())
@@ -347,6 +359,7 @@ fn point_ui(
                     toggle = owner.code();
                 }
             });
+
             // What is not kept in the end steps back.
             let preview = egui::RichText::new(&*value.preview).monospace();
             let preview = if Some(owner.id.as_str()) == winner { preview } else { preview.weak() };
@@ -354,6 +367,7 @@ fn point_ui(
             ui.add_space(4.0);
         }
     });
+
     if let Some(code) = toggle {
         scan.toggle_hidden(code, point);
     }

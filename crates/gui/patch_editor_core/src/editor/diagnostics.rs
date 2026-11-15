@@ -31,6 +31,27 @@ pub fn field_diagnostics(text: &str, behavior: &Behavior, is_new: bool, code: &s
         .collect()
 }
 
+/// The message of [`not_linked`].
+pub const NOT_LINKED: &str = "No object links to this new object: Nemesis never uses it.";
+
+/// A warning on the first line (`<hkobject name="#mymod$0" ...>`) of a new object the root does not
+/// reach: see [`crate::tree::Graph::unlinked`]. It is written to the patch all the same.
+pub fn not_linked(text: &str) -> Diagnostic {
+    let line = text.lines().next().unwrap_or_default();
+    let start = line.chars().take_while(|c| c.is_whitespace()).count();
+    Diagnostic {
+        line: 0,
+        columns: start..line.chars().count(),
+        severity: Severity::Warning,
+        message: NOT_LINKED.to_owned(),
+    }
+}
+
+/// Is `problem` a [`not_linked`] warning?
+pub fn is_not_linked(problem: &Diagnostic) -> bool {
+    problem.message == NOT_LINKED
+}
+
 /// Where d-merge's parser rejected a patch. See [`parser_problem`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ParserProblem {
@@ -122,6 +143,16 @@ mod tests {
     use super::*;
 
     const ERROR: &str = "error: \n  |\n3 |   <hkparam name=\"typoField\">null</hkparam>\n  |   - Unknown field.";
+
+    #[test]
+    fn a_new_object_nothing_links_to_is_warned_of_at_its_first_line() {
+        let problem = not_linked(
+            "		<hkobject name=\"#m$0\">
+		</hkobject>",
+        );
+        assert_eq!((problem.line, problem.columns.clone(), problem.severity), (0, 2..24, Severity::Warning));
+        assert!(is_not_linked(&problem));
+    }
 
     #[test]
     fn reads_the_place_of_a_parser_error() {

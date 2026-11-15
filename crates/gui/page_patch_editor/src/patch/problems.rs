@@ -13,14 +13,20 @@
 //! | others    | what the mod changes | fields, pointers, and d-merge's parser on the patch |
 //!
 //! A template object nobody changed has nothing of the mod's to find, so only changes are checked.
+//!
+//! A new object nothing links to is warned of too ([`diagnostics::not_linked`]). That depends on the
+//! other objects: an edit of `#0106` that adds `#mymod$0` links it. So an edit also checks again the
+//! objects that were or are not linked.
 
 use egui_code_editor::Diagnostic;
+use fast_hash::HashSet;
 use gui_shared::settings::pages::patch::behavior::ParserMode;
 use rayon::prelude::*;
 
 use super::{
     editor::{diagnostics, preview::Preview},
     tool::work_state::Work,
+    tree::Graph,
     workspace::{Behavior, ObjectText},
 };
 
@@ -58,6 +64,13 @@ struct Checker<'a> {
     code: &'a str,
     /// The patch page's, which the parser checks by.
     mode: ParserMode,
+    /// The ids of the new objects nothing links to. See [`Graph::unlinked`].
+    not_linked: &'a HashSet<&'a str>,
+}
+
+/// The ids of `graph`'s new objects nothing links to.
+fn not_linked_ids(graph: &Graph) -> HashSet<&str> {
+    graph.unlinked().iter().map(|&node| graph.id(node)).collect()
 }
 
 /// Is this object checked? See the module docs.
@@ -67,7 +80,7 @@ fn is_checked(behavior: &Behavior, object: &ObjectText<'_>) -> bool {
 
 /// The problems of one object. `None`: it has none.
 fn object_problems(checker: Checker<'_>, object: &ObjectText<'_>) -> Option<ObjectProblems> {
-    let Checker { index, behavior, code, mode } = checker;
+    let Checker { index, behavior, code, mode, not_linked } = checker;
     let (id, text) = (object.id, object.text);
     // Animation data only has the parser's word: see `anim_lines`.
     let mut found: Vec<Diagnostic> = if behavior.is_anim_data() {
@@ -75,6 +88,9 @@ fn object_problems(checker: Checker<'_>, object: &ObjectText<'_>) -> Option<Obje
     } else {
         diagnostics::field_diagnostics(text, behavior, object.is_new, code)
     };
+    if not_linked.contains(id) {
+        found.insert(0, diagnostics::not_linked(text));
+    }
     // As the editor does: the parser reads the patch, whose lines are not the object's.
     if let Some(patch) = behavior.patch(code, id)
         && let Err(error) = behavior.validate(id, &patch, mode)
@@ -102,26 +118,40 @@ impl Problems {
     /// Checks the whole work again if it changed as a whole (read, loaded, restored). `(code, mode)`:
     /// the mod code, and the parser's mode.
     fn check_work(&mut self, behaviors: &[Behavior], (code, mode): (&str, ParserMode)) {
-        let checker = |index| Checker { index, behavior: &behaviors[index], code, mode };
-        let mut found: Vec<ObjectProblems> =
-            (0..behaviors.len()).flat_map(|index| behavior_problems(checker(index))).collect();
+        let mut found = Vec::new();
+        for (index, behavior) in behaviors.iter().enumerate() {
+            // Only new objects can be not linked: no graph for a behavior without any.
+            let has_new = !behavior.is_anim_data() && !behavior.added.is_empty();
+            let graph = has_new.then(|| Graph::new(behavior));
+            let not_linked = graph.as_ref().map(not_linked_ids).unwrap_or_default();
+
+            let checker = Checker { index, behavior, code, mode, not_linked: &not_linked };
+            found.extend(behavior_problems(checker));
+        }
         sort(&mut found);
         self.list = Some(found);
     }
 
-    /// The object `id` of behavior `index` changed: only its problems are found again. After typing
-    /// pauses.
-    fn refresh_object(&mut self, (index, behavior): (usize, &Behavior), id: &str, (code, mode): (&str, ParserMode)) {
-        let checker = Checker { index, behavior, code, mode };
-        let object = behavior.object_text(id).filter(|object| is_checked(behavior, object));
-        let found = object.and_then(|object| object_problems(checker, &object));
-
+    /// The objects `ids` of behavior `index` changed: only their problems are found again. After
+    /// typing pauses.
+    fn refresh_objects(&mut self, checker: Checker<'_>, ids: &[&str]) {
         let Some(groups) = &mut self.list else { return };
-        groups.retain(|group| group.behavior != index || group.id != id);
-        if let Some(found) = found {
-            groups.push(found);
-            sort(groups);
+        let (index, behavior) = (checker.index, checker.behavior);
+        for &id in ids {
+            let object = behavior.object_text(id).filter(|object| is_checked(behavior, object));
+            let found = object.and_then(|object| object_problems(checker, &object));
+            groups.retain(|group| group.behavior != index || group.id != id);
+            groups.extend(found);
         }
+        sort(groups);
+    }
+
+    /// The ids of behavior `index` the list warns of as not linked.
+    fn warned_not_linked(&self, index: usize) -> Vec<String> {
+        let groups = self.list.as_deref().unwrap_or_default();
+        let warned = groups.iter().filter(|group| group.behavior == index);
+        let warned = warned.filter(|group| group.problems.iter().any(diagnostics::is_not_linked));
+        warned.map(|group| group.id.clone()).collect()
     }
 
     /// The errors and warnings of the work, once it was checked: the status bar's counts.
@@ -142,11 +172,28 @@ impl Problems {
         self.checked = Some(work.reloads());
     }
 
-    /// The object `id` of behavior `active` changed: see [`Self::refresh_object`].
-    pub(super) fn refresh_in(&mut self, work: &Work, active: usize, id: &str) {
-        let Some(behavior) = work.workspace.behaviors.get(active) else { return };
-        let settings = (work.place.mod_code.trim(), work.parser_mode);
-        self.refresh_object((active, behavior), id, settings);
+    /// The object `id` of behavior `active` changed: it is checked again, and so are the objects that
+    /// were or are not linked (see the module docs). See [`Self::refresh_objects`].
+    pub(super) fn refresh_in(&mut self, work: &mut Work, active: usize, id: &str) {
+        if active >= work.workspace.behaviors.len() {
+            return;
+        }
+        let names = work.names(active);
+        let not_linked = not_linked_ids(&names.graph);
+
+        // (Owned: the list they are read from is changed after.)
+        let was_warned = self.warned_not_linked(active);
+        let mut ids: Vec<&str> = std::iter::once(id)
+            .chain(not_linked.iter().copied())
+            .chain(was_warned.iter().map(String::as_str))
+            .collect();
+        ids.sort_unstable();
+        ids.dedup();
+
+        let behavior = &work.workspace.behaviors[active];
+        let (code, mode) = (work.place.mod_code.trim(), work.parser_mode);
+        let checker = Checker { index: active, behavior, code, mode, not_linked: &not_linked };
+        self.refresh_objects(checker, &ids);
     }
 }
 
@@ -189,10 +236,10 @@ mod tests {
 
         let motion = "Male~1/m$2.txt";
         work.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\n1\n0\n0\n".to_owned());
-        problems.refresh_in(&work, 0, motion);
+        problems.refresh_in(&mut work, 0, motion);
         assert_eq!(problems.counts(), Some((2, 0)));
         work.workspace.behaviors[0].added.insert(motion.to_owned(), "m$2\nwrong\n0\n0\n".to_owned());
-        problems.refresh_in(&work, 0, motion);
+        problems.refresh_in(&mut work, 0, motion);
         assert_eq!(problems.counts(), Some((3, 0)), "a new mistake comes in");
     }
 
@@ -225,7 +272,14 @@ mod tests {
         let mut behavior = Behavior::open(&template).unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
         let checker = |behavior: &Behavior| -> Vec<ObjectProblems> {
-            behavior_problems(Checker { index: 0, behavior, code: "m", mode: ParserMode::Strict })
+            let not_linked = HashSet::default();
+            behavior_problems(Checker {
+                index: 0,
+                behavior,
+                code: "m",
+                mode: ParserMode::Strict,
+                not_linked: &not_linked,
+            })
         };
 
         assert!(checker(&behavior).is_empty(), "nothing changed");
@@ -241,5 +295,38 @@ mod tests {
         };
         assert!(lines("#0100").contains(&1), "{problems:?}");
         assert!(lines("#0101").is_empty(), "{problems:?}");
+    }
+
+    /// A new object nothing links to is warned of; an edit of another object that links it takes the
+    /// warning away.
+    #[test]
+    fn a_new_object_is_warned_of_until_something_links_it() {
+        let dir = std::env::temp_dir().join(format!("d_merge_not_linked_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let template = dir.join("x.xml");
+        let root = "\t\t<hkobject name=\"#0100\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">\n\t\t\t<hkparam name=\"userData\">0</hkparam>\n\t\t</hkobject>\n";
+        std::fs::write(&template, format!("<hkpackfile>\n{root}</hkpackfile>\n")).unwrap();
+        let mut behavior = Behavior::open(&template).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        behavior.added.insert("#m$0".to_owned(), root.replace("#0100", "#m$0"));
+
+        let mut work = Work::default();
+        work.workspace.behaviors.push(behavior);
+        work.place.mod_code = "m".to_owned();
+        work.place.loaded_for = Some("m".to_owned());
+        work.reset_names();
+        let mut problems = Problems::default();
+        let is_warned = |problems: &Problems| {
+            let groups = problems.list.iter().flatten().filter(|group| group.id == "#m$0");
+            groups.flat_map(|group| &group.problems).any(diagnostics::is_not_linked)
+        };
+
+        problems.diagnose(&work);
+        assert!(is_warned(&problems), "{:?}", problems.list);
+
+        work.workspace.behaviors[0].set_text("#0100", &root.replace(">0<", ">#m$0<"));
+        work.object_changed("#0100");
+        problems.refresh_in(&mut work, 0, "#0100");
+        assert!(!is_warned(&problems), "{:?}", problems.list);
     }
 }
