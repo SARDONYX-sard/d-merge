@@ -11,6 +11,7 @@
 use std::path::PathBuf;
 
 use egui_widgets::{
+    HoverMarkdown as _,
     notify::Notification,
     shadcn::{Button, Icon},
 };
@@ -127,7 +128,7 @@ fn add_menu(ui: &mut egui::Ui, scope: TemplateScope, i18n: &I18nMap) -> Option<A
             }
             let mut response = ui.button(i18n.t(label));
             if let Some(hover) = hover {
-                response = response.on_hover_text(i18n.t(hover));
+                response = response.on_hover_markdown(i18n.t(hover));
             }
             if response.clicked() {
                 event = Some(item);

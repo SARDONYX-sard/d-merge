@@ -313,37 +313,6 @@ impl Workspace {
         self.reload_refs();
     }
 
-    /// Takes in the patches of `other`, a mod read with [`Self::import`] (of this mod code): `replace`
-    /// discards what this has first; else what `other` has wins where both have it. Its referenced
-    /// mods come too.
-    ///
-    /// e.g. a user patch written for another tool, read back into the user patch.
-    pub fn take_in(&mut self, other: Self, replace: bool) {
-        if replace {
-            for behavior in &mut self.behaviors {
-                behavior.edits.clear();
-                behavior.added.clear();
-            }
-        }
-
-        for theirs in other.behaviors {
-            let ours = self.behaviors.iter_mut().find(|ours| ours.meshes_path == theirs.meshes_path);
-            match ours {
-                Some(ours) => {
-                    ours.edits.extend(theirs.edits);
-                    ours.added.extend(theirs.added);
-                }
-                None => self.behaviors.push(theirs),
-            }
-        }
-        for dir in other.ref_mods {
-            if !self.ref_mods.iter().any(|known| known.eq_ignore_ascii_case(&dir)) {
-                self.ref_mods.push(dir);
-            }
-        }
-        self.reload_refs();
-    }
-
     /// Reads the referenced mods into every behavior. Call when they or the behaviors change.
     pub fn reload_refs(&mut self) {
         for behavior in &mut self.behaviors {
@@ -592,29 +561,6 @@ mod tests {
         assert!(found && gone && !again);
     }
 
-    /// Only a patched template Nemesis does not know is outside what Nemesis reads: not one it
-    /// knows, not one without patches, not animation data.
-    #[test]
-    fn the_templates_outside_nemesis() {
-        let template = |meshes_path: &str, nemesis: Option<(String, bool)>, patched: bool| {
-            let mut behavior = Behavior::open(&std::path::Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
-            (behavior.adsf, behavior.meshes_path, behavior.nemesis) = (false, meshes_path.to_owned(), nemesis);
-            if patched {
-                behavior.edits.insert("#0001".to_owned(), String::new());
-            }
-            behavior
-        };
-        let mut workspace = Workspace::default();
-        workspace.behaviors.push(template("meshes/troll.bin", None, true));
-        workspace.behaviors.push(template("meshes/bear.bin", None, false));
-        workspace.behaviors.push(template("meshes/0_master.bin", Some(("0_master".to_owned(), false)), true));
-        let mut clips = Behavior::open(&std::path::Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
-        clips.added.insert("Male~1/m$0.txt".to_owned(), String::new());
-        workspace.behaviors.push(clips);
-
-        assert_eq!(workspace.outside_nemesis().collect::<Vec<_>>(), ["meshes/troll.bin"]);
-    }
-
     /// A mod of Nemesis only is a Nemesis work; one written elsewhere is an `Extended` one.
     #[test]
     fn the_scope_of_a_read_mod() {
@@ -637,48 +583,6 @@ mod tests {
         assert_eq!(bin.objects.len(), txt.objects.len());
         let differ = bin.objects.iter().zip(&txt.objects).filter(|(a, b)| a.id != b.id || a.text != b.text).count();
         assert_eq!(differ, 0);
-    }
-
-    /// A mod read back: in place of what the work has, or added to it with the mod's patch winning.
-    #[test]
-    fn a_mod_is_taken_in_in_place_of_the_work_or_added_to_it() {
-        let dir = std::env::temp_dir().join(format!("d_merge_take_in_{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let template = dir.join("x.xml");
-        let object = |id: &str, value: &str| {
-            format!(
-                "\t\t<hkobject name=\"{id}\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">\n\t\t\t<hkparam name=\"userData\">{value}</hkparam>\n\t\t</hkobject>\n"
-            )
-        };
-        std::fs::write(
-            &template,
-            format!("<hkpackfile>\n{}{}</hkpackfile>\n", object("#0100", "0"), object("#0101", "0")),
-        )
-        .unwrap();
-        let work = |edits: &[(&str, &str)], added: &str| {
-            let mut workspace = Workspace::default();
-            workspace.behaviors.push(Behavior::open(&template).unwrap());
-            for (id, value) in edits {
-                workspace.behaviors[0].set_text(id, &object(id, value));
-            }
-            workspace.behaviors[0].added.insert(added.to_owned(), object(added, "0"));
-            workspace
-        };
-        let ours = || work(&[("#0100", "1"), ("#0101", "1")], "#upatch$0");
-        let theirs = || work(&[("#0100", "2")], "#upatch$1");
-
-        let mut added_to = ours();
-        added_to.take_in(theirs(), false);
-        let mut replaced = ours();
-        replaced.take_in(theirs(), true);
-        std::fs::remove_dir_all(&dir).unwrap();
-
-        let value = |workspace: &Workspace, id: &str| workspace.behaviors[0].text(id).map(|text| text.contains(">2<"));
-        assert_eq!(value(&added_to, "#0100"), Some(true), "the mod's wins");
-        assert!(added_to.behaviors[0].edits.contains_key("#0101"), "ours stays");
-        assert_eq!(added_to.behaviors[0].added.len(), 2);
-        assert!(!replaced.behaviors[0].edits.contains_key("#0101"), "ours is gone");
-        assert_eq!(replaced.behaviors[0].added.keys().collect::<Vec<_>>(), ["#upatch$1"]);
     }
 
     /// An event a referenced mod adds is defined in its names object: kept as `#0083@amco` to go to.

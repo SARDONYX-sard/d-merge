@@ -18,7 +18,7 @@
 //! each pointed object is shown under its mod, to compare them.
 
 use egui_code_editor::languages::Xml;
-use egui_widgets::shadcn::Button;
+use egui_widgets::{HoverMarkdown as _, shadcn::Button};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{
@@ -120,11 +120,11 @@ fn panel_ui(
     let mut close = false;
 
     ui.horizontal(|ui| {
-        ui.strong(i18n.t(I18nKey::MergeTitle)).on_hover_text(i18n.t(I18nKey::MergeHover));
+        ui.strong(i18n.t(I18nKey::MergeTitle)).on_hover_markdown(i18n.t(I18nKey::MergeHover));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             close = ui.small_button("✖").clicked();
             let all = Button::new(i18n.t(I18nKey::MergeAcceptAll)).small();
-            if ui.add(all).on_hover_text(i18n.t(I18nKey::MergeAcceptAllHover)).clicked() {
+            if ui.add(all).on_hover_markdown(i18n.t(I18nKey::MergeAcceptAllHover)).clicked() {
                 picked = Some(MergePick::Accept(merge::all_lines(values)));
             }
         });
@@ -200,7 +200,7 @@ fn pointed_ui(
                     ui.weak(i18n.t(I18nKey::MergePointedMissing));
                 }
             });
-        header.header_response.on_hover_text(i18n.t(I18nKey::MergePointedHover));
+        header.header_response.on_hover_markdown(i18n.t(I18nKey::MergePointedHover));
     }
 }
 
@@ -224,7 +224,7 @@ fn side_ui(ui: &mut egui::Ui, i18n: &I18nMap, side: &resolve::MergeSide, origina
     ui.horizontal(|ui| {
         ui.strong(&side.name);
         let accept = Button::new(i18n.t(I18nKey::MergeAccept)).small();
-        if ui.add(accept).on_hover_text(i18n.t(I18nKey::MergeAcceptHover)).clicked() {
+        if ui.add(accept).on_hover_markdown(i18n.t(I18nKey::MergeAcceptHover)).clicked() {
             picked = Some(MergePick::Accept(side.lines.clone()));
         }
     });
@@ -234,7 +234,7 @@ fn side_ui(ui: &mut egui::Ui, i18n: &I18nMap, side: &resolve::MergeSide, origina
     }
     for line in &side.lines {
         ui.horizontal(|ui| {
-            if ui.small_button("+").on_hover_text(i18n.t(I18nKey::MergeInsertHover)).clicked() {
+            if ui.small_button("+").on_hover_markdown(i18n.t(I18nKey::MergeInsertHover)).clicked() {
                 picked = Some(MergePick::Insert(vec![line.clone()]));
             }
             let label = ui.add(egui::Label::new(egui_code_editor::line_job(ui, line.trim_start(), &Xml)).extend());

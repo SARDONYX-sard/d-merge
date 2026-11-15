@@ -5,7 +5,10 @@
 //! [Save] [Revert] [Format] [⚙]  Keymap: [Vim ▼]                [Hide Preview]  <- toolbar
 //! ```
 
-use egui_widgets::shadcn::{Button, Checkbox, ComboBox, TextEdit};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, Checkbox, ComboBox, TextEdit},
+};
 use gui_shared::{i18n::I18nKey, settings::pages::convert::OutputFormat};
 
 use crate::{HkannoPage, HkannoPageCtx};
@@ -62,7 +65,7 @@ impl HkannoPage {
 
             let has_tab = !self.tabs.is_empty();
             let import = Button::new(i18n.t(I18nKey::HkannoImportTxt));
-            if ui.add_enabled(has_tab, import).on_hover_text(i18n.t(I18nKey::HkannoImportTxtHover)).clicked()
+            if ui.add_enabled(has_tab, import).on_hover_markdown(i18n.t(I18nKey::HkannoImportTxtHover)).clicked()
                 && let Some(path) = gui_shared::rfd::FileDialog::new().add_filter("Text", &["txt"]).pick_file()
             {
                 self.import_txt(&path, ctx);

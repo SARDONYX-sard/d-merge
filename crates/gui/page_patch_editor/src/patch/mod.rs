@@ -320,7 +320,7 @@ impl PatchTool {
         let start = !user_patch && !self.work.place.is_open();
         let parts = (&mut self.work, &mut self.panels);
         let asks = if user_patch {
-            ui::user_patch::user_patch_bar(ui, i18n, (&*parts.0, parts.1), notify)
+            ui::user_patch::user_patch_bar(ui, i18n, (&*parts.0, parts.1))
         } else if start {
             ui::start_screen::start_screen(ui, i18n, (&*parts.0, parts.1), notify)
         } else {
@@ -568,7 +568,6 @@ impl PatchTool {
     ) {
         self.editor.read_options(editor);
         self.read_view_settings(settings);
-        self.panels.mod_export.sync_settings(settings);
         let shown = self.editor.shown(&self.sel);
         self.work.sync_workspace(shown, notify, i18n);
         self.take_resolution(notify, i18n);

@@ -12,6 +12,8 @@ use crate::error::{Error, *};
 /// - Alphabetical order of the `snake_case` name, `Invalid` last (a test checks it).
 /// - Names end in `Label`, `Hover`, `Hint` by kind.
 /// - "directory" (`dir` in a label), never "folder".
+/// - A long hover: a sentence or two, then `# Notes` / `# Examples` / ... with `- items` (no full
+///   stop) and `` `paths` ``. It reads as Rust docs and is drawn as Markdown (`on_hover_markdown`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[derive(serde::Serialize, serde::Deserialize, gui_shared_derive::I18n)]
 #[serde(rename_all = "snake_case")]
@@ -52,7 +54,11 @@ pub enum I18nKey {
     /// Animation Data…
     AnimDataOpen,
 
-    /// Uses the mod's root directory: generates the data of the clips of this work from their hkx (animationdatasinglefile), and adds the hkx you choose to the anim set files you choose (animationsetdatasinglefile).
+    /// Generates the animation data of this work from the mod's root directory.
+    ///
+    /// # Targets
+    /// - `animationdatasinglefile`: the clip data of this work's clips, from their hkx
+    /// - `animationsetdatasinglefile`: the hkx you choose, added to the anim sets you choose
     AnimDataOpenHover,
 
     /// Project:
@@ -61,7 +67,11 @@ pub enum I18nKey {
     /// Anim sets (animationsetdatasinglefile)
     AnimDataSet,
 
-    /// Adds every checked hkx to every checked txt: the hkx the game caches while that anim set is active. Checks in each project are kept.
+    /// Adds every checked hkx to every checked txt.
+    ///
+    /// # Notes
+    /// - These are the hkx the game caches while that anim set is active
+    /// - The checks are kept for each project
     AnimDataSetHover,
 
     /// Clips
@@ -88,28 +98,24 @@ pub enum I18nKey {
     /// Also add the checked hkx to their characters
     AnimNamesToCharacters,
 
-    /// A behavior plays a hkx only if its character lists it. Each checked hkx goes to the animationNames of the characters of its actor, told by its folder: e.g. meshes\actors\character\animations\Para\Equip.hkx -> Animations\Para\Equip.hkx in defaultmale and defaultfemale. Names already there are left.
+    /// Adds each checked hkx to the `animationNames` of the characters of its actor, told by its directory. A behavior plays a hkx only if its character lists it.
+    ///
+    /// # Examples
+    /// - `meshes\actors\character\animations\Para\Equip.hkx`
+    ///   -> `Animations\Para\Equip.hkx` in defaultmale and defaultfemale
+    ///
+    /// # Notes
+    /// - Names already there are left
     AnimNamesToCharactersHover,
 
     /// Apply
     ApplyButton,
 
-    /// Gets the bone count from each `skeleton.xml` distributed by mods such as
-    /// XPMSSE and extends the corresponding character hkx based on that information.
-    ///
-    /// This provides functionality equivalent to `Auto Skeleton Patch` and FNIS's `SKELETON arm fix`.
+    /// Gets the bone count from each `skeleton.xml` distributed by mods such as XPMSSE, and extends the corresponding character hkx by it. The same as `Auto Skeleton Patch` and FNIS's `SKELETON arm fix`.
     ///
     /// # Recommended
-    /// The following mods are recommended to use with Arm Fix:
-    /// (Without this, arm animations such as blocking while moving may not work)
     /// - XPMSSE (v5.06) and other bone-expanding mods
-    ///
-    /// # Notes
-    /// The following may result in incorrect patching:
-    /// - Manual mode + `Skyrim Data directory = MO2/mods/*`
-    ///   -> Multiple `skeleton.xml` files may be found.
-    ///   -> The first match is used.
-    ///   -> A warning is logged when multiple files are found.
+    ///   -> Without this, arm animations such as blocking while moving may not work
     ///
     /// # Targets
     /// - `<Skyrim Data directory>/meshes/actors/character/character assets/skeleton.xml`
@@ -118,8 +124,12 @@ pub enum I18nKey {
     ///   -> `defaultfemale.hkx`
     ///
     /// # Processing
-    /// - Missing bone indices -> extend `bonePairMap`.
-    /// - Missing bone weights -> append `0.0` / `1.0` to the corresponding weight arrays.
+    /// - Missing bone indices -> extend `bonePairMap`
+    /// - Missing bone weights -> append `0.0` / `1.0` to the corresponding weight arrays
+    ///
+    /// # Notes
+    /// - Manual mode with a glob Skyrim Data directory (e.g. `MO2/mods/*`) may patch wrongly
+    ///   -> When several `skeleton.xml` are found, the first is used, and a warning is logged
     ArmFixHover,
 
     /// Arm fix
@@ -131,55 +141,58 @@ pub enum I18nKey {
     /// Auto Detect
     AutoDetectButton,
 
-    /// Automatically detect the Skyrim Data directory based on the selected output format. This uses the Steam registry, so it will only work if you have launched Skyrim at least once.
+    /// Detects the Skyrim Data directory for the selected output format.
+    ///
+    /// # Notes
+    /// - It uses the Steam registry: Skyrim must have been launched at least once
     AutoDetectHover,
 
     /// Auto remove `meshes`
     AutoRemoveMeshes,
 
-    /// Deletes previous output before patch execution.
+    /// Deletes the previous output before patching.
     ///
     /// # Targets
-    /// - `<output directory>/meshes`
     /// - `<output directory>/.d_merge/.debug`
-    /// - `<output directory>/FNIS.esp`
+    /// - `<output directory>/meshes`
     /// - `<output directory>/SKSE/Plugins/fnis_aa/config.json`
+    /// - `<output directory>/FNIS.esp`
     ///
     /// # Notes
-    /// To avoid accidental mod corruption caused by deleting `meshes`,
-    /// deletion is skipped when the output directory is the same as the Skyrim Data directory.
+    /// - The output directory is not the Skyrim Data directory
+    ///   -> Strongly recommended: the previous output may cause unintended behavior
+    /// - The output directory is the Skyrim Data directory
+    ///   -> Not recommended: the deletion is skipped, so as not to break mods by deleting `meshes`
     AutoRemoveMeshesHover,
 
     /// Auto run
     AutoRun,
 
-    /// Once the mod list has been updated, enable all mods and run the patch once.
+    /// Each time the mod list is updated, enables all mods and patches.
     ///
-    /// # Mod list update triggers
-    /// - Once at startup
+    /// # Mod list updates
+    /// - At startup
     /// - When the reload button is pressed
-    /// - When switching between vfs and manual environments
-    /// - When the Skyrim data directory is changed
+    /// - When switching between VFS and manual mode
+    /// - When the Skyrim Data directory is changed
     ///
     /// # Notes
-    /// You must close the window manually to prevent the auto-run option from becoming disabled.
+    /// - The window does not close by itself, so that auto-run can still be turned off
     AutoRunHover,
 
     /// Enabled
     BackgroundImageEnabled,
 
-    /// Whether the background image is shown.
-    ///
-    /// This feature exists to allow you to toggle the setting on and off while keeping the background image path specified.
+    /// Whether the background image is shown, keeping its path.
     BackgroundImageEnabledHover,
 
     /// Background Image:
     BackgroundImageLabel,
 
-    /// Reload background image.
+    /// Reloads the background image.
     ///
     /// # Notes
-    /// When you click this button, the `Enabled` checkbox will also be checked.
+    /// - The `Enabled` checkbox is checked too
     BackgroundImageReloadHover,
 
     /// Background
@@ -191,7 +204,10 @@ pub enum I18nKey {
     /// Custom Template…
     BehaviorsCustomXml,
 
-    /// Use your own template file (.xml, or a d-merge .bin). Its object ids must match the game's template.
+    /// Uses your own template file (`.xml`, or a d-merge `.bin`).
+    ///
+    /// # Notes
+    /// - Its object ids must match the game's template
     BehaviorsCustomXmlHover,
 
     /// Add a behavior (template xml) to start.
@@ -236,7 +252,10 @@ pub enum I18nKey {
     /// Commit
     ChangesCommit,
 
-    /// Keeps the changes as a revision of this work, with the message (Ctrl+Enter in the field). The history is in the work data, not in the mod.
+    /// Keeps the changes as a revision of this work, with the message (`Ctrl+Enter` in the field).
+    ///
+    /// # Notes
+    /// - The history is in the work data, not in the mod
     ChangesCommitHover,
 
     /// Message
@@ -272,7 +291,10 @@ pub enum I18nKey {
     /// Restore the work to this revision
     ChangesRestoreRevision,
 
-    /// Puts every object as it was at this revision. The history stays: what differs from the last revision is a change, to commit or to discard.
+    /// Puts every object as it was at this revision.
+    ///
+    /// # Notes
+    /// - The history stays: what differs from the last revision is a change, to commit or to discard
     ChangesRestoreRevisionHover,
 
     /// Changes
@@ -287,7 +309,13 @@ pub enum I18nKey {
     /// Actor
     ClipActor,
 
-    /// The project the clips go to: search among those there are, or type a new one, as <name>~<number>, e.g. DefaultMale~1. A new project also needs its place in the list of projects, $header$/$header$.txt.
+    /// The project the clips go to: search among those there are, or type a new one as `<name>~<number>`.
+    ///
+    /// # Examples
+    /// - `DefaultMale~1`
+    ///
+    /// # Notes
+    /// - A new project also needs its place in the list of projects, `$header$/$header$.txt`
     ClipActorHover,
 
     /// Count
@@ -296,7 +324,14 @@ pub enum I18nKey {
     /// How many clips to add: their ids are numbered after what exists.
     ClipCountHover,
 
-    /// The clip's name, e.g. Attack, without / \ ~ $. With a count of 2 or more: Attack_0, Attack_1, ...
+    /// The clip's name.
+    ///
+    /// # Examples
+    /// - `Attack`
+    /// - With a count of 2 or more: `Attack_0`, `Attack_1`, ...
+    ///
+    /// # Notes
+    /// - `/` `\` `~` `$` can't be used
     ClipNameHover,
 
     /// Close
@@ -323,7 +358,10 @@ pub enum I18nKey {
     /// Site
     ColumnSite,
 
-    /// All this mod's patch does loses to other mods, so it does nothing in the end. Its files are not changed: it still takes part in other mods' merges by the load order.
+    /// All this mod's patch does loses to other mods: it does nothing in the end.
+    ///
+    /// # Notes
+    /// - Its files are not changed: it still takes part in other mods' merges by the load order
     ConflictDeadHover,
 
     /// Checked for conflicts
@@ -332,7 +370,10 @@ pub enum I18nKey {
     /// Resolve by hand…
     ConflictEdit,
 
-    /// Opens this conflict in the user patch of the Patch Editor, from the value kept now, with each mod's value beside it. Export it there when done.
+    /// Opens this conflict in the user patch of the Patch Editor, from the value kept now, with each mod's value beside it.
+    ///
+    /// # Notes
+    /// - Write it there when done
     ConflictEditHover,
 
     /// Filter by path
@@ -347,13 +388,23 @@ pub enum I18nKey {
     /// Hide
     ConflictHide,
 
-    /// Leaves this operation of this mod out of the merge, as if the mod did not do it, like MO2's mohidden. The mod's files do not change. The flags change at once, what is generated at the next patch. Animation data goes by the whole file. Off with Apply User Patch.
+    /// Leaves this operation of this mod out of the merge, as if the mod did not do it (like MO2's mohidden).
+    ///
+    /// # Notes
+    /// - The mod's files do not change
+    /// - The flags change at once; what is generated, at the next patch
+    /// - Animation data goes by the whole file
+    /// - Off while Apply User Patch is off
     ConflictHideHover,
 
     /// Keep all events
     ConflictKeepAllEvents,
 
-    /// Each mod points this field to an array of events of its own. The user patch gets one array with the events of every mod, and points the field to it. The mods' files do not change.
+    /// The user patch gets one array with the events of every mod, and points this field to it.
+    ///
+    /// # Notes
+    /// - Each mod points this field to an array of events of its own
+    /// - The mods' files do not change
     ConflictKeepAllEventsHover,
 
     /// In effect
@@ -377,7 +428,16 @@ pub enum I18nKey {
     /// Check Conflicts
     ConflictScan,
 
-    /// Finds which enabled mods change the same fields. + overrides another mod, - is overridden. Right click a mod for the details. Every patch file of the enabled mods is read, so this takes about as long as patching.
+    /// Finds which enabled mods change the same fields.
+    ///
+    /// # Flags
+    /// - `+`: overrides another mod
+    /// - `-`: is overridden by another mod
+    /// - `✓`: resolved in the user patch
+    ///
+    /// # Notes
+    /// - Right click a mod for the details
+    /// - Every patch file of the enabled mods is read: this takes about as long as patching
     ConflictScanHover,
 
     /// Checking…
@@ -410,7 +470,7 @@ pub enum I18nKey {
     /// Use this
     ConflictUse,
 
-    /// Decides on this value: it goes in the user patch, a mod that loads last and so wins, and the mod is written.
+    /// Decides on this value: it goes in the user patch, which loads last and so wins, and the user patch is written.
     ConflictUseHover,
 
     /// Overrides others
@@ -455,7 +515,10 @@ pub enum I18nKey {
     /// Directory Tree
     ConvertSelectionTree,
 
-    /// Add root directories, then check the files to convert. The directory structure is kept in the output.
+    /// Add root directories, then check the files to convert.
+    ///
+    /// # Notes
+    /// - The directory structure is kept in the output
     ConvertSelectionTreeHover,
 
     /// Unselect All
@@ -473,7 +536,10 @@ pub enum I18nKey {
     /// Directory of a Nemesis patch mod (or drop it here)
     CrcModDirHint,
 
-    /// A directory to list the CRC32 of every .hkx under it, e.g. the mod's root D:\MO2\mods\MyMod. Any directory will do, or drop one here.
+    /// Lists the CRC32 of every `.hkx` under this directory. Any directory will do, or drop one here.
+    ///
+    /// # Examples
+    /// - The mod's root: `D:\MO2\mods\MyMod`
     CrcModDirHover,
 
     /// Nemesis mod:
@@ -488,7 +554,10 @@ pub enum I18nKey {
     /// e.g. meshes\actors\character\animations\mymod  or  ground_bite
     CrcTextHint,
 
-    /// Skyrim's CRC32 of the lowercase text, with `/` as `\`. A file name is hashed without `.hkx`.
+    /// Skyrim's CRC32 of the lowercase text, with `/` as `\`.
+    ///
+    /// # Notes
+    /// - A file name is hashed without `.hkx`
     CrcTextHover,
 
     /// Text / path:
@@ -500,7 +569,7 @@ pub enum I18nKey {
     /// Debug output
     DebugOutput,
 
-    /// Outputs debug JSON and XML files.
+    /// Writes the JSON and XML used for debugging.
     ///
     /// # Examples
     /// - `<output directory>/.d_merge/.debug/meshes/.../0_master.xml`
@@ -517,7 +586,11 @@ pub enum I18nKey {
     /// Duplicate to
     DuplicateTo,
 
-    /// Copies this patch to another project. DefaultMale~1 and DefaultFemale~1 usually have the same patches. A clip goes with its motion.
+    /// Copies this patch to another project.
+    ///
+    /// # Notes
+    /// - `DefaultMale~1` and `DefaultFemale~1` usually have the same patches
+    /// - A clip goes with its motion
     DuplicateToHover,
 
     /// Duplicate to...
@@ -598,7 +671,10 @@ pub enum I18nKey {
     /// Not linked
     ExplorerNotLinked,
 
-    /// New objects no object in the tree points to. Nemesis ignores them: add their #id to a pointer field somewhere.
+    /// New objects that no object in the tree points to: Nemesis ignores them.
+    ///
+    /// # Notes
+    /// - Add their `#id` to a pointer field somewhere
     ExplorerNotLinkedHover,
 
     /// Objects
@@ -607,7 +683,10 @@ pub enum I18nKey {
     /// Explorer
     ExplorerTab,
 
-    /// Show the objects as a tree from hkRootLevelContainer, following their #pointers. (A filter shows the flat list.)
+    /// Shows the objects as a tree from `hkRootLevelContainer`, following their `#pointers`.
+    ///
+    /// # Notes
+    /// - While filtering, the flat list is shown
     ExplorerTreeViewHover,
 
     /// Only the new objects nothing links to (Nemesis ignores them)
@@ -616,7 +695,14 @@ pub enum I18nKey {
     /// Export
     ExportButton,
 
-    /// The root directory of the mod Export writes to, e.g. D:\MO2\mods\MyMod: by default the mod that was opened. Export writes <here>\Nemesis_Engine\mod\<mod code> (Nemesis_EngineExt for NemesisExt templates), replacing only the files this work read or wrote. The button on the left opens the directory.
+    /// The root directory of the mod Export writes to. By default, the mod that was opened.
+    ///
+    /// # Examples
+    /// - `D:\MO2\mods\MyMod` -> `D:\MO2\mods\MyMod\Nemesis_Engine\mod\<mod code>`
+    ///
+    /// # Notes
+    /// - Templates Nemesis does not support go to `Nemesis_EngineExt`
+    /// - Only the files this work read or wrote are replaced
     ExportDirHover,
 
     /// Set the output directory and add a behavior first.
@@ -625,7 +711,17 @@ pub enum I18nKey {
     /// Export failed
     ExportFailed,
 
-    /// What Export writes. Nemesis: Nemesis_Engine, and Nemesis_EngineExt for the templates Nemesis does not support. Nemesis Ext: every template to Nemesis_EngineExt (only d-merge reads it). Pandora v5: Pandora_Engine\mod\<mod code>\patches\*.xml and info.xml of Pandora Behaviour Engine v5, without the animation data. It is the same work: a mod read in one format can be written in another.
+    /// What Export writes.
+    ///
+    /// - Nemesis:
+    ///   `Nemesis_Engine`, and `Nemesis_EngineExt` for the templates Nemesis does not support
+    /// - Nemesis Ext:
+    ///   every template to `Nemesis_EngineExt` (only d-merge reads it)
+    /// - Pandora v5:
+    ///   `Pandora_Engine\mod\<mod code>\patches\*.xml` and `info.xml` of Pandora Behaviour Engine v5, without the animation data
+    ///
+    /// # Notes
+    /// - It is the same work: a mod read in one format can be written in another
     ExportFormatHover,
 
     /// Exported
@@ -655,18 +751,17 @@ pub enum I18nKey {
     /// Default
     FontModeDefault,
 
-    /// Font loading mode configuration.
+    /// How the font is loaded.
     ///
     /// - Default:
-    ///   Uses the application's built-in font configuration.
+    ///   the application's built-in font
     /// - System:
-    ///   Loads a font from an installed system font family.
+    ///   a font family installed in the system
     /// - File:
-    ///   Loads a font from the specified font file.
+    ///   the font file you choose
     ///
     /// # Notes
-    /// Different fonts may alter text width and spacing, which can affect
-    /// table layouts, column alignment, and overall UI appearance.
+    /// - Fonts differ in text width and spacing: table layouts, column alignment and the whole UI may look different
     FontModeHover,
 
     /// Font Source:
@@ -684,9 +779,12 @@ pub enum I18nKey {
     /// Format
     FormatButton,
 
-    /// Generates a dummy FNIS.esp file.
+    /// Generates a dummy `FNIS.esp`.
     ///
-    /// # Examples:
+    /// # Notes
+    /// - Some FNIS mods tell whether their hkx were generated by whether `FNIS.esp` exists
+    ///
+    /// # Examples
     /// - XPMSE
     /// - FNIS Sexy Move
     /// - EatingSleepingDrinking
@@ -722,7 +820,10 @@ pub enum I18nKey {
     /// Import .txt…
     HkannoImportTxt,
 
-    /// Replace the annotations of this tab with a .txt file (hkanno text). A .txt dropped on the page does the same.
+    /// Replaces the annotations of this tab with a `.txt` file (hkanno text).
+    ///
+    /// # Notes
+    /// - A `.txt` dropped on the page does the same
     HkannoImportTxtHover,
 
     /// Open .hkx / .xml files. (Drag & drop also works.)
@@ -749,7 +850,7 @@ pub enum I18nKey {
     /// I18n Path:
     I18nPathLabel,
 
-    /// Reload the translation file. This is useful for previewing translations without restarting the application.
+    /// Reloads the translation file, to see a translation without restarting the application.
     I18nReloadJsonHover,
 
     /// Language & Translation
@@ -758,20 +859,8 @@ pub enum I18nKey {
     /// New I18n
     I18nWriteNewJsonButton,
 
-    /// Create a new translation JSON file for the current application version with English default values.
+    /// Writes a new translation file for this version of the application, with the English texts.
     I18nWriteNewJsonHover,
-
-    /// Import (add)
-    ImportAppend,
-
-    /// Reads the mod in the directory above into the user patch, added to what it has: where both have a patch, the mod's wins.
-    ImportAppendHover,
-
-    /// Import (replace)
-    ImportReplace,
-
-    /// Reads the mod in the directory above into the user patch, in place of what it has.
-    ImportReplaceHover,
 
     /// Imported
     ImportedMessage,
@@ -785,11 +874,10 @@ pub enum I18nKey {
     /// Report Issue
     IssueReportButton,
 
-    /// Report a bug on GitHub.
-    /// This will auto-fill version info and some hardware.
+    /// Reports a bug on GitHub, with the version and some hardware info filled in.
     ///
     /// # Notes
-    /// GitHub account required.
+    /// - A GitHub account is needed
     IssueReportHover,
 
     /// Previous / next change (Vim: [c, ]c)
@@ -798,10 +886,9 @@ pub enum I18nKey {
     /// Keep Open
     KeepOpen,
 
-    /// # Nemesis special syntax: Empty Array push pattern
-    /// Adds elements to an array that is empty in the template. Its line stays as it is and the elements follow it, so the array is not replaced and several mods can add to it.
+    /// Nemesis special syntax: Empty Array push pattern. Adds elements to an array that is empty in the template: its line stays and the elements follow it, so the array is not replaced and several mods can add to it.
     ///
-    /// # Example
+    /// # Examples
     /// ```xml
     /// <hkparam name="eventNames" numelements="0"></hkparam>
     /// <!-- MOD_CODE ~mymod~ OPEN -->
@@ -811,7 +898,7 @@ pub enum I18nKey {
     /// ```
     ///
     /// # Notes
-    /// - Not compatible with Pandora v4.
+    /// - Not compatible with Pandora v4
     KeptArrayHover,
 
     /// Other commands with these keys:
@@ -832,7 +919,7 @@ pub enum I18nKey {
     /// Key binding saved to keybindings.json
     KeybindingSaved,
 
-    /// Do you want to save the changes you made to keybindings.json? Your changes will be lost if you don't save them.
+    /// Save the changes to keybindings.json? They are lost if they are not saved.
     KeybindingUnsaved,
 
     /// License:
@@ -844,8 +931,10 @@ pub enum I18nKey {
     /// Locked
     LockButton,
 
-    /// Row reordering is locked unless sorting by Priority ascending.
-    /// Click to unlock.
+    /// Reordering the rows is locked unless they are sorted by priority (ascending) and not searched: it is unsafe then.
+    ///
+    /// # Notes
+    /// - Click to unlock
     LockButtonHover,
 
     /// Log
@@ -860,12 +949,11 @@ pub enum I18nKey {
     /// Log Level
     LogLevelLabel,
 
-    /// Change the log directory to the specified path.
+    /// Changes the log directory to this path.
     ///
     /// # Notes
-    /// Logs are rotated with a maximum of 5 files retained.
-    /// The log directory will not change until this button is clicked
-    /// (or the application is restarted).
+    /// - Logs are rotated, up to 5 files
+    /// - The change takes effect when this button is clicked, or the application restarts
     LogReloadHover,
 
     /// Logging
@@ -925,11 +1013,11 @@ pub enum I18nKey {
     /// Manual
     ManualMode,
 
-    /// Mode for use without virtual mod managers such as MO2.
+    /// For use without a virtual file system such as MO2's.
     ///
     /// # Notes
-    /// - Conflicts may occur if multiple versions of the same mod exist.
-    /// - In manual mode, absolute paths are used as identifiers to prevent duplication. This makes configuration sharing unsuitable.
+    /// - Several versions of one mod may conflict
+    /// - Absolute paths are the ids of the mods (no duplicates): the settings are not for sharing
     ManualModeHover,
 
     /// Accept
@@ -938,22 +1026,38 @@ pub enum I18nKey {
     /// Accept all
     MergeAcceptAll,
 
-    /// Puts the lines of every mod in place of the conflict, each line once, as git's "accept both". The resolution is kept, and done again the next time this conflict comes.
+    /// Puts the lines of every mod in place of the conflict, each line once (git's "accept both").
+    ///
+    /// # Notes
+    /// - The resolution is kept, and done again the next time this conflict comes
     MergeAcceptAllHover,
 
-    /// Puts this mod's lines in place of the conflict. The resolution is kept, and done again the next time this conflict comes.
+    /// Puts this mod's lines in place of the conflict.
+    ///
+    /// # Notes
+    /// - The resolution is kept, and done again the next time this conflict comes
     MergeAcceptHover,
 
-    /// What each mod has at this conflict. Put together in the editor what is wanted: with an array, the elements of several mods are often wanted. Closed with its x, the patch preview comes back.
+    /// What each mod has at this conflict: put together in the editor what is wanted.
+    ///
+    /// # Notes
+    /// - With an array, the elements of several mods are often wanted
+    /// - Closed with its ✖, the patch preview comes back
     MergeHover,
 
-    /// Puts it below the line of the cursor in the editor. What it replaces stays: delete it there if it is not wanted.
+    /// Puts it below the line of the cursor in the editor.
+    ///
+    /// # Notes
+    /// - What it replaces stays: delete it there if it is not wanted
     MergeInsertHover,
 
     /// Original
     MergeOriginal,
 
-    /// What this value points to, as this mod has it. Two mods pointing to their own objects differ in what those are: compare them before picking one.
+    /// What this value points to, as this mod has it.
+    ///
+    /// # Notes
+    /// - Two mods pointing to their own objects differ in what those are: compare them before picking one
     MergePointedHover,
 
     /// Neither this mod nor the template has this object.
@@ -977,7 +1081,12 @@ pub enum I18nKey {
     /// e.g. mymod
     ModCodeHint,
 
-    /// What identifies the mod: 4-6 ASCII letters/digits, not "vanilla", and not used by another mod. It is the name of its folder and the prefix of its new objects (#mymod$0). Once the work is made, "Rename…" of the project details changes it, and those ids with it.
+    /// What identifies the mod: 4-6 ASCII letters or digits.
+    ///
+    /// # Notes
+    /// - Not `vanilla`, and not used by another mod
+    /// - The name of its directory, and the prefix of its new objects (`#mymod$0`)
+    /// - Once the work is made, "Rename…" of the project details changes it, with those ids
     ModCodeHover,
 
     /// A mod code is 4-6 ASCII letters/digits and not "vanilla".
@@ -992,7 +1101,11 @@ pub enum I18nKey {
     /// Renamed the mod code
     ModCodeRenameDone,
 
-    /// Gives this work another mod code (4-6 letters or digits): the ids of its new objects and clips change with it. What was exported under the old code goes at the next Export.
+    /// Gives this work another mod code (4-6 letters or digits).
+    ///
+    /// # Notes
+    /// - The ids of its new objects and clips change with it
+    /// - What was written under the old code goes at the next Export
     ModCodeRenameHover,
 
     /// Renaming the mod code
@@ -1010,11 +1123,15 @@ pub enum I18nKey {
     /// Open a mod…
     ModOpen,
 
-    /// Open a Nemesis mod to edit it: its root (where Nemesis_Engine is), e.g. D:\MO2\mods\Paraglider, or its patch directory, e.g. ...\Nemesis_Engine\mod\para. If it has been opened before, the work goes on with its edits that are not exported yet.
+    /// Opens a Nemesis mod to edit it.
+    ///
+    /// # Targets
+    /// - Its root (where `Nemesis_Engine` is): `D:\MO2\mods\Paraglider`
+    /// - Its patch directory: `...\Nemesis_Engine\mod\para`
+    ///
+    /// # Notes
+    /// - A mod opened before goes on with its edits that are not written yet
     ModOpenHover,
-
-    /// The mod's root directory: the patches are written below it, e.g. ./output/ -> ./output/Nemesis_Engine/mod/upatch/
-    ModOutputDirHover,
 
     /// Reload from the mod
     ModReload,
@@ -1031,7 +1148,13 @@ pub enum I18nKey {
     /// Mod Test Status:
     ModTestStatusLabel,
 
-    /// The mod's version now, e.g. 1.2.0. Written to the info.ini of Nemesis_EngineExt only, with the mod codes of the references as deps.
+    /// The mod's version now.
+    ///
+    /// # Examples
+    /// - `1.2.0`
+    ///
+    /// # Notes
+    /// - Written to the `info.ini` of `Nemesis_EngineExt` only, with the mod codes of the references as `deps`
     ModVersionHover,
 
     /// Version:
@@ -1052,11 +1175,11 @@ pub enum I18nKey {
     /// Mods
     ModsListTitle,
 
-    /// The list of mods is collected by scanning the following glob paths in the Skyrim Data directory.
+    /// The mods are collected from these paths in the Skyrim Data directory.
     ///
-    /// - Nemesis: Nemesis_Engine/mod/*/info.ini
-    /// - NemesisExt: Nemesis_EngineExt/mod/*/info.ini
-    /// - FNIS: meshes/**/animations/*/FNIS_*_List.txt
+    /// - Nemesis: `Nemesis_Engine/mod/*/info.ini`
+    /// - NemesisExt: `Nemesis_EngineExt/mod/*/info.ini`
+    /// - FNIS: `meshes/**/animations/*/FNIS_*_List.txt`
     ModsListTitleHover,
 
     /// No change
@@ -1068,29 +1191,27 @@ pub enum I18nKey {
     /// Normalize
     NormalizeButton,
 
-    /// Sort the mod list according to the following rules
+    /// Sorts the mod list by these rules.
     ///
-    /// 1. Group mods by type in the following order:
-    ///    Nemesis -> NemesisExt -> FNIS
-    /// 2. Sort mods alphabetically within each type.
-    /// 3. Reassign priorities sequentially starting from `0`.
-    /// 4. In manual mode, disable the check for duplicate ID rows.
+    /// - Mods are grouped by type: Nemesis -> NemesisExt -> FNIS
+    /// - In each type, mods are sorted alphabetically
+    /// - The priorities are given again from `0`
+    /// - In manual mode, the check of duplicate ids is turned off
     ///
     /// # Notes
-    /// This sorting does not resolve conflicts between patches.
+    /// - This does not resolve conflicts between patches
     NormalizeHover,
 
     /// Clear Notify
     NotificationClearButton,
 
-    /// Warn: `get_skyrim_data_dir` is not supported on this platform(Linux, MacOs). Please specify the Skyrim data directory manually.
+    /// Getting the Skyrim Data directory is not supported on this platform (Linux, macOS): specify it by hand.
     NotifyErrPlatformNotSupported,
 
-    /// Error: Could not find path in the Windows registry.
-    /// If you are not using the Steam version of Skyrim, please specify the Skyrim data directory manually.
+    /// Could not find the path in the Windows registry. If Skyrim is not the Steam version, specify the Skyrim Data directory by hand.
     NotifyErrWindowsRegistryNotFound,
 
-    /// The patch file of the object in the mod, if this work patches it (where the export writes it); else the template it is read from.
+    /// The patch file of the object in the mod, where Export writes it, if this work patches it; else the template it is read from.
     ObjectFileHover,
 
     /// Filter (id, class, name)
@@ -1123,27 +1244,6 @@ pub enum I18nKey {
     /// Choose the output directory.
     OutputMissing,
 
-    /// Do not export
-    OutsideNemesisCancel,
-
-    /// Nothing was exported: Nemesis does not support these templates
-    OutsideNemesisCancelled,
-
-    /// Templates Nemesis does not support:
-    OutsideNemesisLabel,
-
-    /// Left out, as Nemesis does not support these templates
-    OutsideNemesisLeftOut,
-
-    /// Leave them out
-    OutsideNemesisSkip,
-
-    /// Write to Nemesis_EngineExt
-    OutsideNemesisWriteExt,
-
-    /// Nemesis does not support these templates: their patches go to Nemesis_EngineExt, which only d-merge reads
-    OutsideNemesisWrittenToExt,
-
     /// Convert
     PageConvert,
 
@@ -1159,70 +1259,66 @@ pub enum I18nKey {
     /// Takes the settings of Pandora Behaviour Engine into d-merge's VFS mode, or gives them to it.
     PandoraButtonHover,
 
-    /// The directory with Pandora's Settings.json and Pandora_Engine\ActiveMods.json. Import reads them from here and Export writes them here. Only used for these two buttons. The button on the left opens the directory.
+    /// The directory with Pandora's `Settings.json` and `Pandora_Engine\ActiveMods.json`.
+    ///
+    /// # Notes
+    /// - Import reads them from here and Export writes them here: only these two buttons use it
     PandoraDirHover,
 
-    /// Open the Pandora patch of this template, to edit it as text. It follows the edits of the objects, and they follow it.
+    /// Open the Pandora patch of this template as text
     PandoraDocHover,
 
-    /// Exports d-merge VFS settings to Pandora.
+    /// Exports d-merge's VFS settings to Pandora.
     ///
     /// # Targets
     /// - `Settings.json`
-    ///   - Skyrim SE data path
-    ///   - Output path
+    ///   - The Skyrim SE Data directory
+    ///   - The output directory
     /// - `ActiveMods.json`
-    ///   - Nemesis mod enabled state
-    ///   - Nemesis mod priority
+    ///   - Whether each Nemesis mod is on
+    ///   - The priority of each Nemesis mod
     PandoraExportHover,
 
     /// Export
     PandoraExportLabel,
 
-    /// Imports Pandora settings into the d-merge VFS configuration.
+    /// Imports Pandora's settings into d-merge's VFS settings.
     ///
     /// # Targets
     /// - `Settings.json`
-    ///   - Skyrim SE data path
-    ///   - Output path
+    ///   - The Skyrim SE Data directory
+    ///   - The output directory
     /// - `ActiveMods.json`
-    ///   - Nemesis mod enabled state
-    ///   - Nemesis mod priority
+    ///   - Whether each Nemesis mod is on
+    ///   - The priority of each Nemesis mod
     PandoraImportHover,
 
     /// Import
     PandoraImportLabel,
 
-    /// Select the Pandora version used for import or export.
+    /// The version of Pandora to import from or export to.
     ///
-    /// - `v4.4.0-beta`: Compatible with `v5.0.0`.
+    /// - `v4.4.0-beta`: compatible with `v5.0.0`
     PandoraTargetVersionHover,
 
     /// Target version:
     PandoraTargetVersionLabel,
 
-    /// Controls how parser input is validated and how invalid patch data is handled.
+    /// How the patches are checked, and what is done with the wrong ones.
     ///
     /// - Strict:
-    ///   Rejects inconsistent or invalid input. This is the traditional behavior
-    ///   used before v2.6.0.
+    ///   rejects inconsistent or invalid input, as before v2.6.0
     /// - Lenient:
-    ///   Behaves similarly to Nemesis by attempting to recover from known input
-    ///   mistakes when the intended value can be inferred from the input.
+    ///   like Nemesis, recovers from known mistakes when the intended value can be told from the input
     ///
     /// # Notes
-    /// - A patch that requires Lenient mode contains invalid or potentially
-    ///   undefined input. Even if the parser can recover from it, the resulting
-    ///   behavior is not guaranteed to match the mod author's intent.
-    /// - Incorrect length values may cause unintended behavior. Lenient mode only
-    ///   allows the parser to continue based on the available input; it does not
-    ///   guarantee that the recovered data is correct.
-    /// - Lenient mode is not a convenience mode. It is a fallback for users who
-    ///   cannot reasonably fix the original patch themselves.
-    /// - Input that cannot be reasonably recovered, or whose intended value cannot
-    ///   be inferred, still fails in Lenient mode.
+    /// - A patch that needs Lenient has invalid or nearly undefined input: even recovered, it may not do what its author meant
+    ///   -> A wrong length (`len`) above all: the value worked out may not be right
+    /// - Lenient is not a convenience: it is for when the patch can't be fixed by hand
+    /// - Input whose value can't be told still fails in Lenient
     ///
-    /// Examples of mods with `trigger_names_len` errors that require Lenient mode:
+    /// # Examples
+    /// Mods with `trigger_names_len` mistakes that need Lenient:
     /// - Unarmed Behaviors Expanded (v2.0.1)
     /// - BFCO (v3.100.7)
     ParserModeHover,
@@ -1278,7 +1374,11 @@ pub enum I18nKey {
     /// No problems have been found in the work.
     ProblemsNone,
 
-    /// The mods this one depends on (an add-on's base, the mods a user patch takes values from): the root of each, or its patch directory. Their new objects, events and variables can be pointed to and looked at. They are not edited or exported: they come with those mods when merging.
+    /// The mods this one depends on: an add-on's base, or the mods a user patch takes values from. `+` adds one: its root, or its patch directory.
+    ///
+    /// # Notes
+    /// - Their new objects, events and variables can be pointed to and looked at
+    /// - They are not edited or written: they come with those mods when merging
     RefModsHover,
 
     /// References:
@@ -1293,7 +1393,11 @@ pub enum I18nKey {
     /// Removing the `<output_dir>/meshes` directory...
     RemovingMeshesMessage,
 
-    /// Makes many new objects from this one, one per line of values: {{name}} in the template takes the value of the column name, {{i}} the line number from 0.
+    /// Makes new objects from this one, one per line of values.
+    ///
+    /// # Notes
+    /// - `{{name}}` in the template takes the value of the column `name`
+    /// - `{{i}}` takes the line number, from 0
     RepeatHover,
 
     /// objects to create
@@ -1317,12 +1421,13 @@ pub enum I18nKey {
     /// Revert
     RevertButton,
 
-    /// Output format for hkx.
-    /// - SkyrimLE/Enderal: win32
-    /// - SkyrimSE/SkyrimVR/EnderalSE: amd64
+    /// The format of the hkx written.
+    ///
+    /// - SkyrimLE / Enderal: win32
+    /// - SkyrimSE / SkyrimVR / EnderalSE: amd64
     ///
     /// # Notes
-    /// For Windows ver. user: When changing settings in vfs mode, it will automatically attempt to locate and modify the Skyrim Data Directory from the registry.
+    /// - In VFS mode on Windows, a change also looks for the Skyrim Data directory in the registry
     RuntimeTargetHover,
 
     /// Save
@@ -1334,7 +1439,15 @@ pub enum I18nKey {
     /// Saved successfully.
     SavedMessage,
 
-    /// Which templates this work can patch. It can't be changed later. Nemesis: only those Nemesis knows. Nemesis Ext / Pandora v5: all of them, and template files of your own. Either can be exported in any format.
+    /// Which templates this work can patch. It can't be changed later.
+    ///
+    /// - Nemesis:
+    ///   only those Nemesis supports
+    /// - Nemesis Ext / Pandora v5:
+    ///   all of them, and template files of your own
+    ///
+    /// # Notes
+    /// - Either can be written in any format
     ScopeHover,
 
     /// Templates
@@ -1418,7 +1531,7 @@ pub enum I18nKey {
     /// No template found for
     TemplateNotFound,
 
-    /// No templates (.bin / .xml under meshes/) in the template directory. Check template_dir in the settings.
+    /// No templates (.bin / .xml under meshes/) in the template directory: check template_dir in the settings.
     TemplatesNone,
 
     /// 🎨 Edit
@@ -1448,14 +1561,12 @@ pub enum I18nKey {
     /// Apply User Patch
     UserPatchApply,
 
-    /// Merges what the conflict tool decided, kept in <output>/.d_merge/user_patch, after every mod, and leaves out the operations hidden there. It is not in the mod list: it always loads last, like MO2's overwrite, and belongs to this output directory.
+    /// Merges what the conflict check decided, kept in `<output directory>/.d_merge/user_patch`, after every mod, and leaves out the operations hidden there.
+    ///
+    /// # Notes
+    /// - It is not in the mod list: it always loads last, like MO2's overwrite
+    /// - Each output directory has its own
     UserPatchApplyHover,
-
-    /// Export / Import as mod…
-    UserPatchAsMod,
-
-    /// Writes the user patch as a mod of its own (code upatch) as Nemesis, Nemesis Ext or Pandora v5, e.g. into MO2's mods to share it or use it with another patching tool, or reads such a mod back. In the mod list it is a mod like the others.
-    UserPatchAsModHover,
 
     /// Delete all
     UserPatchClear,
@@ -1463,13 +1574,21 @@ pub enum I18nKey {
     /// Delete all of the User Patch?
     UserPatchClearConfirm,
 
-    /// Takes everything out of the User Patch and writes that: each conflict goes back to the mod that wins by the load order. Hidden operations stay. It cannot be undone.
+    /// Takes everything out of the user patch and writes that: each conflict goes back to the mod that wins by the load order.
+    ///
+    /// # Notes
+    /// - Hidden operations stay
+    /// - It cannot be undone
     UserPatchClearHover,
 
     /// All that the user patch has: the values chosen in conflicts and what was edited by hand.
     UserPatchHover,
 
-    /// Decided by the output directory of the Patch page, as each profile has its own conflicts. It cannot be changed here. Edits are written a moment later.
+    /// Decided by the output directory of the Patch page: each profile has its own conflicts.
+    ///
+    /// # Notes
+    /// - It cannot be changed here
+    /// - Edits are written a moment later
     UserPatchOutputHover,
 
     /// The User Patch is edited in its own window: the User Patch button.
@@ -1484,19 +1603,35 @@ pub enum I18nKey {
     /// Event name
     VarsNewEventHint,
 
-    /// The new event's name, e.g. myEvent: no spaces, and not one that exists, whatever its case. Patches refer to it as $eventID[myEvent]$.
+    /// The new event's name. Patches refer to it as `$eventID[myEvent]$`.
+    ///
+    /// # Examples
+    /// - `myEvent`
+    ///
+    /// # Notes
+    /// - No spaces, and not one that exists, whatever its case
     VarsNewEventHover,
 
     /// Variable name
     VarsNewVariableHint,
 
-    /// The new variable's name, e.g. myVar: no spaces, and not one that exists, whatever its case. Patches refer to it as $variableID[myVar]$.
+    /// The new variable's name. Patches refer to it as `$variableID[myVar]$`.
+    ///
+    /// # Examples
+    /// - `myVar`
+    ///
+    /// # Notes
+    /// - No spaces, and not one that exists, whatever its case
     VarsNewVariableHover,
 
     /// The type of its value: BOOL, the whole numbers INT8 / INT16 / INT32, or REAL for decimals.
     VarsNewVariableTypeHover,
 
-    /// Its initial value, by type. BOOL: true or false. INT: a whole number, e.g. 1. REAL: a decimal, e.g. 0.2.
+    /// Its initial value, by type.
+    ///
+    /// - BOOL: `true` or `false`
+    /// - INT: a whole number, e.g. `1`
+    /// - REAL: a decimal, e.g. `0.2`
     VarsNewVariableValueHover,
 
     /// This template has no event / variable data (hkbBehaviorGraphStringData).
@@ -1520,7 +1655,10 @@ pub enum I18nKey {
     /// When booting using MO2's VFS, etc.
     VfsModeHover,
 
-    /// Where the work in progress is saved automatically, for each mod code: in the output directory of the Patch page. Decided by the app.
+    /// Where the work in progress is saved by itself, for each mod code.
+    ///
+    /// # Notes
+    /// - In the output directory of the Patch page: decided by the app
     WorkCacheDirHover,
 
     /// Close
@@ -1532,7 +1670,7 @@ pub enum I18nKey {
     /// There is already a work with this mod code: open it, or choose another code.
     WorkExists,
 
-    /// Set the output directory on the Patch page first: the works and the User Patch are kept in it. The Skyrim Data directory can be used too, but something may be overwritten unintentionally.
+    /// Set the output directory on the Patch page first: the works and the user patch are kept in it. The Skyrim Data directory can be used too, but something may be overwritten unintentionally.
     WorkNeedPatchOutput,
 
     /// New

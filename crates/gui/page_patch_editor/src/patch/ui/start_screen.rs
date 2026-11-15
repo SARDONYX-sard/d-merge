@@ -10,7 +10,7 @@
 //! ```
 
 use egui_widgets::{
-    PathRow,
+    HoverMarkdown as _, PathRow,
     notify::Notification,
     shadcn::{Button, ComboBox, Icon, TextEdit},
 };
@@ -64,7 +64,7 @@ fn start_buttons(ui: &mut egui::Ui, i18n: &I18nMap, work: &Work, new_work: &mut 
             new_work.get_or_insert_default();
         }
         let open = Button::new(i18n.t(I18nKey::ModOpen)).icon(Icon::FolderSearch);
-        if ui.add(open).on_hover_text(i18n.t(I18nKey::ModOpenHover)).clicked() {
+        if ui.add(open).on_hover_markdown(i18n.t(I18nKey::ModOpenHover)).clicked() {
             asked = Some(BarAsk::OpenMod);
         }
         if super::top_bar::cache_button(ui, i18n, &work.place.cache_dir()) {
@@ -86,12 +86,13 @@ fn new_work_form(
     ui.add_space(8.0);
     ui.horizontal(|ui| {
         let hover = i18n.t(I18nKey::ModCodeHover);
-        ui.label(i18n.t(I18nKey::ModCodeLabel)).on_hover_text(hover);
+        ui.label(i18n.t(I18nKey::ModCodeLabel)).on_hover_markdown(hover);
         let code = TextEdit::singleline(&mut form.code).hint_text(i18n.t(I18nKey::ModCodeHint));
-        ui.add(code.desired_width(90.0)).on_hover_text(hover);
+        ui.add(code.desired_width(90.0)).on_hover_markdown(hover);
     });
     let output = PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
-        .help(i18n.t(I18nKey::ExportDirHover))
+        .open_hover(i18n.t(I18nKey::OpenSelectedPathHover))
+        .field_hover(i18n.t(I18nKey::ExportDirHover))
         .show(ui, &mut form.output);
     if let Some(err) = output.open_error {
         notify.error(err);
@@ -123,7 +124,7 @@ fn new_work_form(
 fn scope_box(ui: &mut egui::Ui, scope: &mut TemplateScope, i18n: &I18nMap) {
     ui.horizontal(|ui| {
         let hover = i18n.t(I18nKey::ScopeHover);
-        ui.label(i18n.t(I18nKey::ScopeLabel)).on_hover_text(hover);
+        ui.label(i18n.t(I18nKey::ScopeLabel)).on_hover_markdown(hover);
         let mut selected = TemplateScope::ALL.iter().position(|(known, _)| known == scope).unwrap_or(0);
         let response = ComboBox::from_id_salt("nemesis_new_work_scope").show_index(
             ui,
@@ -131,7 +132,7 @@ fn scope_box(ui: &mut egui::Ui, scope: &mut TemplateScope, i18n: &I18nMap) {
             TemplateScope::ALL.len(),
             |index| TemplateScope::ALL[index].1,
         );
-        if response.on_hover_text(hover).changed() {
+        if response.on_hover_markdown(hover).changed() {
             *scope = TemplateScope::ALL[selected].0;
         }
     });

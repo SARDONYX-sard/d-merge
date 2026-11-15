@@ -1,6 +1,7 @@
 //! The rows of the mod table: draggable, or read-only with only the checkboxes active.
 
 use egui_extras::TableBody;
+use egui_widgets::HoverMarkdown as _;
 use gui_shared::settings::pages::patch::mod_item::ModItem;
 
 use super::label_ext::{CellAlign, ROW_HEIGHT, hyperlink_with_hover, label_with_hover};
@@ -147,7 +148,7 @@ impl RowConflicts<'_> {
         // Not selectable: it would take the clicks, and with them the row's right-click menu.
         let text = if is_dead { "⚡" } else { mark.glyph() };
         let glyph = egui::Label::new(egui::RichText::new(text).color(color).strong()).selectable(false);
-        ui.add_sized([width, ROW_HEIGHT], glyph).on_hover_text(hover);
+        ui.add_sized([width, ROW_HEIGHT], glyph).on_hover_markdown(&hover);
     }
 
     /// The background of a row: the picked mod's, or what it is to it. `None`: none of them.

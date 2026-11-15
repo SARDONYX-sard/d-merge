@@ -10,3 +10,4 @@ English is the doc comment of each `I18nKey` (`crates/gui/gui_shared/src/i18n.rs
 - Names: `*_label`, `*_hover`, `*_hint`.
 - `directory` (`dir` in labels), never `folder`.
 - `behavior`, `actor` stay English.
+- A long hover: a sentence or two, then `# Note` / `# Example` / ... with `- items` and `` `paths` `` (Markdown).

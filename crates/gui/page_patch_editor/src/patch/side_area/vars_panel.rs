@@ -9,7 +9,10 @@
 //!   0   INT8 moveStart               (the type: variables only)
 //! ```
 
-use egui_widgets::shadcn::{Button, TextEdit};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, TextEdit},
+};
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::vars::VariableType;
 use stdx::text::contains_ignore_case;
@@ -72,7 +75,7 @@ impl VarsPanel {
                 let name = TextEdit::singleline(&mut new.variable)
                     .hint_text(i18n.t(I18nKey::VarsNewVariableHint))
                     .desired_width(110.0);
-                ui.add(name).on_hover_text(i18n.t(I18nKey::VarsNewVariableHover));
+                ui.add(name).on_hover_markdown(i18n.t(I18nKey::VarsNewVariableHover));
                 egui::ComboBox::from_id_salt("nemesis_var_type")
                     .width(70.0)
                     .selected_text(type_label(new.kind))
@@ -84,7 +87,7 @@ impl VarsPanel {
                     .response
                     .on_hover_text(i18n.t(I18nKey::VarsNewVariableTypeHover));
                 ui.add(TextEdit::singleline(&mut new.value).hint_text("0").desired_width(50.0))
-                    .on_hover_text(i18n.t(I18nKey::VarsNewVariableValueHover));
+                    .on_hover_markdown(i18n.t(I18nKey::VarsNewVariableValueHover));
                 let enabled = value_set.is_some();
                 if ui.add_enabled(enabled, Button::new(i18n.t(I18nKey::AddButton)).small()).clicked() {
                     action = Some(Action::AddVariable);
@@ -103,7 +106,7 @@ impl VarsPanel {
                 let name = TextEdit::singleline(&mut self.new.event)
                     .hint_text(i18n.t(I18nKey::VarsNewEventHint))
                     .desired_width(140.0);
-                ui.add(name).on_hover_text(i18n.t(I18nKey::VarsNewEventHover));
+                ui.add(name).on_hover_markdown(i18n.t(I18nKey::VarsNewEventHover));
                 if ui.add(Button::new(i18n.t(I18nKey::AddButton)).small()).clicked() {
                     action = Some(Action::AddEvent);
                 }

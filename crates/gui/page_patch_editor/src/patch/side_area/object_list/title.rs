@@ -9,7 +9,10 @@
 
 use std::rc::Rc;
 
-use egui_widgets::shadcn::{Button, Icon};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, Icon},
+};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 /// What the buttons show.
@@ -73,7 +76,7 @@ fn view_buttons(ui: &mut egui::Ui, i18n: &I18nMap, anim: bool, tree_view: bool) 
     }
 
     let tree = Button::selectable(tree_view, "").icon(Icon::ListTree).small();
-    ui.add(tree).on_hover_text(i18n.t(I18nKey::ExplorerTreeViewHover)).clicked().then_some(TitleAsk::ToggleTreeView)
+    ui.add(tree).on_hover_markdown(i18n.t(I18nKey::ExplorerTreeViewHover)).clicked().then_some(TitleAsk::ToggleTreeView)
 }
 
 /// `[⋯]`, as VS Code's "More Actions": what is used less.

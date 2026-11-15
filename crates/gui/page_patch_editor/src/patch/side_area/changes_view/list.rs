@@ -13,7 +13,7 @@
 //! They see only the work, the Changes view's state and the selection; what a click asks for is
 //! returned ([`ListOutput`]).
 
-use egui_widgets::shadcn::Button;
+use egui_widgets::{HoverMarkdown as _, shadcn::Button};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::ChangeAction;
@@ -208,7 +208,7 @@ fn revision_section(
     // As GitLens' "Restore": the whole work as it was then.
     header.context_menu(|ui| {
         let restore = Button::new(i18n.t(I18nKey::ChangesRestoreRevision)).destructive();
-        if ui.add(restore).on_hover_text(i18n.t(I18nKey::ChangesRestoreRevisionHover)).clicked() {
+        if ui.add(restore).on_hover_markdown(i18n.t(I18nKey::ChangesRestoreRevisionHover)).clicked() {
             picked = Some(ChangeAction::RestoreRevision(number));
             ui.close();
         }

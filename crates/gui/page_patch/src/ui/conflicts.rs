@@ -21,7 +21,10 @@
 //! It starts as small as its rows allow. Only the user makes it bigger: what is drawn must never ask
 //! for more than the window has, or the window grows a bit more each frame, down to the screen's edge.
 
-use egui_widgets::shadcn::{Button, TextEdit};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, TextEdit},
+};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     patch::{ResolveRequest, ResolveSide},
@@ -294,7 +297,7 @@ fn point_ui(
     let start = values.iter().find_map(|(owner, _)| owner.dir.as_ref());
     let by_hand = Button::new(i18n.t(I18nKey::ConflictEdit)).small();
     ui.horizontal(|ui| {
-        if ui.add_enabled(start.is_some(), by_hand).on_hover_text(i18n.t(I18nKey::ConflictEditHover)).clicked()
+        if ui.add_enabled(start.is_some(), by_hand).on_hover_markdown(i18n.t(I18nKey::ConflictEditHover)).clicked()
             && let Some(dir) = start
         {
             request = Some(resolve_request(point, dir, Some(resolve_sides(found, point))));
@@ -304,7 +307,7 @@ fn point_ui(
             && let Some(dir) = start
             && ui
                 .add(Button::new(i18n.t(I18nKey::ConflictKeepAllEvents)).small())
-                .on_hover_text(i18n.t(I18nKey::ConflictKeepAllEventsHover))
+                .on_hover_markdown(i18n.t(I18nKey::ConflictKeepAllEventsHover))
                 .clicked()
         {
             let sides = resolve_sides(found, point);
@@ -337,7 +340,7 @@ fn point_ui(
                 let usable = owner.dir.is_some();
                 if ui
                     .add_enabled(usable, Button::new(i18n.t(I18nKey::ConflictUse)).small())
-                    .on_hover_text(i18n.t(hover))
+                    .on_hover_markdown(i18n.t(hover))
                     .on_disabled_hover_text(i18n.t(hover))
                     .clicked()
                 {
@@ -353,7 +356,7 @@ fn point_ui(
                 let hide_hover = if usable { hide_hover } else { I18nKey::ConflictFnisHover };
                 if ui
                     .add_enabled(usable, Button::new(i18n.t(label)).small())
-                    .on_hover_text(i18n.t(hide_hover))
+                    .on_hover_markdown(i18n.t(hide_hover))
                     .on_disabled_hover_text(i18n.t(hide_hover))
                     .clicked()
                 {

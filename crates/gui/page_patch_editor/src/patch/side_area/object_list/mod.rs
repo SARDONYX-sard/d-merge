@@ -12,7 +12,10 @@ mod explorer;
 mod flat;
 mod title;
 
-use egui_widgets::shadcn::{Button, TextEdit};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, TextEdit},
+};
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
 
@@ -219,7 +222,7 @@ pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed:
     ui.separator();
     let new = ui.button(i18n.t(I18nKey::ObjectNew)).clicked();
     let duplicate = ui.button(i18n.t(I18nKey::DuplicateButton)).clicked();
-    let repeat = ui.button(i18n.t(I18nKey::RepeatTitle)).on_hover_text(i18n.t(I18nKey::RepeatHover)).clicked();
+    let repeat = ui.button(i18n.t(I18nKey::RepeatTitle)).on_hover_markdown(i18n.t(I18nKey::RepeatHover)).clicked();
     let copy = ui.button(i18n.t(I18nKey::CopyId)).clicked();
     let hover = i18n.t(I18nKey::ObjectFileHover);
     let copy_path = ui.button(i18n.t(I18nKey::CopyPath)).on_hover_text(hover).clicked();

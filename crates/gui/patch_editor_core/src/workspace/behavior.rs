@@ -266,14 +266,6 @@ impl Behavior {
         }
     }
 
-    /// A template Nemesis does not know: as [`super::ExportFormat::Nemesis`], its patches go to
-    /// `Nemesis_EngineExt`, which only d-merge reads. Animation data is no such one.
-    ///
-    /// e.g. `meshes/actors/troll/behaviors/trollbehavior.bin`
-    pub const fn is_outside_nemesis(&self) -> bool {
-        !self.is_anim_data() && self.nemesis.is_none()
-    }
-
     /// `ext`: the work is exported as NemesisExt ([`super::ExportFormat::NemesisExt`]), so even the
     /// templates Nemesis knows go there.
     pub fn target(&self, ext: bool) -> Target {

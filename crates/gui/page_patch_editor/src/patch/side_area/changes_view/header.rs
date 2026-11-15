@@ -5,7 +5,10 @@
 //! [message...................] [Commit]   `Ctrl+Enter` in the field too
 //! ```
 
-use egui_widgets::shadcn::{Button, ComboBox, Icon};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, ComboBox, Icon},
+};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::workspace::history::History;
@@ -76,7 +79,8 @@ pub(super) fn commit_box(ui: &mut egui::Ui, i18n: &I18nMap, message: &mut String
     ui.horizontal(|ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let button = Button::new(i18n.t(I18nKey::ChangesCommit)).small().primary();
-            commit |= ui.add_enabled(can_commit, button).on_hover_text(i18n.t(I18nKey::ChangesCommitHover)).clicked();
+            commit |=
+                ui.add_enabled(can_commit, button).on_hover_markdown(i18n.t(I18nKey::ChangesCommitHover)).clicked();
 
             let field = egui::TextEdit::singleline(message)
                 .hint_text(i18n.t(I18nKey::ChangesCommitMessageHint))

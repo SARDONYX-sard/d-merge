@@ -23,6 +23,7 @@ pub use self::{
     activity_bar::{ActivityBar, ActivityItem, section_header, side_bar_title},
     cut_hover::{CutHover, Fitted, fit, fit_text, fitted_button},
     editor_tab::{EditorTab, EditorTabOutput, TabAction, TabMenu},
+    markdown::HoverMarkdown,
     path_row::{PathActions, PathRow, PathRowOutput},
     window::{Modal, NearPointer, quick_pick_window, show_modal, vertical_splitter, window_near_pointer},
 };

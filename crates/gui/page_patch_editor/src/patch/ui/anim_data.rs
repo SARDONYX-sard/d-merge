@@ -22,6 +22,7 @@
 use std::path::{Path, PathBuf};
 
 use egui_widgets::{
+    HoverMarkdown as _,
     checklist::{Checklist, ChecklistLabels},
     notify::Notification,
     shadcn::{Button, ComboBox, TextEdit},
@@ -208,7 +209,7 @@ fn dialog_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) -> 
             anim_sets_ui(ui, i18n, dialog);
         })
         .header_response
-        .on_hover_text(i18n.t(I18nKey::AnimDataSetHover));
+        .on_hover_markdown(i18n.t(I18nKey::AnimDataSetHover));
     ui.separator();
     ui.add_enabled(dialog.can_generate(), Button::new(i18n.t(I18nKey::AnimDataGenerate)).primary()).clicked()
 }
@@ -228,7 +229,7 @@ fn clips_ui(ui: &mut egui::Ui, i18n: &I18nMap, rows: &mut [ClipRow]) {
 /// The project, and side by side the hkx and the txt of that project.
 fn anim_sets_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) {
     ui.checkbox(&mut dialog.add_names, i18n.t(I18nKey::AnimNamesToCharacters))
-        .on_hover_text(i18n.t(I18nKey::AnimNamesToCharactersHover));
+        .on_hover_markdown(i18n.t(I18nKey::AnimNamesToCharactersHover));
     project_combo(ui, i18n, dialog);
     let AnimDataDialog { hkx, projects, project, .. } = dialog;
     let labels = ChecklistLabels {
@@ -330,18 +331,18 @@ impl NewClipsForm {
     fn fields(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         egui::Grid::new("nemesis_new_clips").num_columns(2).show(ui, |ui| {
             let hover = i18n.t(I18nKey::ClipActorHover);
-            ui.label(i18n.t(I18nKey::ClipActor)).on_hover_text(hover);
+            ui.label(i18n.t(I18nKey::ClipActor)).on_hover_markdown(hover);
             actor_field(ui, i18n, &mut self.folder, &self.projects, hover);
             ui.end_row();
 
             let hover = i18n.t(I18nKey::ClipNameHover);
-            ui.label(i18n.t(I18nKey::ColumnName)).on_hover_text(hover);
-            ui.add(TextEdit::singleline(&mut self.name).desired_width(220.0)).on_hover_text(hover);
+            ui.label(i18n.t(I18nKey::ColumnName)).on_hover_markdown(hover);
+            ui.add(TextEdit::singleline(&mut self.name).desired_width(220.0)).on_hover_markdown(hover);
             ui.end_row();
 
             let hover = i18n.t(I18nKey::ClipCountHover);
-            ui.label(i18n.t(I18nKey::ClipCount)).on_hover_text(hover);
-            ui.add(egui::DragValue::new(&mut self.count).range(1..=999)).on_hover_text(hover);
+            ui.label(i18n.t(I18nKey::ClipCount)).on_hover_markdown(hover);
+            ui.add(egui::DragValue::new(&mut self.count).range(1..=999)).on_hover_markdown(hover);
             ui.end_row();
         });
     }
@@ -369,7 +370,7 @@ fn project_folder_of(typed: &str) -> String {
 /// With no list (a template that is not a `.bin`), it is typed.
 fn actor_field(ui: &mut egui::Ui, i18n: &I18nMap, folder: &mut String, projects: &[String], hover: &str) {
     if projects.is_empty() {
-        ui.add(TextEdit::singleline(folder).desired_width(220.0)).on_hover_text(hover);
+        ui.add(TextEdit::singleline(folder).desired_width(220.0)).on_hover_markdown(hover);
         return;
     }
     let mut index = projects.iter().position(|project| project == folder).unwrap_or(usize::MAX);
@@ -379,7 +380,7 @@ fn actor_field(ui: &mut egui::Ui, i18n: &I18nMap, folder: &mut String, projects:
         .selected_text(folder.as_str())
         .search_hint(i18n.t(I18nKey::SearchLabel))
         .show_creatable(ui, &mut index, projects.len(), |i| projects[i].as_str(), (new_label, &mut created))
-        .on_hover_text(hover);
+        .on_hover_markdown(hover);
     if let Some(typed) = created {
         *folder = project_folder_of(&typed);
     } else if picked.changed() {

@@ -9,6 +9,7 @@
 //! is returned ([`AnimEvent`]).
 
 use egui_tree::{Nav, TreeKey};
+use egui_widgets::HoverMarkdown as _;
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::{RowAction, row_menu};
@@ -217,11 +218,11 @@ fn duplicate_items(ui: &mut egui::Ui, i18n: &I18nMap, projects: &[String], curre
     let partner = data::partner_of(current);
     if partner != current && projects.contains(&partner) {
         let label = format!("{} {partner}", i18n.t(I18nKey::DuplicateTo));
-        if ui.button(label).on_hover_text(hover).clicked() {
+        if ui.button(label).on_hover_markdown(hover).clicked() {
             picked = Some(DuplicatePick::To(partner));
         }
     }
-    if ui.button(i18n.t(I18nKey::DuplicateToOther)).on_hover_text(hover).clicked() {
+    if ui.button(i18n.t(I18nKey::DuplicateToOther)).on_hover_markdown(hover).clicked() {
         picked = Some(DuplicatePick::Choose);
     }
 

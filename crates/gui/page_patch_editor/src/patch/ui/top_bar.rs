@@ -14,7 +14,7 @@
 use std::path::{Path, PathBuf};
 
 use egui_widgets::{
-    PathActions, PathRow,
+    HoverMarkdown as _, PathActions, PathRow,
     notify::Notification,
     shadcn::{Button, ComboBox, Icon, TextEdit},
 };
@@ -62,13 +62,6 @@ pub(in crate::patch) enum BarAsk {
     CreateWork(NewWork),
     /// The user patch's `Delete all`.
     ClearUserPatch,
-    /// The user patch's `Export as a mod`.
-    ExportUserPatchAsMod,
-    /// The mod "Export as mod" names, read back into the user patch: in place of what it has, or
-    /// added to it.
-    ImportUserPatch {
-        replace: bool,
-    },
 }
 
 /// What the editor shows after a [`BarAsk`].
@@ -124,7 +117,8 @@ fn project_form(
     let mut asks = Vec::new();
 
     let output = PathRow::new(i18n.t(I18nKey::OutputLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
-        .help(i18n.t(I18nKey::ExportDirHover))
+        .open_hover(i18n.t(I18nKey::OpenSelectedPathHover))
+        .field_hover(i18n.t(I18nKey::ExportDirHover))
         .show(ui, &mut work.place.output);
     if let Some(err) = output.open_error {
         notify.error(err);
@@ -139,8 +133,8 @@ fn project_form(
     ui.horizontal_wrapped(|ui| {
         // It is in the ids of the new objects and the names of the folders: renamed, not typed over.
         let hover = i18n.t(I18nKey::ModCodeHover);
-        ui.label(i18n.t(I18nKey::ModCodeLabel)).on_hover_text(hover);
-        ui.strong(work.place.mod_code.trim()).on_hover_text(hover);
+        ui.label(i18n.t(I18nKey::ModCodeLabel)).on_hover_markdown(hover);
+        ui.strong(work.place.mod_code.trim()).on_hover_markdown(hover);
         if !work.user_patch {
             let old = work.place.loaded_for.as_deref().unwrap_or_default();
             asks.extend(rename_form(ui, i18n, rename_to, (old, &work.place.cache_root)));
@@ -206,13 +200,6 @@ pub(in crate::patch) fn apply(
         }
 
         BarAsk::ClearUserPatch => return Some(BarDone::Reshow(work.clear_user_patch(notify, i18n))),
-        BarAsk::ExportUserPatchAsMod => {
-            crate::patch::user_patch::export_as_mod(work, &panels.mod_export, notify, i18n);
-        }
-        BarAsk::ImportUserPatch { replace } => {
-            crate::patch::user_patch::import_as_user_patch(work, &panels.mod_export, replace, notify, i18n);
-            return Some(refs_changed(work)); // names, the save and the views, as for new references
-        }
     }
     None
 }
@@ -243,7 +230,7 @@ fn file_menu(ui: &mut egui::Ui, i18n: &I18nMap, recent: &[RecentWork]) -> Option
             (I18nKey::ModOpen, I18nKey::ModOpenHover, BarAsk::OpenMod),
         ];
         for (label, hover, ask) in items {
-            if ui.button(i18n.t(label)).on_hover_text(i18n.t(hover)).clicked() {
+            if ui.button(i18n.t(label)).on_hover_markdown(i18n.t(hover)).clicked() {
                 asked = Some(ask);
             }
         }
@@ -282,7 +269,7 @@ fn export_buttons(ui: &mut egui::Ui, i18n: &I18nMap, ready: bool, format: Export
         ExportFormat::ALL.len(),
         |index| ExportFormat::ALL[index].label(),
     );
-    let changed = format_box.on_hover_text(i18n.t(I18nKey::ExportFormatHover)).changed();
+    let changed = format_box.on_hover_markdown(i18n.t(I18nKey::ExportFormatHover)).changed();
     ui.separator();
 
     if export { Some(BarAsk::Export) } else { changed.then(|| BarAsk::ExportFormat(ExportFormat::ALL[selected])) }
@@ -293,7 +280,7 @@ fn export_buttons(ui: &mut egui::Ui, i18n: &I18nMap, ready: bool, format: Export
 pub(super) fn cache_button(ui: &mut egui::Ui, i18n: &I18nMap, dir: &Path) -> bool {
     let button = Button::new(i18n.t(I18nKey::WorkOpenCacheDir)).icon(Icon::FolderOpen);
     let response = ui.add(button).on_hover_ui(|ui| {
-        ui.label(i18n.t(I18nKey::WorkCacheDirHover));
+        egui_widgets::markdown::hover_markdown(ui, i18n.t(I18nKey::WorkCacheDirHover));
         ui.monospace(dir.to_string_lossy());
     });
     response.clicked()
@@ -314,7 +301,7 @@ fn source_row(ui: &mut egui::Ui, i18n: &I18nMap, mod_dir: &str, notify: &mut Not
 
     let mut reload = false;
     let error = PathRow::new(i18n.t(I18nKey::WorkSourceLabel), "", PATH_ACTIONS)
-        .hover(i18n.t(I18nKey::WorkSourceHover))
+        .open_hover(i18n.t(I18nKey::WorkSourceHover))
         .show_read_only(ui, mod_dir, |ui| {
             let button = Button::new(i18n.t(I18nKey::ModReload)).icon(Icon::RefreshCcw);
             reload = ui.add(button).on_hover_text(i18n.t(I18nKey::ModReloadHover)).clicked();
@@ -330,7 +317,7 @@ fn source_row(ui: &mut egui::Ui, i18n: &I18nMap, mod_dir: &str, notify: &mut Not
 pub(super) fn ref_mods_row(ui: &mut egui::Ui, i18n: &I18nMap, ref_mods: &[String]) -> Option<BarAsk> {
     let mut asked = None;
     ui.horizontal_wrapped(|ui| {
-        ui.label(i18n.t(I18nKey::RefModsLabel)).on_hover_text(i18n.t(I18nKey::RefModsHover));
+        ui.label(i18n.t(I18nKey::RefModsLabel)).on_hover_markdown(i18n.t(I18nKey::RefModsHover));
         if ref_mods.is_empty() {
             ui.weak(i18n.t(I18nKey::NoneText));
         }
@@ -341,7 +328,7 @@ pub(super) fn ref_mods_row(ui: &mut egui::Ui, i18n: &I18nMap, ref_mods: &[String
             }
         }
 
-        let add = ui.add(Button::new("").icon(Icon::Plus).small()).on_hover_text(i18n.t(I18nKey::RefModsHover));
+        let add = ui.add(Button::new("").icon(Icon::Plus).small()).on_hover_markdown(i18n.t(I18nKey::RefModsHover));
         if add.clicked()
             && let Some(dir) = gui_shared::rfd::FileDialog::new().pick_folder()
         {
@@ -380,7 +367,7 @@ fn rename_form(
 ) -> Option<BarAsk> {
     let Some(new) = rename_to else {
         let start = Button::new(i18n.t(I18nKey::ModCodeRename)).small();
-        if ui.add(start).on_hover_text(i18n.t(I18nKey::ModCodeRenameHover)).clicked() {
+        if ui.add(start).on_hover_markdown(i18n.t(I18nKey::ModCodeRenameHover)).clicked() {
             *rename_to = Some(String::new());
         }
         return None;
@@ -394,7 +381,7 @@ fn rename_form(
         ui.colored_label(ui.visuals().warn_fg_color, i18n.t(problem));
     }
 
-    if rename.on_hover_text(i18n.t(I18nKey::ModCodeRenameHover)).clicked() {
+    if rename.on_hover_markdown(i18n.t(I18nKey::ModCodeRenameHover)).clicked() {
         let new = std::mem::take(new);
         *rename_to = None;
         return Some(BarAsk::Rename(new));
@@ -415,9 +402,9 @@ fn info_fields(ui: &mut egui::Ui, i18n: &I18nMap, info: &mut ModInfo) -> bool {
     ];
     let mut changed = false;
     for (label, hover, value, width) in fields {
-        ui.label(i18n.t(label)).on_hover_text(i18n.t(hover));
+        ui.label(i18n.t(label)).on_hover_markdown(i18n.t(hover));
         let field = ui.add(TextEdit::singleline(value).desired_width(width));
-        changed |= field.on_hover_text(i18n.t(hover)).changed();
+        changed |= field.on_hover_markdown(i18n.t(hover)).changed();
     }
     changed
 }

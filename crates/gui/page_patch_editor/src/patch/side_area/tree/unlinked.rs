@@ -3,6 +3,7 @@
 
 use std::rc::Rc;
 
+use egui_widgets::HoverMarkdown as _;
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::label::object_button;
@@ -19,7 +20,7 @@ pub(super) fn show(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Rc<st
     }
 
     let title = format!("⚠ {} ({})", i18n.t(I18nKey::ExplorerNotLinked), unlinked.len());
-    ui.colored_label(ui.visuals().warn_fg_color, title).on_hover_text(i18n.t(I18nKey::ExplorerNotLinkedHover));
+    ui.colored_label(ui.visuals().warn_fg_color, title).on_hover_markdown(i18n.t(I18nKey::ExplorerNotLinkedHover));
 
     egui::ScrollArea::vertical().id_salt("nemesis_unlinked").max_height(MAX_HEIGHT).show(ui, |ui| {
         for &node in unlinked {
