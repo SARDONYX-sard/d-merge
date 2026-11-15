@@ -92,10 +92,10 @@ fnis_patch_gen       = { path = "./crates/core/fnis_patch_gen" }
 hkx_io               = { path = "./crates/core/hkx_io" }
 json_patch           = { path = "./crates/core/json_patch" }
 jwalk_glob           = { path = "./crates/core/jwalk_glob" }
-nemesis_diff         = { path = "./crates/core/nemesis_diff" }
+nemesis_diff         = { path = "./crates/gui/nemesis_diff" }
 nemesis_patch_syntax = { path = "./crates/core/nemesis_patch_syntax" }
 nemesis_xml          = { path = "./crates/core/nemesis_xml" }
-pandora_patch        = { path = "./crates/core/pandora_patch" }
+pandora_patch        = { path = "./crates/gui/pandora_patch" }
 skyrim_anim_data     = { path = "./crates/core/skyrim_anim_data" }
 skyrim_crc           = { path = "./crates/core/skyrim_crc" }
 skyrim_esp           = { path = "./crates/core/skyrim_esp" }

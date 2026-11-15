@@ -134,7 +134,7 @@ This project includes multiple crates with different licenses. The distributed b
 
 ### License Tree
 
-Workspace crates only (`crates/core/*`, `crates/gui/*`). `fast_hash` (MIT OR Apache-2.0) is used by most of them and omitted.
+Workspace crates only (`crates/core/*`: the merge, `crates/gui/*`: the app and what only it uses). `fast_hash` and `stdx` (MIT OR Apache-2.0) are used by most of them and omitted.
 
 ```txt
 d_merge (GPL-3.0-or-later)                          <- crates/gui/d_merge: the app
@@ -146,9 +146,11 @@ d_merge (GPL-3.0-or-later)                          <- crates/gui/d_merge: the a
 │   │   ├── fnis_list (GPL-3.0-or-later)
 │   │   ├── skyrim_crc (MIT OR Apache-2.0)
 │   │   └── skyrim_esp (MIT OR Apache-2.0)
+│   ├── hkx_io (MIT OR Apache-2.0)
 │   ├── json_patch (MIT OR Apache-2.0)
 │   ├── jwalk_glob (MIT OR Apache-2.0)
 │   ├── nemesis_xml (MIT OR Apache-2.0)
+│   │   └── nemesis_patch_syntax (GPL-3.0-or-later)
 │   └── skyrim_anim_data (GPL-3.0-or-later)
 │       └── skyrim_crc (MIT OR Apache-2.0)
 │
@@ -157,21 +159,31 @@ d_merge (GPL-3.0-or-later)                          <- crates/gui/d_merge: the a
 │   ├── gui_shared_derive (MIT OR Apache-2.0)
 │   ├── mod_info (MIT OR Apache-2.0)
 │   └── skyrim_data_dir (MIT OR Apache-2.0)
+├── egui_widgets (MIT)
+├── keybinding (MIT)
+│   ├── egui_code_editor (MIT)
+│   │   └── egui_widgets (MIT)
+│   └── egui_tree (MIT)
 ├── page_convert (GPL-3.0-or-later)
 │   └── serde_hkx_for_gui (MIT OR Apache-2.0)
 │       └── node_expr (MIT OR Apache-2.0)
-├── page_patch_editor (GPL-3.0-or-later)
-│   ├── behavior_merge_types (GPL-3.0-or-later)
+├── page_hkanno (GPL-3.0-or-later)
 │   ├── egui_code_editor (MIT)
-│   ├── nemesis_diff (MIT OR Apache-2.0)
-│   │   └── nemesis_xml (MIT OR Apache-2.0)
-│   └── skyrim_crc (MIT OR Apache-2.0)
-├── page_hkanno (MIT OR Apache-2.0)
-│   ├── egui_code_editor (MIT)
-│   │   └── egui_widgets (MIT)
 │   ├── hkanno_lsp (MIT OR Apache-2.0)
 │   └── serde_hkx_for_gui (MIT OR Apache-2.0)
-├── egui_widgets (MIT)
+├── page_patch (GPL-3.0-or-later)                    <- the patch page: mod list, conflicts
+│   ├── behavior_merge (GPL-3.0-or-later)
+│   └── nemesis_diff (MIT OR Apache-2.0)
+│       └── nemesis_xml (MIT OR Apache-2.0)
+├── page_patch_editor (GPL-3.0-or-later)             <- the patch editor: its drawing
+│   ├── patch_editor_core (GPL-3.0-or-later)         <- what it edits
+│   │   ├── behavior_merge_types (GPL-3.0-or-later)
+│   │   ├── nemesis_diff (MIT OR Apache-2.0)
+│   │   ├── pandora_patch (MIT OR Apache-2.0)
+│   │   └── skyrim_anim_data (GPL-3.0-or-later)
+│   ├── egui_code_editor (MIT)
+│   ├── egui_tree (MIT)
+│   └── keybinding (MIT)
 └── tracing_rotation (MIT OR Apache-2.0)
 ```
 
