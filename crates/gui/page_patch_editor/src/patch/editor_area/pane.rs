@@ -30,6 +30,8 @@ pub(super) struct PreviewSettings<'a> {
     pub(super) code: &'a str,
     pub(super) parser_mode: ParserMode,
     pub(super) export_format: ExportFormat,
+    /// The object is a new one nothing links to: see [`editor::diagnostics::not_linked`].
+    pub(super) not_linked: bool,
 }
 
 /// The editor of the open object, and what is shown beside it.
@@ -131,6 +133,9 @@ impl EditorPane {
         let patch = behavior.patch(settings.code, id);
         let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(id, patch, settings.parser_mode));
         self.problems = self.field_problems(behavior, id, settings.code);
+        if settings.not_linked {
+            self.problems.insert(0, editor::diagnostics::not_linked(&self.text));
+        }
 
         // Keep the ▲ / ▼ position across edits.
         let current = self.preview_view.as_ref().map_or(0, |view| view.current);

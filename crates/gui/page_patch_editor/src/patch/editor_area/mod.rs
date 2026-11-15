@@ -250,10 +250,16 @@ impl EditorArea {
             return;
         }
         work.sync_pandora_doc(active);
+        let not_linked = {
+            let names = work.names(active);
+            let graph = &names.graph;
+            graph.node_of(id).is_some_and(|node| graph.is_unlinked(node))
+        };
         let settings = pane::PreviewSettings {
             code: work.place.mod_code.trim(),
             parser_mode: work.parser_mode,
             export_format: work.workspace.export_format,
+            not_linked,
         };
         if self.pane.refresh_preview(&work.workspace.behaviors[active], id, settings) {
             problems.refresh_in(work, active, id);
