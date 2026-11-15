@@ -43,6 +43,10 @@ pub struct PatchProgress {
     /// Total item count within the phase.
     pub total: AtomicUsize,
 
+    /// The files read so far: only of [`phase::READING_PATCHES`], whose items (mod dirs) can take
+    /// seconds each.
+    pub files: AtomicUsize,
+
     /// Terminal error state.
     ///
     /// Rarely written/read, so a lock is acceptable.
@@ -58,6 +62,7 @@ impl PatchProgress {
     /// - phase
     /// - index
     /// - total
+    /// - files
     /// - done flag
     /// - terminal error
     ///
@@ -68,6 +73,7 @@ impl PatchProgress {
         self.phase.store(phase::IDLE, Ordering::Relaxed);
         self.index.store(0, Ordering::Relaxed);
         self.total.store(0, Ordering::Relaxed);
+        self.files.store(0, Ordering::Relaxed);
         *self.error.write() = None;
     }
 
@@ -80,6 +86,7 @@ impl PatchProgress {
             phase: self.phase.load(Ordering::Relaxed),
             index: self.index.load(Ordering::Relaxed),
             total: self.total.load(Ordering::Relaxed),
+            files: self.files.load(Ordering::Relaxed),
         }
     }
 
@@ -103,7 +110,13 @@ impl PatchProgress {
             _ => None,
         };
         if let Some(key) = progress_key {
-            return format!("[{}/{steps}] {} ({}/{})", snapshot.phase, i18n.t(key), snapshot.index, snapshot.total,);
+            let (step, label, index, total) = (snapshot.phase, i18n.t(key), snapshot.index, snapshot.total);
+            // e.g. `[2/6] Reading templates and patches... (12/69, files: 8421)`
+            if step == phase::READING_PATCHES {
+                let files = i18n.t(I18nKey::StatusReadFiles);
+                return format!("[{step}/{steps}] {label} ({index}/{total}, {files} {})", snapshot.files);
+            }
+            return format!("[{step}/{steps}] {label} ({index}/{total})");
         }
 
         match snapshot.phase {
@@ -131,6 +144,8 @@ pub struct PatchProgressSnapshot {
     pub phase: u8,
     pub index: usize,
     pub total: usize,
+    /// See [`PatchProgress::files`].
+    pub files: usize,
 }
 
 /// The mod code of the user patch: what the conflict tool writes, and what loads last.

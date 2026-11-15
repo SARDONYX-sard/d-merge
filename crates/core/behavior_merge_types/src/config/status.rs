@@ -17,11 +17,17 @@ pub enum Status {
     },
 
     /// Status when reading patches.
+    ///
+    /// A mod dir can take seconds (thousands of files when the OS file cache is cold), so `files` goes
+    /// up within one: e.g. `(12/69 mods, 8421 files)`.
     ReadingPatches {
-        /// 0 based index
+        /// The mod dirs read. 0 based index
         index: usize,
         /// Number of mod dirs
         total: usize,
+        /// The patch files read so far, over every mod dir. Their total is not known until all are
+        /// read: each mod dir is walked while it is read.
+        files: usize,
     },
 
     /// Status when Parsing patches.
@@ -57,8 +63,8 @@ impl fmt::Display for Status {
             Self::GeneratingFnisPatches { index, total } => {
                 write!(f, "[1/6] Generating FNIS patches...({index}/{total})")
             }
-            Self::ReadingPatches { index, total } => {
-                write!(f, "[2/6] Reading templates and patches...({index}/{total})")
+            Self::ReadingPatches { index, total, files } => {
+                write!(f, "[2/6] Reading templates and patches...({index}/{total} mods, {files} files)")
             }
             Self::ParsingPatches { index, total } => {
                 write!(f, "[3/6] Parsing patches...({index}/{total})")
@@ -87,8 +93,8 @@ mod tests {
         let serialized = sonic_rs::to_string(&status).unwrap();
         assert_eq!(serialized, r#"{"type":"Error","content":"Error message"}"#);
 
-        let status = Status::ReadingPatches { index: 0, total: 100 };
+        let status = Status::ReadingPatches { index: 0, total: 100, files: 7 };
         let serialized = sonic_rs::to_string(&status).unwrap();
-        assert_eq!(serialized, r#"{"type":"ReadingPatches","content":{"index":0,"total":100}}"#);
+        assert_eq!(serialized, r#"{"type":"ReadingPatches","content":{"index":0,"total":100,"files":7}}"#);
     }
 }

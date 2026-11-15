@@ -1503,6 +1503,9 @@ pub enum I18nKey {
     /// Parsing patches...
     StatusParsingPatches,
 
+    /// files:
+    StatusReadFiles,
+
     /// Reading templates and patches...
     StatusReadingPatches,
 

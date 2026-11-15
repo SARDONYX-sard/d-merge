@@ -58,7 +58,7 @@ pub struct PatchPageCtx<'a> {
     pub show_log_window: &'a AtomicBool,
 }
 
-/// How often the app looks whether a check that is running has ended.
+/// How often the app looks at a check or a merge that is running: whether it ended, how far it is.
 const SCAN_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(200);
 
 /// What [`PatchPage::poll`] needs. It runs on every page: a merge goes on while another is shown.
@@ -132,6 +132,11 @@ impl PatchPage {
         }
         if self.run.poll(ctx.notify, ctx.i18n) {
             self.conflicts.on_merge_ended();
+        }
+        if self.run.is_running() {
+            // The merge only wakes the app when its phase changes: the counts within one (e.g. the
+            // files read) are shown as they go only if the app looks again.
+            egui_ctx.request_repaint_after(SCAN_POLL_INTERVAL);
         }
         self.conflicts.follow_output(ctx.settings.current_output_dir());
         if let Some((count, elapsed)) = self.conflicts.poll()
