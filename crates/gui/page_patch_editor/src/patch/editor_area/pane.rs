@@ -58,7 +58,7 @@ pub(super) struct EditorPane {
     pub(super) cursor_line: usize,
     /// The patch of the open object and the parser's word on it. `None`: to compute again, see
     /// [`EditorArea::refresh_preview`].
-    pub(super) preview: Option<(Option<String>, Result<(), String>)>,
+    pub(super) preview: Option<(Option<String>, Result<(), editor::parser_error::ParserError>)>,
     /// When the text was last typed: the preview waits for a pause.
     pub(super) typed_at: Option<Instant>,
     /// The problems of the open object, underlined in the editor.
@@ -151,7 +151,7 @@ impl EditorPane {
         let (view, check) = if as_pandora {
             match editor::pandora::op_preview(behavior, id) {
                 Ok(view) => (Some(view), Ok(())),
-                Err(problem) => (None, Err(problem)),
+                Err(problem) => (None, Err(editor::parser_error::ParserError::without_place(problem))),
             }
         } else {
             (nemesis_view, check)

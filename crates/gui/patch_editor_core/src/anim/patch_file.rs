@@ -37,6 +37,8 @@ use skyrim_anim_data::{
 };
 use winnow::Parser as _;
 
+use crate::editor::parser_error::ParserError;
+
 /// The file name of the header patches, without `.txt`.
 const HEADER: &str = "$header$";
 
@@ -118,45 +120,36 @@ impl AsdsfFile {
 ///
 /// # Errors
 /// What the parser rejects in the patch.
-pub fn validate_adsf(id: &str, patch: &str, mode: ParserMode) -> Result<(), String> {
-    let text = |e: &dyn std::fmt::Display| e.to_string();
+pub fn validate_adsf(id: &str, patch: &str, mode: ParserMode) -> Result<(), ParserError> {
     let strict = matches!(mode, ParserMode::Strict);
     match AdsfFile::of(id) {
-        AdsfFile::ProjectNamesHeader => parse_lines_diff_patch(patch, 0).map(|_| ()).map_err(|e| text(&e)),
-        AdsfFile::AnimHeader => parse_anim_header_diff_patch(patch).map(|_| ()).map_err(|e| text(&e)),
-        AdsfFile::IndexedAnim if is_edit(patch) => {
-            parse_clip_anim_diff_patch(patch, 0).map(|_| ()).map_err(|e| text(&e))
-        }
-        AdsfFile::AddAnim | AdsfFile::IndexedAnim if strict => {
-            parse_clip_anim_block_patch::<true>(patch).map(|_| ()).map_err(|e| text(&e))
-        }
-        AdsfFile::AddAnim | AdsfFile::IndexedAnim => {
-            parse_clip_anim_block_patch::<false>(patch).map(|_| ()).map_err(|e| text(&e))
-        }
-        AdsfFile::IndexedMotion if is_edit(patch) => {
-            parse_clip_motion_diff_patch(patch, 0).map(|_| ()).map_err(|e| text(&e))
-        }
+        AdsfFile::ProjectNamesHeader => checked(parse_lines_diff_patch(patch, 0)),
+        AdsfFile::AnimHeader => checked(parse_anim_header_diff_patch(patch)),
+        AdsfFile::IndexedAnim if is_edit(patch) => checked(parse_clip_anim_diff_patch(patch, 0)),
+        AdsfFile::AddAnim | AdsfFile::IndexedAnim if strict => checked(parse_clip_anim_block_patch::<true>(patch)),
+        AdsfFile::AddAnim | AdsfFile::IndexedAnim => checked(parse_clip_anim_block_patch::<false>(patch)),
+        AdsfFile::IndexedMotion if is_edit(patch) => checked(parse_clip_motion_diff_patch(patch, 0)),
         AdsfFile::AddMotion | AdsfFile::IndexedMotion if strict => {
-            parse_clip_motion_block_patch::<true>(patch).map(|_| ()).map_err(|e| text(&e))
+            checked(parse_clip_motion_block_patch::<true>(patch))
         }
-        AdsfFile::AddMotion | AdsfFile::IndexedMotion => {
-            parse_clip_motion_block_patch::<false>(patch).map(|_| ()).map_err(|e| text(&e))
-        }
+        AdsfFile::AddMotion | AdsfFile::IndexedMotion => checked(parse_clip_motion_block_patch::<false>(patch)),
     }
+}
+
+/// A parser's result, its value dropped and its error as a [`ParserError`].
+fn checked<T, E: Into<ParserError>>(parsed: Result<T, E>) -> Result<(), ParserError> {
+    parsed.map(|_| ()).map_err(Into::into)
 }
 
 /// d-merge's parser check of one `animationsetdatasinglefile` patch. These parsers have no modes.
 ///
 /// # Errors
 /// What the parser rejects in the patch.
-pub fn validate_asdsf(id: &str, patch: &str) -> Result<(), String> {
-    let text = |e: &dyn std::fmt::Display| e.to_string();
+pub fn validate_asdsf(id: &str, patch: &str) -> Result<(), ParserError> {
     match AsdsfFile::of(id) {
-        AsdsfFile::ProjectsHeader | AsdsfFile::SetsHeader => {
-            parse_lines_diff_patch(patch, 0).map(|_| ()).map_err(|e| text(&e))
-        }
-        AsdsfFile::AddSet => anim_set_data.parse(patch).map(|_| ()).map_err(|e| text(&e)),
-        AsdsfFile::EditSet => parse_anim_set_diff_patch(patch, 0).map(|_| ()).map_err(|e| text(&e)),
+        AsdsfFile::ProjectsHeader | AsdsfFile::SetsHeader => checked(parse_lines_diff_patch(patch, 0)),
+        AsdsfFile::AddSet => checked(anim_set_data.parse(patch)),
+        AsdsfFile::EditSet => checked(parse_anim_set_diff_patch(patch, 0)),
     }
 }
 
@@ -171,12 +164,11 @@ mod tests {
     fn a_wrong_attack_trigger_says_where_and_why() {
         let patch = "V3\n0\n0\n1\n<!-- MOD_CODE ~m~ OPEN -->\nattackStat1\n<!-- ORIGINAL -->\nattackStart1\n<!-- CLOSE -->\n0\n0\n0\n";
         let error = validate_asdsf("Project~P/_Set.txt", patch).unwrap_err();
-        let problem = crate::editor::diagnostics::parser_problem(&error).unwrap();
-        assert_eq!(problem.line, 5, "{error}");
-        assert!(problem.message.contains("attackStart"), "{error}");
+        assert_eq!(error.at.map(|(line, _)| line), Some(5), "{error}");
+        assert!(error.message.contains("attackStart"), "{error}");
     }
 
-    fn validate_adsf(id: &str, patch: &str) -> Result<(), String> {
+    fn validate_adsf(id: &str, patch: &str) -> Result<(), ParserError> {
         super::validate_adsf(id, patch, ParserMode::Strict)
     }
 
@@ -199,7 +191,7 @@ mod tests {
     #[test]
     #[ignore = "needs real mods"]
     fn checks_the_patches_of_real_mods() {
-        type Check = fn(&str, &str) -> Result<(), String>;
+        type Check = fn(&str, &str) -> Result<(), ParserError>;
         let lenient: Check = |id, patch| super::validate_adsf(id, patch, ParserMode::Lenient);
         let strict: Check = validate_adsf;
         let checks: [(&str, &str, Check); 3] = [
@@ -219,8 +211,7 @@ mod tests {
                         total += 1;
                         if let Err(err) = check(&id, &text) {
                             rejected += 1;
-                            let first = err.lines().next().unwrap_or_default();
-                            println!("{}: {first}", path.display());
+                            println!("{}: {err}", path.display());
                         }
                     }
                 }

@@ -508,7 +508,7 @@ dependencies = [
 [[package]]
 name = "auto_charset"
 version = "0.1.0"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "chardetng",
  "encoding_rs",
@@ -877,7 +877,7 @@ dependencies = [
 [[package]]
 name = "class_generator"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "bitflags 2.13.2",
  "derive-new",
@@ -1269,7 +1269,7 @@ checksum = "56254986775e3233ffa9c4d7d3faaf6d36a2c09d30b20687e9f88bc8bafc16c8"
 [[package]]
 name = "diff"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "imara-diff",
 ]
@@ -2444,7 +2444,7 @@ dependencies = [
 [[package]]
 name = "havok_classes"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "bitflags 2.13.2",
  "educe",
@@ -2460,7 +2460,7 @@ dependencies = [
 [[package]]
 name = "havok_serde"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "arrayvec",
  "havok_types",
@@ -2470,7 +2470,7 @@ dependencies = [
 [[package]]
 name = "havok_types"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "lexical",
  "serde",
@@ -2481,7 +2481,7 @@ dependencies = [
 [[package]]
 name = "havok_types_derive"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "havok_types_derive_proc_macros",
 ]
@@ -2489,7 +2489,7 @@ dependencies = [
 [[package]]
 name = "havok_types_derive_proc_macros"
 version = "0.1.0"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4180,6 +4180,7 @@ dependencies = [
  "gui_shared",
  "hkx_io",
  "nemesis_diff",
+ "nemesis_xml",
  "pandora_patch",
  "phf 0.14.0",
  "rayon",
@@ -4191,6 +4192,7 @@ dependencies = [
  "sonic-rs",
  "stdx",
  "winnow",
+ "winnow_ext",
 ]
 
 [[package]]
@@ -5174,7 +5176,7 @@ dependencies = [
 [[package]]
 name = "serde_hkx"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "byteorder",
  "educe",
@@ -5190,7 +5192,7 @@ dependencies = [
 [[package]]
 name = "serde_hkx_features"
 version = "1.0.1"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "auto_charset",
  "diff 1.0.1",
@@ -6854,7 +6856,7 @@ dependencies = [
 [[package]]
 name = "winnow_ext"
 version = "0.1.0"
-source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=e71c602#e71c60226425f9a92a2af963931f4ddc9a470085"
+source = "git+https://github.com/SARDONYX-forks/d-merge-serde-hkx?rev=0ebff43#0ebff4323e78728279bed12291d7920f73e2dfb4"
 dependencies = [
  "annotate-snippets",
  "winnow",

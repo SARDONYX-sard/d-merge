@@ -255,13 +255,13 @@ impl Behavior {
     ///
     /// # Errors
     /// What the parser rejects in the patch.
-    pub fn validate(&self, id: &str, patch: &str) -> Result<(), String> {
+    pub fn validate(&self, id: &str, patch: &str) -> Result<(), crate::editor::parser_error::ParserError> {
         if self.adsf {
             crate::anim::patch_file::validate_adsf(id, patch, ParserMode::Strict)
         } else if self.asdsf {
             crate::anim::patch_file::validate_asdsf(id, patch)
         } else {
-            nemesis_diff::validate(patch)
+            nemesis_diff::validate(patch).map_err(Into::into)
         }
     }
 

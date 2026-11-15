@@ -727,10 +727,10 @@ pub fn apply_patches<'a>(template: &str, patches: impl IntoIterator<Item = (&'a 
 ///
 /// # Errors
 /// The parse error, readable.
-pub fn validate(patch: &str) -> Result<(), String> {
+pub fn validate(patch: &str) -> Result<(), nemesis_xml::error::Error> {
     // The push to an empty array that keeps its line: see `kept_array`.
     let hacks = nemesis_xml::hack::HackOptions { empty_array_outside_hkparam: true, ..Default::default() };
-    nemesis_xml::patch::parse_nemesis_patch(patch, Some(hacks)).map(|_| ()).map_err(|err| err.to_string())
+    nemesis_xml::patch::parse_nemesis_patch(patch, Some(hacks)).map(|_| ())
 }
 
 /// A class or field name the Havok class table does not know.

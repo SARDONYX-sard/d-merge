@@ -519,7 +519,7 @@ mod tests {
     use super::*;
     use crate::anim::patch_file::validate_asdsf;
 
-    fn validate_adsf(id: &str, patch: &str) -> Result<(), String> {
+    fn validate_adsf(id: &str, patch: &str) -> Result<(), crate::editor::parser_error::ParserError> {
         crate::anim::patch_file::validate_adsf(id, patch, ParserMode::Strict)
     }
 

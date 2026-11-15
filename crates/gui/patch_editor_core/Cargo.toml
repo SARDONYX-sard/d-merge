@@ -30,11 +30,13 @@ fast_hash            = { workspace = true }
 gui_shared           = { workspace = true }
 hkx_io               = { workspace = true }
 nemesis_diff         = { workspace = true }
+nemesis_xml          = { workspace = true } # its errors: see `editor::parser_error`
 pandora_patch        = { workspace = true }
 serde_hkx_for_gui    = { workspace = true }
 skyrim_anim_data     = { workspace = true }
 skyrim_crc           = { workspace = true }
 winnow               = { workspace = true }
+winnow_ext           = { workspace = true } # the place of a parser error
 
 [lints]
 workspace = true

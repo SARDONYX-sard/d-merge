@@ -279,6 +279,7 @@ mod tests {
                         let written = behavior.patch(&code, id).unwrap_or_default();
                         if let Err(err) = nemesis_diff::validate(&written) {
                             broken += 1;
+                            let err = err.to_string();
                             let first = err.lines().next().unwrap_or_default();
                             println!("{} {}/{id}: {first}", code_dir.display(), behavior.name);
                             if only.is_some() {

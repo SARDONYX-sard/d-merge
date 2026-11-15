@@ -652,7 +652,7 @@ mod tests {
         behavior.set_text(&id, &broken);
         let bad_patch = time!("broken: patch", behavior.patch("m", &id)).unwrap();
         let bad = time!("broken: validate", behavior.validate(&id, &bad_patch));
-        println!("  valid: {}, error of {} bytes", bad.is_ok(), bad.as_ref().err().map_or(0, String::len));
+        println!("  valid: {}, error of {} bytes", bad.is_ok(), bad.as_ref().err().map_or(0, |err| err.message.len()));
         time!("broken: diagnostics", editor::diagnostics::field_diagnostics(&broken, &behavior, false, "m"));
         time!("broken: names", names.apply_changes(&behavior, std::slice::from_ref(&id)));
         behavior.set_text(&id, &edited);

@@ -55,7 +55,7 @@ impl EditorPane {
                 }
                 // The details are in the Problems panel: a long text here would widen this panel.
                 Err(err) => {
-                    ui.colored_label(ui.visuals().error_fg_color, "✖").on_hover_text(err);
+                    ui.colored_label(ui.visuals().error_fg_color, "✖").on_hover_text(err.to_string());
                 }
             }
 

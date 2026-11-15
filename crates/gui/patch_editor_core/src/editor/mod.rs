@@ -6,6 +6,7 @@ pub mod language;
 pub mod merge;
 pub mod names;
 pub mod pandora;
+pub mod parser_error;
 pub mod preview;
 pub mod resolve;
 pub mod tabs;
