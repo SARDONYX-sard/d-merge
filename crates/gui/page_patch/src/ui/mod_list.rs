@@ -14,7 +14,7 @@ use mod_info::ModType;
 
 use super::{
     PatchView,
-    dnd_table::{RowConflicts, check_only_table_body, dnd_table_body},
+    dnd_table::{Links, RowConflicts, check_only_table_body, dnd_table_body, paint_links},
 };
 use crate::visible_mods::{self, is_dnd_allowed};
 
@@ -22,10 +22,15 @@ impl PatchView<'_> {
     /// The central panel with the toolbar and the table.
     pub(super) fn ui_mod_list(&mut self, ui: &mut egui::Ui) {
         let rows = self.read_only_rows();
-        let settings = &*self.ctx.settings;
-        let user_patch =
-            crate::run::uses_user_patch(settings).then(|| crate::run::user_patch_priority(settings.mod_list()));
-        self.page.conflicts.refresh_marks(settings.mod_list(), user_patch, settings.behavior.apply_user_patch);
+
+        {
+            let settings = &*self.ctx.settings;
+            let user_patch =
+                crate::run::uses_user_patch(settings).then(|| crate::run::user_patch_priority(settings.mod_list()));
+            self.page.conflicts.refresh_marks(settings.mod_list(), user_patch, settings.behavior.apply_user_patch);
+        }
+        self.page.conflicts.refresh_relations();
+
         egui::CentralPanel::default().frame(self.ctx.panel_frame).show(ui, |ui| {
             ui.add_space(10.0);
             self.render_toolbar(ui, rows.is_some());
@@ -187,13 +192,15 @@ impl PatchView<'_> {
     /// Renders the scroll area and [`egui_extras::TableBuilder`].
     fn render_table(&mut self, ui: &mut egui::Ui, rows: Option<&[u32]>) {
         let table_max_height = ui.available_height() * 0.97;
-        // The real space of this panel (the window size setting is not the panel width).
-        let total_width = ui.available_width();
-
-        let changed_width = (self.page.prev_table_width - total_width).abs() > 0.5;
-        if changed_width {
-            self.page.prev_table_width = total_width;
-        }
+        let changed_width = {
+            // The real space of this panel (the window size setting is not the panel width).
+            let total_width = ui.available_width();
+            let changed = (self.page.prev_table_width - total_width).abs() > 0.5;
+            if changed {
+                self.page.prev_table_width = total_width;
+            }
+            changed
+        };
 
         egui::ScrollArea::vertical()
             .max_height(table_max_height)
@@ -202,34 +209,47 @@ impl PatchView<'_> {
             .scroll_bar_rect(egui::Rect::everything_above(20.0))
             .show(ui, |ui| {
                 const MARGIN: f32 = 8.0;
-
-                ui.add_space(MARGIN * 2.0);
-                let rect = ui.available_rect_before_wrap().shrink2(egui::vec2(MARGIN, 0.0));
-                let table_width = rect.width();
-
-                // Text-sized columns: `NemesisExt` just fits; the priority header (with the sort
-                // arrow) is not squashed.
-                let spacing = ui.spacing();
-                let padding = spacing.button_padding.x.mul_add(2.0, spacing.item_spacing.x);
-                let mod_type_width = text_width(ui, ModType::NemesisExt.as_str())
-                    .max(text_width(ui, self.ctx.i18n.t(I18nKey::ColumnModType)))
-                    + padding;
-                let priority_width =
-                    text_width(ui, &format!("{} ▲", self.ctx.i18n.t(I18nKey::ColumnPriority))) + padding;
+                // Left of the table: the lines from the picked mod to those it meets. See `paint_links`.
+                const LINK_GUTTER: f32 = 18.0;
                 const CHECKBOX_WIDTH: f32 = 24.0;
                 const FLAG_WIDTH: f32 = 18.0;
-                let (id_width, name_width) = (table_width * 0.20, table_width * 0.28);
 
-                // Site gets the rest. Computed here (not `Column::remainder`): egui_extras keeps a
-                // remainder column's width in sync with the window only when it is the last one.
-                let gaps = spacing.item_spacing.x * 7.0;
-                let fixed = CHECKBOX_WIDTH + FLAG_WIDTH + id_width + name_width + mod_type_width + priority_width;
-                let site_width = (table_width - fixed - gaps).max(80.0);
+                ui.add_space(MARGIN * 2.0);
+                let (rect, gutter) = {
+                    let mut rect = ui.available_rect_before_wrap().shrink2(egui::vec2(MARGIN, 0.0));
+                    let gutter = (rect.min.x, rect.min.x + LINK_GUTTER);
+                    rect.min.x += LINK_GUTTER;
+                    (rect, gutter)
+                };
+
+                let [id_width, name_width, mod_type_width, site_width, priority_width] = {
+                    let table_width = rect.width();
+
+                    // Text-sized columns: `NemesisExt` just fits; the priority header (with the sort
+                    // arrow) is not squashed.
+                    let spacing = ui.spacing();
+                    let padding = spacing.button_padding.x.mul_add(2.0, spacing.item_spacing.x);
+                    let mod_type_width = text_width(ui, ModType::NemesisExt.as_str())
+                        .max(text_width(ui, self.ctx.i18n.t(I18nKey::ColumnModType)))
+                        + padding;
+                    let priority_width =
+                        text_width(ui, &format!("{} ▲", self.ctx.i18n.t(I18nKey::ColumnPriority))) + padding;
+                    let (id_width, name_width) = (table_width * 0.20, table_width * 0.28);
+
+                    // Site gets the rest. Computed here (not `Column::remainder`): egui_extras keeps a
+                    // remainder column's width in sync with the window only when it is the last one.
+                    let gaps = spacing.item_spacing.x * 7.0;
+                    let fixed = CHECKBOX_WIDTH + FLAG_WIDTH + id_width + name_width + mod_type_width + priority_width;
+                    let site_width = (table_width - fixed - gaps).max(80.0);
+
+                    [id_width, name_width, mod_type_width, site_width, priority_width]
+                };
 
                 // | checkbox | + - | id | name | mod type | site (fills the rest) | priority |
                 // NOTE: The column border is the resize handle: keep the columns resizable. Not the last
                 // one: its handle would be on the scroll bar, and take its drags.
                 let mut asked = None;
+                let mut links = Links::default();
                 ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
                     egui_extras::TableBuilder::new(ui)
                         .striped(true)
@@ -247,17 +267,21 @@ impl PatchView<'_> {
                             let mut widths = [0.0_f32; 7];
                             widths.clone_from_slice(body.widths());
 
-                            let i18n = self.ctx.i18n;
+                            let mut conflicts = {
+                                let i18n = self.ctx.i18n;
+                                RowConflicts {
+                                    scan: &self.page.conflicts,
+                                    label: i18n.t(I18nKey::ConflictShow),
+                                    hovers: (i18n.t(I18nKey::ConflictWinsHover), i18n.t(I18nKey::ConflictLosesHover)),
+                                    dead_hover: i18n.t(I18nKey::ConflictDeadHover),
+                                    asked: None,
+                                    links: Links::default(),
+                                }
+                            };
+
                             let mod_list: &mut [_] =
                                 if self.page.fetch.last_was_empty { &mut [] } else { self.ctx.settings.mod_list_mut() };
                             let anchor = &mut self.page.selection_anchor;
-                            let mut conflicts = RowConflicts {
-                                scan: &self.page.conflicts,
-                                label: i18n.t(I18nKey::ConflictShow),
-                                hovers: (i18n.t(I18nKey::ConflictWinsHover), i18n.t(I18nKey::ConflictLosesHover)),
-                                dead_hover: i18n.t(I18nKey::ConflictDeadHover),
-                                asked: None,
-                            };
                             match rows {
                                 None => dnd_table_body(&mut body, mod_list, widths, anchor, &mut conflicts),
                                 Some(rows) => {
@@ -265,8 +289,15 @@ impl PatchView<'_> {
                                 }
                             }
                             asked = conflicts.asked;
+                            links = conflicts.links;
                         });
                 });
+
+                paint_links(ui.painter(), ui.visuals(), gutter, &links);
+                if let Some(id) = links.clicked {
+                    self.page.conflicts.pick(&id);
+                }
+
                 if let Some(id) = asked {
                     self.page.conflicts.inspected = Some(id);
                     if self.page.conflicts.current.is_none() {

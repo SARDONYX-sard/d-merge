@@ -6,12 +6,8 @@
 //!
 //! ```text
 //! <output>/.d_merge/.debug/patches/meshes/actors/character/behaviors/0_master.patch.json
-//! {
-//!   "one": { "#0106/hkbModifierList/enable": { "patch": { "action": .., "value": false }, "priority": 7 } },
-//!   "overridden": { "#0106/hkbModifierList/enable": [ { "patch": { .. "value": true }, "priority": 3 } ] },
-//!   "seq": { "#0106/hkbModifierList/modifiers": [ { "patch": { "action": { "kind": "seq_push" }, .. } } ] }
-//! }
 //! ```
+//! A behavior's file is a `behavior_merge_types::patches::PatchJson`, read with that type:
 //! - `one`, a single value: the highest priority wins, the others are in `overridden`.
 //! - `seq`, arrays: where two mods write different things to the same element, see [`read_array`].
 //!   `seq_push` and adding conflict with nothing: a merge keeps them all.
@@ -30,9 +26,12 @@ use std::{
 };
 
 use behavior_merge::HiddenPatches;
+use behavior_merge_types::patches::ReadPatchJson;
 use fast_hash::HashMap;
 use gui_shared::{patch::USER_PATCH_ID, settings::pages::patch::mod_item::ModItem};
+use json_patch::{Action, Op, ValueWithPriority};
 use parking_lot::Mutex;
+use simd_json::prelude::{ValueAsArray as _, Writable as _};
 use sonic_rs::{JsonContainerTrait as _, JsonValueTrait as _};
 
 /// How much of a value is kept to show. The whole value is in the mod's file.
@@ -98,6 +97,28 @@ impl Mark {
             (false, true) => "-",
             (false, false) => "",
         }
+    }
+}
+
+/// What another mod is to the mod picked in the list, like MO2's colors when a mod is selected.
+///
+/// ```text
+/// picked: B (priority 5)
+/// A (3): B puts other values than A's at 12 places -> overridden_by_picked 12   (green)
+/// C (8): C puts other values than B's at 2 places  -> overrides_picked 2        (red)
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Relation {
+    /// Places where the picked mod's value replaces this mod's: it comes later.
+    pub(crate) overridden_by_picked: u32,
+    /// Places where this mod's value replaces the picked mod's.
+    pub(crate) overrides_picked: u32,
+}
+
+impl Relation {
+    /// How much they meet: what the color and the line are as strong as.
+    pub(crate) const fn count(self) -> u32 {
+        self.overridden_by_picked + self.overrides_picked
     }
 }
 
@@ -215,6 +236,48 @@ impl Conflicts {
         let at = at as u32;
         self.points.iter().filter(|point| point.values.iter().any(|value| value.owner == at)).collect()
     }
+
+    /// What each other mod is to `picked`, for the load order `priority_of` gives (`None`: off). Two
+    /// mods at a time, as MO2: where they put other values, the later one replaces the other, whoever
+    /// wins the place in the end. What is in `hidden` is as if the mod did not do it.
+    pub(crate) fn relations(
+        &self,
+        picked: &str,
+        priority_of: impl Fn(&str) -> Option<usize>,
+        hidden: Option<&HiddenPatches>,
+    ) -> HashMap<String, Relation> {
+        let mut relations: HashMap<String, Relation> = HashMap::default();
+
+        let Some(at) = self.mods.iter().position(|scanned| scanned.id == picked) else { return relations };
+        let Some(own_priority) = priority_of(picked) else { return relations };
+        let picked_mod = &self.mods[at];
+        #[expect(clippy::cast_possible_truncation, reason = "far fewer than 4 billion mods")]
+        let at = at as u32;
+
+        for point in &self.points {
+            let Some(own) = point.values.iter().find(|value| value.owner == at) else { continue };
+            if picked_mod.hides(point, hidden) {
+                continue;
+            }
+
+            for value in point.values.iter().filter(|value| value.owner != at && value.hash != own.hash) {
+                let other = &self.mods[value.owner as usize];
+                if other.hides(point, hidden) {
+                    continue;
+                }
+                let Some(priority) = priority_of(&other.id) else { continue };
+
+                let relation = relations.entry(other.id.clone()).or_default();
+                if own_priority > priority {
+                    relation.overridden_by_picked += 1;
+                } else {
+                    relation.overrides_picked += 1;
+                }
+            }
+        }
+
+        relations
+    }
 }
 
 /// `<dir>/meshes/a/b.patch.json` -> `meshes/a/b.bin`
@@ -252,10 +315,9 @@ impl Owners {
         }
     }
 
-    /// The owner of `{ "patch": .., "priority": 3 }`.
-    fn of_entry(&self, entry: &sonic_rs::Value) -> Option<u32> {
-        let priority = usize::try_from(entry.get("priority")?.as_u64()?).ok()?;
-        self.by_priority.get(&priority).copied()
+    /// The owner of an operation, by its priority in the run.
+    fn of_entry(&self, entry: &ValueWithPriority<'_>) -> Option<u32> {
+        self.by_priority.get(&entry.priority).copied()
     }
 }
 
@@ -265,17 +327,14 @@ fn dir_key(dir: &str) -> String {
 }
 
 fn read_file(target: &str, json: &str, owners: &Owners, points: &mut Vec<Point>) {
-    let value: sonic_rs::Value = match sonic_rs::from_str(json) {
-        Ok(value) => value,
-        Err(err) => {
-            tracing::error!("{target}: {err}");
-            return;
-        }
-    };
-    if value.is_array() {
-        read_anim_data(target, &value, owners, points);
+    // Animation data is a list of every mod's patches; a behavior, a `PatchJson`.
+    let result = if json.trim_start().starts_with('[') {
+        sonic_rs::from_str(json).map(|value| read_anim_data(target, &value, owners, points))
     } else {
-        read_behavior(target, &value, owners, points);
+        sonic_rs::from_str(json).map(|file| read_behavior(target, file, owners, points))
+    };
+    if let Err(err) = result {
+        tracing::error!("{target}: {err}");
     }
 }
 
@@ -292,43 +351,38 @@ fn value_hash(text: &str) -> u64 {
     hasher.finish()
 }
 
-fn value_of(owner: u32, value: &sonic_rs::Value) -> Value {
-    let text = sonic_rs::to_string(value).unwrap_or_default();
+/// What `owner` puts somewhere, `text` being the value as JSON.
+fn value_of_text(owner: u32, text: &str) -> Value {
     let preview: String = text.trim_matches('"').chars().take(PREVIEW_CHARS).collect();
-    Value { owner, hash: value_hash(&text), preview: preview.into() }
+    Value { owner, hash: value_hash(text), preview: preview.into() }
 }
 
-/// The owner and value of `{ "patch": { "action": .., "value": .. }, "priority": 3 }`.
-fn entry_value(entry: &sonic_rs::Value, owners: &Owners) -> Option<Value> {
-    let priority = usize::try_from(entry.get("priority")?.as_u64()?).ok()?;
-    let owner = *owners.by_priority.get(&priority)?;
-    Some(value_of(owner, entry.get("patch")?.get("value")?))
+/// The owner and value of an operation of a behavior.
+fn entry_value(entry: &ValueWithPriority<'_>, owners: &Owners) -> Option<Value> {
+    let owner = owners.of_entry(entry)?;
+    Some(value_of_text(owner, &entry.patch.value.encode()))
 }
 
 /// See the module docs. Only what disagrees is kept.
-fn read_behavior(target: &str, json: &sonic_rs::Value, owners: &Owners, points: &mut Vec<Point>) {
-    if let (Some(one), Some(overridden)) =
-        (json.get("one").and_then(|v| v.as_object()), json.get("overridden").and_then(|v| v.as_object()))
-    {
-        // `Object::get` walks the object: too slow with a `one` of many thousand entries.
-        let one: HashMap<&str, &sonic_rs::Value> = one.iter().collect();
-        let mut contested: fast_hash::HashSet<&str> = fast_hash::HashSet::default();
-        for (path, losers) in overridden.iter() {
-            contested.insert(path);
-            let Some(losers) = losers.as_array() else { continue };
-            let winner = one.get(path).and_then(|entry| entry_value(entry, owners));
-            let values: Vec<Value> =
-                winner.into_iter().chain(losers.iter().filter_map(|entry| entry_value(entry, owners))).collect();
-            push_if_different(target, path, values, owners, points);
-        }
-        let only_one = one.iter().filter(|(path, _)| !contested.contains(*path));
-        only_one.filter_map(|(_, entry)| owners.of_entry(entry)).for_each(|owner| owners.note_useful(owner));
+fn read_behavior(target: &str, file: ReadPatchJson<'_>, owners: &Owners, points: &mut Vec<Point>) {
+    let one = file.one.into_inner();
+
+    for (path, losers) in file.overridden.0 {
+        let winner = one.remove(&path).and_then(|(_, entry)| entry_value(&entry, owners));
+        let values: Vec<Value> =
+            winner.into_iter().chain(losers.iter().filter_map(|entry| entry_value(entry, owners))).collect();
+        push_if_different(target, &path.join("/"), values, owners, points);
     }
-    let Some(seq) = json.get("seq").and_then(|v| v.as_object()) else { return };
-    for (path, entries) in seq.iter() {
-        let Some(entries) = entries.as_array() else { continue };
-        let entries: Vec<&sonic_rs::Value> = entries.iter().collect();
-        read_array(target, path, &entries, owners, points);
+
+    // What is left of `one` lost to nothing.
+    for (_, entry) in one {
+        if let Some(owner) = owners.of_entry(&entry) {
+            owners.note_useful(owner);
+        }
+    }
+
+    for (path, entries) in file.seq.0 {
+        read_array(target, &path.join("/"), &entries, owners, points);
     }
 }
 
@@ -336,28 +390,18 @@ fn read_behavior(target: &str, json: &sonic_rs::Value, owners: &Owners, points: 
 const REMOVED_ELEMENT: &str = "(removed)";
 
 /// What one mod writes to one element of an array, by the index in the template.
-type ElementWrites = BTreeMap<u64, Vec<(u32, String)>>;
+type ElementWrites = BTreeMap<usize, Vec<(u32, String)>>;
 
 /// Adds what `entry` writes, if it replaces or removes a range. See [`read_array`].
-fn add_element_writes(entry: &sonic_rs::Value, owners: &Owners, writes: &mut ElementWrites) -> Option<()> {
-    let patch = entry.get("patch")?;
-    let action = patch.get("action")?;
-    let op = action.get("op").and_then(|op| op.as_str());
-    if action.get("kind")?.as_str()? != "seq" || !matches!(op, Some("replace" | "remove")) {
-        return None;
-    }
-    let range = action.get("range")?;
-    let (start, end) = (range.get("start")?.as_u64()?, range.get("end")?.as_u64()?);
-    let priority = usize::try_from(entry.get("priority")?.as_u64()?).ok()?;
-    let owner = *owners.by_priority.get(&priority)?;
+fn add_element_writes(entry: &ValueWithPriority<'_>, owners: &Owners, writes: &mut ElementWrites) -> Option<()> {
+    let Action::Seq { op: op @ (Op::Replace | Op::Remove), range } = &entry.patch.action else { return None };
+    let owner = owners.of_entry(entry)?;
 
-    let values = patch.get("value").and_then(|value| value.as_array());
-    for index in start..end {
-        let offset = usize::try_from(index - start).ok()?;
-        // A replace with fewer values than its range removes the rest.
-        let value = if op == Some("replace") { values.and_then(|values| values.get(offset)) } else { None };
-        let text =
-            value.map_or_else(|| REMOVED_ELEMENT.to_owned(), |value| sonic_rs::to_string(value).unwrap_or_default());
+    // A replace with fewer values than its range removes the rest.
+    let values = if *op == Op::Replace { entry.patch.value.as_array() } else { None };
+    for index in range.clone() {
+        let value = values.and_then(|values| values.get(index - range.start));
+        let text = value.map_or_else(|| REMOVED_ELEMENT.to_owned(), |value| value.encode());
         writes.entry(index).or_default().push((owner, text));
     }
     Some(())
@@ -372,7 +416,7 @@ fn add_element_writes(entry: &sonic_rs::Value, owners: &Owners, writes: &mut Ele
 ///
 /// e.g. `0..2` -> `[a, b]` and `1..3` -> `[b, c]` agree on element 1 and have no conflict;
 /// `1..3` -> `[x, c]` disagrees on element 1 only: `<path>/[1:2]`.
-fn read_array(target: &str, path: &str, entries: &[&sonic_rs::Value], owners: &Owners, points: &mut Vec<Point>) {
+fn read_array(target: &str, path: &str, entries: &[ValueWithPriority<'_>], owners: &Owners, points: &mut Vec<Point>) {
     let mut writes = ElementWrites::new();
     for entry in entries {
         // What adds is kept from all mods.
@@ -382,8 +426,10 @@ fn read_array(target: &str, path: &str, entries: &[&sonic_rs::Value], owners: &O
             owners.note_useful(owner);
         }
     }
+
     let agreed = writes.values().filter(|element| !element_differs(element));
     agreed.flatten().for_each(|(owner, _)| owners.note_useful(*owner));
+
     let mut group: Option<ElementGroup<'_>> = None;
     for (&index, element) in writes.iter().filter(|(_, element)| element_differs(element)) {
         let owners_here = element_owners(element);
@@ -421,8 +467,8 @@ fn element_owners(element: &[(u32, String)]) -> Vec<u32> {
 
 /// Elements next to each other that the same mods disagree on: one conflict to look at.
 struct ElementGroup<'a> {
-    start: u64,
-    end: u64,
+    start: usize,
+    end: usize,
     owners: Vec<u32>,
     elements: Vec<&'a Vec<(u32, String)>>,
 }
@@ -451,6 +497,7 @@ fn push_if_different(target: &str, path: &str, mut values: Vec<Value>, owners: &
     // Several places of one mod are one value here: the others say the same about that mod.
     values.sort_unstable_by_key(|value| value.owner);
     values.dedup_by_key(|value| (value.owner, value.hash));
+
     let owners_differ = values.windows(2).any(|pair| pair[0].owner != pair[1].owner);
     let values_differ = values.windows(2).any(|pair| pair[0].hash != pair[1].hash);
     if owners_differ && values_differ {
@@ -462,7 +509,34 @@ fn push_if_different(target: &str, path: &str, mut values: Vec<Value>, owners: &
     }
 }
 
-/// `animationdatasinglefile.patch.json`, `animationsetdatasinglefile.patch.json`: a list.
+/// The names `animationdatasinglefile.patch.json` / `animationsetdatasinglefile.patch.json` are written
+/// with: serde's, of `behavior_merge_types::adsf::AdsfPatch` and `asdsf::AsdsfPatch`. Those types are
+/// written only, not read back, so their names are here. A rename there is to be made here too: the
+/// tests read real patches of those types, and fail until it is.
+mod anim_json {
+    /// The fields of `AdsfPatch` / `AsdsfPatch`: the project, the mod (its directory), the patch.
+    pub(super) const TARGET: &str = "target";
+    pub(super) const MOD_DIR: &str = "id";
+    pub(super) const PATCH: &str = "patch";
+
+    /// The variants of `PatchKind` whose patch is a whole file: compared as one value.
+    pub(super) const WHOLE_FILES: [&str; 3] = ["SpecifiedAnim", "SpecifiedMotion", "AddAnimSet"];
+    /// The variants of `PatchKind` whose patch is fields of a file: compared field by field.
+    pub(super) const EDITED_FIELDS: [&str; 3] = ["EditAnim", "EditMotion", "EditAnimSet"];
+    /// The field of a variant naming its file. A variant without one is a header: a list merged.
+    pub(super) const FILE_NAMES: [&str; 4] = ["name_clip", "clip_id", "index", "file_name"];
+    /// The field of a variant holding its patch.
+    pub(super) const VARIANT_PATCH: &str = "patch";
+
+    /// A field patched as one value: `json_patch::ValueWithPriority` (`{ "patch": { .., "value": .. } }`).
+    pub(super) const ONE_PATCH: &str = "patch";
+    pub(super) const ONE_PATCH_VALUE: &str = "value";
+    /// The pushes of an array of a field patch (`NonNestedArrayDiff::seq`): they conflict with nothing.
+    pub(super) const PUSHES: &str = "seq";
+}
+
+/// `animationdatasinglefile.patch.json`, `animationsetdatasinglefile.patch.json`: a list. See
+/// [`anim_json`] for the names.
 ///
 /// ```json
 /// [ { "target": "DefaultMale~1", "id": "D:\\mods\\a\\Nemesis_Engine\\mod\\a",
@@ -470,45 +544,51 @@ fn push_if_different(target: &str, path: &str, mut values: Vec<Value>, owners: &
 ///       "patch": { "name": null, "play_back_speed": "1.1", "trigger_names_patches": { "one": {}, "seq": [] } } } } } ]
 /// ```
 /// Each field that is not `null` is a change at `<target>/<name>/<field>`. What adds is left out:
-/// `AddAnim`, `AddMotion` and the `seq` lists, which are pushes; headers are lists merged by the merge.
+/// `AddAnim`, `AddMotion` and the pushes, as the merge keeps them all; headers are lists merged by the
+/// merge.
 fn read_anim_data(target: &str, json: &sonic_rs::Value, owners: &Owners, points: &mut Vec<Point>) {
     let mut places: BTreeMap<String, Vec<Value>> = BTreeMap::new();
     for entry in json.as_array().into_iter().flat_map(|list| list.iter()) {
-        let (Some(project), Some(id), Some(patch)) = (
-            entry.get("target").and_then(|v| v.as_str()),
-            entry.get("id").and_then(|v| v.as_str()),
-            entry.get("patch").and_then(|v| v.as_object()),
+        let (Some(project), Some(mod_dir), Some(patch)) = (
+            entry.get(anim_json::TARGET).and_then(|v| v.as_str()),
+            entry.get(anim_json::MOD_DIR).and_then(|v| v.as_str()),
+            entry.get(anim_json::PATCH).and_then(|v| v.as_object()),
         ) else {
             continue;
         };
-        let Some(&owner) = owners.by_dir.get(&dir_key(id)) else { continue };
+        let Some(&owner) = owners.by_dir.get(&dir_key(mod_dir)) else { continue };
+
         for (kind, body) in patch.iter() {
-            let name = ["name_clip", "clip_id", "index", "file_name"]
-                .iter()
-                .find_map(|key| body.get(key).and_then(|v| v.as_str()));
+            let name = anim_json::FILE_NAMES.iter().find_map(|key| body.get(key).and_then(|v| v.as_str()));
             let Some(name) = name else {
                 owners.note_useful(owner); // a header: a list merged by the merge
                 continue;
             };
+
             let mut place = format!("{project}/{name}");
-            match kind {
-                "SpecifiedAnim" | "SpecifiedMotion" | "AddAnimSet" => {
-                    if let Some(value) = body.get("patch") {
-                        places.entry(place).or_default().push(value_of(owner, value));
-                    }
+            let fields = body.get(anim_json::VARIANT_PATCH);
+            if anim_json::WHOLE_FILES.contains(&kind) {
+                if let Some(value) = fields {
+                    places.entry(place).or_default().push(sonic_value(owner, value));
                 }
-                "EditAnim" | "EditMotion" | "EditAnimSet" => {
-                    if let Some(fields) = body.get("patch") {
-                        flatten(&mut place, fields, owner, &mut places);
-                    }
+            } else if anim_json::EDITED_FIELDS.contains(&kind) {
+                if let Some(fields) = fields {
+                    flatten(&mut place, fields, owner, &mut places);
                 }
-                _ => owners.note_useful(owner), // what adds
+            } else {
+                owners.note_useful(owner); // what adds
             }
         }
     }
+
     for (path, values) in places {
         push_if_different(target, &path, values, owners, points);
     }
+}
+
+/// What `owner` puts somewhere, from the JSON of animation data.
+fn sonic_value(owner: u32, value: &sonic_rs::Value) -> Value {
+    value_of_text(owner, &sonic_rs::to_string(value).unwrap_or_default())
 }
 
 /// The leaves of a patch, each at `<place>/<field>/..`. See [`read_anim_data`].
@@ -518,24 +598,25 @@ fn flatten(place: &mut String, value: &sonic_rs::Value, owner: u32, places: &mut
     if value.is_null() {
         return;
     }
-    // `{ "patch": { "action": .., "value": .. }, "priority": 3 }`: one change.
-    if let Some(inner) = value.get("patch").and_then(|patch| patch.get("value")) {
-        places.entry(place.clone()).or_default().push(value_of(owner, inner));
+
+    // A field patched as one value: one change.
+    if let Some(inner) = value.get(anim_json::ONE_PATCH).and_then(|patch| patch.get(anim_json::ONE_PATCH_VALUE)) {
+        places.entry(place.clone()).or_default().push(sonic_value(owner, inner));
         return;
     }
+
     if let Some(object) = value.as_object() {
-        for (key, field) in object.iter() {
-            if key != "seq" {
-                let at = place.len();
-                place.push('/');
-                place.push_str(key);
-                flatten(place, field, owner, places);
-                place.truncate(at);
-            }
+        for (key, field) in object.iter().filter(|(key, _)| *key != anim_json::PUSHES) {
+            let at = place.len();
+            place.push('/');
+            place.push_str(key);
+            flatten(place, field, owner, places);
+            place.truncate(at);
         }
         return;
     }
-    places.entry(place.clone()).or_default().push(value_of(owner, value));
+
+    places.entry(place.clone()).or_default().push(sonic_value(owner, value));
 }
 
 /// The scan's state in the page. See the module docs.
@@ -577,6 +658,13 @@ pub(crate) struct ConflictScan {
     hidden_revision: u64,
     /// Why what is hidden could not be saved.
     pub(crate) hidden_error: Option<String>,
+    /// The mod picked in the list (a click on its row): the others are colored by what they are to it.
+    picked: Option<String>,
+    /// See [`Conflicts::relations`], for [`Self::picked`] and the load order `relations_for` tells.
+    relations: HashMap<String, Relation>,
+    /// The highest [`Relation::count`] of [`Self::relations`]: the strongest color.
+    relations_max: u32,
+    relations_for: u64,
 }
 
 impl ConflictScan {
@@ -682,12 +770,14 @@ impl ConflictScan {
     pub(crate) fn refresh_marks(&mut self, list: &[ModItem], user_patch: Option<usize>, hidden_applies: bool) {
         self.hidden_applies = hidden_applies;
         let Some(found) = &self.current else { return };
-        let mut hasher = DefaultHasher::new();
-        for item in list.iter().filter(|item| item.enabled) {
-            (&item.id, item.priority).hash(&mut hasher);
-        }
-        (user_patch, hidden_applies, self.hidden_revision).hash(&mut hasher);
-        let hash = hasher.finish() | 1; // never the 0 of "computed again"
+        let hash = {
+            let mut hasher = DefaultHasher::new();
+            for item in list.iter().filter(|item| item.enabled) {
+                (&item.id, item.priority).hash(&mut hasher);
+            }
+            (user_patch, hidden_applies, self.hidden_revision).hash(&mut hasher);
+            hasher.finish() | 1 // never the 0 of "computed again"
+        };
         if hash == self.marks_for {
             return;
         }
@@ -701,6 +791,44 @@ impl ConflictScan {
         self.marks = found.marks(|id| self.priorities.get(id).copied(), hidden);
         self.dead = found.dead_mods(&self.marks, |id| self.priorities.get(id).copied(), hidden);
         self.stale = self.priorities.keys().any(|id| !found.mods.iter().any(|scanned| scanned.id == *id));
+    }
+
+    /// A click on a mod's row: picks it, or puts it down if it is the one picked.
+    pub(crate) fn pick(&mut self, mod_id: &str) {
+        self.picked = if self.picked.as_deref() == Some(mod_id) { None } else { Some(mod_id.to_owned()) };
+    }
+
+    pub(crate) fn picked(&self) -> Option<&str> {
+        self.picked.as_deref()
+    }
+
+    /// What `mod_id` is to the picked mod, and the strongest of all: see [`Conflicts::relations`].
+    pub(crate) fn relation_of(&self, mod_id: &str) -> (Relation, u32) {
+        (self.relations.get(mod_id).copied().unwrap_or_default(), self.relations_max)
+    }
+
+    /// Finds [`Self::relation_of`] again if the mod picked, the load order or what is hidden changed.
+    /// Runs every frame after [`Self::refresh_marks`], and only compares a hash then.
+    pub(crate) fn refresh_relations(&mut self) {
+        let hash = {
+            let mut hasher = DefaultHasher::new();
+            (self.marks_for, &self.picked).hash(&mut hasher);
+            hasher.finish() | 1
+        };
+        if hash == self.relations_for {
+            return;
+        }
+        self.relations_for = hash;
+
+        let (Some(found), Some(picked)) = (&self.current, &self.picked) else {
+            self.relations.clear();
+            self.relations_max = 0;
+            return;
+        };
+
+        let hidden = self.hidden_applies.then_some(&self.hidden);
+        self.relations = found.relations(picked, |id| self.priorities.get(id).copied(), hidden);
+        self.relations_max = self.relations.values().map(|relation| relation.count()).max().unwrap_or(0);
     }
 
     pub(crate) fn is_selected(&self, point: &Point) -> bool {
@@ -742,6 +870,15 @@ impl ConflictScan {
 
 #[cfg(test)]
 mod tests {
+    use behavior_merge_types::{
+        adsf::{AdsfPatch, EditAnim, PatchKind},
+        patches::{OnePatchMap, PatchJson, SeqPatchMap},
+    };
+    use json_patch::{JsonPatch, json_path};
+    use skyrim_anim_data::adsf::{
+        normal::ClipAnimDataBlock, patch::de::others::clip_anim::deserializer::parse_clip_anim_diff_patch,
+    };
+
     use super::*;
 
     fn mods() -> Vec<ScannedMod> {
@@ -755,6 +892,27 @@ mod tests {
                 dir: Some(format!("D:/mods/{id}")),
             })
             .collect()
+    }
+
+    /// As MO2's colors: the later mod replaces the other where they put other values.
+    #[test]
+    fn a_picked_mod_overrides_the_earlier_and_is_overridden_by_the_later() {
+        let found = read(&behavior("false", "true"), "meshes/m.bin");
+        let in_order = |id: &str| match id {
+            "low" => Some(1),
+            "high" => Some(2),
+            _ => None,
+        };
+
+        let of_low = found.relations("low", in_order, None);
+        assert_eq!(of_low["high"], Relation { overridden_by_picked: 0, overrides_picked: 1 });
+        let of_high = found.relations("high", in_order, None);
+        assert_eq!(of_high["low"], Relation { overridden_by_picked: 1, overrides_picked: 0 });
+
+        // A mod that is off is nothing to the others, and has nothing itself.
+        let low_off = |id: &str| (id != "low").then(|| in_order(id)).flatten();
+        assert!(found.relations("high", low_off, None).is_empty());
+        assert!(found.relations("low", low_off, None).is_empty());
     }
 
     /// MO2's lightning: all it does loses, and nothing of it is kept.
@@ -779,24 +937,22 @@ mod tests {
         let marks = found.marks(swapped, None);
         assert_eq!(found.dead_mods(&marks, swapped, None).into_iter().collect::<Vec<_>>(), ["high"]);
 
+        let lost = || {
+            let one = OnePatchMap::default();
+            one.insert(json_path!["#1", "C", "a"], op("false", 4, REPLACE));
+            one.insert(json_path!["#1", "C", "a"], op("true", 3, REPLACE));
+            one
+        };
+
         // It also changes a field nobody else does: it is of use.
-        let more = format!(
-            r##"{{"one":{{"#1/C/a":{},"#1/C/b":{}}},"overridden":{{"#1/C/a":[{}]}},"seq":{{}}}}"##,
-            entry("false", 4, PURE),
-            entry("7", 3, PURE),
-            entry("true", 3, PURE)
-        );
-        assert!(dead(&read(&more, "meshes/m.bin")).is_empty());
+        let more = lost();
+        more.insert(json_path!["#1", "C", "b"], op("7", 3, REPLACE));
+        assert!(dead(&read(&file(&more, &SeqPatchMap::default()), "meshes/m.bin")).is_empty());
 
         // It pushes to an array: a merge keeps that.
-        let push = r#"{"kind":"seq_push"}"#;
-        let pushes = format!(
-            r##"{{"one":{{"#1/C/a":{}}},"overridden":{{"#1/C/a":[{}]}},"seq":{{"#1/C/items":[{}]}}}}"##,
-            entry("false", 4, PURE),
-            entry("true", 3, PURE),
-            entry("[]", 3, push)
-        );
-        assert!(dead(&read(&pushes, "meshes/m.bin")).is_empty());
+        let pushes = SeqPatchMap::default();
+        pushes.insert(json_path!["#1", "C", "items"], op("[]", 3, Action::SeqPush));
+        assert!(dead(&read(&file(&lost(), &pushes), "meshes/m.bin")).is_empty());
     }
 
     /// Hiding the winner's operation: the conflict is gone from the flags, and the mod that lost keeps
@@ -859,18 +1015,26 @@ mod tests {
         Conflicts { mods, points, useful }
     }
 
-    fn entry(value: &str, priority: usize, action: &str) -> String {
-        format!(r#"{{"patch":{{"action":{action},"value":{value}}},"priority":{priority}}}"#)
+    /// An operation of the mod of `priority`, its value written as JSON.
+    fn op(value: &str, priority: usize, action: Action) -> ValueWithPriority<'static> {
+        let mut bytes = value.as_bytes().to_vec();
+        let value = simd_json::BorrowedValue::from(simd_json::to_owned_value(&mut bytes).unwrap());
+        ValueWithPriority { patch: JsonPatch { action, value }, priority }
     }
 
-    const PURE: &str = r#"{"kind":"pure","op":"replace"}"#;
+    const REPLACE: Action = Action::Pure { op: Op::Replace };
 
+    /// A behavior's file, written as the merge writes it: see `PatchJson`.
+    fn file<'a>(one: &OnePatchMap<'a>, seq: &SeqPatchMap<'a>) -> String {
+        sonic_rs::to_string(&PatchJson { one, seq, overridden: &one.overridden }).unwrap()
+    }
+
+    /// Two mods replace `#1/C/a`: `winner` (priority 4) and `loser` (3).
     fn behavior(winner: &str, loser: &str) -> String {
-        format!(
-            r##"{{"one":{{"#1/C/a":{}}},"overridden":{{"#1/C/a":[{}]}},"seq":{{}}}}"##,
-            entry(winner, 4, PURE),
-            entry(loser, 3, PURE)
-        )
+        let one = OnePatchMap::default();
+        one.insert(json_path!["#1", "C", "a"], op(winner, 4, REPLACE));
+        one.insert(json_path!["#1", "C", "a"], op(loser, 3, REPLACE));
+        file(&one, &SeqPatchMap::default())
     }
 
     #[test]
@@ -917,15 +1081,14 @@ mod tests {
         assert_eq!(Mark::default().glyph(), "");
     }
 
-    fn seq(ranges: &[(usize, u32, u32, &str, &str)]) -> String {
-        let entries: Vec<String> = ranges
-            .iter()
-            .map(|(priority, start, end, op, value)| {
-                let action = format!(r#"{{"kind":"seq","op":"{op}","range":{{"start":{start},"end":{end}}}}}"#);
-                entry(value, *priority, &action)
-            })
-            .collect();
-        format!(r##"{{"one":{{}},"seq":{{"#1/C/items":[{}]}}}}"##, entries.join(","))
+    /// Mods writing to ranges of `#1/C/items`: `(priority, range, op, the values as JSON)`.
+    fn seq(ranges: &[(usize, std::ops::Range<usize>, Op, &str)]) -> String {
+        let seq = SeqPatchMap::default();
+        for (priority, range, kind, values) in ranges {
+            let action = Action::Seq { op: *kind, range: range.clone() };
+            seq.insert(json_path!["#1", "C", "items"], op(values, *priority, action));
+        }
+        file(&OnePatchMap::default(), &seq)
     }
 
     fn paths(found: &Conflicts) -> Vec<&str> {
@@ -935,74 +1098,98 @@ mod tests {
     #[test]
     fn arrays_conflict_per_element() {
         // Overlapping on element 1, and writing different things there.
-        let found = read(&seq(&[(3, 0, 2, "replace", r#"["a","b"]"#), (4, 1, 3, "replace", r#"["x","c"]"#)]), "x");
+        let found = read(&seq(&[(3, 0..2, Op::Replace, r#"["a","b"]"#), (4, 1..3, Op::Replace, r#"["x","c"]"#)]), "x");
         assert_eq!(paths(&found), ["#1/C/items/[1:2]"]);
         assert_eq!(&*found.points[0].values[0].preview, "b");
         assert_eq!(&*found.points[0].values[1].preview, "x");
 
         // Overlapping, and writing the same there: the rest of the ranges do not matter.
-        let same = read(&seq(&[(3, 0, 2, "replace", r#"["a","b"]"#), (4, 1, 3, "replace", r#"["b","c"]"#)]), "x");
+        let same = read(&seq(&[(3, 0..2, Op::Replace, r#"["a","b"]"#), (4, 1..3, Op::Replace, r#"["b","c"]"#)]), "x");
         assert!(same.points.is_empty());
 
         // Next to each other: no shared element.
-        let apart = read(&seq(&[(3, 0, 2, "replace", r#"["a","b"]"#), (4, 2, 3, "replace", r#"["c"]"#)]), "x");
+        let apart = read(&seq(&[(3, 0..2, Op::Replace, r#"["a","b"]"#), (4, 2..3, Op::Replace, r#"["c"]"#)]), "x");
         assert!(apart.points.is_empty());
     }
 
     #[test]
     fn elements_side_by_side_are_one_conflict() {
-        let found = read(&seq(&[(3, 0, 2, "replace", r#"["a","b"]"#), (4, 0, 2, "replace", r#"["x","y"]"#)]), "x");
+        let found = read(&seq(&[(3, 0..2, Op::Replace, r#"["a","b"]"#), (4, 0..2, Op::Replace, r#"["x","y"]"#)]), "x");
         assert_eq!(paths(&found), ["#1/C/items/[0:2]"]);
         assert_eq!(&*found.points[0].values[0].preview, "a\nb");
     }
 
     #[test]
     fn removing_is_a_write_of_its_own() {
-        let found = read(&seq(&[(3, 1, 2, "remove", "[]"), (4, 1, 2, "replace", r#"["x"]"#)]), "x");
+        let found = read(&seq(&[(3, 1..2, Op::Remove, "[]"), (4, 1..2, Op::Replace, r#"["x"]"#)]), "x");
         assert_eq!(paths(&found), ["#1/C/items/[1:2]"]);
         assert_eq!(&*found.points[0].values[0].preview, REMOVED_ELEMENT);
 
         // A replace with too few values removes the rest, as the merge does.
-        let short = read(&seq(&[(3, 0, 2, "replace", r#"["a"]"#), (4, 1, 2, "replace", r#"["x"]"#)]), "x");
+        let short = read(&seq(&[(3, 0..2, Op::Replace, r#"["a"]"#), (4, 1..2, Op::Replace, r#"["x"]"#)]), "x");
         assert_eq!(paths(&short), ["#1/C/items/[1:2]"]);
 
         // Both remove it: they agree.
-        assert!(read(&seq(&[(3, 1, 2, "remove", "[]"), (4, 0, 2, "remove", "[]")]), "x").points.is_empty());
+        assert!(read(&seq(&[(3, 1..2, Op::Remove, "[]"), (4, 0..2, Op::Remove, "[]")]), "x").points.is_empty());
     }
 
     #[test]
     fn adding_does_not_conflict() {
-        assert!(read(&seq(&[(3, 0, 2, "add", r#"["a"]"#), (4, 0, 2, "add", r#"["b"]"#)]), "x").points.is_empty());
+        assert!(read(&seq(&[(3, 0..2, Op::Add, r#"["a"]"#), (4, 0..2, Op::Add, r#"["b"]"#)]), "x").points.is_empty());
     }
 
     #[test]
     fn pushes_do_not_conflict() {
-        let push = entry("[1]", 3, r#"{"kind":"seq_push"}"#);
-        let other = entry("[2]", 4, r#"{"kind":"seq_push"}"#);
-        let json = format!(r##"{{"one":{{}},"seq":{{"#1/C/items":[{push},{other}]}}}}"##);
-        assert!(read(&json, "x").points.is_empty());
+        let seq = SeqPatchMap::default();
+        seq.insert(json_path!["#1", "C", "items"], op("[1]", 3, Action::SeqPush));
+        seq.insert(json_path!["#1", "C", "items"], op("[2]", 4, Action::SeqPush));
+        assert!(read(&file(&OnePatchMap::default(), &seq), "x").points.is_empty());
+    }
+
+    /// `animationdatasinglefile.patch.json` of `patches`, as the merge writes it: real `AdsfPatch`es,
+    /// so that a rename there fails here until `anim_json` follows.
+    fn anim_file(patches: &[AdsfPatch<'_>]) -> String {
+        sonic_rs::to_string(patches).unwrap()
+    }
+
+    /// Mod `mod_name` sets the play back speed of clip `Dodge~644` of `D~1` to `speed`.
+    fn edit_speed(mod_name: &str, speed: &str) -> String {
+        let text =
+            format!("Dodge\n644\n<!-- MOD_CODE ~m~ OPEN -->\n{speed}\n<!-- ORIGINAL -->\n1\n<!-- CLOSE -->\n0\n0\n0\n");
+        let patch = parse_clip_anim_diff_patch(&text, 1).unwrap_or_else(|e| panic!("{e}"));
+        let mod_dir = format!("D:\\mods\\{mod_name}");
+        let edit = EditAnim { patch, priority: 1, name_clip: "Dodge~644" };
+        anim_file(&[AdsfPatch { target: "D~1", id: &mod_dir, patch: PatchKind::EditAnim(edit) }])
+    }
+
+    /// The patches of two anim data files, as one list.
+    fn both(a: &str, b: &str) -> String {
+        format!(
+            "[{},{}]",
+            a.trim_start_matches('[').trim_end_matches(']'),
+            b.trim_start_matches('[').trim_end_matches(']')
+        )
     }
 
     #[test]
     fn anim_data_fields_are_compared_by_their_place() {
-        let edit = |id: &str, speed: &str| {
-            format!(
-                r#"{{"target":"D~1","id":"D:\\mods\\{id}","patch":{{"EditAnim":{{"name_clip":"Dodge~644","priority":1,"patch":{{"name":null,"play_back_speed":"{speed}","trigger_names_patches":{{"one":{{}},"seq":[]}}}}}}}}}}"#
-            )
-        };
         let found =
-            read(&format!("[{},{}]", edit("low", "1.1"), edit("high", "2")), "meshes/animationdatasinglefile.bin");
+            read(&both(&edit_speed("low", "1.1"), &edit_speed("high", "2")), "meshes/animationdatasinglefile.bin");
         assert_eq!(found.points.len(), 1);
         assert_eq!(&*found.points[0].path, "D~1/Dodge~644/play_back_speed");
 
-        assert!(read(&format!("[{},{}]", edit("low", "1"), edit("high", "1")), "x").points.is_empty());
-        assert!(read(&format!("[{},{}]", edit("low", "1"), edit("low", "2")), "x").points.is_empty(), "one mod");
+        assert!(read(&both(&edit_speed("low", "1"), &edit_speed("high", "1")), "x").points.is_empty());
+        assert!(read(&both(&edit_speed("low", "1"), &edit_speed("low", "2")), "x").points.is_empty(), "one mod");
     }
 
     #[test]
     fn added_clips_do_not_conflict() {
-        let add = |id: &str| format!(r#"{{"target":"D~1","id":"D:/mods/{id}","patch":{{"AddAnim":{{"name":"x"}}}}}}"#);
-        assert!(read(&format!("[{},{}]", add("low"), add("high")), "x").points.is_empty());
+        let add = |mod_name: &str| {
+            let mod_dir = format!("D:/mods/{mod_name}");
+            let patch = PatchKind::AddAnim(ClipAnimDataBlock::default());
+            anim_file(&[AdsfPatch { target: "D~1", id: &mod_dir, patch }])
+        };
+        assert!(read(&both(&add("low"), &add("high")), "x").points.is_empty());
     }
 
     /// On real mods (`PATCH_MODS`: a folder of mods; `PATCH_OUT`: a scratch directory): the merge writes

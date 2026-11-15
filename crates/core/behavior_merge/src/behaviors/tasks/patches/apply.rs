@@ -123,15 +123,6 @@ pub(crate) fn write_all_debug_json_patches(patches: &BehaviorPatchesMap<'_>, con
     });
 }
 
-/// What `<template>.patch.json` holds. `overridden`: what lost at each path of `one`, which the merge
-/// does not use, and a conflict check does.
-#[derive(serde::Serialize)]
-struct DebugPatchJson<'p, 'a> {
-    one: &'p behavior_merge_types::patches::OnePatchMap<'a>,
-    seq: &'p behavior_merge_types::patches::SeqPatchMap<'a>,
-    overridden: &'p behavior_merge_types::patches::SeqPatchMap<'a>,
-}
-
 fn write_debug_json_patch(output_dir: &Path, key: &TemplateKey, patches: &HkxPatchMaps) -> Result<(), Error> {
     use snafu::ResultExt as _;
 
@@ -145,7 +136,12 @@ fn write_debug_json_patch(output_dir: &Path, key: &TemplateKey, patches: &HkxPat
         std::fs::create_dir_all(parent).context(FailedIoSnafu { path: parent })?;
     }
 
-    let patches = DebugPatchJson { one: &patches.one, seq: &patches.seq, overridden: &patches.one.overridden };
+    // See `PatchJson`: the conflict check reads it back with the same type.
+    let patches = behavior_merge_types::patches::PatchJson {
+        one: &patches.one,
+        seq: &patches.seq,
+        overridden: &patches.one.overridden,
+    };
     let json = sonic_rs::to_string_pretty(&patches)
         .with_context(|_| crate::errors::JsonSnafu { path: output_path.clone() })?;
     std::fs::write(&output_path, &json).context(FailedIoSnafu { path: output_path })?;
