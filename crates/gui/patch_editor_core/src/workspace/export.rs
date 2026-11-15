@@ -2,7 +2,6 @@
 
 use std::{fmt::Write as _, path::Path};
 
-use gui_shared::settings::pages::patch::behavior::ParserMode;
 use stdx::text::push_joined;
 
 use super::{
@@ -73,14 +72,14 @@ impl Workspace {
 
     /// Writes the mod under `<output>`: each behavior to its [`Behavior::patch_dir`], `info.ini` to
     /// each mod root used. Returns the files written and the patches d-merge's Nemesis parser rejects
-    /// (`behavior/#id: error`).
+    /// in `Strict` mode (`behavior/#id: error`): see [`super::Behavior::validate`].
     ///
     /// By default `<output>` is the mod it was read from, so only [`Self::owned`] is replaced: what
     /// this work did not read stays (a readme, the patches of a template that is not installed).
     ///
     /// # Errors
     /// A file could not be written.
-    pub fn export(&mut self, output: &Path, code: &str, mode: ParserMode) -> Result<(usize, Vec<String>), String> {
+    pub fn export(&mut self, output: &Path, code: &str) -> Result<(usize, Vec<String>), String> {
         for file in &self.owned {
             remove_owned(output, file)?;
         }
@@ -93,7 +92,7 @@ impl Workspace {
             let relative = behavior.patch_dir(code, ext);
             for id in behavior.edits.keys().chain(behavior.added.keys()) {
                 let Some(patch) = behavior.patch(code, id) else { continue };
-                if let Err(err) = behavior.validate(id, &patch, mode) {
+                if let Err(err) = behavior.validate(id, &patch) {
                     invalid.push(format!("{}/{id}: {err}", behavior.name));
                 }
                 let file = Path::new(&relative).join(behavior.patch_file(id));

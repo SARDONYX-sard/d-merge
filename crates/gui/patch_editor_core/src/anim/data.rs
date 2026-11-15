@@ -565,7 +565,7 @@ mod tests {
 
         let asdsf = workspace.anim_behavior(ASDSF, &templates).unwrap();
         let patch = asdsf.patch("test", id).unwrap();
-        asdsf.validate(id, &patch, ParserMode::Strict).unwrap();
+        asdsf.validate(id, &patch).unwrap();
         assert_eq!(patch.matches("<!-- MOD_CODE").count(), 1);
         println!("{}", &patch[patch.find("<!-- MOD_CODE").unwrap()..]);
     }

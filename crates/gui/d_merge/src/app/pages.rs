@@ -106,6 +106,5 @@ fn patch_paths(patch: &gui_shared::settings::pages::patch::PatchSettings) -> pag
     page_patch_editor::PatchPaths {
         patch_output_dir: patch.current_output_dir(),
         template_dir: &patch.behavior.template_dir,
-        parser_mode: patch.behavior.parser_mode,
     }
 }

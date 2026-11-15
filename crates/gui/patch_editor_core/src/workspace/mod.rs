@@ -513,7 +513,6 @@ fn write(path: &Path, text: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use gui_shared::settings::pages::patch::behavior::ParserMode;
 
     use super::{import::import_asdsf, locations::code_dirs, *};
 
@@ -679,7 +678,7 @@ mod tests {
         assert!(skipped.is_empty());
         assert_eq!(new_set, set);
         assert_eq!(header, "1\nNew.txt\n");
-        behavior.validate("AData~A/m$New.txt", &new_set, ParserMode::Strict).unwrap();
+        behavior.validate("AData~A/m$New.txt", &new_set).unwrap();
     }
 
     /// By default a mod is exported to where it was read from: what the work did not read must stay,
@@ -708,13 +707,13 @@ mod tests {
         write(&unknown, "keep");
 
         let (mut workspace, code, skipped) = Workspace::import(&root, &dir.join("templates")).unwrap();
-        let exported = workspace.export(&root, &code, ParserMode::Strict).map(|(written, _)| written);
+        let exported = workspace.export(&root, &code).map(|(written, _)| written);
         let was_written = patch.is_file();
         let kept = (readme.is_file(), unknown.is_file());
 
         // The object is removed from the work: its file goes with it, and its folder that is left empty.
         workspace.behaviors[0].added.clear();
-        workspace.export(&root, &code, ParserMode::Strict).unwrap();
+        workspace.export(&root, &code).unwrap();
         let removed = (patch.is_file(), code_dir.join(ASDSF).is_dir());
         let kept_after = (readme.is_file(), unknown.is_file());
         std::fs::remove_dir_all(&dir).unwrap();

@@ -172,11 +172,6 @@ impl EditorArea {
         self.pane.focus = Some(FocusAt::Keep);
     }
 
-    /// The preview is computed again (another parser mode): what it says changed.
-    pub(in crate::patch) fn preview_again(&mut self) {
-        self.pane.preview = None;
-    }
-
     /// A conflict's `values` beside the object it went to, with the lines `accepted` already; the
     /// cursor at `line`. See [`crate::patch::editor::merge`].
     pub(in crate::patch) fn show_merge(
@@ -257,7 +252,6 @@ impl EditorArea {
         };
         let settings = pane::PreviewSettings {
             code: work.place.mod_code.trim(),
-            parser_mode: work.parser_mode,
             export_format: work.workspace.export_format,
             not_linked,
         };

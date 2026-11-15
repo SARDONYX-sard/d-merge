@@ -15,7 +15,7 @@
 
 use std::rc::Rc;
 
-use gui_shared::settings::pages::{patch::behavior::ParserMode, patch_editor::RecentWork};
+use gui_shared::settings::pages::patch_editor::RecentWork;
 
 use crate::patch::{
     editor::names::{Names, NamesCache},
@@ -40,8 +40,6 @@ pub(in crate::patch) struct Work {
     pub(super) edits: u64,
     /// The work changed as a whole, counted: see [`Self::reset_names`].
     pub(super) reloads: u64,
-    /// The patch page's parser mode: what d-merge will accept, so what is checked here.
-    pub(in crate::patch) parser_mode: ParserMode,
     /// The works opened lately, the last one first. From the settings.
     pub(in crate::patch) recent: Vec<RecentWork>,
     /// `output` / `code` were taken from the settings.

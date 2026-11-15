@@ -250,13 +250,14 @@ impl Behavior {
         if self.is_anim_data() { id.to_string() } else { format!("{id}.txt") }
     }
 
-    /// d-merge's parser check of a patch, in the mode of the patch page.
+    /// d-merge's parser check of a patch, always in `Strict` mode: what is written here should be
+    /// right, whatever the patch page lets through.
     ///
     /// # Errors
     /// What the parser rejects in the patch.
-    pub fn validate(&self, id: &str, patch: &str, mode: ParserMode) -> Result<(), String> {
+    pub fn validate(&self, id: &str, patch: &str) -> Result<(), String> {
         if self.adsf {
-            crate::anim::patch_file::validate_adsf(id, patch, mode)
+            crate::anim::patch_file::validate_adsf(id, patch, ParserMode::Strict)
         } else if self.asdsf {
             crate::anim::patch_file::validate_asdsf(id, patch)
         } else {

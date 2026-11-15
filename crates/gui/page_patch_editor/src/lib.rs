@@ -108,7 +108,6 @@ impl PatchEditorPage {
     /// Draws the page.
     pub fn ui(&mut self, ui: &mut egui::Ui, ctx: PatchEditorPageCtx<'_>) {
         let PatchEditorPageCtx { i18n, notify, paths, settings, editor, panel_frame, keys } = ctx;
-        self.patch.set_parser_mode(paths.parser_mode);
         egui::CentralPanel::default().frame(panel_frame).show(ui, |ui| {
             // Always-visible scroll bars (like the hkanno page): you see where you are in a long object.
             ui.spacing_mut().scroll = egui::style::ScrollStyle::solid();

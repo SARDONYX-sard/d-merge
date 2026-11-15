@@ -136,11 +136,7 @@ struct ModExported<'a> {
 }
 
 /// Writes the user patch of `work` as a mod, where and how `export` says. `None`: no output yet.
-fn write_as_mod<'a>(
-    work: &'a mut Workspace,
-    export: &'a ModExport,
-    mode: gui_shared::settings::pages::patch::behavior::ParserMode,
-) -> Option<ModExported<'a>> {
+fn write_as_mod<'a>(work: &'a mut Workspace, export: &'a ModExport) -> Option<ModExported<'a>> {
     let output = export.output.trim();
     if output.is_empty() {
         return None;
@@ -154,7 +150,7 @@ fn write_as_mod<'a>(
         // The files of its own place are what its next save replaces: not those of this mod.
         let owned = std::mem::take(&mut work.owned);
         let format = std::mem::replace(&mut work.export_format, chosen);
-        let written = work.export(root, USER_PATCH_CODE, mode).map(|(_, invalid)| invalid);
+        let written = work.export(root, USER_PATCH_CODE).map(|(_, invalid)| invalid);
         (work.owned, work.export_format) = (owned, format);
         written
     };
@@ -190,7 +186,7 @@ fn report_mod_export(notify: &mut Notification, i18n: &I18nMap, exported: &ModEx
 
 /// Writes the user patch of `work` as a mod: see [`ModExport`] and [`write_as_mod`].
 pub(super) fn export_as_mod(work: &mut Work, export: &ModExport, notify: &mut Notification, i18n: &I18nMap) {
-    if let Some(exported) = write_as_mod(&mut work.workspace, export, work.parser_mode) {
+    if let Some(exported) = write_as_mod(&mut work.workspace, export) {
         report_mod_export(notify, i18n, &exported);
     }
 }
@@ -209,7 +205,7 @@ pub(super) fn work_of(paths: PatchPaths<'_>) -> Work {
         ..Default::default()
     };
     let mut work = Work::default();
-    (work.workspace, work.place, work.parser_mode) = (workspace, place, paths.parser_mode);
+    (work.workspace, work.place) = (workspace, place);
     (work.restored, work.user_patch) = (true, true);
     work
 }
@@ -219,7 +215,7 @@ impl Work {
     /// Returns the patches d-merge's parser rejects.
     fn write_user_patch(&mut self) -> Result<Vec<String>, String> {
         self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
-        let invalid = self.workspace.export(Path::new(&self.place.output), USER_PATCH_CODE, self.parser_mode)?.1;
+        let invalid = self.workspace.export(Path::new(&self.place.output), USER_PATCH_CODE)?.1;
         self.workspace.save(&self.place.cache_root, USER_PATCH_CODE)?;
         self.saved();
         Ok(invalid)
@@ -358,11 +354,7 @@ mod tests {
     use super::*;
 
     fn paths(output: &str) -> PatchPaths<'_> {
-        PatchPaths {
-            patch_output_dir: output,
-            template_dir: "",
-            parser_mode: gui_shared::settings::pages::patch::behavior::ParserMode::Strict,
-        }
+        PatchPaths { patch_output_dir: output, template_dir: "" }
     }
 
     #[test]

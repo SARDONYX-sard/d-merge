@@ -109,7 +109,8 @@ impl AsdsfFile {
     }
 }
 
-/// d-merge's parser check of one `animationdatasinglefile` patch, in the mode of the patch page.
+/// d-merge's parser check of one `animationdatasinglefile` patch, in `mode`. The patch editor always
+/// checks in `Strict`: see `Behavior::validate`.
 ///
 /// The mode only matters for whole clips and motions. `Lenient` takes a wrong count (`7` triggers,
 /// none listed): d-merge counts them itself, so that is neither an error nor a warning here, as a

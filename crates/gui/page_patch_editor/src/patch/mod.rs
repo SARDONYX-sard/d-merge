@@ -44,10 +44,7 @@ use gui_shared::{
     i18n::{I18nKey, I18nMap},
     patch::ResolveRequest,
     settings::{
-        pages::{
-            patch::behavior::ParserMode,
-            patch_editor::{PatchEditorSettings, RecentWork},
-        },
+        pages::patch_editor::{PatchEditorSettings, RecentWork},
         ui::editor::LspOptions,
     },
 };
@@ -82,8 +79,6 @@ pub struct PatchPaths<'a> {
     pub patch_output_dir: &'a str,
     /// `settings.behavior.template_dir` (absolute or relative).
     pub template_dir: &'a str,
-    /// `settings.behavior.parser_mode`: patches are checked as d-merge will read them.
-    pub parser_mode: ParserMode,
 }
 
 /// See the module docs.
@@ -162,14 +157,6 @@ impl PatchTool {
     /// A mod was written since the last call: what the conflict check found may be old.
     pub(crate) const fn take_mod_written(&mut self) -> bool {
         std::mem::replace(&mut self.work.mod_written, false)
-    }
-
-    /// Follows the patch page's setting. A change takes effect on the shown object at once.
-    pub(crate) fn set_parser_mode(&mut self, mode: ParserMode) {
-        if self.work.parser_mode != mode {
-            self.work.parser_mode = mode;
-            self.editor.preview_again();
-        }
     }
 
     /// One frame of the page.
@@ -458,7 +445,6 @@ impl PatchTool {
         }
 
         let tool = self.user_patch.tool.get_or_insert_with(|| Box::new(Self::for_user_patch(paths)));
-        tool.set_parser_mode(paths.parser_mode);
         if tool.work.place.template_dir != paths.template_dir {
             paths.template_dir.clone_into(&mut tool.work.place.template_dir);
         }
@@ -654,7 +640,7 @@ mod tests {
         let mut names = time!("Names::new", editor::names::Names::new(&behavior));
         time!("set_text", behavior.set_text(&id, &edited));
         let patch = time!("patch", behavior.patch("m", &id)).unwrap();
-        let check = time!("validate", behavior.validate(&id, &patch, ParserMode::Strict));
+        let check = time!("validate", behavior.validate(&id, &patch));
         println!("  valid: {}", check.is_ok());
         time!("field_diagnostics", editor::diagnostics::field_diagnostics(&edited, &behavior, false, "m"));
         time!("Preview::new", editor::preview::Preview::new(&patch));
@@ -665,7 +651,7 @@ mod tests {
         let broken = text.replacen("name=\"", "name=\"x", 2);
         behavior.set_text(&id, &broken);
         let bad_patch = time!("broken: patch", behavior.patch("m", &id)).unwrap();
-        let bad = time!("broken: validate", behavior.validate(&id, &bad_patch, ParserMode::Strict));
+        let bad = time!("broken: validate", behavior.validate(&id, &bad_patch));
         println!("  valid: {}, error of {} bytes", bad.is_ok(), bad.as_ref().err().map_or(0, String::len));
         time!("broken: diagnostics", editor::diagnostics::field_diagnostics(&broken, &behavior, false, "m"));
         time!("broken: names", names.apply_changes(&behavior, std::slice::from_ref(&id)));
@@ -935,7 +921,7 @@ mod user_patch_tests {
     use super::*;
 
     fn paths(output: &str) -> PatchPaths<'_> {
-        PatchPaths { patch_output_dir: output, template_dir: "", parser_mode: ParserMode::Strict }
+        PatchPaths { patch_output_dir: output, template_dir: "" }
     }
 
     #[test]

@@ -13,6 +13,7 @@
 //! | others    | what the mod changes | fields, pointers, and d-merge's parser on the patch |
 //!
 //! A template object nobody changed has nothing of the mod's to find, so only changes are checked.
+//! The parser checks in `Strict` mode, whatever the patch page's: see `Behavior::validate`.
 //!
 //! A new object nothing links to is warned of too ([`diagnostics::not_linked`]). That depends on the
 //! other objects: an edit of `#0106` that adds `#mymod$0` links it. So an edit also checks again the
@@ -20,7 +21,6 @@
 
 use egui_code_editor::Diagnostic;
 use fast_hash::HashSet;
-use gui_shared::settings::pages::patch::behavior::ParserMode;
 use rayon::prelude::*;
 
 use super::{
@@ -62,8 +62,6 @@ struct Checker<'a> {
     index: usize,
     behavior: &'a Behavior,
     code: &'a str,
-    /// The patch page's, which the parser checks by.
-    mode: ParserMode,
     /// The ids of the new objects nothing links to. See [`Graph::unlinked`].
     not_linked: &'a HashSet<&'a str>,
 }
@@ -80,7 +78,7 @@ fn is_checked(behavior: &Behavior, object: &ObjectText<'_>) -> bool {
 
 /// The problems of one object. `None`: it has none.
 fn object_problems(checker: Checker<'_>, object: &ObjectText<'_>) -> Option<ObjectProblems> {
-    let Checker { index, behavior, code, mode, not_linked } = checker;
+    let Checker { index, behavior, code, not_linked } = checker;
     let (id, text) = (object.id, object.text);
     // Animation data only has the parser's word: see `anim_lines`.
     let mut found: Vec<Diagnostic> = if behavior.is_anim_data() {
@@ -93,7 +91,7 @@ fn object_problems(checker: Checker<'_>, object: &ObjectText<'_>) -> Option<Obje
     }
     // As the editor does: the parser reads the patch, whose lines are not the object's.
     if let Some(patch) = behavior.patch(code, id)
-        && let Err(error) = behavior.validate(id, &patch, mode)
+        && let Err(error) = behavior.validate(id, &patch)
     {
         let to_editor_line = |line| Preview::new(&patch).editor_line_of(line, text);
         diagnostics::add_parser_error(&mut found, text, &error, to_editor_line);
@@ -115,9 +113,9 @@ fn sort(groups: &mut [ObjectProblems]) {
 }
 
 impl Problems {
-    /// Checks the whole work again if it changed as a whole (read, loaded, restored). `(code, mode)`:
-    /// the mod code, and the parser's mode.
-    fn check_work(&mut self, behaviors: &[Behavior], (code, mode): (&str, ParserMode)) {
+    /// Checks the whole work again if it changed as a whole (read, loaded, restored). `code`: the mod
+    /// code.
+    fn check_work(&mut self, behaviors: &[Behavior], code: &str) {
         let mut found = Vec::new();
         for (index, behavior) in behaviors.iter().enumerate() {
             // Only new objects can be not linked: no graph for a behavior without any.
@@ -125,7 +123,7 @@ impl Problems {
             let graph = has_new.then(|| Graph::new(behavior));
             let not_linked = graph.as_ref().map(not_linked_ids).unwrap_or_default();
 
-            let checker = Checker { index, behavior, code, mode, not_linked: &not_linked };
+            let checker = Checker { index, behavior, code, not_linked: &not_linked };
             found.extend(behavior_problems(checker));
         }
         sort(&mut found);
@@ -168,7 +166,7 @@ impl Problems {
         if work.job().is_some() || !work.place.is_open() || self.checked == Some(work.reloads()) {
             return;
         }
-        self.check_work(&work.workspace.behaviors, (work.place.mod_code.trim(), work.parser_mode));
+        self.check_work(&work.workspace.behaviors, work.place.mod_code.trim());
         self.checked = Some(work.reloads());
     }
 
@@ -191,8 +189,8 @@ impl Problems {
         ids.dedup();
 
         let behavior = &work.workspace.behaviors[active];
-        let (code, mode) = (work.place.mod_code.trim(), work.parser_mode);
-        let checker = Checker { index: active, behavior, code, mode, not_linked: &not_linked };
+        let code = work.place.mod_code.trim();
+        let checker = Checker { index: active, behavior, code, not_linked: &not_linked };
         self.refresh_objects(checker, &ids);
     }
 }
@@ -214,11 +212,10 @@ mod tests {
         adsf
     }
 
-    fn work(mode: ParserMode) -> Work {
+    fn work() -> Work {
         let mut work = Work::default();
         work.workspace.behaviors.push(clip_data());
         work.place.mod_code = "m".to_owned();
-        work.parser_mode = mode;
         work.place.loaded_for = Some("m".to_owned());
         work
     }
@@ -226,7 +223,7 @@ mod tests {
     /// What is read is checked at once; then an edit only checks its object again.
     #[test]
     fn the_work_is_checked_when_read_and_then_per_edit() {
-        let (mut work, mut problems) = (work(ParserMode::Strict), Problems::default());
+        let (mut work, mut problems) = (work(), Problems::default());
         assert_eq!(problems.counts(), None, "not checked yet");
         work.reset_names(); // as a read or a load does
         problems.diagnose(&work);
@@ -243,21 +240,18 @@ mod tests {
         assert_eq!(problems.counts(), Some((3, 0)), "a new mistake comes in");
     }
 
-    /// The count is the parser's to check, in the mode of the patch page.
+    /// Always `Strict`: a wrong count (`7` triggers, none listed) is an error, though the patch page
+    /// may be `Lenient`.
     #[test]
-    fn the_mode_of_the_patch_page_decides() {
-        let count = |mode| {
-            let (mut work, mut problems) = (work(mode), Problems::default());
-            work.workspace.behaviors[0].added.clear();
-            work.workspace.behaviors[0]
-                .added
-                .insert("Male~1/Count~m$0.txt".to_owned(), "Count\nm$0\n1\n0\n0\n7\n".to_owned());
-            work.reset_names();
-            problems.diagnose(&work);
-            problems.counts()
-        };
-        assert_eq!(count(ParserMode::Strict), Some((1, 0)));
-        assert_eq!(count(ParserMode::Lenient), Some((0, 0)));
+    fn the_parser_is_strict() {
+        let (mut work, mut problems) = (work(), Problems::default());
+        work.workspace.behaviors[0].added.clear();
+        work.workspace.behaviors[0]
+            .added
+            .insert("Male~1/Count~m$0.txt".to_owned(), "Count\nm$0\n1\n0\n0\n7\n".to_owned());
+        work.reset_names();
+        problems.diagnose(&work);
+        assert_eq!(problems.counts(), Some((1, 0)));
     }
 
     /// A Nemesis patch: the fields of what the mod changes, and the parser on its patch.
@@ -273,13 +267,7 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
         let checker = |behavior: &Behavior| -> Vec<ObjectProblems> {
             let not_linked = HashSet::default();
-            behavior_problems(Checker {
-                index: 0,
-                behavior,
-                code: "m",
-                mode: ParserMode::Strict,
-                not_linked: &not_linked,
-            })
+            behavior_problems(Checker { index: 0, behavior, code: "m", not_linked: &not_linked })
         };
 
         assert!(checker(&behavior).is_empty(), "nothing changed");

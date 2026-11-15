@@ -142,7 +142,7 @@ impl Work {
 
         // It has no `Export`: what is edited is what the next merge gets.
         if self.user_patch {
-            match self.workspace.export(Path::new(&self.place.output), &code, self.parser_mode) {
+            match self.workspace.export(Path::new(&self.place.output), &code) {
                 Ok((_, invalid)) if invalid.is_empty() => {}
                 Ok((_, invalid)) => notify.warn(format!(
                     "{} ({}):\n{}",
@@ -443,7 +443,7 @@ impl Work {
 
     /// `Export` as Nemesis, to `output`.
     fn export_nemesis(&mut self, output: &Path, code: &str, notify: &mut Notification, i18n: &I18nMap) {
-        let exported = self.workspace.export(output, code, self.parser_mode);
+        let exported = self.workspace.export(output, code);
         self.mod_written |= exported.is_ok();
         match exported {
             Ok((written, invalid)) if invalid.is_empty() => notify.success(format!(
