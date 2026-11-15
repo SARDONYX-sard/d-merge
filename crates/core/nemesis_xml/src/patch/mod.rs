@@ -153,12 +153,18 @@ impl<'de> PatchDeserializer<'de> {
         self.pop_current_field_table();
 
         if should_take_in_this {
-            let path = mem::take(&mut self.current.path);
+            // A new object goes by its id alone (`#aaaa$1`), its class in the value:
+            // `{ "SomeClass": { ..fields } }`. An object is one class, so two mods adding the same id as
+            // other classes (e.g. two versions of one mod) meet at one path, and the priority keeps one.
+            let mut path = mem::take(&mut self.current.path);
+            path.truncate(1); // OK: truncate is no capacity change.
+            let mut class = Object::with_capacity(1);
+            class.insert(class_name.into(), BorrowedValue::Object(Box::new(obj)));
             self.output_patches.insert(
                 path,
                 JsonPatch {
                     action: Action::Pure { op: Op::Add }, // root class
-                    value: BorrowedValue::Object(Box::new(obj)),
+                    value: BorrowedValue::Object(Box::new(class)),
                 },
             );
         }
@@ -688,6 +694,28 @@ mod tests {
         );
 
         assert_eq!(actual, hash_map);
+    }
+
+    /// A new object goes by its id alone, its class in the value: two mods adding the id as other
+    /// classes meet at one path.
+    #[test]
+    fn a_new_object_goes_by_its_id_alone() {
+        let nemesis_xml = r###"
+		<hkobject name="#aaaa$1" class="hkbStringEventPayload" signature="0xed04256a">
+			<hkparam name="data">Hello</hkparam>
+		</hkobject>
+"###;
+
+        use simd_json::prelude::ValueAsObject as _;
+
+        let (actual, _) = parse_nemesis_patch(nemesis_xml, None).unwrap_or_else(|e| panic!("{e}"));
+
+        let patch = &actual[&json_path!["#aaaa$1"]];
+        assert_eq!(actual.len(), 1);
+        assert_eq!(patch.action, Action::Pure { op: Op::Add });
+        let class = patch.value.as_object().and_then(|object| object.get("hkbStringEventPayload"));
+        let data = class.and_then(|class| class.as_object()).and_then(|class| class.get("data"));
+        assert_eq!(data, Some(&BorrowedValue::from("Hello")));
     }
 
     // key: vec!["#0010", "hkbProjectData", "Array", "[100:101]"]

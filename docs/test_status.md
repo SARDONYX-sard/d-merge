@@ -259,12 +259,16 @@ Installing [Auto Skeleton Patch - Universal Behaviour Runtime](https://www.nexus
 
 ## About `TrailingData at character 0` Error
 
-This occurs when converting data from a patched JSON file to a data type that can be converted to HKX.
+In versions 3.0.0-alpha.2 and earlier, this error could occur when applying multiple versions of a mod.
 
-This is likely to occur in the following scenarios:
+This is because adding classes with the same ID causes the internal hashmap's ID uniqueness check to fail.
 
-- When attempting to apply two DMCO patch MODs simultaneously
-- When attempting to apply TkDodge and TkDodge RE simultaneously (TkDodge should normally be overwritten by RE)
+Example
+
+- `$aaaa/Class1`
+- `$aaaa/Class2`
+
+In this case, both would be saved, and an error occurred during conversion to hkx because this is invalid. From 3.0.0-alpha.2 onwards, one takes precedence based on the priority.
 
 If you know of any other specific conditions where this error occurs, please let me know.
 This error should not occur if the patches are applied correctly.
