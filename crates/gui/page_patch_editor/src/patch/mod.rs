@@ -410,8 +410,9 @@ impl PatchTool {
 
     /// What the editor asked for: see [`editor_area::EditorOut`].
     fn apply_editor_out(&mut self, ui: &egui::Ui, out: editor_area::EditorOut, notify: &mut Notification) {
-        if out.reveal {
+        if out.reveal || self.editor.take_moved() {
             self.side.reveal();
+            ui.ctx().request_repaint(); // the side bar is drawn first: next frame
         }
         if out.leave_tree {
             self.side.leave_tree();

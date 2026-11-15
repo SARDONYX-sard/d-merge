@@ -12,8 +12,9 @@ use crate::patch::tree::Graph;
 /// How high the list gets before it scrolls.
 const MAX_HEIGHT: f32 = 80.0;
 
-/// Draws the list, if there is anything in it. A click selects that object.
-pub(super) fn show(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Rc<str>>, i18n: &I18nMap) {
+/// Draws the list, if there is anything in it. A click selects that object. `reveal`: the selected
+/// object is scrolled to, if it is here (e.g. a click on its warning in the Problems panel).
+pub(super) fn show(ui: &mut egui::Ui, graph: &Graph, (selected, reveal): (&mut Option<Rc<str>>, bool), i18n: &I18nMap) {
     let unlinked = graph.unlinked();
     if unlinked.is_empty() {
         return;
@@ -26,7 +27,11 @@ pub(super) fn show(ui: &mut egui::Ui, graph: &Graph, selected: &mut Option<Rc<st
         for &node in unlinked {
             let id = graph.id(node);
             let is_selected = selected.as_deref() == Some(id);
-            if object_button(ui, graph, node, (is_selected, false)).clicked() {
+            let button = object_button(ui, graph, node, (is_selected, false));
+            if is_selected && reveal {
+                button.scroll_to_me(Some(egui::Align::Center));
+            }
+            if button.clicked() {
                 *selected = Some(id.into());
             }
         }

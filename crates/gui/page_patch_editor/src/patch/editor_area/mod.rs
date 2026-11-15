@@ -44,6 +44,9 @@ pub(in crate::patch) struct EditorArea {
     tabs: EditorTabs,
     /// The diffs and blames of the history open as tabs. See [`Views`].
     views: Views,
+    /// The editor went to a place on its own (a problem, a definition, a reference, back / forward):
+    /// the tree shows it, though the editor had the keyboard already (getting it shows it too).
+    moved: bool,
 }
 
 impl EditorArea {
@@ -87,6 +90,11 @@ impl EditorArea {
         self.apply_tab_outcome(sel, outcome);
     }
 
+    /// Did the editor go to a place since the last call? See [`Self::moved`].
+    pub(in crate::patch) const fn take_moved(&mut self) -> bool {
+        std::mem::replace(&mut self.moved, false)
+    }
+
     /// Vim `Ctrl+O` / `Ctrl+I`: the previous / next visited object of `behavior` (skips deleted ones).
     fn walk_history(&mut self, (behavior, sel): (&Behavior, &mut Selection), older: bool, current: &str) {
         let mut current = current.to_owned();
@@ -94,6 +102,7 @@ impl EditorArea {
             if behavior.text(&target).is_some() {
                 sel.selected = Some(target.into());
                 self.pane.focus = Some(FocusAt::Keep);
+                self.moved = true;
                 return;
             }
             current = target;
@@ -113,6 +122,7 @@ impl EditorArea {
             sel.selected = Some(document.into());
         }
         self.pane.focus = Some(FocusAt::Line(line));
+        self.moved = true;
     }
 
     /// Double click or menu in the tree and the list: shows `id` in a tab that stays.

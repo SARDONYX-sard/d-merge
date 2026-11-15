@@ -51,7 +51,8 @@ impl Explorer {
             self.trees.insert(path.to_owned(), crate::patch::tree::TreeState::default());
         }
         let Some(tree) = self.trees.get_mut(path) else { return ListOutput::default() };
-        if std::mem::take(&mut self.reveal) {
+        let reveal = std::mem::take(&mut self.reveal);
+        if reveal {
             tree.reveal_again();
         }
 
@@ -68,7 +69,7 @@ impl Explorer {
             }
         }
 
-        let flags = (self.changed_only, self.tree_focus);
+        let flags = (self.changed_only, self.tree_focus, reveal);
         let menu = crate::patch::side_area::tree::tree_ui(ui, graph, selected, tree, flags, i18n);
         ListOutput { menu, ..ListOutput::default() }
     }
