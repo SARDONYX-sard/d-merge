@@ -9,6 +9,7 @@
 #![cfg_attr(feature = "gen", allow(unused_crate_dependencies))]
 
 mod cmd;
+mod license_tree;
 mod release;
 mod tag;
 mod version;
@@ -29,6 +30,7 @@ const TASKS: &[Task] = &[
     Task { name: "release", usage: release::USAGE, help: release::HELP, run: release::run },
     Task { name: "tag", usage: tag::USAGE, help: tag::HELP, run: tag::run },
     Task { name: "gen", usage: GEN_USAGE, help: GEN_HELP, run: run_gen },
+    Task { name: "license-tree", usage: license_tree::USAGE, help: license_tree::HELP, run: license_tree::run },
 ];
 
 fn main() -> ExitCode {

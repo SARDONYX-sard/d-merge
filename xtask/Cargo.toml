@@ -13,6 +13,8 @@ rust-version.workspace = true
 # NOTE: `cargo x release` must stay fast, so the heavy crates are only built for `cargo x gen ..`
 #       (the `gen` feature; `cargo x gen` turns it on by itself).
 [dependencies]
+serde_json = { workspace = true, features = ["preserve_order"] } # license-tree: `cargo metadata` (no derive: stays light)
+
 # gen
 class_generator    = { workspace = true, optional = true }
 havok_classes      = { workspace = true, optional = true }
@@ -20,7 +22,6 @@ rayon              = { workspace = true, optional = true }
 rmp-serde          = { workspace = true, optional = true }
 serde              = { workspace = true, optional = true }
 serde_hkx          = { workspace = true, optional = true }
-serde_json         = { workspace = true, optional = true, features = ["preserve_order"] }
 serde_hkx_features = { workspace = true, optional = true, features = ["json", "serde_default"] }
 
 # workspace members (gen)
@@ -47,7 +48,6 @@ gen = [
   "dep:rmp-serde",
   "dep:serde",
   "dep:serde_hkx",
-  "dep:serde_json",
   "dep:serde_hkx_features",
   "dep:skyrim_anim_data",
 ]
