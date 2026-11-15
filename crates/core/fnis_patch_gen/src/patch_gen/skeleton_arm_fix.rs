@@ -25,7 +25,7 @@ use crate::{
 /// parsed, or if its HKX structure is invalid.
 pub(crate) fn apply<'a>(
     config: &crate::Config,
-    patches: &BehaviorPatchesMap<'a>,
+    patches: &mut BehaviorPatchesMap<'a>,
 ) -> Result<(), serde_hkx_features::error::Error> {
     let skyrim_data_dir_glob = config.skyrim_data_dir_glob.as_deref().unwrap_or(".");
 

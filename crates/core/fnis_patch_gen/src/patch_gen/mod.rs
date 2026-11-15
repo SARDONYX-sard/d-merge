@@ -144,7 +144,7 @@ pub fn collect_borrowed_patches<'a>(
         }
     });
     let LocalAgg {
-        borrowed_patches,
+        mut borrowed_patches,
         behavior_index_map,
         adsf_patches,
         asdsf_patches,
@@ -159,14 +159,14 @@ pub fn collect_borrowed_patches<'a>(
         })
         .reduce(LocalAgg::new, |a, b| a.merge(b));
 
-    add_global_patches(&borrowed_patches, furniture_groups);
+    add_global_patches(&mut borrowed_patches, furniture_groups);
 
-    let aa_base_map = apply_alternate_animations(&borrowed_patches, &conversion_jobs, config, &mut errors);
+    let aa_base_map = apply_alternate_animations(&mut borrowed_patches, &conversion_jobs, config, &mut errors);
     #[cfg(feature = "tracing")]
     tracing::debug!("aa_base_map = {aa_base_map:#?}");
 
     if config.skeleton_arm_fix
-        && let Err(e) = self::skeleton_arm_fix::apply(config, &borrowed_patches)
+        && let Err(e) = self::skeleton_arm_fix::apply(config, &mut borrowed_patches)
     {
         errors.push(Error::Custom { msg: e.to_string() });
     }
@@ -219,7 +219,7 @@ fn add_one_list<'a>(
         animations.par_sort_unstable(); // NOTE: The addition of animations has been tested to work in any order, but just to be safe.
 
         conversion_jobs.par_extend(io_jobs::hkx::prepare_conversion_jobs(&animations, owned_data, config));
-        add_animation_paths(&animations, owned_data, &acc.borrowed_patches);
+        add_animation_paths(&animations, owned_data, &mut acc.borrowed_patches);
     }
 
     acc.adsf_patches.extend(adsf_patches);
@@ -229,16 +229,14 @@ fn add_one_list<'a>(
 }
 
 /// Adds patches to `mt_behavior.xml`.
-fn add_mt_behavior_patches<'a>(acc: &LocalAgg<'a>, one: JsonPatchPairs<'a>, seq: JsonPatchPairs<'a>) {
+fn add_mt_behavior_patches<'a>(acc: &mut LocalAgg<'a>, one: JsonPatchPairs<'a>, seq: JsonPatchPairs<'a>) {
     let entry = acc.borrowed_patches.0.entry(THREAD_PERSON_MT_BEHAVIOR_KEY).or_default();
 
     // Indexes of `meshes/actors/character/behaviors/mt_behavior.bin`
-    if !acc.behavior_index_map.0.contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY) {
-        acc.behavior_index_map.0.insert(
-            THREAD_PERSON_MT_BEHAVIOR_KEY,
-            BehaviorIndexes { string_data: Cow::Borrowed("#0083"), behavior_graph: Some(Cow::Borrowed("#0085")) },
-        );
-    }
+    acc.behavior_index_map.0.entry(THREAD_PERSON_MT_BEHAVIOR_KEY).or_insert(BehaviorIndexes {
+        string_data: Cow::Borrowed("#0083"),
+        behavior_graph: Some(Cow::Borrowed("#0085")),
+    });
 
     for (path, patch) in one {
         entry.one.insert(path, patch);
@@ -250,7 +248,7 @@ fn add_mt_behavior_patches<'a>(acc: &LocalAgg<'a>, one: JsonPatchPairs<'a>, seq:
 
 /// Adds patches to the master file of the behavior, e.g. `0_master.xml`.
 fn add_master_patches<'a>(
-    acc: &LocalAgg<'a>,
+    acc: &mut LocalAgg<'a>,
     owned_data: &'a OwnedFnisInjection,
     one: JsonPatchPairs<'a>,
     seq: JsonPatchPairs<'a>,
@@ -271,7 +269,7 @@ fn add_master_patches<'a>(
     }
 
     // Push Mod Root behavior to master xml
-    let mut entry = acc.borrowed_patches.0.entry(master_template_key).or_default();
+    let entry = acc.borrowed_patches.0.entry(master_template_key).or_default();
     let (one_gen, one_state_info, seq_state) = new_injectable_mod_root_behavior(owned_data);
     entry.one.insert(one_gen.0, one_gen.1);
     entry.one.insert(one_state_info.0, one_state_info.1);
@@ -279,7 +277,7 @@ fn add_master_patches<'a>(
 
     // Insert patches for FNIS_*_List.txt
     // additions only, there won't be any duplicate keys, so we should be able to use `par_extend`.
-    entry.one.par_extend(one);
+    entry.one.extend_unique(one);
     for (path, patch) in seq {
         entry.seq.insert(path, patch);
     }
@@ -303,7 +301,7 @@ fn add_master_patches<'a>(
 fn add_animation_paths<'a>(
     animations: &[&'a str],
     owned_data: &'a OwnedFnisInjection,
-    patches: &BehaviorPatchesMap<'a>,
+    patches: &mut BehaviorPatchesMap<'a>,
 ) {
     new_push_anim_seq_patch(animations, owned_data, owned_data.behavior_entry, patches);
 
@@ -319,7 +317,7 @@ fn add_animation_paths<'a>(
 }
 
 /// Adds the classes that all mods of a template share, once.
-fn add_global_patches<'a>(patches: &BehaviorPatchesMap<'a>, furniture_groups: Vec<&'a str>) {
+fn add_global_patches<'a>(patches: &mut BehaviorPatchesMap<'a>, furniture_groups: Vec<&'a str>) {
     // The inclusion of a patch for `0_master` implies that a class for FNIS options for `0_master` is also required.
     if patches.0.contains_key(&THREAD_PERSON_0_MASTER_KEY) {
         patches
@@ -328,15 +326,15 @@ fn add_global_patches<'a>(patches: &BehaviorPatchesMap<'a>, furniture_groups: Ve
             .or_default()
             // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
             .one
-            .par_extend(new_global_master_patch(0));
+            .extend_unique(new_global_master_patch(0));
     }
 
     if patches.0.contains_key(&THREAD_PERSON_MT_BEHAVIOR_KEY) {
         let (one, seq) = new_mt_global_patch(furniture_groups, 0);
-        let mut entry = patches.0.entry(THREAD_PERSON_MT_BEHAVIOR_KEY).or_default();
+        let entry = patches.0.entry(THREAD_PERSON_MT_BEHAVIOR_KEY).or_default();
 
         // Safety: This only adds private global indexes and does not conflict with the class_name indexes.
-        entry.one.par_extend(one);
+        entry.one.extend_unique(one);
         for (path, patch) in seq {
             entry.seq.insert(path, patch);
         }
@@ -346,7 +344,7 @@ fn add_global_patches<'a>(patches: &BehaviorPatchesMap<'a>, furniture_groups: Ve
 /// If a mod has alternate animations: writes `fnis_aa/config.json`, and adds what `0_master` needs for
 /// them. Returns the base of each group, for writing the configs of the slots later.
 fn apply_alternate_animations(
-    patches: &BehaviorPatchesMap<'_>,
+    patches: &mut BehaviorPatchesMap<'_>,
     conversion_jobs: &[AnimIoJob],
     config: &Config,
     errors: &mut Vec<Error>,
@@ -465,7 +463,7 @@ fn new_push_anim_seq_patch<'a>(
     animations: &[&'a str],
     owned_data: &'a OwnedFnisInjection,
     behavior_entry: &'static BehaviorEntry,
-    patches: &BehaviorPatchesMap<'a>,
+    patches: &mut BehaviorPatchesMap<'a>,
 ) {
     let namespace = &owned_data.namespace;
     let priority = owned_data.priority;

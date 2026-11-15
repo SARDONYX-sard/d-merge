@@ -13,12 +13,11 @@ repository.workspace   = true
 rust-version.workspace = true
 
 [dependencies]
-dashmap   = { workspace = true, features = ["rayon", "serde"] }
 fast_hash = { workspace = true }
+hashbrown = { workspace = true } # `PriorityMap`
 phf       = { workspace = true, features = ["macros"] }
 rayon     = { workspace = true }
 serde     = { workspace = true }
-tracing   = { workspace = true, optional = true }
 
 # workspace members
 json_patch       = { workspace = true, features = ["serde"] }
@@ -26,12 +25,16 @@ nemesis_xml      = { workspace = true }
 skyrim_anim_data = { workspace = true, features = ["alt_map", "serde"] }
 stdx             = { workspace = true }
 
+[dev-dependencies]
+dashmap = { workspace = true } # the benchmarks compare against what the maps replaced
+
 [lints]
 workspace = true
 
 [features]
 default = ["tracing"]
-tracing = ["dep:tracing"]
+# Nothing logs here now; kept as `behavior_merge`'s `tracing` turns it on.
+tracing = []
 
 # See `behavior_merge`'s `ts_serde` feature.
 ts_serde = []
