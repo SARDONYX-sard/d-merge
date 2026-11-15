@@ -443,7 +443,7 @@ fn field_name(text: &str) -> Option<&str> {
 /// The `#XXXX` / `#mod$N` pointers of an object (not its own name), first occurrence order.
 ///
 /// e.g., `name="#0106"`, own = `#0106`, then `#0105 #0109 #0105` -> `["#0105", "#0109"]`
-fn pointers<'a>(text: &'a str, own: &str) -> Vec<&'a str> {
+pub(crate) fn pointers<'a>(text: &'a str, own: &str) -> Vec<&'a str> {
     let is_id_char = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '$';
     let mut found: Vec<&str> = Vec::new();
     // A generator can list hundreds of children: a set keeps this linear.

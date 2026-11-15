@@ -273,6 +273,8 @@
   "nemesis_merge_hover": "この競合での各modの値です。必要なものをエディタで組み合わせます。配列では複数のmodの要素が必要なことがよくあります。✖ で閉じるとパッチのプレビューに戻ります。",
   "nemesis_merge_insert_hover": "エディタのカーソル行の下に挿入します。置き換え前の行は残るので、不要ならエディタで削除してください。",
   "nemesis_merge_original": "元の値",
+  "nemesis_merge_pointed_hover": "この値が指すオブジェクトです(このmodでの内容)。各modが自分のオブジェクトを指す場合、その中身が違います。選ぶ前に見比べてください。",
+  "nemesis_merge_pointed_missing": "このmodにもテンプレートにもこのオブジェクトはありません。",
   "nemesis_merge_removes": "このmodはこの行を削除します。",
   "nemesis_merge_title": "各modの値",
   "nemesis_mod_code_hint": "例: mymod",

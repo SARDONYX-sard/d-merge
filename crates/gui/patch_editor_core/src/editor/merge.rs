@@ -112,11 +112,13 @@ mod tests {
         let side = |name: &str, lines: &[&str]| MergeSide {
             name: name.to_owned(),
             lines: lines.iter().map(|line| (*line).to_owned()).collect(),
+            pointed: Vec::new(),
         };
         MergeValues {
             id: "#2489".to_owned(),
             path: "#2489/x/generators/[0:1]".to_owned(),
             original: vec!["\t#0338".to_owned()],
+            original_pointed: Vec::new(),
             sides: vec![side("Flinching", &["\t#flinch$2"]), side("Impact", &["\t#neymar$1019", "\t#flinch$2"])],
         }
     }

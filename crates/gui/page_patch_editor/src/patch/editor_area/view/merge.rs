@@ -9,9 +9,13 @@
 //! ──────────────────────────────────
 //! Flinching [Accept]
 //!   + <hkparam name="value">2</hkparam>    <- tinted: the mod changes it; `+` puts it below the cursor
+//!   ▼ → #flinch$2  hkbClipGenerator        <- what a value points to, as this mod has it
+//!       <hkobject name="#flinch$2" ...>
 //! ──────────────────────────────────
 //! Impact [Accept]
 //! ```
+//! Two mods pointing to their own objects differ in what those are, which the ids alone do not tell:
+//! each pointed object is shown under its mod, to compare them.
 
 use egui_code_editor::languages::Xml;
 use egui_widgets::shadcn::Button;
@@ -22,6 +26,7 @@ use crate::patch::{
     editor::{merge, resolve},
     editor_area::EditorPane,
     tool::work_state::Work,
+    workspace::{Behavior, behavior::class_attribute},
 };
 
 /// What the panel asked for.
@@ -48,7 +53,8 @@ impl EditorPane {
         let (picked, close) = {
             let panel_id = if work.user_patch { "user_patch_merge" } else { "nemesis_merge" };
             let panel = egui::Panel::right(panel_id).default_size(620.0).resizable(true);
-            panel.show(ui, |ui| panel_ui(ui, i18n, id, &values)).inner
+            let template = &work.workspace.behaviors[active];
+            panel.show(ui, |ui| panel_ui(ui, i18n, (id, template), &values)).inner
         };
 
         if let Some(pick) = picked {
@@ -102,8 +108,14 @@ fn merged_text(
     }
 }
 
-/// The panel's insides. Returns `(what was picked, ✖ clicked)`.
-fn panel_ui(ui: &mut egui::Ui, i18n: &I18nMap, id: &str, values: &resolve::MergeValues) -> (Option<MergePick>, bool) {
+/// The panel's insides. `template`: the behavior of object `id`, which has the objects no mod changes.
+/// Returns `(what was picked, ✖ clicked)`.
+fn panel_ui(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    (id, template): (&str, &Behavior),
+    values: &resolve::MergeValues,
+) -> (Option<MergePick>, bool) {
     let mut picked = None;
     let mut close = false;
 
@@ -120,8 +132,14 @@ fn panel_ui(ui: &mut egui::Ui, i18n: &I18nMap, id: &str, values: &resolve::Merge
     ui.add(egui::Label::new(egui::RichText::new(&values.path).monospace().weak()).truncate());
     ui.separator();
 
-    egui::ScrollArea::both().id_salt(("nemesis_merge_values", id)).auto_shrink(false).show(ui, |ui| {
-        if let Some(pick) = values_ui(ui, i18n, values) {
+    // The bars always show: the values and the objects they point to are often longer and wider than
+    // the panel.
+    let scroll = egui::ScrollArea::both()
+        .id_salt(("nemesis_merge_values", id))
+        .auto_shrink(false)
+        .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible);
+    scroll.show(ui, |ui| {
+        if let Some(pick) = values_ui(ui, i18n, template, values) {
             picked = Some(pick);
         }
     });
@@ -130,11 +148,19 @@ fn panel_ui(ui: &mut egui::Ui, i18n: &I18nMap, id: &str, values: &resolve::Merge
 }
 
 /// The original, then each mod below it, as wide as the panel (side by side they were cut off).
-fn values_ui(ui: &mut egui::Ui, i18n: &I18nMap, values: &resolve::MergeValues) -> Option<MergePick> {
+fn values_ui(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    template: &Behavior,
+    values: &resolve::MergeValues,
+) -> Option<MergePick> {
     ui.vertical(|ui| {
-        ui.weak(i18n.t(I18nKey::NemesisMergeOriginal));
-        for line in &values.original {
-            ui.add(egui::Label::new(egui_code_editor::line_job(ui, line.trim_start(), &Xml)));
+        {
+            ui.weak(i18n.t(I18nKey::NemesisMergeOriginal));
+            for line in &values.original {
+                ui.add(egui::Label::new(egui_code_editor::line_job(ui, line.trim_start(), &Xml)).extend());
+            }
+            pointed_ui(ui, i18n, template, ("", &values.original_pointed));
         }
 
         let mut picked = None;
@@ -143,10 +169,52 @@ fn values_ui(ui: &mut egui::Ui, i18n: &I18nMap, values: &resolve::MergeValues) -
             if let Some(pick) = side_ui(ui, i18n, side, &values.original) {
                 picked = Some(pick);
             }
+            pointed_ui(ui, i18n, template, (&side.name, &side.pointed));
         }
         picked
     })
     .inner
+}
+
+/// The objects a side's values point to, each folded under `→ #flinch$2  hkbClipGenerator`. One the
+/// mod has no file of is the template's. `salt`: the side, as two sides may point to one id.
+fn pointed_ui(
+    ui: &mut egui::Ui,
+    i18n: &I18nMap,
+    template: &Behavior,
+    (salt, pointed): (&str, &[resolve::PointedObject]),
+) {
+    for object in pointed {
+        let text = {
+            let of_template = || template.template_object(&object.id).map(|template| template.text.as_str());
+            object.text.as_deref().or_else(of_template)
+        };
+        let title = format!("→ {}  {}", object.id, text.map_or("", class_attribute));
+
+        let header = egui::CollapsingHeader::new(egui::RichText::new(title).monospace())
+            .id_salt(("nemesis_merge_pointed", salt, &object.id))
+            .default_open(true)
+            .show(ui, |ui| match text {
+                Some(text) => object_lines_ui(ui, text),
+                None => {
+                    ui.weak(i18n.t(I18nKey::NemesisMergePointedMissing));
+                }
+            });
+        header.header_response.on_hover_text(i18n.t(I18nKey::NemesisMergePointedHover));
+    }
+}
+
+/// The lines of an object, less the indentation of its first line, so that it starts at the left.
+///
+/// Long lines (paths, names) are not wrapped: the panel's scroll area goes both ways. No scroll area
+/// of its own: one inside the panel's takes the wheel, hides its bar and cuts off what is below it.
+fn object_lines_ui(ui: &mut egui::Ui, text: &str) {
+    let first = text.lines().next().unwrap_or_default();
+    let indent = &first[..first.len() - first.trim_start().len()];
+    for line in text.lines() {
+        let line = line.strip_prefix(indent).unwrap_or(line);
+        ui.add(egui::Label::new(egui_code_editor::line_job(ui, line, &Xml)).extend());
+    }
 }
 
 /// One mod: its name and `Accept`, then its lines, each with `+`; what it changes is tinted.
@@ -169,7 +237,7 @@ fn side_ui(ui: &mut egui::Ui, i18n: &I18nMap, side: &resolve::MergeSide, origina
             if ui.small_button("+").on_hover_text(i18n.t(I18nKey::NemesisMergeInsertHover)).clicked() {
                 picked = Some(MergePick::Insert(vec![line.clone()]));
             }
-            let label = ui.add(egui::Label::new(egui_code_editor::line_job(ui, line.trim_start(), &Xml)));
+            let label = ui.add(egui::Label::new(egui_code_editor::line_job(ui, line.trim_start(), &Xml)).extend());
 
             // What this mod changes, as a diff's added line.
             let is_original = original.iter().any(|original| original.trim() == line.trim());

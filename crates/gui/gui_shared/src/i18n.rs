@@ -949,6 +949,12 @@ pub enum I18nKey {
     /// Original
     NemesisMergeOriginal,
 
+    /// What this value points to, as this mod has it. Two mods pointing to their own objects differ in what those are: compare them before picking one.
+    NemesisMergePointedHover,
+
+    /// Neither this mod nor the template has this object.
+    NemesisMergePointedMissing,
+
     /// It removes these lines.
     NemesisMergeRemoves,
 
