@@ -1,6 +1,7 @@
 //! The rows of the mod table: draggable, or read-only with only the checkboxes active.
 
 use egui_extras::TableBody;
+use egui_widgets::HoverMarkdown as _;
 use gui_shared::settings::pages::patch::mod_item::ModItem;
 
 use super::label_ext::{CellAlign, ROW_HEIGHT, hyperlink_with_hover, label_with_hover};
@@ -14,8 +15,8 @@ pub(super) struct RowConflicts<'a> {
     pub(super) scan: &'a ConflictScan,
     /// The menu's "show conflicts".
     pub(super) label: &'a str,
-    /// The flag's hover: wins, loses.
-    pub(super) hovers: (&'a str, &'a str),
+    /// The flag's hover: wins, loses, resolved in the user patch.
+    pub(super) hovers: (&'a str, &'a str, &'a str),
     /// The hover of a mod whose patch does nothing in the end.
     pub(super) dead_hover: &'a str,
     /// The mod whose conflicts were asked for.
@@ -71,8 +72,11 @@ const fn conflict_color(visuals: &egui::Visuals, (green, red): (bool, bool)) -> 
 }
 
 /// The color of what a mod is to the picked one. Green: the picked mod replaces its values; red: it
-/// replaces the picked mod's; orange: both.
-const fn relation_color(visuals: &egui::Visuals, relation: Relation) -> egui::Color32 {
+/// replaces the picked mod's; orange: both; gray: only where the user patch decided.
+fn relation_color(visuals: &egui::Visuals, relation: Relation) -> egui::Color32 {
+    if relation.is_all_resolved() {
+        return visuals.weak_text_color();
+    }
     conflict_color(visuals, (relation.overridden_by_picked > 0, relation.overrides_picked > 0))
 }
 
@@ -120,8 +124,9 @@ pub(super) fn paint_links(painter: &egui::Painter, visuals: &egui::Visuals, gutt
 }
 
 impl RowConflicts<'_> {
-    /// `+`, `-` or `±`. Green: it overrides others, orange: others override it. `⚡`, like MO2: all it
-    /// does loses, so its patch does nothing.
+    /// `+`, `-` or `±`. Green: it overrides others, orange: others override it. `✓` in gray: all its
+    /// conflicts are resolved in the user patch. `⚡`, like MO2: all it does loses, so its patch does
+    /// nothing.
     fn flag(&self, ui: &mut egui::Ui, id: &str, width: f32) {
         let mark = self.scan.mark_of(id);
         if mark == Mark::default() {
@@ -129,17 +134,21 @@ impl RowConflicts<'_> {
             return;
         }
 
-        let color = conflict_color(ui.visuals(), (mark.wins > 0, mark.loses > 0));
+        let color = if mark.is_all_resolved() {
+            ui.visuals().weak_text_color()
+        } else {
+            conflict_color(ui.visuals(), (mark.wins > 0, mark.loses > 0))
+        };
         let is_dead = self.scan.is_dead(id);
 
-        let (wins, loses) = self.hovers;
-        let counts = format!("{wins}: {}\n{loses}: {}", mark.wins, mark.loses);
+        let (wins, loses, resolved) = self.hovers;
+        let counts = format!("{wins}: {}\n{loses}: {}\n{resolved}: {}", mark.wins, mark.loses, mark.resolved);
         let hover = if is_dead { format!("{}\n\n{counts}", self.dead_hover) } else { counts };
 
         // Not selectable: it would take the clicks, and with them the row's right-click menu.
         let text = if is_dead { "⚡" } else { mark.glyph() };
         let glyph = egui::Label::new(egui::RichText::new(text).color(color).strong()).selectable(false);
-        ui.add_sized([width, ROW_HEIGHT], glyph).on_hover_text(hover);
+        ui.add_sized([width, ROW_HEIGHT], glyph).on_hover_markdown(&hover);
     }
 
     /// The background of a row: the picked mod's, or what it is to it. `None`: none of them.
@@ -176,9 +185,10 @@ impl RowConflicts<'_> {
         self.links.others.push((rect, relation));
         self.links.max = max;
 
-        let (wins, loses) = self.hovers;
+        let (wins, loses, resolved) = self.hovers;
         let (overrides, overridden) = (relation.overrides_picked, relation.overridden_by_picked);
-        response.clone().on_hover_text(format!("{picked}\n{wins}: {overrides}\n{loses}: {overridden}"));
+        let hover = format!("{picked}\n{wins}: {overrides}\n{loses}: {overridden}\n{resolved}: {}", relation.resolved);
+        response.clone().on_hover_text(hover);
     }
 
     fn menu(&mut self, response: &egui::Response, id: &str) {

@@ -159,6 +159,11 @@ impl PatchTool {
         std::mem::replace(&mut self.work.mod_written, false)
     }
 
+    /// The user patch was written since the last call.
+    pub(crate) const fn take_user_patch_written(&mut self) -> bool {
+        std::mem::replace(&mut self.work.user_patch_written, false)
+    }
+
     /// One frame of the page.
     pub(crate) fn ui(
         &mut self,
@@ -315,7 +320,7 @@ impl PatchTool {
         let start = !user_patch && !self.work.place.is_open();
         let parts = (&mut self.work, &mut self.panels);
         let asks = if user_patch {
-            ui::user_patch::user_patch_bar(ui, i18n, (&*parts.0, parts.1), notify)
+            ui::user_patch::user_patch_bar(ui, i18n, (&*parts.0, parts.1))
         } else if start {
             ui::start_screen::start_screen(ui, i18n, (&*parts.0, parts.1), notify)
         } else {
@@ -337,7 +342,7 @@ impl PatchTool {
             self.apply_side(ask, ui.ctx(), notify);
         }
         if self.work.workspace.behaviors.is_empty() {
-            egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::NemesisNoBehavior)));
+            egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::BehaviorsNone)));
             return;
         }
 
@@ -405,8 +410,9 @@ impl PatchTool {
 
     /// What the editor asked for: see [`editor_area::EditorOut`].
     fn apply_editor_out(&mut self, ui: &egui::Ui, out: editor_area::EditorOut, notify: &mut Notification) {
-        if out.reveal {
+        if out.reveal || self.editor.take_moved() {
             self.side.reveal();
+            ui.ctx().request_repaint(); // the side bar is drawn first: next frame
         }
         if out.leave_tree {
             self.side.leave_tree();
@@ -440,7 +446,7 @@ impl PatchTool {
         let output = paths.patch_output_dir.trim();
         if let Some(tool) = self.user_patch.tool.as_mut().filter(|tool| tool.work.place.patch_output != output) {
             tool.leave_user_patch(notify, i18n);
-            self.work.mod_written |= tool.work.mod_written;
+            self.work.user_patch_written |= tool.work.mod_written;
             self.user_patch.tool = None;
         }
 
@@ -467,14 +473,14 @@ impl PatchTool {
         i18n: &I18nMap,
     ) -> Result<(), String> {
         if paths.patch_output_dir.trim().is_empty() {
-            return Err(i18n.t(I18nKey::NemesisNeedPatchOutput).to_owned());
+            return Err(i18n.t(I18nKey::WorkNeedPatchOutput).to_owned());
         }
         let root = PathBuf::from(paths.template_dir);
         let tool = self.user_patch_tool(paths, notify, i18n);
         let invalid = tool.work.resolve_now(request, &root, i18n)?;
         tool.editor.reload();
 
-        self.work.mod_written = true;
+        self.work.user_patch_written = true;
         if invalid.is_empty() { Ok(()) } else { Err(invalid.join("\n")) }
     }
 
@@ -512,7 +518,7 @@ impl PatchTool {
     fn close_user_patch(&mut self, notify: &mut Notification, i18n: &I18nMap) {
         let Some(tool) = &mut self.user_patch.tool else { return };
         tool.leave_user_patch(notify, i18n);
-        self.work.mod_written |= std::mem::take(&mut tool.work.mod_written);
+        self.work.user_patch_written |= std::mem::take(&mut tool.work.mod_written);
     }
 
     /// Draws the user patch's window if it is open. It belongs to no page: it stays when another is
@@ -542,7 +548,7 @@ impl PatchTool {
             .show(ctx, &mut open, |ui| match &mut tool {
                 Some(tool) => tool.user_patch_ui(ui, i18n, notify, (settings, editor), keys),
                 None => {
-                    ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNeedPatchOutput));
+                    ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::WorkNeedPatchOutput));
                 }
             });
 
@@ -978,7 +984,7 @@ mod user_patch_tests {
             tool.work.workspace.info.name.clone(),
         );
         let written = dir.join("out").exists();
-        let wrote = main.take_mod_written();
+        let wrote = main.take_user_patch_written();
         std::fs::remove_dir_all(&dir).unwrap();
 
         assert_eq!(behaviors, 0, "the behavior was opened for it");
@@ -999,9 +1005,9 @@ mod user_patch_tests {
         main.close_user_patch(&mut notify, &i18n);
         let tool = main.user_patch.tool.as_ref().unwrap();
         let text = tool.work.workspace.behaviors[0].text("D~1/Idle~m$0.txt").map(str::to_owned);
-        let wrote = main.take_mod_written();
+        let wrote = main.take_user_patch_written();
         let exported =
-            dir.join("out/.d_merge/user_patch/Nemesis_Engine/mod/upatch/animationdatasinglefile/D~1/Idle~m$0.txt");
+            dir.join("out/.d_merge/user_patch/Nemesis_EngineExt/mod/upatch/animationdatasinglefile/D~1/Idle~m$0.txt");
         let on_disk = std::fs::read_to_string(exported).ok();
         std::fs::remove_dir_all(&dir).unwrap();
 
@@ -1043,7 +1049,7 @@ mod user_patch_tests {
         let cache = workspace::cache_root_of(&output).join(USER_PATCH_CODE);
         let kept = cache.is_dir();
         main.close_user_patch(&mut notify, &i18n);
-        let written = main.take_mod_written();
+        let written = main.take_user_patch_written();
         std::fs::remove_dir_all(&dir).unwrap();
 
         assert!(kept);

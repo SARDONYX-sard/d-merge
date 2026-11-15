@@ -1,6 +1,13 @@
 # Localization
 
-This files in are language tags according to the BCP-47 standard.
+Directories are BCP-47 language tags ([list](https://partnerhub.warnermediagroup.com/metadata/languages)).
+English is the doc comment of each `I18nKey` (`crates/gui/gui_shared/src/i18n.rs`).
 
-- See:
-  [Content Partner Hub | BCP-47 Language Tags](https://partnerhub.warnermediagroup.com/metadata/languages)
+## Rules
+
+- Reuse a key first. One likely to be reused is named for no page from the start.
+- Keys in alphabetical order (checked by a test).
+- Names: `*_label`, `*_hover`, `*_hint`.
+- `directory` (`dir` in labels), never `folder`.
+- `behavior`, `actor` stay English.
+- A long hover: a sentence or two, then `# Note` / `# Example` / ... with `- items` and `` `paths` `` (Markdown).

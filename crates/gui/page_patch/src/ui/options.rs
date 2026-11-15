@@ -2,7 +2,7 @@
 
 use egui::Label;
 use egui_widgets::{
-    PathActions, PathRow,
+    HoverMarkdown as _, PathActions, PathRow,
     shadcn::{Checkbox, ComboBox, RadioButton},
 };
 use gui_shared::{
@@ -48,7 +48,7 @@ impl PatchView<'_> {
             for (mode, label, hover) in items {
                 if ui
                     .add(RadioButton::new(self.ctx.settings.behavior.mode == mode, label))
-                    .on_hover_text(hover)
+                    .on_hover_markdown(hover)
                     .clicked()
                 {
                     self.ctx.settings.behavior.mode = mode;
@@ -67,7 +67,7 @@ impl PatchView<'_> {
 
         ui.horizontal_top(|ui| {
             ui.add(Label::new(self.ctx.i18n.t(I18nKey::OutputFormatLabel)))
-                .on_hover_text(self.ctx.i18n.t(I18nKey::RuntimeTargetHover));
+                .on_hover_markdown(self.ctx.i18n.t(I18nKey::RuntimeTargetHover));
 
             const RUNTIMES: [(Runtime, &str); Runtime::ALL.len()] = {
                 const fn make_runtimes() -> [(Runtime, &'static str); Runtime::ALL.len()] {
@@ -106,7 +106,7 @@ impl PatchView<'_> {
     fn ui_parser_mode(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_top(|ui| {
             ui.label(self.ctx.i18n.t(I18nKey::ParserModeLabel))
-                .on_hover_text(self.ctx.i18n.t(I18nKey::ParserModeHover));
+                .on_hover_markdown(self.ctx.i18n.t(I18nKey::ParserModeHover));
 
             let modes = [
                 (ParserMode::Strict, self.ctx.i18n.t(I18nKey::ParserModeStrict)),
@@ -142,7 +142,7 @@ impl PatchView<'_> {
             (&mut self.ctx.settings.behavior.apply_user_patch, I18nKey::UserPatchApply, I18nKey::UserPatchApplyHover),
             (&mut self.ctx.settings.behavior.auto_run, I18nKey::AutoRun, I18nKey::AutoRunHover),
         ] {
-            ui.add(Checkbox::new(value, self.ctx.i18n.t(label))).on_hover_text(self.ctx.i18n.t(hover));
+            ui.add(Checkbox::new(value, self.ctx.i18n.t(label))).on_hover_markdown(self.ctx.i18n.t(hover));
         }
     }
 
@@ -175,7 +175,7 @@ impl PatchView<'_> {
 
         let mut auto = false;
         let row = PathRow::new(i18n.t(I18nKey::SkyrimDataDirLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
-            .hover(i18n.t(I18nKey::OpenSelectedPathHover))
+            .open_hover(i18n.t(I18nKey::OpenSelectedPathHover))
             .hint((!is_vfs).then_some("D:\\GAME\\ModOrganizer Skyrim SE\\mods\\*"))
             .show_with(ui, settings.current_skyrim_data_dir_mut(), |ui| auto = auto_detect_button(ui, is_vfs, i18n));
         if let Some(err) = row.open_error {
@@ -193,7 +193,7 @@ impl PatchView<'_> {
     fn ui_output_dir_row(&mut self, ui: &mut egui::Ui) {
         let i18n = self.ctx.i18n;
         let row = PathRow::new(i18n.t(I18nKey::OutputDirLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
-            .hover(i18n.t(I18nKey::OpenSelectedPathHover))
+            .open_hover(i18n.t(I18nKey::OpenSelectedPathHover))
             .show_with(ui, self.ctx.settings.current_output_dir_mut(), |ui| {
                 ui.allocate_space(egui::Vec2::from(PathRow::BUTTON_SIZE));
             });
@@ -213,7 +213,7 @@ fn auto_detect_button(ui: &mut egui::Ui, is_vfs: bool, i18n: &gui_shared::i18n::
         let button = egui_widgets::shadcn::Button::new(i18n.t(I18nKey::AutoDetectButton))
             .icon(egui_widgets::shadcn::Icon::ScanSearch)
             .full_width();
-        ui.add_sized(PathRow::BUTTON_SIZE, button).on_hover_text(i18n.t(I18nKey::AutoDetectHover)).clicked()
+        ui.add_sized(PathRow::BUTTON_SIZE, button).on_hover_markdown(i18n.t(I18nKey::AutoDetectHover)).clicked()
     } else {
         ui.allocate_space(egui::Vec2::from(PathRow::BUTTON_SIZE));
         false

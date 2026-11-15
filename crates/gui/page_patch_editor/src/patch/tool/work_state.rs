@@ -46,6 +46,8 @@ pub(in crate::patch) struct Work {
     pub(in crate::patch) restored: bool,
     /// A mod was written since the conflict check last asked.
     pub(in crate::patch) mod_written: bool,
+    /// The user patch was written since then: only it is for the check to read again.
+    pub(in crate::patch) user_patch_written: bool,
     /// What was edited of the active behavior since the Pandora file was last synced.
     pub(super) pandora_edited: Vec<String>,
     /// The projects of the clip data template, read once. See [`crate::patch::anim::data::template_projects`].

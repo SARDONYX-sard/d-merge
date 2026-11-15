@@ -15,8 +15,21 @@
 //! `animationdatasinglefile` and `animationsetdatasinglefile` are lists of every mod's patches
 //! (see [`read_anim_data`]), where each field that is not `null` is a change.
 //!
+//! When the user patch was written, only its own files are read again ([`Conflicts::read_user_patch`]):
+//! its values at the conflicts found change, the other mods' do not.
+//!
 //! An operation can be hidden, see [`HiddenPatches`]. The check does not leave it out of the files,
 //! so hiding and showing it needs no new scan: the flags just stop counting it.
+//!
+//! # Resolved in the user patch
+//! The user patch is scanned as a mod ([`USER_PATCH_ID`]) and loads last. A place it has a value is
+//! decided there: it is counted as resolved, apart from what is still to do, and it no longer makes
+//! the mods there win or lose.
+//!
+//! ```text
+//! #0106/enable  A: true  B: false  user patch: false  -> A and B: resolved 1 (✓, gray)
+//! #0107/enable  A: 1     B: 2                         -> A: - 1, B: + 1 (still to do)
+//! ```
 
 use std::{
     collections::BTreeMap,
@@ -82,21 +95,29 @@ pub(crate) struct Point {
 }
 
 /// One mod's flags: `+` it overrides another mod somewhere, `-` another mod overrides it somewhere.
+/// Places the user patch decided count apart, as `resolved`: see the module docs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct Mark {
     pub(crate) wins: u32,
     pub(crate) loses: u32,
+    pub(crate) resolved: u32,
 }
 
 impl Mark {
-    /// What the mod list shows.
+    /// What the mod list shows. `✓`: all its conflicts are resolved in the user patch.
     pub(crate) const fn glyph(self) -> &'static str {
-        match (self.wins > 0, self.loses > 0) {
-            (true, true) => "±",
-            (true, false) => "+",
-            (false, true) => "-",
-            (false, false) => "",
+        match (self.wins > 0, self.loses > 0, self.resolved > 0) {
+            (true, true, _) => "±",
+            (true, false, _) => "+",
+            (false, true, _) => "-",
+            (false, false, true) => "✓",
+            (false, false, false) => "",
         }
+    }
+
+    /// Only resolved conflicts: nothing is left to do for this mod.
+    pub(crate) const fn is_all_resolved(self) -> bool {
+        self.wins == 0 && self.loses == 0 && self.resolved > 0
     }
 }
 
@@ -113,17 +134,24 @@ pub(crate) struct Relation {
     pub(crate) overridden_by_picked: u32,
     /// Places where this mod's value replaces the picked mod's.
     pub(crate) overrides_picked: u32,
+    /// Places they put other values, which the user patch decided: neither replaces the other.
+    pub(crate) resolved: u32,
 }
 
 impl Relation {
     /// How much they meet: what the color and the line are as strong as.
     pub(crate) const fn count(self) -> u32 {
-        self.overridden_by_picked + self.overrides_picked
+        self.overridden_by_picked + self.overrides_picked + self.resolved
+    }
+
+    /// They only meet where the user patch decided: shown in gray.
+    pub(crate) const fn is_all_resolved(self) -> bool {
+        self.overridden_by_picked == 0 && self.overrides_picked == 0 && self.resolved > 0
     }
 }
 
 /// What a scan found. See the module docs.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub(crate) struct Conflicts {
     pub(crate) mods: Vec<ScannedMod>,
     pub(crate) points: Vec<Point>,
@@ -166,7 +194,8 @@ impl Conflicts {
     /// priority, `None` if it is off now.
     ///
     /// The highest priority wins a point. Those with its value are not overridden by it. What is in
-    /// `hidden` is as if the mod did not do it.
+    /// `hidden` is as if the mod did not do it. Where the user patch has a value, each other mod there
+    /// is `resolved` instead (see the module docs).
     pub(crate) fn marks(
         &self,
         priority_of: impl Fn(&str) -> Option<usize>,
@@ -181,6 +210,14 @@ impl Conflicts {
                 }
                 priority_of(&owner.id).map(|priority| (priority, owner, value.hash))
             });
+
+            if enabled.clone().any(|(_, owner, _)| owner.id == USER_PATCH_ID) {
+                for (_, owner, _) in enabled.filter(|(_, owner, _)| owner.id != USER_PATCH_ID) {
+                    marks.entry(owner.id.clone()).or_default().resolved += 1;
+                }
+                continue;
+            }
+
             let Some((_, winner, hash)) = enabled.clone().max_by_key(|(priority, ..)| *priority) else { continue };
             let losers: Vec<_> = enabled.filter(|(.., other)| *other != hash).collect();
             if losers.is_empty() {
@@ -223,7 +260,8 @@ impl Conflicts {
         marks
             .iter()
             .filter(|(id, mark)| {
-                mark.wins == 0 && mark.loses > 0 && !keeps_a_value.contains(id.as_str()) && useful_of(id) == 0
+                let meets_others = mark.loses > 0 || mark.resolved > 0;
+                mark.wins == 0 && meets_others && !keeps_a_value.contains(id.as_str()) && useful_of(id) == 0
             })
             .map(|(id, _)| id.clone())
             .collect()
@@ -259,16 +297,19 @@ impl Conflicts {
             if picked_mod.hides(point, hidden) {
                 continue;
             }
+            let resolved = self.is_resolved(point, &priority_of, hidden);
 
             for value in point.values.iter().filter(|value| value.owner != at && value.hash != own.hash) {
                 let other = &self.mods[value.owner as usize];
-                if other.hides(point, hidden) {
+                if other.id == USER_PATCH_ID || other.hides(point, hidden) {
                     continue;
                 }
                 let Some(priority) = priority_of(&other.id) else { continue };
 
                 let relation = relations.entry(other.id.clone()).or_default();
-                if own_priority > priority {
+                if resolved {
+                    relation.resolved += 1;
+                } else if own_priority > priority {
                     relation.overridden_by_picked += 1;
                 } else {
                     relation.overrides_picked += 1;
@@ -278,6 +319,111 @@ impl Conflicts {
 
         relations
     }
+}
+
+impl Conflicts {
+    /// Does the user patch have a value at `point`, on and not hidden? Then it decides it.
+    fn is_resolved(
+        &self,
+        point: &Point,
+        priority_of: &impl Fn(&str) -> Option<usize>,
+        hidden: Option<&HiddenPatches>,
+    ) -> bool {
+        point.values.iter().any(|value| {
+            let owner = &self.mods[value.owner as usize];
+            owner.id == USER_PATCH_ID && !owner.hides(point, hidden) && priority_of(&owner.id).is_some()
+        })
+    }
+}
+
+impl Conflicts {
+    /// The user patch was written: its values at the conflicts found are read again from its own
+    /// files (a few), not from every mod's. They are worked out as a scan does: a field's value, or
+    /// what it writes to the elements of an array's range. Its animation data is not looked at.
+    ///
+    /// What it now writes where the other mods agree is no conflict found here: the next scan finds
+    /// that one.
+    fn read_user_patch(&mut self, user_patch: ScannedMod) {
+        let Some(dir) = user_patch.dir.clone() else { return };
+        let owner = self.user_patch_owner(user_patch);
+        for point in &mut self.points {
+            point.values.retain(|value| value.owner != owner);
+        }
+
+        // Of each array point: what the user patch writes to its elements, by the template's index.
+        let mut arrays: HashMap<usize, BTreeMap<usize, String>> = HashMap::default();
+        for (target, file) in user_patch_files(Path::new(&dir)) {
+            let Ok(text) = std::fs::read_to_string(&file) else { continue };
+            let hacks = Some(behavior_merge::HackOptions::enable_all().into());
+            let Ok((patches, _)) = nemesis_xml::patch::parse_nemesis_patch(&text, hacks) else { continue };
+
+            for (path, patch) in patches {
+                let path = path.join("/");
+                if let Some(elements) = element_texts(&patch) {
+                    let of_array = self.points.iter().enumerate().filter(|(_, point)| *point.target == *target);
+                    for (at, range) in of_array.filter_map(|(at, point)| Some((at, array_range(&point.path, &path)?))) {
+                        let written = elements.iter().filter(|(index, _)| range.contains(index));
+                        arrays.entry(at).or_default().extend(written.cloned());
+                    }
+                } else if matches!(patch.action, Action::Pure { .. })
+                    && let Some(point) =
+                        self.points.iter_mut().find(|point| *point.target == *target && *point.path == *path)
+                {
+                    point.values.push(value_of_text(owner, &patch.value.encode()));
+                }
+            }
+        }
+
+        for (at, elements) in arrays {
+            let joined = elements.values().map(|text| text.trim_matches('"')).collect::<Vec<_>>().join("\n");
+            self.points[at].values.push(value_of_text(owner, &joined));
+        }
+    }
+
+    /// The user patch's index in [`Self::mods`], added if the scan had it not.
+    fn user_patch_owner(&mut self, user_patch: ScannedMod) -> u32 {
+        let at = self.mods.iter().position(|scanned| scanned.id == USER_PATCH_ID).unwrap_or_else(|| {
+            self.mods.push(user_patch);
+            self.useful.push(0);
+            self.mods.len() - 1
+        });
+        #[expect(clippy::cast_possible_truncation, reason = "far fewer than 4 billion mods")]
+        let at = at as u32;
+        at
+    }
+}
+
+/// The behavior patch files of the user patch at `dir` (NemesisExt), with their template.
+///
+/// e.g. `<dir>/meshes/actors/character/behaviors/0_master.bin/#0106.txt` ->
+/// `(meshes/actors/character/behaviors/0_master.bin, <that file>)`
+fn user_patch_files(dir: &Path) -> Vec<(Box<str>, PathBuf)> {
+    let mut files = Vec::new();
+    let mut folders = vec![dir.join("meshes")];
+    while let Some(folder) = folders.pop() {
+        let Ok(entries) = std::fs::read_dir(&folder) else { continue };
+        for path in entries.flatten().map(|entry| entry.path()) {
+            if path.is_dir() {
+                folders.push(path);
+                continue;
+            }
+            let is_patch = path.file_name().and_then(|name| name.to_str()).is_some_and(|name| name.starts_with('#'));
+            let target = path.parent().and_then(|parent| parent.strip_prefix(dir).ok());
+            if let (true, Some(target)) = (is_patch, target) {
+                files.push((target.to_string_lossy().replace('\\', "/").into(), path));
+            }
+        }
+    }
+    files
+}
+
+/// The range of the array point at `point_path`, if it is one of the array at `array_path`.
+///
+/// e.g. `#2489/C/generators/[0:2]`, `#2489/C/generators` -> `0..2`
+fn array_range(point_path: &str, array_path: &str) -> Option<std::ops::Range<usize>> {
+    let range = point_path.strip_prefix(array_path)?.strip_prefix("/[")?.strip_suffix(']')?;
+    let (start, end) = range.split_once(':')?;
+    Some(start.parse().ok()?..end.parse().ok()?)
 }
 
 /// `<dir>/meshes/a/b.patch.json` -> `meshes/a/b.bin`
@@ -395,17 +541,26 @@ type ElementWrites = BTreeMap<usize, Vec<(u32, String)>>;
 
 /// Adds what `entry` writes, if it replaces or removes a range. See [`read_array`].
 fn add_element_writes(entry: &ValueWithPriority<'_>, owners: &Owners, writes: &mut ElementWrites) -> Option<()> {
-    let Action::Seq { op: op @ (Op::Replace | Op::Remove), range } = &entry.patch.action else { return None };
+    let elements = element_texts(&entry.patch)?;
     let owner = owners.of_entry(entry)?;
-
-    // A replace with fewer values than its range removes the rest.
-    let values = if *op == Op::Replace { entry.patch.value.as_array() } else { None };
-    for index in range.clone() {
-        let value = values.and_then(|values| values.get(index - range.start));
-        let text = value.map_or_else(|| REMOVED_ELEMENT.to_owned(), |value| value.encode());
+    for (index, text) in elements {
         writes.entry(index).or_default().push((owner, text));
     }
     Some(())
+}
+
+/// What `patch` writes to each element of an array, by its index in the template, if it replaces
+/// or removes a range. A replace with fewer values than its range removes the rest.
+///
+/// e.g. `[1:3]` replaced by `[x]` -> `(1, "x")`, `(2, "(removed)")`
+fn element_texts(patch: &json_patch::JsonPatch<'_>) -> Option<Vec<(usize, String)>> {
+    let Action::Seq { op: op @ (Op::Replace | Op::Remove), range } = &patch.action else { return None };
+    let values = if *op == Op::Replace { patch.value.as_array() } else { None };
+    let texts = range.clone().map(|index| {
+        let value = values.and_then(|values| values.get(index - range.start));
+        (index, value.map_or_else(|| REMOVED_ELEMENT.to_owned(), |value| value.encode()))
+    });
+    Some(texts.collect())
 }
 
 /// The conflicts in one array, as `json_patch`'s `apply_ops_parallel` applies it.
@@ -840,6 +995,14 @@ impl ConflictScan {
         self.selected = Some((point.target.clone(), point.path.clone()));
     }
 
+    /// The user patch was written: see [`Conflicts::read_user_patch`]. The flags and the colors are
+    /// found again at the next frame.
+    pub(crate) fn read_user_patch(&mut self, user_patch: ScannedMod) {
+        let Some(current) = &mut self.current else { return };
+        Arc::make_mut(current).read_user_patch(user_patch);
+        (self.marks_for, self.relations_for) = (0, 0);
+    }
+
     pub(crate) fn mark_of(&self, mod_id: &str) -> Mark {
         self.marks.get(mod_id).copied().unwrap_or_default()
     }
@@ -906,14 +1069,95 @@ mod tests {
         };
 
         let of_low = found.relations("low", in_order, None);
-        assert_eq!(of_low["high"], Relation { overridden_by_picked: 0, overrides_picked: 1 });
+        assert_eq!(of_low["high"], Relation { overridden_by_picked: 0, overrides_picked: 1, resolved: 0 });
         let of_high = found.relations("high", in_order, None);
-        assert_eq!(of_high["low"], Relation { overridden_by_picked: 1, overrides_picked: 0 });
+        assert_eq!(of_high["low"], Relation { overridden_by_picked: 1, overrides_picked: 0, resolved: 0 });
 
         // A mod that is off is nothing to the others, and has nothing itself.
         let low_off = |id: &str| (id != "low").then(|| in_order(id)).flatten();
         assert!(found.relations("high", low_off, None).is_empty());
         assert!(found.relations("low", low_off, None).is_empty());
+    }
+
+    /// The user patch written: only its files are read again, and its value is at the conflict.
+    #[test]
+    fn the_user_patch_alone_is_read_again() {
+        const PATH: [&str; 3] = ["#0100", "hkbModifierList", "enable"];
+        let json = {
+            let mut one = OnePatchMap::default();
+            one.insert(json_path![PATH[0], PATH[1], PATH[2]], op("true", 4, REPLACE));
+            one.insert(json_path![PATH[0], PATH[1], PATH[2]], op("false", 3, REPLACE));
+            file(&one, &SeqPatchMap::default())
+        };
+        let mut found = read(&json, "meshes/m.bin");
+
+        let dir = std::env::temp_dir().join(format!("d_merge_read_user_patch_{}", std::process::id()));
+        let patch = "<hkobject name=\"#0100\" class=\"hkbModifierList\" signature=\"0xa4180ca1\">\n<!-- MOD_CODE ~upatch~ OPEN -->\n\t<hkparam name=\"enable\">false</hkparam>\n<!-- ORIGINAL -->\n\t<hkparam name=\"enable\">true</hkparam>\n<!-- CLOSE -->\n</hkobject>\n";
+        let file = dir.join("meshes/m.bin/#0100.txt");
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, patch).unwrap();
+        let user_patch = ScannedMod {
+            id: USER_PATCH_ID.to_owned(),
+            name: "User Patch".to_owned(),
+            priority: 5,
+            dir: Some(dir.display().to_string()),
+        };
+        found.read_user_patch(user_patch.clone());
+        found.read_user_patch(user_patch); // again: still one value of it
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        let values = &found.points[0].values;
+        let ours: Vec<&Value> =
+            values.iter().filter(|value| found.mods[value.owner as usize].id == USER_PATCH_ID).collect();
+        let low = values.iter().find(|value| found.mods[value.owner as usize].id == "low").unwrap();
+        assert_eq!(ours.len(), 1, "{values:?}");
+        assert_eq!(ours[0].hash, low.hash, "low's value, false");
+    }
+
+    /// The module docs' example: `a` is decided in the user patch, `b` is still to do.
+    #[test]
+    fn what_the_user_patch_decides_is_resolved() {
+        let mut mods = mods();
+        mods.push(ScannedMod {
+            id: USER_PATCH_ID.to_owned(),
+            name: "User Patch".to_owned(),
+            priority: 5,
+            dir: Some("D:/out/user_patch".to_owned()),
+        });
+        let json = {
+            let mut one = OnePatchMap::default();
+            one.insert(json_path!["#1", "C", "a"], op("true", 4, REPLACE));
+            one.insert(json_path!["#1", "C", "a"], op("false", 3, REPLACE));
+            one.insert(json_path!["#1", "C", "a"], op("false", 5, REPLACE));
+            one.insert(json_path!["#1", "C", "b"], op("1", 4, REPLACE));
+            one.insert(json_path!["#1", "C", "b"], op("2", 3, REPLACE));
+            file(&one, &SeqPatchMap::default())
+        };
+        let found = {
+            let mut points = Vec::new();
+            let owners = Owners::new(&mods);
+            read_file("meshes/m.bin", &json, &owners, &mut points);
+            let useful = owners.useful.into_inner();
+            Conflicts { mods, points, useful }
+        };
+        let in_order = |id: &str| match id {
+            "low" => Some(3),
+            "high" => Some(4),
+            USER_PATCH_ID => Some(5),
+            _ => None,
+        };
+
+        let marks = found.marks(in_order, None);
+        assert_eq!(marks["low"], Mark { wins: 0, loses: 1, resolved: 1 });
+        assert_eq!(marks["high"], Mark { wins: 1, loses: 0, resolved: 1 });
+        assert!(!marks.contains_key(USER_PATCH_ID), "it is not in the mod list");
+
+        let of_low = found.relations("low", in_order, None);
+        assert_eq!(of_low["high"], Relation { overridden_by_picked: 0, overrides_picked: 1, resolved: 1 });
+
+        // The user patch off: `a` is a conflict again.
+        let without = |id: &str| (id != USER_PATCH_ID).then(|| in_order(id)).flatten();
+        assert_eq!(found.marks(without, None)["low"], Mark { wins: 0, loses: 2, resolved: 0 });
     }
 
     /// MO2's lightning: all it does loses, and nothing of it is kept.
@@ -969,15 +1213,15 @@ mod tests {
         let mut hidden = HiddenPatches::default();
 
         let before = found.marks(priority, Some(&hidden));
-        assert_eq!(before["high"], Mark { wins: 1, loses: 0 });
-        assert_eq!(before["low"], Mark { wins: 0, loses: 1 });
+        assert_eq!(before["high"], Mark { wins: 1, loses: 0, resolved: 0 });
+        assert_eq!(before["low"], Mark { wins: 0, loses: 1, resolved: 0 });
 
         hidden.toggle("high", "meshes/m.bin", "#1/C/a");
         assert!(found.marks(priority, Some(&hidden)).is_empty());
         assert!(found.marks(priority, None).contains_key("high"), "`apply_user_patch` is off");
 
         hidden.toggle("high", "meshes/m.bin", "#1/C/a");
-        assert_eq!(found.marks(priority, Some(&hidden))["high"], Mark { wins: 1, loses: 0 });
+        assert_eq!(found.marks(priority, Some(&hidden))["high"], Mark { wins: 1, loses: 0, resolved: 0 });
     }
 
     #[test]
@@ -1004,7 +1248,7 @@ mod tests {
         // The switch is off: it counts as if nothing were hidden.
         scan.refresh_marks(&list, None, false);
         assert_eq!(scan.winner_of(&found, point).map(|winner| winner.id.as_str()), Some("high"));
-        assert_eq!(scan.mark_of("high"), Mark { wins: 1, loses: 0 });
+        assert_eq!(scan.mark_of("high"), Mark { wins: 1, loses: 0, resolved: 0 });
     }
 
     fn read(json: &str, target: &str) -> Conflicts {
@@ -1078,7 +1322,9 @@ mod tests {
 
     #[test]
     fn a_mod_with_both_flags() {
-        assert_eq!(Mark { wins: 1, loses: 2 }.glyph(), "±");
+        assert_eq!(Mark { wins: 1, loses: 2, resolved: 0 }.glyph(), "±");
+        assert_eq!(Mark { wins: 0, loses: 0, resolved: 3 }.glyph(), "✓");
+        assert_eq!(Mark { wins: 0, loses: 1, resolved: 3 }.glyph(), "-", "something is still to do");
         assert_eq!(Mark::default().glyph(), "");
     }
 

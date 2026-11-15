@@ -50,7 +50,7 @@ pub(super) fn show(ui: &mut egui::Ui, i18n: &I18nMap, input: ToolbarInput<'_>) -
             split_and_diff_buttons(ui, i18n, pane, can_split);
 
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                let labels = (i18n.t(I18nKey::NemesisGoBack), i18n.t(I18nKey::NemesisGoForward));
+                let labels = (i18n.t(I18nKey::GoBack), i18n.t(I18nKey::GoForward));
                 output.walk_history = pane.history.buttons(ui, labels);
 
                 let marks = super::super::tab_bar::TabMarks { focused, problems };
@@ -70,9 +70,9 @@ fn split_and_diff_buttons(ui: &mut egui::Ui, i18n: &I18nMap, pane: &mut EditorPa
         toggle(ui, &mut pane.show_preview, Icon::Columns2, hover);
     }
 
-    toggle(ui, &mut pane.show_inline_diff, Icon::Diff, i18n.t(I18nKey::NemesisInlineDiffHover));
+    toggle(ui, &mut pane.show_inline_diff, Icon::Diff, i18n.t(I18nKey::InlineDiffHover));
     if pane.show_inline_diff {
-        let hover = i18n.t(I18nKey::NemesisJumpDiffHover);
+        let hover = i18n.t(I18nKey::JumpDiffHover);
         if let Some(line) = pane.inline_diff.nav(ui, pane.cursor_line, hover) {
             pane.focus = Some(FocusAt::Line(line));
         }
@@ -88,5 +88,5 @@ fn toggle(ui: &mut egui::Ui, on: &mut bool, icon: Icon, hover: &str) {
 
 /// `▥`'s hover: what a click does.
 const fn preview_hover(shown: bool) -> I18nKey {
-    if shown { I18nKey::EditorHidePreview } else { I18nKey::EditorShowPreview }
+    if shown { I18nKey::PreviewHide } else { I18nKey::PreviewShow }
 }

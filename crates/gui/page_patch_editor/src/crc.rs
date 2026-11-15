@@ -16,7 +16,10 @@
 
 use std::path::{Path, PathBuf};
 
-use egui_widgets::shadcn::{Button, TextEdit};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, TextEdit},
+};
 use gui_shared::i18n::{I18nKey, I18nMap};
 use stdx::text::contains_ignore_case;
 
@@ -67,7 +70,7 @@ impl CrcTool {
     /// `Text / path: [..] 3692944883 0xdc1dddf3 [Copy]`
     fn text_row(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         ui.horizontal(|ui| {
-            ui.label(i18n.t(I18nKey::CrcTextLabel)).on_hover_text(i18n.t(I18nKey::CrcTextHover));
+            ui.label(i18n.t(I18nKey::CrcTextLabel)).on_hover_markdown(i18n.t(I18nKey::CrcTextHover));
             let crc = (!self.text.is_empty()).then(|| text_crc(&self.text));
             // Right-to-left: the result takes its width first, the input gets the rest.
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -82,7 +85,7 @@ impl CrcTool {
                         .hint_text(i18n.t(I18nKey::CrcTextHint))
                         .desired_width(ui.available_width()),
                 )
-                .on_hover_text(i18n.t(I18nKey::CrcTextHover));
+                .on_hover_markdown(i18n.t(I18nKey::CrcTextHover));
             });
         });
     }
@@ -91,7 +94,7 @@ impl CrcTool {
     fn mod_row(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) {
         ui.horizontal(|ui| {
             let hover = i18n.t(I18nKey::CrcModDirHover);
-            ui.label(i18n.t(I18nKey::CrcModDirLabel)).on_hover_text(hover);
+            ui.label(i18n.t(I18nKey::CrcModDirLabel)).on_hover_markdown(hover);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add(
                     TextEdit::singleline(&mut self.filter).hint_text(i18n.t(I18nKey::FilterLabel)).desired_width(160.0),
@@ -106,7 +109,7 @@ impl CrcTool {
                         .hint_text(i18n.t(I18nKey::CrcModDirHint))
                         .desired_width(ui.available_width()),
                 )
-                .on_hover_text(hover);
+                .on_hover_markdown(hover);
             });
         });
     }

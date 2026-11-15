@@ -24,9 +24,9 @@ use crate::patch::workspace::{self, Workspace};
 pub(in crate::patch) fn rename_problem(old: &str, new: &str, exists: impl FnOnce(&str) -> bool) -> Option<I18nKey> {
     let new = new.trim();
     if !is_valid_mod_code(new) || new.eq_ignore_ascii_case(old) {
-        return Some(I18nKey::NemesisModCodeInvalid);
+        return Some(I18nKey::ModCodeInvalid);
     }
-    (new.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE) || exists(new)).then_some(I18nKey::NemesisWorkExists)
+    (new.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE) || exists(new)).then_some(I18nKey::WorkExists)
 }
 
 impl Work {
@@ -49,7 +49,7 @@ impl Work {
         let total = workspace::rename::object_count(&work);
         let new = new.trim().to_owned();
         let detail = format!("{old} -> {new}");
-        self.job = Some(Job::spawn(I18nKey::NemesisRenameCodeRunning, detail, total, move |done| {
+        self.job = Some(Job::spawn(I18nKey::ModCodeRenameRunning, detail, total, move |done| {
             work.rename_code(&old, &new, done);
             Done::Renamed { work, old, new }
         }));
@@ -64,10 +64,10 @@ mod tests {
     fn a_new_code_must_be_valid_free_and_another() {
         assert_eq!(rename_problem("oldc", "newc", |_| false), None);
         assert_eq!(rename_problem("oldc", " newc ", |_| false), None);
-        assert_eq!(rename_problem("oldc", "ab", |_| false), Some(I18nKey::NemesisModCodeInvalid));
-        assert_eq!(rename_problem("oldc", "OLDC", |_| false), Some(I18nKey::NemesisModCodeInvalid));
-        assert_eq!(rename_problem("oldc", "newc", |_| true), Some(I18nKey::NemesisWorkExists));
-        assert_eq!(rename_problem("oldc", "upatch", |_| false), Some(I18nKey::NemesisWorkExists));
+        assert_eq!(rename_problem("oldc", "ab", |_| false), Some(I18nKey::ModCodeInvalid));
+        assert_eq!(rename_problem("oldc", "OLDC", |_| false), Some(I18nKey::ModCodeInvalid));
+        assert_eq!(rename_problem("oldc", "newc", |_| true), Some(I18nKey::WorkExists));
+        assert_eq!(rename_problem("oldc", "upatch", |_| false), Some(I18nKey::WorkExists));
     }
 
     /// The work goes to another thread and comes back with the new code; meanwhile nothing saves.

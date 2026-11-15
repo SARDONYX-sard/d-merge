@@ -106,91 +106,6 @@ impl Draft {
     }
 }
 
-/// Writing the user patch as a mod of its own, e.g. into MO2's `mods` to manage or share it there:
-/// to `output`, as `format`. Its own place (`<output>/.d_merge/user_patch`, NemesisExt) and what it
-/// wrote there stay as they are.
-///
-/// As `Nemesis`, the templates Nemesis does not know can't be in `Nemesis_Engine`: they go to
-/// `Nemesis_EngineExt` as always ([`workspace::Workspace::outside_nemesis`]), and the window says so.
-///
-/// ```text
-/// [Export as mod…] -> Output: [D:/MO2/mods/My Patch] [Select]   Format: [Nemesis ▼]   [Export]
-///                     ⚠ Nemesis does not know these templates: ... (1)   <- only as Nemesis
-/// ```
-#[derive(Debug, Default)]
-pub(super) struct ModExport {
-    pub(super) open: bool,
-    /// The mod's root, e.g. `D:/MO2/mods/My Patch`.
-    pub(super) output: String,
-    /// Any of them. See the struct docs for `Nemesis`.
-    pub(super) format: workspace::ExportFormat,
-}
-
-/// What [`write_as_mod`] wrote.
-struct ModExported<'a> {
-    output: &'a str,
-    /// The patches d-merge's parser rejects, or why nothing was written.
-    written: Result<Vec<String>, String>,
-    /// For the Nemesis format: the templates Nemesis does not know (their patches are of no use there).
-    outside: Vec<&'a str>,
-}
-
-/// Writes the user patch of `work` as a mod, where and how `export` says. `None`: no output yet.
-fn write_as_mod<'a>(work: &'a mut Workspace, export: &'a ModExport) -> Option<ModExported<'a>> {
-    let output = export.output.trim();
-    if output.is_empty() {
-        return None;
-    }
-
-    let root = Path::new(output);
-    let chosen = export.format;
-    let written = if chosen == workspace::ExportFormat::PandoraV5 {
-        work.export_pandora(root, USER_PATCH_CODE).map(|export| export.problems)
-    } else {
-        // The files of its own place are what its next save replaces: not those of this mod.
-        let owned = std::mem::take(&mut work.owned);
-        let format = std::mem::replace(&mut work.export_format, chosen);
-        let written = work.export(root, USER_PATCH_CODE).map(|(_, invalid)| invalid);
-        (work.owned, work.export_format) = (owned, format);
-        written
-    };
-
-    let outside = match chosen {
-        workspace::ExportFormat::Nemesis => work.outside_nemesis().collect(),
-        _ => Vec::new(),
-    };
-    Some(ModExported { output, written, outside })
-}
-
-/// Tells how [`write_as_mod`] went: written, written with templates Nemesis does not know,
-/// rejected patches, or failed.
-fn report_mod_export(notify: &mut Notification, i18n: &I18nMap, exported: &ModExported<'_>) {
-    let ModExported { output, written, outside } = exported;
-    match written {
-        Ok(problems) if problems.is_empty() && outside.is_empty() => {
-            notify.success(format!("{}: {output}", i18n.t(I18nKey::ExportedMessage)));
-        }
-        Ok(problems) if problems.is_empty() => notify.warn(format!(
-            "{}: {output}\n{} ({}):\n{}",
-            i18n.t(I18nKey::ExportedMessage),
-            i18n.t(I18nKey::UserPatchOutsideNemesis),
-            outside.len(),
-            outside.join("\n")
-        )),
-        Ok(problems) => {
-            notify.warn(format!("{} ({}):\n{}", i18n.t(I18nKey::NemesisRejected), problems.len(), problems.join("\n")));
-        }
-        Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
-    }
-}
-
-/// Writes the user patch of `work` as a mod: see [`ModExport`] and [`write_as_mod`].
-pub(super) fn export_as_mod(work: &mut Work, export: &ModExport, notify: &mut Notification, i18n: &I18nMap) {
-    if let Some(exported) = write_as_mod(&mut work.workspace, export) {
-        report_mod_export(notify, i18n, &exported);
-    }
-}
-
 /// The user patch's work, as it starts: nothing open yet, kept where `paths` say.
 pub(super) fn work_of(paths: PatchPaths<'_>) -> Work {
     let output = paths.patch_output_dir.trim();
@@ -252,7 +167,7 @@ impl Work {
         self.reset_names();
         match self.write_user_patch() {
             Ok(_) => self.mod_written = true,
-            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::ExportFailed))),
         }
         Reshow::Nothing
     }
@@ -282,7 +197,7 @@ pub(super) fn take_in_resolution(
     let root = PathBuf::from(&work.place.template_dir);
     let shown = resolve::apply(&mut work.workspace, &root, request).map_or_else(
         |err| {
-            notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisResolveFailed)));
+            notify.error(format!("{}: {err}", i18n.t(I18nKey::ConflictTakeFailed)));
             // It is for the user to edit: all the more if it could not be taken in.
             resolve::object_of(&mut work.workspace, &root, request)
         },

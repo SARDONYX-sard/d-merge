@@ -9,7 +9,10 @@
 //!   0   INT8 moveStart               (the type: variables only)
 //! ```
 
-use egui_widgets::shadcn::{Button, TextEdit};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, TextEdit},
+};
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::vars::VariableType;
 use stdx::text::contains_ignore_case;
@@ -42,7 +45,7 @@ impl VarsPanel {
     ) -> Vec<String> {
         let ids = [STRING_DATA, GRAPH_DATA, VALUE_SET].map(|class| behavior.object_of_class(class).map(str::to_string));
         let [Some(string_data), Some(graph_data), value_set] = ids else {
-            ui.weak(i18n.t(I18nKey::NemesisNoVars));
+            ui.weak(i18n.t(I18nKey::VarsNone));
             return Vec::new();
         };
 
@@ -55,7 +58,7 @@ impl VarsPanel {
         // `[Events (279)] [Variables (78)]`: one list at a time, its "add" row always on top.
         ui.horizontal(|ui| {
             for (variables_tab, key, count) in
-                [(false, I18nKey::NemesisEvents, events.len()), (true, I18nKey::NemesisVariables, variables.len())]
+                [(false, I18nKey::VarsEvents, events.len()), (true, I18nKey::VarsVariables, variables.len())]
             {
                 let label = format!("{} ({count})", i18n.t(key));
                 if ui.add(Button::selectable(self.show_variables == variables_tab, label)).clicked() {
@@ -70,9 +73,9 @@ impl VarsPanel {
             ui.horizontal_wrapped(|ui| {
                 let new = &mut self.new;
                 let name = TextEdit::singleline(&mut new.variable)
-                    .hint_text(i18n.t(I18nKey::NemesisNewVariableHint))
+                    .hint_text(i18n.t(I18nKey::VarsNewVariableHint))
                     .desired_width(110.0);
-                ui.add(name).on_hover_text(i18n.t(I18nKey::NemesisNewVariableHover));
+                ui.add(name).on_hover_markdown(i18n.t(I18nKey::VarsNewVariableHover));
                 egui::ComboBox::from_id_salt("nemesis_var_type")
                     .width(70.0)
                     .selected_text(type_label(new.kind))
@@ -82,11 +85,11 @@ impl VarsPanel {
                         }
                     })
                     .response
-                    .on_hover_text(i18n.t(I18nKey::NemesisNewVariableTypeHover));
+                    .on_hover_text(i18n.t(I18nKey::VarsNewVariableTypeHover));
                 ui.add(TextEdit::singleline(&mut new.value).hint_text("0").desired_width(50.0))
-                    .on_hover_text(i18n.t(I18nKey::NemesisNewVariableValueHover));
+                    .on_hover_markdown(i18n.t(I18nKey::VarsNewVariableValueHover));
                 let enabled = value_set.is_some();
-                if ui.add_enabled(enabled, Button::new(i18n.t(I18nKey::NemesisAdd)).small()).clicked() {
+                if ui.add_enabled(enabled, Button::new(i18n.t(I18nKey::AddButton)).small()).clicked() {
                     action = Some(Action::AddVariable);
                 }
             });
@@ -101,10 +104,10 @@ impl VarsPanel {
         } else {
             ui.horizontal_wrapped(|ui| {
                 let name = TextEdit::singleline(&mut self.new.event)
-                    .hint_text(i18n.t(I18nKey::NemesisNewEventHint))
+                    .hint_text(i18n.t(I18nKey::VarsNewEventHint))
                     .desired_width(140.0);
-                ui.add(name).on_hover_text(i18n.t(I18nKey::NemesisNewEventHover));
-                if ui.add(Button::new(i18n.t(I18nKey::NemesisAdd)).small()).clicked() {
+                ui.add(name).on_hover_markdown(i18n.t(I18nKey::VarsNewEventHover));
+                if ui.add(Button::new(i18n.t(I18nKey::AddButton)).small()).clicked() {
                     action = Some(Action::AddEvent);
                 }
             });
@@ -196,7 +199,7 @@ fn name_row(
     if !own {
         return None;
     }
-    if ui.small_button("✎").on_hover_text(i18n.t(I18nKey::NemesisRename)).clicked() {
+    if ui.small_button("✎").on_hover_text(i18n.t(I18nKey::VarsRename)).clicked() {
         *renaming = Some(Renaming { is_variable, index, text: names[index].clone(), focus: true });
     }
     ui.small_button("✖").clicked().then_some(if is_variable {

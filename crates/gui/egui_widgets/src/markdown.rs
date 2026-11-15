@@ -8,7 +8,11 @@
 //! - `⟦class|hkbClipGenerator⟧` and `⟦name|Idle⟧`: the colors of class and object names, the same
 //!   as in lists, so that a tooltip reads like the list it is about
 //!
-//! Anything else is shown as plain text. A full CommonMark renderer would be overkill here.
+//! Anything else is shown as plain text. A full CommonMark renderer would be overkill here. A line's
+//! leading spaces indent it, e.g. `  -> a note` under a list item.
+//!
+//! The texts of `I18nKey` are written in this, so that their doc comments read as Rust docs and their
+//! hovers draw the same: see [`HoverMarkdown`].
 
 /// The color of a class name in lists and tooltips.
 #[inline]
@@ -25,6 +29,12 @@ pub const fn name_color(visuals: &egui::Visuals) -> egui::Color32 {
 /// Default of [`Markdown::line_height`]: as VS Code's hover (`line-height: 1.5em`).
 const LINE_HEIGHT: f32 = 1.5;
 
+/// Default of [`Markdown::heading_size`].
+const HEADING_SIZE: f32 = 16.0;
+
+/// How far a leading space indents a line.
+const INDENT_PER_SPACE: f32 = 4.0;
+
 /// Renders `markdown` into `ui`, see [`Markdown`].
 #[inline]
 pub fn markdown(ui: &mut egui::Ui, markdown: &str) -> Vec<egui::Response> {
@@ -37,12 +47,13 @@ pub fn markdown(ui: &mut egui::Ui, markdown: &str) -> Vec<egui::Response> {
 pub struct Markdown<'a> {
     text: &'a str,
     line_height: f32,
+    heading_size: f32,
 }
 
 impl<'a> Markdown<'a> {
     #[inline]
     pub const fn new(text: &'a str) -> Self {
-        Self { text, line_height: LINE_HEIGHT }
+        Self { text, line_height: LINE_HEIGHT, heading_size: HEADING_SIZE }
     }
 
     /// The height of a line of text, in multiples of the font size.
@@ -52,25 +63,89 @@ impl<'a> Markdown<'a> {
         self
     }
 
+    /// The font size of a `# heading`. Default: `16.0`. A hover that is not a document wants the
+    /// size of its text, bold only: see [`HoverMarkdown`].
+    #[inline]
+    pub const fn heading_size(mut self, heading_size: f32) -> Self {
+        self.heading_size = heading_size;
+        self
+    }
+
     /// Returns the responses of the links, in order, e.g. to focus the first one for keyboard use
     /// (a focused link opens with `Enter`; `Tab` moves to the next one).
     #[inline]
     pub fn show(self, ui: &mut egui::Ui) -> Vec<egui::Response> {
-        render(ui, self.text, self.line_height)
+        render(ui, self)
     }
 }
 
-/// A line that wraps, with each of its rows `height` tall.
-fn text_line(ui: &mut egui::Ui, height: f32, add_contents: impl FnOnce(&mut egui::Ui)) {
+/// [`egui::Response::on_hover_text`] of a text in Markdown (see the module docs), as the texts of
+/// `I18nKey` are written: its headings are bold, as large as the text.
+pub trait HoverMarkdown {
+    /// Not `#[must_use]`, as `on_hover_text` is not: the response is often dropped after it.
+    fn on_hover_markdown(self, text: &str) -> Self;
+}
+
+impl HoverMarkdown for egui::Response {
+    #[inline]
+    fn on_hover_markdown(self, text: &str) -> Self {
+        if !is_markdown(text) {
+            return self.on_hover_text(text);
+        }
+        self.on_hover_ui(|ui| hover_markdown(ui, text))
+    }
+}
+
+/// Draws `text` as [`HoverMarkdown`] does, in a hover made by hand.
+pub fn hover_markdown(ui: &mut egui::Ui, text: &str) {
+    let body = egui::TextStyle::Body.resolve(ui.style()).size;
+    Markdown::new(text).heading_size(body).show(ui);
+}
+
+/// Has `text` more than one line, or `` `code` ``? Else it is plain text, drawn as egui does.
+///
+/// e.g. `"Save"` -> `false`; `"Reloads it.\n\n# Notes\n- ..."` -> `true`
+pub fn is_markdown(text: &str) -> bool {
+    text.contains('\n') || text.contains('`')
+}
+
+/// A line that wraps, with each of its rows `height` tall, `indent` from the left.
+fn text_line(ui: &mut egui::Ui, (height, indent): (f32, f32), add_contents: impl FnOnce(&mut egui::Ui)) {
     let size = egui::vec2(ui.available_size_before_wrap().x, height);
     let layout = egui::Layout::left_to_right(egui::Align::Center).with_main_wrap(true);
     ui.allocate_ui_with_layout(size, layout, |ui| {
         ui.spacing_mut().item_spacing.y = 0.0; // the height of a row is all there is between rows
+        if indent > 0.0 {
+            ui.add_space(indent);
+        }
         add_contents(ui);
     });
 }
 
-fn render(ui: &mut egui::Ui, markdown: &str, line_height: f32) -> Vec<egui::Response> {
+/// A `- item`: the bullet, then the text wrapping in the width right of it.
+///
+/// ```text
+/// • a long item
+///   goes on here
+/// ```
+/// Not the bullet in the wrapping line: a first word wider than what is left next to it went to the
+/// next row, leaving the bullet alone above it.
+fn item_line(ui: &mut egui::Ui, (height, indent): (f32, f32), add_contents: impl FnOnce(&mut egui::Ui)) {
+    let size = egui::vec2(ui.available_size_before_wrap().x, height);
+    ui.allocate_ui_with_layout(size, egui::Layout::left_to_right(egui::Align::Min), |ui| {
+        if indent > 0.0 {
+            ui.add_space(indent);
+        }
+        ui.allocate_ui_with_layout(egui::vec2(0.0, height), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+            ui.set_min_height(height);
+            ui.label("•");
+        });
+        text_line(ui, (height, 0.0), add_contents);
+    });
+}
+
+fn render(ui: &mut egui::Ui, markdown: Markdown<'_>) -> Vec<egui::Response> {
+    let Markdown { text: markdown, line_height, heading_size } = markdown;
     let row_height = egui::TextStyle::Body.resolve(ui.style()).size * line_height;
     let mut links = Vec::new();
     let mut in_code_block = false;
@@ -94,17 +169,16 @@ fn render(ui: &mut egui::Ui, markdown: &str, line_height: f32) -> Vec<egui::Resp
             continue;
         }
 
+        #[expect(clippy::cast_precision_loss, reason = "a few spaces")]
+        let indent = (line.len() - trimmed.len()) as f32 * INDENT_PER_SPACE;
         if let Some(heading) = trimmed.strip_prefix("# ") {
-            ui.label(egui::RichText::new(heading).strong().size(16.0));
+            ui.label(egui::RichText::new(heading).strong().size(heading_size));
         } else if let Some(item) = trimmed.strip_prefix("- ") {
-            text_line(ui, row_height, |ui| {
-                ui.label("•");
-                inline(ui, item, &mut links);
-            });
+            item_line(ui, (row_height, indent), |ui| inline(ui, item, &mut links));
         } else if trimmed.is_empty() {
             ui.add_space(4.0);
         } else {
-            text_line(ui, row_height, |ui| inline(ui, trimmed, &mut links));
+            text_line(ui, (row_height, indent), |ui| inline(ui, trimmed, &mut links));
         }
     }
 
@@ -354,5 +428,22 @@ mod tests {
         let labels = frames.last().unwrap();
         let tops: Vec<f32> = labels.iter().flatten().map(|row| row.top()).collect();
         assert!(tops.windows(2).any(|pair| pair[1] > pair[0] + 1.0), "more than one row: {tops:?}");
+    }
+
+    /// e.g. `- hellooooo...`: the bullet was alone on the first row and the word below it.
+    #[test]
+    fn an_item_starts_beside_its_bullet_and_wraps_right_of_it() {
+        let long_word = format!("hell{}", "o".repeat(30));
+        for text in [format!("- {long_word}"), format!("- {long_word} and more words to wrap")] {
+            let frames = text_rows(&text, 160.0);
+            let labels = frames.last().unwrap();
+            let (bullet, words) = labels.split_first().unwrap();
+            let bullet = bullet[0];
+            let first = words[0][0];
+            assert!((first.center().y - bullet.center().y).abs() < 2.0, "{text}: {bullet:?} {first:?}");
+            for row in words.iter().flatten() {
+                assert!(row.left() >= bullet.right(), "{text}: {row:?} left of {bullet:?}");
+            }
+        }
     }
 }

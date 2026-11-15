@@ -5,15 +5,16 @@ use std::path::{Path, PathBuf};
 pub use stdx::path::joined;
 
 use super::{
+    ExportFormat,
     mod_info::{pandora_info, parse_info},
     read_dir,
 };
 
-/// The directories of a mod's root that hold patches, in `<engine>/mod/<code>`.
-pub(super) const ENGINES: [&str; 2] = ["Nemesis_Engine", "Nemesis_EngineExt"];
+/// The directories of a mod's root that hold Nemesis patches, in `<engine>/mod/<code>`.
+pub(super) const ENGINES: [&str; 2] = [ExportFormat::Nemesis.to_static_str(), ExportFormat::NemesisExt.to_static_str()];
 
 /// The directory of a mod's root with its Pandora patches, in `<here>/mod/<code>/patches`.
-const PANDORA_ENGINE: &str = "Pandora_Engine";
+const PANDORA_ENGINE: &str = ExportFormat::PandoraV5.to_static_str();
 
 /// All that can hold a mod code.
 const SOURCES: [&str; 3] = [ENGINES[0], ENGINES[1], PANDORA_ENGINE];

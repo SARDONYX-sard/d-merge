@@ -147,7 +147,7 @@ impl Views {
             let view_tabs = self.tabs_of(active);
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    go_to = self.list[at].body.nav(ui, i18n.t(I18nKey::NemesisJumpDiffHover));
+                    go_to = self.list[at].body.nav(ui, i18n.t(I18nKey::JumpDiffHover));
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         let marks = super::tab_bar::TabMarks { focused: true, problems: None };
                         output.tab_event =
@@ -161,7 +161,7 @@ impl Views {
                 view.body.go_to(line);
             }
             if view.body.is_unchanged() {
-                ui.weak(i18n.t(I18nKey::NemesisNoChange));
+                ui.weak(i18n.t(I18nKey::NoChange));
             }
             let shown = view.body.show(ui, ("nemesis_revision_view", view.id.as_str()), &Xml, keymap);
             output.command = shown.command;

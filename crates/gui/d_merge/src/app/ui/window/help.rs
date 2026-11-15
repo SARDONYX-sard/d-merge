@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+use egui_widgets::HoverMarkdown as _;
 use gui_shared::{
     fs::open_existing_dir_or_ancestor,
     i18n::{I18nKey, I18nMap},
@@ -115,7 +116,7 @@ impl App {
         ui.horizontal(|ui| {
             if ui
                 .add(Button::new(self.i18n.t(I18nKey::IssueReportButton)))
-                .on_hover_text(self.i18n.t(I18nKey::IssueReportHover))
+                .on_hover_markdown(self.i18n.t(I18nKey::IssueReportHover))
                 .clicked()
             {
                 ui.ctx().open_url(egui::OpenUrl {
@@ -131,7 +132,7 @@ impl App {
 
     fn ui_font_section(&mut self, ui: &mut egui::Ui) {
         egui::Grid::new("font_grid").num_columns(2).spacing(GRID_SPACING).show(ui, |ui| {
-            ui.label(self.i18n.t(I18nKey::FontModeLabel)).on_hover_text(self.i18n.t(I18nKey::FontModeHover));
+            ui.label(self.i18n.t(I18nKey::FontModeLabel)).on_hover_markdown(self.i18n.t(I18nKey::FontModeHover));
             let modes = [
                 (FontMode::Default, self.i18n.t(I18nKey::FontModeDefault)),
                 (FontMode::System, self.i18n.t(I18nKey::FontModeSystem)),
@@ -198,7 +199,7 @@ impl App {
             ui.horizontal(|ui| {
                 if ui
                     .add(Button::new(self.i18n.t(I18nKey::I18nWriteNewJsonButton)))
-                    .on_hover_text(self.i18n.t(I18nKey::I18nWriteNewJsonHover))
+                    .on_hover_markdown(self.i18n.t(I18nKey::I18nWriteNewJsonHover))
                     .clicked()
                 {
                     self.write_new_i18n();
@@ -227,7 +228,7 @@ impl App {
                 &mut self.settings.ui.background_image.enabled,
                 self.i18n.t(I18nKey::BackgroundImageEnabled),
             ))
-            .on_hover_text(self.i18n.t(I18nKey::BackgroundImageEnabledHover));
+            .on_hover_markdown(self.i18n.t(I18nKey::BackgroundImageEnabledHover));
             ui.end_row();
         });
     }
@@ -356,7 +357,7 @@ fn path_row(ui: &mut egui::Ui, i18n: &I18nMap, value: &mut String, row: &PathRow
             value.clear();
         }
 
-        if ui.add(Button::new(i18n.t(I18nKey::ReloadButton))).on_hover_text(i18n.t(row.reload_hover)).clicked() {
+        if ui.add(Button::new(i18n.t(I18nKey::ReloadButton))).on_hover_markdown(i18n.t(row.reload_hover)).clicked() {
             reload = true;
         }
 

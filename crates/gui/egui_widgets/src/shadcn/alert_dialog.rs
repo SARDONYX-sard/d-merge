@@ -131,7 +131,11 @@ impl<'a> AlertDialog<'a> {
         ui.label(RichText::new(self.title).strong().size(self.title_size));
         if !self.description.is_empty() {
             ui.add_space(4.0);
-            ui.add(egui::Label::new(RichText::new(self.description).weak()).wrap());
+            if crate::markdown::is_markdown(self.description) {
+                crate::markdown::hover_markdown(ui, self.description);
+            } else {
+                ui.add(egui::Label::new(RichText::new(self.description).weak()).wrap());
+            }
         }
         ui.add_space(12.0);
         let row = vec2(self.width, BUTTON_ROW_HEIGHT);

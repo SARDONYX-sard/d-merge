@@ -72,7 +72,8 @@ impl Behavior {
     /// e.g. `D:/mods/My/Pandora_Engine/mod/mymod/patches/defaultmale~0_master.xml`
     pub fn pandora_patch_path(&self, output: &Path, code: &str) -> Option<PathBuf> {
         let name = self.pandora_file.clone().or_else(|| pack_file_name(&self.meshes_path))?;
-        Some(joined(output, &["Pandora_Engine", "mod", code, "patches", &format!("{name}.xml")]))
+        let engine = super::ExportFormat::PandoraV5.to_static_str();
+        Some(joined(output, &[engine, "mod", code, "patches", &format!("{name}.xml")]))
     }
 
     /// Takes in the Pandora patch file: its operations on the template become the edits of the objects,
@@ -231,7 +232,7 @@ impl Workspace {
     /// # Errors
     /// If a file can't be written.
     pub fn export_pandora(&self, output: &Path, code: &str) -> Result<PandoraExport, String> {
-        let root = joined(output, &["Pandora_Engine", "mod", code]);
+        let root = joined(output, &[super::ExportFormat::PandoraV5.to_static_str(), "mod", code]);
         let mut export = PandoraExport::default();
         for behavior in &self.behaviors {
             let has_changes = !behavior.edits.is_empty() || !behavior.added.is_empty();

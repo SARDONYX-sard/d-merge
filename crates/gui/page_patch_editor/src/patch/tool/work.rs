@@ -76,7 +76,7 @@ impl Work {
             let code = code.to_owned();
             self.save_now(shown, notify, i18n); // the previous workspace
             let root = self.place.cache_root.clone();
-            self.job = Some(Job::spawn(I18nKey::NemesisReadingWork, code.clone(), 0, move |done| Done::Loaded {
+            self.job = Some(Job::spawn(I18nKey::WorkReading, code.clone(), 0, move |done| Done::Loaded {
                 loaded: Workspace::load_counted(&root, &code, done),
                 code,
             }));
@@ -146,17 +146,17 @@ impl Work {
                 Ok((_, invalid)) if invalid.is_empty() => {}
                 Ok((_, invalid)) => notify.warn(format!(
                     "{} ({}):\n{}",
-                    i18n.t(I18nKey::NemesisRejected),
+                    i18n.t(I18nKey::ParserRejected),
                     invalid.len(),
                     invalid.join("\n")
                 )),
-                Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+                Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::ExportFailed))),
             }
             self.mod_written = true;
         }
 
         if let Err(err) = self.workspace.save(&self.place.cache_root, &code) {
-            notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisSaveFailed)));
+            notify.error(format!("{}: {err}", i18n.t(I18nKey::WorkSaveFailed)));
         }
 
         // The output may have changed.
@@ -207,7 +207,7 @@ impl Work {
         if let Some(dir) = workspace::patch_dir_of_code(Path::new(&work.output), &work.mod_code) {
             return self.open_mod(shown, &dir, notify, i18n);
         }
-        notify.warn(format!("{}: {} ({})", i18n.t(I18nKey::NemesisRecentMissing), work.mod_code, work.output));
+        notify.warn(format!("{}: {} ({})", i18n.t(I18nKey::WorkRecentMissing), work.mod_code, work.output));
         self.recent.retain(|other| other.mod_code != work.mod_code);
         None
     }
@@ -284,7 +284,7 @@ impl Work {
     ) {
         match workspace::patch_dir_of_code(&choice.root, code) {
             Some(dir) => self.open_patch_dir(shown, &dir, notify, i18n),
-            None => notify.error(format!("{}: {}", i18n.t(I18nKey::NemesisNotAMod), choice.root.display())),
+            None => notify.error(format!("{}: {}", i18n.t(I18nKey::ModNotNemesis), choice.root.display())),
         }
     }
 
@@ -292,7 +292,7 @@ impl Work {
     /// unexported edits. Else it is read, and exported back to where it is.
     fn open_patch_dir(&mut self, shown: Shown<'_>, selected: &Path, notify: &mut Notification, i18n: &I18nMap) {
         let not_a_mod = |notify: &mut Notification| {
-            notify.error(format!("{}: {}", i18n.t(I18nKey::NemesisNotAMod), selected.display()));
+            notify.error(format!("{}: {}", i18n.t(I18nKey::ModNotNemesis), selected.display()));
         };
         let Some(root) = workspace::mod_root_of(selected) else { return not_a_mod(notify) };
         let code = workspace::code_of(selected);
@@ -300,7 +300,7 @@ impl Work {
             return not_a_mod(notify);
         }
         if code.eq_ignore_ascii_case(gui_shared::patch::USER_PATCH_CODE) {
-            notify.warn(i18n.t(I18nKey::NemesisUserPatchReserved));
+            notify.warn(i18n.t(I18nKey::UserPatchReserved));
             return;
         }
 
@@ -311,7 +311,7 @@ impl Work {
                 self.switch_work(shown, (&code, &source, &source), notify, i18n);
                 return;
             }
-            Some(_) => notify.warn(format!("{}: {code}", i18n.t(I18nKey::NemesisWorkReplaced))),
+            Some(_) => notify.warn(format!("{}: {code}", i18n.t(I18nKey::WorkReplaced))),
             None => {}
         }
         self.read_mod(selected, source, None);
@@ -322,7 +322,7 @@ impl Work {
     fn read_mod(&mut self, selected: &Path, source: String, kept: Option<Kept>) {
         let (selected, templates) = (selected.to_path_buf(), PathBuf::from(&self.place.template_dir));
         let detail = selected.display().to_string();
-        self.job = Some(Job::spawn(I18nKey::NemesisReadingWork, detail, 0, move |done| Done::Read {
+        self.job = Some(Job::spawn(I18nKey::WorkReading, detail, 0, move |done| Done::Read {
             read: Workspace::import_counted(&selected, &templates, done),
             source,
             kept,
@@ -376,7 +376,7 @@ impl Work {
         self.mark_dirty();
 
         if !skipped.is_empty() {
-            notify.warn(format!("{}: {}", i18n.t(I18nKey::NemesisNoTemplateFor), skipped.join(", ")));
+            notify.warn(format!("{}: {}", i18n.t(I18nKey::TemplateNotFound), skipped.join(", ")));
         }
         Some(Reshow::Place(was_open))
     }
@@ -394,7 +394,7 @@ impl Work {
         let Some(code) = self.place.loaded_for.clone() else { return };
         let source = self.place.mod_dir.trim().to_owned();
         let Some(dir) = workspace::patch_dir_of_code(Path::new(&source), &code) else {
-            notify.error(format!("{}: {source}", i18n.t(I18nKey::NemesisNotAMod)));
+            notify.error(format!("{}: {source}", i18n.t(I18nKey::ModNotNemesis)));
             return;
         };
         let kept = Kept { output: self.place.output.clone(), refs: self.workspace.ref_mods.clone() };
@@ -449,15 +449,17 @@ impl Work {
             Ok((written, invalid)) if invalid.is_empty() => notify.success(format!(
                 "{} ({written}): {}",
                 i18n.t(I18nKey::ExportedMessage),
-                workspace::joined(output, &["Nemesis_Engine", "mod", code]).display()
+                workspace::joined(output, &[workspace::ExportFormat::Nemesis.to_static_str(), "mod", code]).display()
             )),
-            Ok((_, invalid)) => notify.warn(format!(
-                "{} ({}):\n{}",
-                i18n.t(I18nKey::NemesisRejected),
-                invalid.len(),
-                invalid.join("\n")
-            )),
-            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+            Ok((_, invalid)) => {
+                notify.warn(format!(
+                    "{} ({}):\n{}",
+                    i18n.t(I18nKey::ParserRejected),
+                    invalid.len(),
+                    invalid.join("\n")
+                ));
+            }
+            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::ExportFailed))),
         }
     }
 
@@ -466,17 +468,17 @@ impl Work {
         match self.workspace.export_pandora(output, code) {
             Ok(export) if export.problems.is_empty() => notify.success(format!(
                 "{} ({}): {}",
-                i18n.t(I18nKey::NemesisExportedPandora),
+                i18n.t(I18nKey::ExportedPandora),
                 export.written,
-                workspace::joined(output, &["Pandora_Engine", "mod", code]).display()
+                workspace::joined(output, &[workspace::ExportFormat::PandoraV5.to_static_str(), "mod", code]).display()
             )),
             Ok(export) => notify.warn(format!(
                 "{} ({}):\n{}",
-                i18n.t(I18nKey::NemesisExportedPandora),
+                i18n.t(I18nKey::ExportedPandora),
                 export.written,
                 export.problems.join("\n")
             )),
-            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::NemesisExportFailed))),
+            Err(err) => notify.error(format!("{}: {err}", i18n.t(I18nKey::ExportFailed))),
         }
     }
 
@@ -506,7 +508,7 @@ impl Work {
             new.clone_into(&mut work.mod_code);
         }
         self.autosave.changed(); // the session restored is saved with it
-        notify.success(format!("{}: {old} -> {new}", i18n.t(I18nKey::NemesisRenameCodeDone)));
+        notify.success(format!("{}: {old} -> {new}", i18n.t(I18nKey::ModCodeRenameDone)));
         Reshow::Session(std::mem::take(&mut self.workspace.session))
     }
 }

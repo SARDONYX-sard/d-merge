@@ -9,7 +9,10 @@
 
 use std::rc::Rc;
 
-use egui_widgets::shadcn::{Button, Icon};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, Icon},
+};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 /// What the buttons show.
@@ -73,7 +76,7 @@ fn view_buttons(ui: &mut egui::Ui, i18n: &I18nMap, anim: bool, tree_view: bool) 
     }
 
     let tree = Button::selectable(tree_view, "").icon(Icon::ListTree).small();
-    ui.add(tree).on_hover_text(i18n.t(I18nKey::NemesisTreeViewHover)).clicked().then_some(TitleAsk::ToggleTreeView)
+    ui.add(tree).on_hover_markdown(i18n.t(I18nKey::ExplorerTreeViewHover)).clicked().then_some(TitleAsk::ToggleTreeView)
 }
 
 /// `[⋯]`, as VS Code's "More Actions": what is used less.
@@ -104,21 +107,21 @@ fn menu_items(
     asked: &mut Option<TitleAsk>,
 ) {
     {
-        ui.checkbox(changed_only, i18n.t(I18nKey::NemesisChangedOnly));
+        ui.checkbox(changed_only, i18n.t(I18nKey::ChangedOnly));
         if !anim {
-            ui.checkbox(unlinked_only, i18n.t(I18nKey::NemesisUnlinkedOnly));
+            ui.checkbox(unlinked_only, i18n.t(I18nKey::ExplorerUnlinkedOnly));
             ui.separator();
-            if ui.button(i18n.t(I18nKey::NemesisPandoraDocHover)).clicked() {
+            if ui.button(i18n.t(I18nKey::PandoraDocHover)).clicked() {
                 *asked = Some(TitleAsk::OpenPandoraDoc);
             }
         }
 
         let Some((selected, is_new, can_copy)) = selected else { return };
         ui.separator();
-        if ui.add_enabled(can_copy, Button::new(i18n.t(I18nKey::NemesisDuplicate))).clicked() {
+        if ui.add_enabled(can_copy, Button::new(i18n.t(I18nKey::DuplicateButton))).clicked() {
             *asked = Some(TitleAsk::Duplicate(Rc::clone(&selected)));
         }
-        let label = if is_new { I18nKey::NemesisDeleteObject } else { I18nKey::RevertButton };
+        let label = if is_new { I18nKey::DeleteButton } else { I18nKey::RevertButton };
         if ui.add(Button::new(i18n.t(label)).destructive()).clicked() {
             *asked = Some(TitleAsk::RevertOrDelete(selected));
         }
@@ -131,11 +134,11 @@ fn new_button(ui: &mut egui::Ui, i18n: &I18nMap, (anim, adsf): (bool, bool), cod
         return None;
     }
 
-    let hover = if adsf { I18nKey::NemesisNewClipsHover } else { I18nKey::NemesisNewObject };
+    let hover = if adsf { I18nKey::AnimDataNewClipsHover } else { I18nKey::ObjectNew };
     let button = Button::new("").icon(Icon::Plus).small();
     ui.add_enabled(code_ok, button)
         .on_hover_text(i18n.t(hover))
-        .on_disabled_hover_text(i18n.t(I18nKey::NemesisModCodeInvalid))
+        .on_disabled_hover_text(i18n.t(I18nKey::ModCodeInvalid))
         .clicked()
         .then_some(TitleAsk::New)
 }

@@ -49,7 +49,7 @@ impl TemplatePicker {
         self.refresh(template_dir, scope);
 
         let mut open = !ctx.input(|i| i.key_pressed(egui::Key::Escape));
-        let window = egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisAddBehavior)).open(&mut open);
+        let window = egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::BehaviorsAdd)).open(&mut open);
         let picked =
             window.show(ctx, |ui| self.contents(ui, i18n, (template_dir, scope))).and_then(|shown| shown.inner);
         let picked = picked.flatten();
@@ -75,7 +75,7 @@ impl TemplatePicker {
         (template_dir, scope): (&str, TemplateScope),
     ) -> Option<PathBuf> {
         let field = TextEdit::singleline(&mut self.filter)
-            .hint_text(i18n.t(I18nKey::NemesisFilterHint))
+            .hint_text(i18n.t(I18nKey::ObjectFilterHint))
             .desired_width(ui.available_width());
         let field = ui.add(field);
         if std::mem::take(&mut self.focus) {
@@ -84,10 +84,10 @@ impl TemplatePicker {
 
         ui.weak(format!("{template_dir} ({})", self.catalog.len()));
         if scope == TemplateScope::Nemesis {
-            ui.weak(i18n.t(I18nKey::NemesisScopeNemesisOnly));
+            ui.weak(i18n.t(I18nKey::ScopeNemesisOnly));
         }
         if self.catalog.is_empty() {
-            ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::NemesisNoTemplates));
+            ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::TemplatesNone));
             return None;
         }
 
@@ -176,7 +176,7 @@ fn file_button(ui: &mut egui::Ui, label: &str, entry: &TemplateEntry, i18n: &I18
     if entry.nemesis {
         ui.weak("Nemesis");
     } else {
-        ui.colored_label(ui.visuals().warn_fg_color, "Ext").on_hover_text(i18n.t(I18nKey::NemesisExtOnlyWarning));
+        ui.colored_label(ui.visuals().warn_fg_color, "Ext").on_hover_text(i18n.t(I18nKey::ExtOnlyWarning));
     }
     clicked
 }

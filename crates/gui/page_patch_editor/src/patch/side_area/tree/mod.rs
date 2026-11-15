@@ -47,6 +47,7 @@ enum TreeEvent {
 ///
 /// - `changed_only`: only the branches leading to edited / new objects.
 /// - `focused`: the keyboard is in the tree: the cursor's row gets a frame.
+/// - `reveal`: the selected object is scrolled to, in the tree or the not linked list.
 ///
 /// Returns what a row's menu (or a double click: keep it open) asked for, of the row's object.
 pub(super) fn tree_ui(
@@ -54,13 +55,13 @@ pub(super) fn tree_ui(
     graph: &Graph,
     selected: &mut Option<Rc<str>>,
     state: &mut TreeState,
-    (changed_only, focused): (bool, bool),
+    (changed_only, focused, reveal): (bool, bool, bool),
     i18n: &I18nMap,
 ) -> Option<(Node, RowAction)> {
     let source = ObjectTree { graph, changed_only };
     state.prepare(&source, selected.as_deref());
 
-    unlinked::show(ui, graph, selected, i18n);
+    unlinked::show(ui, graph, (selected, reveal), i18n);
 
     // The later a part is drawn, the more it wins: the pinned rows are over the others.
     let crumb = breadcrumb::show(ui, graph, state, selected.as_deref(), i18n);

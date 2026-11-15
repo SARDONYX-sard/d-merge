@@ -64,6 +64,13 @@ enum Symbol<'a> {
 }
 
 /// The symbol at char `column` of `line` (on it or right after it).
+/// The line of `name` in array `field` of the names object `(id, text)`, with its id.
+///
+/// e.g. `("#0083", ..)`, `eventNames`, `moveStart` -> `("#0083", 12)`
+fn name_in<'t>((id, text): (&'t str, &str), field: &str, name: &str) -> Option<(&'t str, usize)> {
+    Some((id, vars::name_line(text, field, name)?))
+}
+
 fn symbol_at(line: &str, column: usize) -> Option<Symbol<'_>> {
     let at = line.char_indices().nth(column).map_or(line.len(), |(i, _)| i);
 
@@ -206,7 +213,8 @@ impl Language for NemesisXml<'_> {
         nemesis_diff::format_object(text)
     }
 
-    /// `#0106`: that object. `$eventID[x]$`: the line of `x` in the names object.
+    /// `#0106`: that object. `$eventID[x]$`: the line of `x` in the names object, or in that of the
+    /// referenced mod that adds it.
     fn definition(&self, text: &str, line: usize, column: usize) -> Option<Location<'_>> {
         let behavior = self.behavior;
         match symbol_at(text.split('\n').nth(line)?, column)? {
@@ -215,9 +223,12 @@ impl Language for NemesisXml<'_> {
                 Some(Location { document: object.id.into(), line: 0, detail: object.class.into() })
             }
             Symbol::Name(kind, name) => {
-                let id = behavior.object_of_class("hkbBehaviorGraphStringData")?;
-                let line = vars::name_line(behavior.text(id)?, kind.names_field(), name)?;
-                Some(Location { document: id.into(), line, detail: kind.names_field().into() })
+                let field = kind.names_field();
+                let own = behavior.object_of_class("hkbBehaviorGraphStringData");
+                let own = own.and_then(|id| name_in((id, behavior.text(id)?), field, name));
+                let (id, line) =
+                    own.or_else(|| behavior.ref_names_objects().find_map(|object| name_in(object, field, name)))?;
+                Some(Location { document: id.into(), line, detail: field.into() })
             }
         }
     }

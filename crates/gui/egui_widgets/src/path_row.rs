@@ -29,8 +29,9 @@ pub struct PathRow<'a> {
     label: &'a str,
     select: &'a str,
     actions: PathActions,
-    hover: Option<&'a str>,
-    /// See [`Self::help`].
+    /// See [`Self::open_hover`].
+    open_hover: Option<&'a str>,
+    /// See [`Self::field_hover`].
     field_hover: Option<&'a str>,
     hint: Option<&'a str>,
     label_width: f32,
@@ -69,7 +70,7 @@ impl<'a> PathRow<'a> {
             label,
             select,
             actions,
-            hover: None,
+            open_hover: None,
             field_hover: None,
             hint: None,
             label_width: Self::LABEL_WIDTH,
@@ -99,19 +100,19 @@ impl<'a> PathRow<'a> {
         self
     }
 
-    /// The label button's hover text.
+    /// The label button's hover: what a click does, e.g. "Open this path". Markdown is drawn as such
+    /// (see [`crate::HoverMarkdown`]).
     #[inline]
-    pub const fn hover(mut self, hover: &'a str) -> Self {
-        self.hover = Some(hover);
+    pub const fn open_hover(mut self, open_hover: &'a str) -> Self {
+        self.open_hover = Some(open_hover);
         self
     }
 
-    /// What to enter: the hover text of both the label button and the field, which is what one looks
-    /// at when not knowing what to enter.
+    /// The field's hover: what to enter, e.g. which directory and what goes in it. Markdown is drawn
+    /// as such (see [`crate::HoverMarkdown`]).
     #[inline]
-    pub const fn help(mut self, help: &'a str) -> Self {
-        self.hover = Some(help);
-        self.field_hover = Some(help);
+    pub const fn field_hover(mut self, field_hover: &'a str) -> Self {
+        self.field_hover = Some(field_hover);
         self
     }
 
@@ -135,8 +136,8 @@ impl<'a> PathRow<'a> {
         ui.horizontal(|ui| {
             let size = [self.label_width, self.button_size[1]];
             let mut open = ui.add_sized(size, Button::new(self.label));
-            if let Some(hover) = self.hover {
-                open = open.on_hover_text(hover);
+            if let Some(hover) = self.open_hover {
+                open = crate::markdown::HoverMarkdown::on_hover_markdown(open, hover);
             }
             if open.clicked() {
                 open_error = (self.actions.open)(path).err();
@@ -163,8 +164,8 @@ impl<'a> PathRow<'a> {
         ui.horizontal(|ui| {
             let size = [self.label_width, self.button_size[1]];
             let mut open = ui.add_sized(size, Button::new(self.label));
-            if let Some(hover) = self.hover {
-                open = open.on_hover_text(hover);
+            if let Some(hover) = self.open_hover {
+                open = crate::markdown::HoverMarkdown::on_hover_markdown(open, hover);
             }
             if open.clicked() {
                 output.open_error = (self.actions.open)(path.as_str()).err();
@@ -187,8 +188,8 @@ impl<'a> PathRow<'a> {
                     field = field.hint_text(hint);
                 }
                 let mut field = ui.add(field);
-                if let Some(help) = self.field_hover {
-                    field = field.on_hover_text(help);
+                if let Some(hover) = self.field_hover {
+                    field = crate::markdown::HoverMarkdown::on_hover_markdown(field, hover);
                 }
                 output.changed |= field.changed();
                 output.submitted = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));

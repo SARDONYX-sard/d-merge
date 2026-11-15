@@ -6,7 +6,7 @@
 //! start screen new_work, code_choice (a mod with several codes)
 //! windows      picker (templates), class_picker (New object), repeat,
 //!              anim_data_dialog, duplicate_form, new_clips (see [`ui::windows`])
-//! user patch   confirm_clear (the bulk delete), mod_export
+//! user patch   confirm_clear (the bulk delete)
 //! ```
 
 use crate::patch::{new_work, ui};
@@ -36,6 +36,4 @@ pub(in crate::patch) struct Panels {
     pub(super) new_clips: Option<ui::anim_data::NewClipsForm>,
     /// The user patch's bulk delete asks once more.
     pub(super) confirm_clear: bool,
-    /// The user patch written as a mod of its own. See [`crate::patch::user_patch::ModExport`].
-    pub(in crate::patch) mod_export: crate::patch::user_patch::ModExport,
 }

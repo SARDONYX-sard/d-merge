@@ -4058,6 +4058,7 @@ dependencies = [
  "json_patch",
  "mod_info",
  "nemesis_diff",
+ "nemesis_xml",
  "parking_lot 0.13.0",
  "rayon",
  "simd-json",

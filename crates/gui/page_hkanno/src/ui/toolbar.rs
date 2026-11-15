@@ -5,7 +5,10 @@
 //! [Save] [Revert] [Format] [⚙]  Keymap: [Vim ▼]                [Hide Preview]  <- toolbar
 //! ```
 
-use egui_widgets::shadcn::{Button, Checkbox, ComboBox, TextEdit};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, Checkbox, ComboBox, TextEdit},
+};
 use gui_shared::{i18n::I18nKey, settings::pages::convert::OutputFormat};
 
 use crate::{HkannoPage, HkannoPageCtx};
@@ -39,7 +42,7 @@ impl HkannoPage {
     pub(crate) fn toolbar(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
         let i18n = ctx.i18n;
         ui.horizontal(|ui| {
-            if ui.add(Button::new(i18n.t(I18nKey::HkannoSaveButton)).primary()).clicked() {
+            if ui.add(Button::new(i18n.t(I18nKey::SaveButton)).primary()).clicked() {
                 self.save_active(ctx);
             }
 
@@ -49,7 +52,7 @@ impl HkannoPage {
             }
 
             if ctx.lsp_settings.formatter
-                && ui.add(Button::new(i18n.t(I18nKey::HkannoFormatButton))).clicked()
+                && ui.add(Button::new(i18n.t(I18nKey::FormatButton))).clicked()
                 && let Some(tab) = self.active_tab()
             {
                 let formatted = hkanno_lsp::features::format::format_document(&tab.text);
@@ -62,7 +65,7 @@ impl HkannoPage {
 
             let has_tab = !self.tabs.is_empty();
             let import = Button::new(i18n.t(I18nKey::HkannoImportTxt));
-            if ui.add_enabled(has_tab, import).on_hover_text(i18n.t(I18nKey::HkannoImportTxtHover)).clicked()
+            if ui.add_enabled(has_tab, import).on_hover_markdown(i18n.t(I18nKey::HkannoImportTxtHover)).clicked()
                 && let Some(path) = gui_shared::rfd::FileDialog::new().add_filter("Text", &["txt"]).pick_file()
             {
                 self.import_txt(&path, ctx);
@@ -76,7 +79,7 @@ impl HkannoPage {
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let show = &mut ctx.settings.show_preview;
-                let label = if *show { I18nKey::EditorHidePreview } else { I18nKey::EditorShowPreview };
+                let label = if *show { I18nKey::PreviewHide } else { I18nKey::PreviewShow };
                 if ui.add(Button::new(i18n.t(label))).clicked() {
                     *show = !*show;
                 }
@@ -99,7 +102,7 @@ impl HkannoPage {
         match tab.export_txt(&path) {
             Ok(()) => ctx.notify.success(format!("{}: {}", ctx.i18n.t(I18nKey::ExportedMessage), path.display())),
             Err(err) => {
-                let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::HkannoSaveFailed));
+                let msg = format!("{}: {err}", ctx.i18n.t(I18nKey::SaveFailed));
                 tracing::error!("{msg}");
                 ctx.notify.error(msg);
             }
@@ -144,7 +147,7 @@ impl HkannoPage {
 
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                if ui.add(Button::new(i18n.t(I18nKey::HkannoApplyButton)).destructive()).clicked() {
+                if ui.add(Button::new(i18n.t(I18nKey::ApplyButton)).destructive()).clicked() {
                     tab.revert();
                     ui.close();
                 }

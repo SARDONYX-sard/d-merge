@@ -5,7 +5,10 @@ mod tree;
 
 use std::path::{Path, PathBuf};
 
-use egui_widgets::shadcn::{Button, Icon, TextEdit};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, Icon, TextEdit},
+};
 use gui_shared::{
     fs::open_existing_dir_or_ancestor,
     i18n::{I18nKey, I18nMap},
@@ -52,7 +55,7 @@ impl ConvertPage {
                     let current = &mut ctx.settings.selection_type;
                     if ui
                         .add(Button::selectable(*current == kind, ctx.i18n.t(label)))
-                        .on_hover_text(ctx.i18n.t(hover))
+                        .on_hover_markdown(ctx.i18n.t(hover))
                         .clicked()
                         && *current != kind
                     {

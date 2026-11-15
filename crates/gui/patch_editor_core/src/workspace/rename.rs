@@ -19,7 +19,7 @@ use std::{
 
 use rayon::prelude::*;
 
-use super::{Behavior, Workspace};
+use super::{Behavior, ExportFormat, Workspace};
 
 /// `text` with every id of the code `old` given the code `new`: each `old$` that does not continue a
 /// longer name (e.g. `#xoldc$1` is another code's), ignoring ASCII case. Borrowed if there is none.
@@ -101,7 +101,12 @@ impl Workspace {
             }
         }
         // The next export takes out what was exported under the old code.
-        let infos = [("Nemesis_Engine", "info.ini"), ("Nemesis_EngineExt", "info.ini"), ("Pandora_Engine", "info.xml")];
+        let infos = [
+            (ExportFormat::Nemesis, "info.ini"),
+            (ExportFormat::NemesisExt, "info.ini"),
+            (ExportFormat::PandoraV5, "info.xml"),
+        ];
+        let infos = infos.map(|(format, file)| (format.to_static_str(), file));
         self.owned.extend(infos.map(|(engine, file)| format!("{engine}/mod/{old}/{file}")));
         // Its cache is written anew, under the new code.
         self.saved = None;

@@ -31,7 +31,7 @@ pub(super) fn problems_panel(
             ProblemGroup { title: Cow::Owned(format!("{}  {behavior}", group.id)), problems: &group.problems }
         })
         .collect();
-    let (at, index) = ProblemsPanel::new("nemesis_problems", i18n.t(I18nKey::HkannoProblemsLabel))
+    let (at, index) = ProblemsPanel::new("nemesis_problems", i18n.t(I18nKey::ProblemsLabel))
         .empty_text(i18n.t(I18nKey::ProblemsNone))
         .cursor(cursor)
         .keys(keys)

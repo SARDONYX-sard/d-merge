@@ -93,7 +93,7 @@ impl EditorArea {
             (result.walk_history, result.tab_event) = (toolbar.walk_history, toolbar.tab_event);
 
             if behavior.is_ref(id) {
-                ui.weak(i18n.t(I18nKey::NemesisRefReadOnly));
+                ui.weak(i18n.t(I18nKey::RefReadOnly));
             }
 
             toggle_problems = self.pane.status_bar(ui, i18n, keymap, work.user_patch);
@@ -180,14 +180,14 @@ fn palette_actions<'a>(key_ui: &'a keybinding::KeyUi, i18n: &'a I18nMap) -> [Edi
     };
     let new = |id: &'static str| EditorAction::new(id, "");
     [
-        act(new(ACTION_FOCUS_TREE), I18nKey::NemesisFocusTree),
-        act(new(ACTION_BACK), I18nKey::NemesisGoBack),
-        act(new(ACTION_FORWARD), I18nKey::NemesisGoForward),
+        act(new(ACTION_FOCUS_TREE), I18nKey::ExplorerFocusTree),
+        act(new(ACTION_BACK), I18nKey::GoBack),
+        act(new(ACTION_FORWARD), I18nKey::GoForward),
         act(EditorCommand::NextTab.action(""), I18nKey::EditorNextTab),
         act(EditorCommand::PreviousTab.action(""), I18nKey::EditorPreviousTab),
         act(EditorCommand::CloseTab.action(""), I18nKey::EditorCloseTab),
-        act(EditorCommand::TogglePreview.action(""), I18nKey::EditorTogglePreview),
-        act(EditorCommand::ToggleInlineDiff.action(""), I18nKey::NemesisToggleInlineDiff),
+        act(EditorCommand::TogglePreview.action(""), I18nKey::PreviewToggle),
+        act(EditorCommand::ToggleInlineDiff.action(""), I18nKey::InlineDiffToggle),
         act(EditorCommand::RevealFile.action(""), gui_shared::i18n::REVEAL_IN_FILE_MANAGER),
         act(new(OPEN_JSON_ACTION), I18nKey::KeybindingOpenJson),
     ]
@@ -266,7 +266,7 @@ impl EditorPane {
             graph: &names.graph,
             fields: context.as_ref().map(|(class, fields)| (*class, fields.as_slice())),
             pointer_field: open_field.filter(|field| nemesis_diff::schema::holds_pointers(field)),
-            kept_array_hover: i18n.t(I18nKey::NemesisKeptArrayHover),
+            kept_array_hover: i18n.t(I18nKey::KeptArrayHover),
             in_string_array: open_field.is_some_and(nemesis_diff::schema::holds_strings),
             behavior,
         };

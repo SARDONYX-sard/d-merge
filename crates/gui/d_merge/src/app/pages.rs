@@ -47,7 +47,7 @@ impl App {
         match self.patch_editor.resolve_now(&request, paths, &mut self.notify, &self.i18n) {
             Ok(()) => self.notify.success(self.i18n.t(gui_shared::i18n::I18nKey::ConflictResolved)),
             Err(err) => {
-                self.notify.error(format!("{}: {err}", self.i18n.t(gui_shared::i18n::I18nKey::NemesisResolveFailed)));
+                self.notify.error(format!("{}: {err}", self.i18n.t(gui_shared::i18n::I18nKey::ConflictTakeFailed)));
             }
         }
     }

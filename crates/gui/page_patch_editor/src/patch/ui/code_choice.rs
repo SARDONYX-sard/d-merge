@@ -41,7 +41,7 @@ impl ModCodeChoice {
     pub(super) fn window(&self, ctx: &egui::Context, i18n: &I18nMap) -> Option<ChoiceAsk> {
         let mut open = true;
         let mut picked = None;
-        egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::NemesisChooseModCode)).open(&mut open).show(ctx, |ui| {
+        egui_widgets::quick_pick_window(ctx, i18n.t(I18nKey::ModCodeChoose)).open(&mut open).show(ctx, |ui| {
             ui.weak(self.root.display().to_string());
             ui.add_space(4.0);
             egui::ScrollArea::vertical().max_height(MAX_LIST_HEIGHT).show(ui, |ui| {

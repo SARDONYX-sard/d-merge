@@ -51,12 +51,13 @@ impl Explorer {
             self.trees.insert(path.to_owned(), crate::patch::tree::TreeState::default());
         }
         let Some(tree) = self.trees.get_mut(path) else { return ListOutput::default() };
-        if std::mem::take(&mut self.reveal) {
+        let reveal = std::mem::take(&mut self.reveal);
+        if reveal {
             tree.reveal_again();
         }
 
         if self.tree_focus {
-            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
+            ui.weak(i18n.t(I18nKey::ExplorerKeysHint));
             let source = ObjectTree { graph, changed_only: self.changed_only };
             tree.prepare(&source, selected.as_deref());
             let done = tree.apply_keys(&source, keys);
@@ -68,7 +69,7 @@ impl Explorer {
             }
         }
 
-        let flags = (self.changed_only, self.tree_focus);
+        let flags = (self.changed_only, self.tree_focus, reveal);
         let menu = crate::patch::side_area::tree::tree_ui(ui, graph, selected, tree, flags, i18n);
         ListOutput { menu, ..ListOutput::default() }
     }
@@ -146,7 +147,7 @@ impl Explorer {
     ) -> bool {
         let mut moved = false;
         if self.tree_focus {
-            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
+            ui.weak(i18n.t(I18nKey::ExplorerKeysHint));
             let done = anim_list::keys(&mut self.anim_tree, keys, rows, rebuild);
             output.leave = done.leave;
             moved = done.moved;
@@ -176,7 +177,7 @@ impl Explorer {
 
         let mut output = ListOutput::default();
         if self.tree_focus {
-            ui.weak(i18n.t(I18nKey::NemesisTreeKeysHint));
+            ui.weak(i18n.t(I18nKey::ExplorerKeysHint));
             output.leave = self.list_keys(graph, keys, selected);
         }
 

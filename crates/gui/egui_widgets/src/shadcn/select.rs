@@ -62,6 +62,8 @@ impl ItemStyle {
 pub struct ComboBox {
     id_salt: egui::IdSalt,
     label: Option<egui::WidgetText>,
+    /// The label before the box, not after it as egui puts it. See [`Self::label_first`].
+    label_first: bool,
     selected_text: egui::WidgetText,
     width: Option<f32>,
     height: Option<f32>,
@@ -98,6 +100,7 @@ impl ComboBox {
         Self {
             id_salt: egui::IdSalt::new(id_salt),
             label: None,
+            label_first: false,
             selected_text: egui::WidgetText::default(),
             width: None,
             height: None,
@@ -174,6 +177,14 @@ impl ComboBox {
 
     // ── Extensions (not in egui) ────────────────────────────────
 
+    /// The label before the box (`Format: [Nemesis ▼]`), as a form has it. egui puts it after
+    /// (`[Nemesis ▼] Format:`).
+    #[inline]
+    pub const fn label_first(mut self) -> Self {
+        self.label_first = true;
+        self
+    }
+
     /// Muted text shown while `selected_text` is empty. Default: `"Select..."`.
     #[inline]
     pub fn placeholder(mut self, placeholder: impl Into<egui::WidgetText>) -> Self {
@@ -221,7 +232,7 @@ impl ComboBox {
         ui: &mut egui::Ui,
         menu_contents: impl FnOnce(&mut egui::Ui) -> R,
     ) -> egui::InnerResponse<Option<R>> {
-        let label = self.label.clone();
+        let label = (self.label.clone(), self.label_first);
         with_label(ui, label, |ui| self.show_ui_impl(ui, menu_contents))
     }
 
@@ -241,7 +252,7 @@ impl ComboBox {
         }
         self.widest_item = Some(widest_item(ui, ui.make_persistent_id(self.id_salt), len, &get));
 
-        let label = self.label.clone();
+        let label = (self.label.clone(), self.label_first);
         if self.search_hint.is_some() {
             return with_label(ui, label, |ui| {
                 let response = self.show_searchable_index(ui, selected, len, get, None);
@@ -288,7 +299,7 @@ impl ComboBox {
         if self.search_hint.is_none() {
             self.search_hint = Some(egui::WidgetText::default());
         }
-        let label = self.label.clone();
+        let label = (self.label.clone(), self.label_first);
         with_label(ui, label, |ui| {
             let response = self.show_searchable_index(ui, selected, len, get, Some((create_label, created)));
             egui::InnerResponse::new((), response)
@@ -556,12 +567,19 @@ fn widest_item<Text: Into<egui::WidgetText>>(
 /// Lays the combo box out horizontally with its label, like egui does (only when labelled).
 fn with_label<R>(
     ui: &mut egui::Ui,
-    label: Option<egui::WidgetText>,
+    (label, label_first): (Option<egui::WidgetText>, bool),
     add_combo: impl FnOnce(&mut egui::Ui) -> egui::InnerResponse<R>,
 ) -> egui::InnerResponse<R> {
     let Some(label) = label else { return add_combo(ui) };
 
     ui.horizontal(|ui| {
+        if label_first {
+            let label_response = ui.label(label);
+            let mut ir = add_combo(ui);
+            ir.response = ir.response.labelled_by(label_response.id);
+            ir.response |= label_response;
+            return ir;
+        }
         let mut ir = add_combo(ui);
         let label_response = ui.label(label);
         ir.response = ir.response.labelled_by(label_response.id);

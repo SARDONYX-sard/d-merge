@@ -2,7 +2,10 @@
 
 use std::rc::Rc;
 
-use egui_widgets::shadcn::{Button, ComboBox, Icon, TextEdit, theme::ShadcnTheme};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, ComboBox, Icon, TextEdit, theme::ShadcnTheme},
+};
 use gui_shared::{
     i18n::I18nKey,
     settings::{
@@ -55,7 +58,7 @@ impl PatchView<'_> {
                 .color(ShadcnTheme::get(ui.ctx()).foreground)
                 .size(24.0)
                 .strong();
-            ui.label(heading).on_hover_text(self.ctx.i18n.t(I18nKey::ModsListTitleHover));
+            ui.label(heading).on_hover_markdown(self.ctx.i18n.t(I18nKey::ModsListTitleHover));
 
             ui.separator();
             self.ui_search_bar(ui);
@@ -68,7 +71,7 @@ impl PatchView<'_> {
                     [90.0, 40.0],
                     Button::new(self.ctx.i18n.t(I18nKey::NormalizeButton)).icon(Icon::TextAlignJustify).full_width(),
                 )
-                .on_hover_text(self.ctx.i18n.t(I18nKey::NormalizeHover))
+                .on_hover_markdown(self.ctx.i18n.t(I18nKey::NormalizeHover))
                 .clicked()
             {
                 mod_item::reorder_mods_priorities(self.ctx.settings.mod_list_mut());
@@ -84,7 +87,7 @@ impl PatchView<'_> {
                     Button::new(self.ctx.i18n.t(I18nKey::LockButton)).icon(Icon::Lock).full_width().destructive();
                 let hover_text = self.ctx.i18n.t(I18nKey::LockButtonHover);
 
-                if ui.add_sized([90.0, 40.0], button).on_hover_text(hover_text).clicked() {
+                if ui.add_sized([90.0, 40.0], button).on_hover_markdown(hover_text).clicked() {
                     visible_mods::unlock(&mut self.ctx.settings.view_state);
                 }
             } else {
@@ -112,7 +115,7 @@ impl PatchView<'_> {
             self.page.user_patch_toggle = true;
         }
         let button = Button::new(i18n.t(I18nKey::ConflictScan)).icon(Icon::Layers);
-        if ui.add_enabled(!busy, button).on_hover_text(i18n.t(I18nKey::ConflictScanHover)).clicked() {
+        if ui.add_enabled(!busy, button).on_hover_markdown(i18n.t(I18nKey::ConflictScanHover)).clicked() {
             self.page.scan_conflicts(ui.ctx(), self.ctx.settings, self.ctx.runtime);
         }
         if self.page.conflicts.is_stale() {
@@ -272,7 +275,11 @@ impl PatchView<'_> {
                                 RowConflicts {
                                     scan: &self.page.conflicts,
                                     label: i18n.t(I18nKey::ConflictShow),
-                                    hovers: (i18n.t(I18nKey::ConflictWinsHover), i18n.t(I18nKey::ConflictLosesHover)),
+                                    hovers: (
+                                        i18n.t(I18nKey::ConflictWinsHover),
+                                        i18n.t(I18nKey::ConflictLosesHover),
+                                        i18n.t(I18nKey::ConflictResolvedHover),
+                                    ),
                                     dead_hover: i18n.t(I18nKey::ConflictDeadHover),
                                     asked: None,
                                     links: Links::default(),
@@ -325,7 +332,7 @@ impl PatchView<'_> {
         self.checkbox_header_button(header, rows);
         header.col(|ui| {
             ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
-                ui.label("±").on_hover_text(i18n.t(I18nKey::ConflictScanHover));
+                ui.label("±").on_hover_markdown(i18n.t(I18nKey::ConflictScanHover));
             });
         });
         self.header_button(header, i18n.t(I18nKey::ColumnId), SortColumn::Id);

@@ -13,7 +13,7 @@
 //! They see only the work, the Changes view's state and the selection; what a click asks for is
 //! returned ([`ListOutput`]).
 
-use egui_widgets::shadcn::Button;
+use egui_widgets::{HoverMarkdown as _, shadcn::Button};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::ChangeAction;
@@ -66,12 +66,12 @@ pub(super) fn show(ui: &mut egui::Ui, i18n: &I18nMap, input: &ListInput<'_>) -> 
 /// `▼ CHANGES (2)`: the changes since the last revision.
 fn pending(ui: &mut egui::Ui, i18n: &I18nMap, input: &ListInput<'_>) -> Option<ChangeAction> {
     let changes = &input.scm.pending.changes;
-    let title = format!("{} ({})", i18n.t(I18nKey::SideChanges), changes.len());
+    let title = format!("{} ({})", i18n.t(I18nKey::ChangesTab), changes.len());
     let mut picked = None;
 
     egui::CollapsingHeader::new(title).id_salt("side_pending").default_open(true).show(ui, |ui| {
         if changes.is_empty() {
-            ui.weak(i18n.t(I18nKey::SideNoChanges));
+            ui.weak(i18n.t(I18nKey::ChangesNone));
         }
         for (at, change) in changes.iter().enumerate() {
             let keyboard = (input.cursor.0 == Some(ScmRow::Change(at)), input.cursor.1);
@@ -92,9 +92,9 @@ fn object_history(ui: &mut egui::Ui, i18n: &I18nMap, input: &ListInput<'_>) -> O
     let key = (workspace.behaviors.get(active)?.meshes_path.clone(), id.to_owned());
     let mut picked = None;
 
-    let title = format!("{}  {id}", i18n.t(I18nKey::SideObjectHistory));
+    let title = format!("{}  {id}", i18n.t(I18nKey::ChangesObjectHistory));
     egui::CollapsingHeader::new(title).id_salt("side_object_history").default_open(true).show(ui, |ui| {
-        if ui.small_button(i18n.t(I18nKey::SideBlame)).on_hover_text(i18n.t(I18nKey::SideBlameHover)).clicked() {
+        if ui.small_button(i18n.t(I18nKey::ChangesBlame)).on_hover_text(i18n.t(I18nKey::ChangesBlameHover)).clicked() {
             picked = Some(ChangeAction::Blame(active, id.to_owned()));
         }
 
@@ -106,7 +106,7 @@ fn object_history(ui: &mut egui::Ui, i18n: &I18nMap, input: &ListInput<'_>) -> O
             }
         }
         if !any {
-            ui.weak(i18n.t(I18nKey::SideNoObjectHistory));
+            ui.weak(i18n.t(I18nKey::ChangesNoObjectHistory));
         }
     });
     picked
@@ -131,8 +131,8 @@ fn object_revision_row(
 
     response.context_menu(|ui| {
         let items = [
-            (I18nKey::SideComparePrevious, ChangeAction::Compare(active, id.to_owned(), parent, Some(number))),
-            (I18nKey::SideCompareWorking, ChangeAction::Compare(active, id.to_owned(), number, None)),
+            (I18nKey::ChangesComparePrevious, ChangeAction::Compare(active, id.to_owned(), parent, Some(number))),
+            (I18nKey::ChangesCompareWorking, ChangeAction::Compare(active, id.to_owned(), number, None)),
         ];
         for (label, action) in items {
             if ui.button(i18n.t(label)).clicked() {
@@ -140,7 +140,7 @@ fn object_revision_row(
             }
         }
         ui.separator();
-        if ui.add(Button::new(i18n.t(I18nKey::SideRestoreObject)).destructive()).clicked() {
+        if ui.add(Button::new(i18n.t(I18nKey::ChangesRestoreObject)).destructive()).clicked() {
             picked = Some(ChangeAction::RestoreObject(active, id.to_owned(), number));
         }
         if picked.is_some() {
@@ -155,7 +155,7 @@ fn object_revision_row(
 fn history(ui: &mut egui::Ui, i18n: &I18nMap, input: &ListInput<'_>) -> (Option<ChangeAction>, Option<u32>) {
     let (mut picked, mut toggled) = (None, None);
 
-    egui::CollapsingHeader::new(i18n.t(I18nKey::SideHistory)).id_salt("side_history").default_open(true).show(
+    egui::CollapsingHeader::new(i18n.t(I18nKey::ChangesHistory)).id_salt("side_history").default_open(true).show(
         ui,
         |ui| {
             for revision in input.workspace.history.log() {
@@ -207,8 +207,8 @@ fn revision_section(
 
     // As GitLens' "Restore": the whole work as it was then.
     header.context_menu(|ui| {
-        let restore = Button::new(i18n.t(I18nKey::SideRestoreRevision)).destructive();
-        if ui.add(restore).on_hover_text(i18n.t(I18nKey::SideRestoreRevisionHover)).clicked() {
+        let restore = Button::new(i18n.t(I18nKey::ChangesRestoreRevision)).destructive();
+        if ui.add(restore).on_hover_markdown(i18n.t(I18nKey::ChangesRestoreRevisionHover)).clicked() {
             picked = Some(ChangeAction::RestoreRevision(number));
             ui.close();
         }
@@ -285,10 +285,10 @@ fn change_menu(
     // Of the history: what it changed, and against the work now. A change: against the last revision.
     let compares = match revision {
         Some(number) => vec![
-            (I18nKey::SideComparePrevious, workspace.history.parent_number(number), Some(number)),
-            (I18nKey::SideCompareWorking, number, None),
+            (I18nKey::ChangesComparePrevious, workspace.history.parent_number(number), Some(number)),
+            (I18nKey::ChangesCompareWorking, number, None),
         ],
-        None => vec![(I18nKey::SideCompareWorking, workspace.history.head_number(), None)],
+        None => vec![(I18nKey::ChangesCompareWorking, workspace.history.head_number(), None)],
     };
     for (label, from, to) in compares {
         if ui.button(i18n.t(label)).clicked() {
@@ -300,8 +300,8 @@ fn change_menu(
     }
 
     let (label, action) = match revision {
-        None => (I18nKey::SideDiscard, ChangeAction::Discard(at, id.to_owned())),
-        Some(number) => (I18nKey::SideRestoreObject, ChangeAction::RestoreObject(at, id.to_owned(), number)),
+        None => (I18nKey::ChangesDiscard, ChangeAction::Discard(at, id.to_owned())),
+        Some(number) => (I18nKey::ChangesRestoreObject, ChangeAction::RestoreObject(at, id.to_owned(), number)),
     };
     if ui.add(Button::new(i18n.t(label)).destructive()).clicked() {
         picked = Some(action);

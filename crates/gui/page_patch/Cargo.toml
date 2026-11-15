@@ -30,6 +30,7 @@ behavior_merge       = { workspace = true, features = ["tracing"] }
 behavior_merge_types = { workspace = true } # `PatchJson`: what the conflict check reads
 json_patch           = { workspace = true, features = ["serde"] }
 nemesis_diff         = { workspace = true }
+nemesis_xml          = { workspace = true } # the user patch read again: see `Conflicts::read_user_patch`
 egui_widgets         = { workspace = true }
 gui_shared           = { workspace = true }
 mod_info             = { workspace = true }

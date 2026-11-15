@@ -9,7 +9,7 @@
 //! concerned, see [`Pandora`].
 
 use egui_widgets::{
-    PathRow,
+    HoverMarkdown as _, PathRow,
     shadcn::{Button, ComboBox, Icon},
 };
 use gui_shared::{
@@ -47,11 +47,12 @@ impl PatchView<'_> {
         let pandora = &mut self.ctx.settings.pandora;
         ui.horizontal(|ui| {
             let hover = i18n.t(I18nKey::PandoraTargetVersionHover);
-            ui.label(i18n.t(I18nKey::PandoraTargetVersionLabel)).on_hover_text(hover);
+            ui.label(i18n.t(I18nKey::PandoraTargetVersionLabel)).on_hover_markdown(hover);
             version_box(ui, &mut pandora.version, hover);
         });
         let row = PathRow::new(i18n.t(I18nKey::OutputDirLabel), i18n.t(I18nKey::SelectButton), PATH_ACTIONS)
-            .help(i18n.t(I18nKey::PandoraDirHover))
+            .open_hover(i18n.t(I18nKey::OpenSelectedPathHover))
+            .field_hover(i18n.t(I18nKey::PandoraDirHover))
             .show(ui, &mut pandora.output_dir);
         if let Some(err) = row.open_error {
             self.ctx.notify.error(err);
@@ -60,7 +61,7 @@ impl PatchView<'_> {
         let (mut import, mut export) = (false, false);
         ui.horizontal(|ui| {
             let button =
-                |ui: &mut egui::Ui, label, hover| ui.add(Button::new(i18n.t(label))).on_hover_text(i18n.t(hover));
+                |ui: &mut egui::Ui, label, hover| ui.add(Button::new(i18n.t(label))).on_hover_markdown(i18n.t(hover));
             import = button(ui, I18nKey::PandoraImportLabel, I18nKey::PandoraImportHover).clicked();
             export = button(ui, I18nKey::PandoraExportLabel, I18nKey::PandoraExportHover).clicked();
         });
@@ -102,7 +103,7 @@ fn version_box(ui: &mut egui::Ui, version: &mut PandoraVersion, hover: &str) {
     let picked = ComboBox::from_id_salt("pandora_version")
         .width(120.0)
         .show_index(ui, &mut index, versions.len(), |i| versions[i].to_static_str())
-        .on_hover_text(hover);
+        .on_hover_markdown(hover);
     if picked.changed() {
         *version = versions[index];
     }

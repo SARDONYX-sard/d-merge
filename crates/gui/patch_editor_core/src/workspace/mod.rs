@@ -135,13 +135,15 @@ fn read_cached_behavior(entry: &Path, done: &AtomicUsize) -> Result<Option<Behav
 
 /// What a work is written as. It is the same work: edits of the objects of templates.
 ///
-/// Animation data is written to `Nemesis_Engine` in both Nemesis formats.
+/// Animation data is written to the engine folder of the format: `Nemesis_Engine` as `Nemesis`,
+/// `Nemesis_EngineExt` as `NemesisExt` (d-merge reads either; see `Behavior::patch_dir`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ExportFormat {
     /// `Nemesis_Engine/mod/<code>`, and `Nemesis_EngineExt/mod/<code>` for what Nemesis doesn't know.
     #[default]
     Nemesis,
-    /// `Nemesis_EngineExt/mod/<code>/meshes/...` for every template: only d-merge reads it.
+    /// `Nemesis_EngineExt/mod/<code>/meshes/...` for every template, and its animation data: only
+    /// d-merge reads it. The user patch is always this.
     NemesisExt,
     /// `Pandora_Engine/mod/<code>` of Pandora Behaviour Engine v5. A later version that changes the
     /// format would be another variant.
@@ -150,9 +152,29 @@ pub enum ExportFormat {
 }
 
 impl ExportFormat {
-    /// In the order of the export's list: `(format, label)`.
-    pub const ALL: [(Self, &'static str); 3] =
-        [(Self::Nemesis, "Nemesis"), (Self::NemesisExt, "Nemesis Ext"), (Self::PandoraV5, "Pandora v5")];
+    /// In the order of the export's list.
+    pub const ALL: [Self; 3] = [Self::Nemesis, Self::NemesisExt, Self::PandoraV5];
+
+    /// Its engine folder, below a mod's root: its patches are in `<here>/mod/<code>`. As `Nemesis`,
+    /// those of the templates Nemesis does not know go to `NemesisExt`'s.
+    ///
+    /// e.g. `NemesisExt` -> `Nemesis_EngineExt`
+    pub const fn to_static_str(self) -> &'static str {
+        match self {
+            Self::Nemesis => "Nemesis_Engine",
+            Self::NemesisExt => "Nemesis_EngineExt",
+            Self::PandoraV5 => "Pandora_Engine",
+        }
+    }
+
+    /// What the export's list shows. e.g. `Nemesis Ext`
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Nemesis => "Nemesis",
+            Self::NemesisExt => "Nemesis Ext",
+            Self::PandoraV5 => "Pandora v5",
+        }
+    }
 
     /// Are the templates Nemesis knows written to `Nemesis_EngineExt` too? See [`Behavior::target`].
     #[inline]
@@ -539,29 +561,6 @@ mod tests {
         assert!(found && gone && !again);
     }
 
-    /// Only a patched template Nemesis does not know is outside what Nemesis reads: not one it
-    /// knows, not one without patches, not animation data.
-    #[test]
-    fn the_templates_outside_nemesis() {
-        let template = |meshes_path: &str, nemesis: Option<(String, bool)>, patched: bool| {
-            let mut behavior = Behavior::open(&std::path::Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
-            (behavior.adsf, behavior.meshes_path, behavior.nemesis) = (false, meshes_path.to_owned(), nemesis);
-            if patched {
-                behavior.edits.insert("#0001".to_owned(), String::new());
-            }
-            behavior
-        };
-        let mut workspace = Workspace::default();
-        workspace.behaviors.push(template("meshes/troll.bin", None, true));
-        workspace.behaviors.push(template("meshes/bear.bin", None, false));
-        workspace.behaviors.push(template("meshes/0_master.bin", Some(("0_master".to_owned(), false)), true));
-        let mut clips = Behavior::open(&std::path::Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
-        clips.added.insert("Male~1/m$0.txt".to_owned(), String::new());
-        workspace.behaviors.push(clips);
-
-        assert_eq!(workspace.outside_nemesis().collect::<Vec<_>>(), ["meshes/troll.bin"]);
-    }
-
     /// A mod of Nemesis only is a Nemesis work; one written elsewhere is an `Extended` one.
     #[test]
     fn the_scope_of_a_read_mod() {
@@ -584,6 +583,42 @@ mod tests {
         assert_eq!(bin.objects.len(), txt.objects.len());
         let differ = bin.objects.iter().zip(&txt.objects).filter(|(a, b)| a.id != b.id || a.text != b.text).count();
         assert_eq!(differ, 0);
+    }
+
+    /// An event a referenced mod adds is defined in its names object: kept as `#0083@amco` to go to.
+    #[test]
+    fn a_referenced_mod_s_names_object_is_kept_to_go_to() {
+        let dir = std::env::temp_dir().join(format!("d_merge_ref_names_{}", std::process::id()));
+        let write_file = |path: &Path, text: &str| {
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        };
+        let names = |events: &str| {
+            format!(
+                "\t\t<hkobject name=\"#0083\" class=\"hkbBehaviorGraphStringData\" signature=\"0xc713064e\">\n\t\t\t<hkparam name=\"eventNames\" numelements=\"1\">\n\t\t\t\t<hkcstring>moveStart</hkcstring>\n{events}\t\t\t</hkparam>\n\t\t</hkobject>\n"
+            )
+        };
+        let template = dir.join("templates/meshes/x.xml");
+        write_file(
+            &template,
+            &format!("<hkpackfile>\n\t<hksection name=\"__data__\">\n{}\t</hksection>\n</hkpackfile>\n", names("")),
+        );
+        let added = "<!-- MOD_CODE ~amco~ OPEN -->\n\t\t\t\t<hkcstring>amcoEvent</hkcstring>\n<!-- CLOSE -->\n";
+        write_file(&dir.join("mods/a/Nemesis_Engine/mod/amco/meshes/x.bin/#0083.txt"), &names(added));
+
+        let mut workspace = Workspace::default();
+        workspace.behaviors.push(Behavior::open(&template).unwrap());
+        workspace.add_ref(&dir.join("mods/a"), "upatch");
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        let behavior = &workspace.behaviors[0];
+        let objects: Vec<(&str, &str)> = behavior.ref_names_objects().collect();
+        assert_eq!(objects.len(), 1);
+        let (id, text) = objects[0];
+        assert_eq!(id, "#0083@amco");
+        assert!(text.contains("name=\"#0083@amco\""), "its own id: {text}");
+        assert!(nemesis_diff::vars::name_line(text, "eventNames", "amcoEvent").is_some(), "{text}");
+        assert_eq!(behavior.ref_events, ["amcoEvent"]);
     }
 
     /// A referenced mod's objects can be looked at and pointed to, and are not this mod's.
