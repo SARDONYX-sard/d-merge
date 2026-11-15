@@ -439,6 +439,7 @@
   "status_generating_fnis_patches": "FNISパッチを生成しています...",
   "status_generating_hkx_files": "hkxファイルを生成しています...",
   "status_parsing_patches": "Nemesisパッチを解析しています...",
+  "status_read_files": "ファイル:",
   "status_reading_patches": "Nemesisパッチとテンプレートファイルを読み込んでいます...",
   "theme_editor_button": "🎨 編集",
   "theme_editor_button_hover": "テーマエディターを開いて色や見た目をカスタマイズします",

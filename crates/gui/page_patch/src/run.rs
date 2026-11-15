@@ -213,8 +213,12 @@ impl EguiDisplay for Arc<gui_shared::patch::PatchProgress> {
         self.phase.store(new_phase, Ordering::Relaxed);
 
         match status {
+            behavior_merge::Status::ReadingPatches { index, total, files } => {
+                self.index.store(index, Ordering::Relaxed);
+                self.total.store(total, Ordering::Relaxed);
+                self.files.store(files, Ordering::Relaxed);
+            }
             behavior_merge::Status::GeneratingFnisPatches { index, total }
-            | behavior_merge::Status::ReadingPatches { index, total }
             | behavior_merge::Status::ParsingPatches { index, total }
             | behavior_merge::Status::ApplyingPatches { index, total }
             | behavior_merge::Status::GeneratingHkxFiles { index, total } => {

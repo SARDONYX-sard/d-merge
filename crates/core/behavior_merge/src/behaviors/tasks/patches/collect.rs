@@ -22,7 +22,7 @@ use crate::{
         },
         templates::key::TemplateKey,
     },
-    config::{ReportType, StatusReportCounter},
+    config::{ReadingReporter, ReportType, StatusReportCounter},
     errors::{Error, FailedToCastNemesisPathToTemplateKeySnafu, NemesisXmlErrSnafu, Result},
 };
 
@@ -34,8 +34,9 @@ use crate::{
 /// # Errors
 /// Returns an error if any of the paths cannot be read or parsed.
 pub(crate) fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Config) -> OwnedPatches {
-    // NOTE: Walking and reading take seconds when the OS file cache is cold, so report the progress per mod dir.
-    let reporter = StatusReportCounter::new(&config.status_report, ReportType::ReadingPatches, nemesis_entries.len());
+    // NOTE: Walking and reading take seconds when the OS file cache is cold (one mod dir up to 10 s), so
+    // report the progress per file too.
+    let reporter = ReadingReporter::new(&config.status_report, nemesis_entries.len());
 
     // Walk, read and sort into each category at once per mod dir. (No intermediate `Vec` of paths)
     // - No need to sort. Conflicts are resolved by priority, not by this order.
@@ -51,7 +52,9 @@ pub(crate) fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Conf
             let timer = measure.then(|| ModTimer::start(mod_dir));
             let patches = collect_nemesis_paths(Path::new(mod_dir))
                 .fold(OwnedPatches::default, |mut acc, (category, path)| {
-                    match read_stats::read_to_string(timer.as_ref(), &path) {
+                    let content = read_stats::read_to_string(timer.as_ref(), &path);
+                    reporter.file_read();
+                    match content {
                         Ok(content) => match category {
                             Category::Nemesis => {
                                 acc.owned_patches.insert(path, (content, priority));
@@ -68,7 +71,7 @@ pub(crate) fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Conf
                     acc
                 })
                 .reduce(OwnedPatches::default, OwnedPatches::merge);
-            reporter.increment();
+            reporter.mod_read();
             (patches, timer.map(ModTimer::finish).into_iter().collect::<Vec<_>>())
         })
         .reduce(
