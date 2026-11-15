@@ -25,16 +25,16 @@ tokio       = { workspace = true }
 tracing     = { workspace = true }
 
 # workspace members
-fast_hash        = { workspace = true }
-behavior_merge   = { workspace = true, features = ["tracing"] }
+fast_hash            = { workspace = true }
+behavior_merge       = { workspace = true, features = ["tracing"] }
 behavior_merge_types = { workspace = true } # `PatchJson`: what the conflict check reads
-json_patch       = { workspace = true, features = ["serde"] }
-nemesis_diff     = { workspace = true }
-egui_widgets     = { workspace = true }
-gui_shared       = { workspace = true }
-mod_info         = { workspace = true }
-skyrim_data_dir  = { workspace = true, features = ["serde"] }
-tracing_rotation = { workspace = true }
+json_patch           = { workspace = true, features = ["serde"] }
+nemesis_diff         = { workspace = true }
+egui_widgets         = { workspace = true }
+gui_shared           = { workspace = true }
+mod_info             = { workspace = true }
+skyrim_data_dir      = { workspace = true, features = ["serde"] }
+tracing_rotation     = { workspace = true }
 
 [dev-dependencies]
 skyrim_anim_data = { workspace = true, features = ["serde"] } # real patches of animation data in the tests
