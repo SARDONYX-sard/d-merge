@@ -1,13 +1,17 @@
 //! Parsed (borrowed) patches per template: what `behavior_merge` and `fnis_patch_gen`
 //! both produce, and `behavior_merge` applies.
 
+mod patch_json;
 mod patch_map;
 
 use std::borrow::Cow;
 
 use dashmap::DashMap;
 
-pub use self::patch_map::{HkxPatchMaps, OnePatchMap, SeqPatchMap};
+pub use self::{
+    patch_json::{PatchJson, ReadPatchJson},
+    patch_map::{HkxPatchMaps, OnePatchMap, SeqPatchMap},
+};
 use crate::template_key::TemplateKey;
 
 /// Collection of patches with metadata
