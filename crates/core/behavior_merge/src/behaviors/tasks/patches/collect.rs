@@ -12,7 +12,7 @@ use super::{
         collect::{Category, collect_nemesis_paths},
         parse::parse_nemesis_path,
     },
-    read_stats::{self, ModTimer, log_slowest_mods},
+    read_stats::{self, ModTimer, log_mod_read_times},
 };
 use crate::{
     Config, PriorityMap,
@@ -96,7 +96,7 @@ pub(crate) fn collect_owned_patches(nemesis_entries: &PriorityMap, config: &Conf
         elapsed = ?start.elapsed(),
         "Read Nemesis patch files"
     );
-    log_slowest_mods(mod_read_times);
+    log_mod_read_times(mod_read_times);
 
     owned
 }
