@@ -94,14 +94,14 @@ fn apply_to_one_template<'a, 'b: 'a>(
     // One field patches never remove array elements, so they never shift any index.
     // Destructive changes to arrays(add/remove that shift indexes) are applied later as seq patches,
     // so the paths of one field patches are always valid when they are applied.
-    for (path, patch) in one_patch_map.into_inner() {
+    for (path, patch) in one_patch_map.into_winners() {
         let result = apply_one_field(template_value, path, patch)
             .with_context(|_| PatchSnafu { template_name: key.to_string() });
         status_reporter.increment();
         results.push(result);
     }
 
-    for (path, patches) in seq_patch_map.0 {
+    for (path, patches) in seq_patch_map.into_groups() {
         let result = apply_seq_by_priority(key.as_str(), template_value, path, patches)
             .with_context(|_| PatchSnafu { template_name: key.to_string() });
         status_reporter.increment();
@@ -115,8 +115,8 @@ fn apply_to_one_template<'a, 'b: 'a>(
 
 /// Writes the patches of every template, without applying any. See `DebugOptions::patch_json_only`.
 pub(crate) fn write_all_debug_json_patches(patches: &BehaviorPatchesMap<'_>, config: &Config) {
-    patches.0.par_iter().for_each(|entry| {
-        if let Err(_err) = write_debug_json_patch(&config.output_dir, entry.key(), entry.value()) {
+    patches.0.par_iter().for_each(|(key, maps)| {
+        if let Err(_err) = write_debug_json_patch(&config.output_dir, key, maps) {
             #[cfg(feature = "tracing")]
             tracing::error!("{_err}");
         }
@@ -140,7 +140,7 @@ fn write_debug_json_patch(output_dir: &Path, key: &TemplateKey, patches: &HkxPat
     let patches = behavior_merge_types::patches::PatchJson {
         one: &patches.one,
         seq: &patches.seq,
-        overridden: &patches.one.overridden,
+        overridden: patches.one.overridden(),
     };
     let json = sonic_rs::to_string_pretty(&patches)
         .with_context(|_| crate::errors::JsonSnafu { path: output_path.clone() })?;

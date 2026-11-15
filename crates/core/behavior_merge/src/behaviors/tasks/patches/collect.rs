@@ -106,7 +106,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
     config: &Config,
     fnis_patches: PatchCollection<'a>,
 ) -> (PatchCollection<'a>, Vec<Error>) {
-    let PatchCollection { borrowed_patches: raw_borrowed_patches, behavior_index_map } = fnis_patches;
+    let PatchCollection { borrowed_patches: raw_borrowed_patches, mut behavior_index_map } = fnis_patches;
 
     let reporter = StatusReportCounter::new(&config.status_report, ReportType::ParsingPatches, owned_patches.len());
 
@@ -141,15 +141,15 @@ pub(crate) fn collect_borrowed_patches<'a>(
     // Each template is owned by exactly one thread, so the inner maps are never contended.
     let borrowed_patches = by_template
         .into_par_iter()
-        .map(|(key, TemplatePatches { base, files })| {
+        .map(|(key, TemplatePatches { mut base, files })| {
             for (patches, priority, hidden) in files {
                 for (json_path, value) in patches {
                     let Some(hidden) = hidden else {
-                        insert_patch(&base, json_path, value, priority);
+                        insert_patch(&mut base, json_path, value, priority);
                         continue;
                     };
                     for left in hidden.apply(&json_path, value) {
-                        insert_patch(&base, json_path.clone(), left, priority);
+                        insert_patch(&mut base, json_path.clone(), left, priority);
                     }
                 }
             }
@@ -160,7 +160,7 @@ pub(crate) fn collect_borrowed_patches<'a>(
     (PatchCollection { borrowed_patches: BehaviorPatchesMap(borrowed_patches), behavior_index_map }, errors)
 }
 
-fn insert_patch<'a>(base: &HkxPatchMaps<'a>, path: JsonPath<'a>, patch: JsonPatch<'a>, priority: usize) {
+fn insert_patch<'a>(base: &mut HkxPatchMaps<'a>, path: JsonPath<'a>, patch: JsonPatch<'a>, priority: usize) {
     let is_seq = matches!(patch.action, json_patch::Action::Seq { .. } | json_patch::Action::SeqPush);
     let patch = ValueWithPriority::new(patch, priority);
     if is_seq {

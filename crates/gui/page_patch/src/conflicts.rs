@@ -365,23 +365,24 @@ fn entry_value(entry: &ValueWithPriority<'_>, owners: &Owners) -> Option<Value> 
 
 /// See the module docs. Only what disagrees is kept.
 fn read_behavior(target: &str, file: ReadPatchJson<'_>, owners: &Owners, points: &mut Vec<Point>) {
-    let one = file.one.into_inner();
+    let mut one = file.one;
+    one.insert_losers(file.overridden);
 
-    for (path, losers) in file.overridden.0 {
-        let winner = one.remove(&path).and_then(|(_, entry)| entry_value(&entry, owners));
-        let values: Vec<Value> =
-            winner.into_iter().chain(losers.iter().filter_map(|entry| entry_value(entry, owners))).collect();
-        push_if_different(target, &path.join("/"), values, owners, points);
-    }
-
-    // What is left of `one` lost to nothing.
-    for (_, entry) in one {
-        if let Some(owner) = owners.of_entry(&entry) {
-            owners.note_useful(owner);
+    for slot in one.into_entries() {
+        // Nothing lost to it: no conflict.
+        if slot.losers.is_empty() {
+            if let Some(owner) = owners.of_entry(&slot.winner) {
+                owners.note_useful(owner);
+            }
+            continue;
         }
+
+        let values: Vec<Value> =
+            std::iter::once(&slot.winner).chain(&slot.losers).filter_map(|entry| entry_value(entry, owners)).collect();
+        push_if_different(target, &slot.key.join("/"), values, owners, points);
     }
 
-    for (path, entries) in file.seq.0 {
+    for (path, entries) in file.seq.into_groups() {
         read_array(target, &path.join("/"), &entries, owners, points);
     }
 }
@@ -938,19 +939,19 @@ mod tests {
         assert_eq!(found.dead_mods(&marks, swapped, None).into_iter().collect::<Vec<_>>(), ["high"]);
 
         let lost = || {
-            let one = OnePatchMap::default();
+            let mut one = OnePatchMap::default();
             one.insert(json_path!["#1", "C", "a"], op("false", 4, REPLACE));
             one.insert(json_path!["#1", "C", "a"], op("true", 3, REPLACE));
             one
         };
 
         // It also changes a field nobody else does: it is of use.
-        let more = lost();
+        let mut more = lost();
         more.insert(json_path!["#1", "C", "b"], op("7", 3, REPLACE));
         assert!(dead(&read(&file(&more, &SeqPatchMap::default()), "meshes/m.bin")).is_empty());
 
         // It pushes to an array: a merge keeps that.
-        let pushes = SeqPatchMap::default();
+        let mut pushes = SeqPatchMap::default();
         pushes.insert(json_path!["#1", "C", "items"], op("[]", 3, Action::SeqPush));
         assert!(dead(&read(&file(&lost(), &pushes), "meshes/m.bin")).is_empty());
     }
@@ -1026,12 +1027,12 @@ mod tests {
 
     /// A behavior's file, written as the merge writes it: see `PatchJson`.
     fn file<'a>(one: &OnePatchMap<'a>, seq: &SeqPatchMap<'a>) -> String {
-        sonic_rs::to_string(&PatchJson { one, seq, overridden: &one.overridden }).unwrap()
+        sonic_rs::to_string(&PatchJson { one, seq, overridden: one.overridden() }).unwrap()
     }
 
     /// Two mods replace `#1/C/a`: `winner` (priority 4) and `loser` (3).
     fn behavior(winner: &str, loser: &str) -> String {
-        let one = OnePatchMap::default();
+        let mut one = OnePatchMap::default();
         one.insert(json_path!["#1", "C", "a"], op(winner, 4, REPLACE));
         one.insert(json_path!["#1", "C", "a"], op(loser, 3, REPLACE));
         file(&one, &SeqPatchMap::default())
@@ -1083,7 +1084,7 @@ mod tests {
 
     /// Mods writing to ranges of `#1/C/items`: `(priority, range, op, the values as JSON)`.
     fn seq(ranges: &[(usize, std::ops::Range<usize>, Op, &str)]) -> String {
-        let seq = SeqPatchMap::default();
+        let mut seq = SeqPatchMap::default();
         for (priority, range, kind, values) in ranges {
             let action = Action::Seq { op: *kind, range: range.clone() };
             seq.insert(json_path!["#1", "C", "items"], op(values, *priority, action));
@@ -1140,7 +1141,7 @@ mod tests {
 
     #[test]
     fn pushes_do_not_conflict() {
-        let seq = SeqPatchMap::default();
+        let mut seq = SeqPatchMap::default();
         seq.insert(json_path!["#1", "C", "items"], op("[1]", 3, Action::SeqPush));
         seq.insert(json_path!["#1", "C", "items"], op("[2]", 4, Action::SeqPush));
         assert!(read(&file(&OnePatchMap::default(), &seq), "x").points.is_empty());

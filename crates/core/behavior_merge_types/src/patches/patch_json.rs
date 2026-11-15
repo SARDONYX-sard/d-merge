@@ -17,16 +17,18 @@ use super::{OnePatchMap, SeqPatchMap};
 /// See the module docs.
 ///
 /// Generic over how the maps are held: the merge writes references to its own
-/// (`PatchJson<&OnePatchMap, &SeqPatchMap>`), and a reader owns what it read ([`ReadPatchJson`]).
+/// (`PatchJson<&OnePatchMap, &SeqPatchMap, Overridden>`), and a reader owns what it read
+/// ([`ReadPatchJson`]).
 #[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
-pub struct PatchJson<One, Seq> {
+pub struct PatchJson<One, Seq, Lost> {
     /// One value per path: the highest priority's. See [`OnePatchMap`].
     pub one: One,
     /// Arrays: what every mod does to them. See [`SeqPatchMap`].
     pub seq: Seq,
     /// What lost at each path of `one`: not applied. See [`OnePatchMap::overridden`].
-    pub overridden: Seq,
+    pub overridden: Lost,
 }
 
-/// A [`PatchJson`] as read from its file.
-pub type ReadPatchJson<'a> = PatchJson<OnePatchMap<'a>, SeqPatchMap<'a>>;
+/// A [`PatchJson`] as read from its file. What lost is put back into `one` with
+/// [`OnePatchMap::insert_losers`].
+pub type ReadPatchJson<'a> = PatchJson<OnePatchMap<'a>, SeqPatchMap<'a>, SeqPatchMap<'a>>;

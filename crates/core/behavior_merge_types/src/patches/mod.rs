@@ -1,16 +1,21 @@
 //! Parsed (borrowed) patches per template: what `behavior_merge` and `fnis_patch_gen`
 //! both produce, and `behavior_merge` applies.
 
+mod key_index;
+mod list_map;
 mod patch_json;
 mod patch_map;
+mod priority_map;
 
 use std::borrow::Cow;
 
-use dashmap::DashMap;
+use fast_hash::HashMap;
 
 pub use self::{
+    list_map::ListMap,
     patch_json::{PatchJson, ReadPatchJson},
-    patch_map::{HkxPatchMaps, OnePatchMap, SeqPatchMap},
+    patch_map::{HkxPatchMaps, OnePatchMap, Overridden, SeqPatchMap},
+    priority_map::{Prioritized, PriorityEntry, PriorityMap},
 };
 use crate::template_key::TemplateKey;
 
@@ -28,7 +33,11 @@ pub struct PatchCollection<'a> {
 /// A patch containing references to parsed strings.
 ///
 /// - key: template name (e.g., `"meshes/actors/character/behavior/0_master.bin"`)
-/// - value: `DashMap<jsonPath, { patch, priority }>`
+/// - value: the patches of that template, see [`HkxPatchMaps`]
+///
+/// Not concurrent: it has one writer at a time. `fnis_patch_gen` gives each worker a map of its own
+/// (rayon's `fold`) and merges them after (`reduce`); `behavior_merge` collects one made per template.
+/// A reader may still go through it in parallel (`par_iter`).
 ///
 /// # Lifetime
 /// The duration during which the Nemesis patch remains active from the path.
@@ -46,7 +55,7 @@ pub struct PatchCollection<'a> {
 /// }
 /// ```
 #[derive(Debug, Default, Clone)]
-pub struct BehaviorPatchesMap<'a>(pub DashMap<TemplateKey<'static>, HkxPatchMaps<'a>, fast_hash::RandomState>);
+pub struct BehaviorPatchesMap<'a>(pub HashMap<TemplateKey<'static>, HkxPatchMaps<'a>>);
 
 impl<'a> BehaviorPatchesMap<'a> {
     #[inline]
@@ -54,26 +63,19 @@ impl<'a> BehaviorPatchesMap<'a> {
         self.len() == 0
     }
 
+    /// How many paths are patched, over every template.
     pub fn len(&self) -> usize {
-        use rayon::prelude::*;
-        self.0
-            .par_iter()
-            .map(|pair| {
-                let HkxPatchMaps { one, seq } = pair.value();
-                one.len() + seq.0.len()
-            })
-            .sum()
+        self.0.values().map(HkxPatchMaps::len).sum()
     }
 
-    pub fn merge(&self, other: Self) {
+    /// Takes in the patches of `other`: of a template both have, as [`HkxPatchMaps::merge`] does.
+    pub fn merge(&mut self, other: Self) {
         for (key, other_maps) in other.0 {
             match self.0.entry(key) {
-                dashmap::Entry::Vacant(v) => {
-                    v.insert(other_maps);
+                fast_hash::hash_map::Entry::Vacant(vacant) => {
+                    vacant.insert(other_maps);
                 }
-                dashmap::Entry::Occupied(mut occ) => {
-                    occ.get_mut().merge(other_maps);
-                }
+                fast_hash::hash_map::Entry::Occupied(mut occupied) => occupied.get_mut().merge(other_maps),
             }
         }
     }
@@ -90,7 +92,7 @@ pub struct BehaviorIndexes {
     pub behavior_graph: Option<Cow<'static, str>>,
 }
 
-/// A concurrent map from a template key (e.g., a file name like `0_master.xml`)
+/// A map from a template key (e.g., a file name like `0_master.xml`)
 /// to the indexes of `hkbBehaviorGraphStringData` & `hkbBehaviorGraphData`.
 ///
 /// This mapping is necessary for replacing Nemesis variables such as `$variableID[]$`, `$eventID[]$`,
@@ -101,12 +103,12 @@ pub struct BehaviorIndexes {
 /// - key: template_name
 /// - value: [`BehaviorIndexes`]
 #[derive(Debug, Default, Clone)]
-pub struct BehaviorIndexMap<'a>(pub DashMap<TemplateKey<'a>, BehaviorIndexes, fast_hash::RandomState>);
+pub struct BehaviorIndexMap<'a>(pub HashMap<TemplateKey<'a>, BehaviorIndexes>);
 impl<'a> BehaviorIndexMap<'a> {
     /// Create `Self`
     #[inline]
     pub fn new() -> Self {
-        Self(DashMap::default())
+        Self(HashMap::default())
     }
 
     /// Inserts the indexes. Already inserted ones are kept, except that the one with
@@ -114,14 +116,14 @@ impl<'a> BehaviorIndexMap<'a> {
     ///
     /// Therefore, the result does not depend on the insertion order.
     #[inline]
-    pub fn insert(&self, key: TemplateKey<'a>, indexes: BehaviorIndexes) {
+    pub fn insert(&mut self, key: TemplateKey<'a>, indexes: BehaviorIndexes) {
         match self.0.entry(key) {
-            dashmap::Entry::Occupied(mut occ) => {
-                if occ.get().behavior_graph.is_none() && indexes.behavior_graph.is_some() {
-                    occ.insert(indexes);
+            fast_hash::hash_map::Entry::Occupied(mut occupied) => {
+                if occupied.get().behavior_graph.is_none() && indexes.behavior_graph.is_some() {
+                    occupied.insert(indexes);
                 }
             }
-            dashmap::Entry::Vacant(vacant) => {
+            fast_hash::hash_map::Entry::Vacant(vacant) => {
                 vacant.insert(indexes);
             }
         }

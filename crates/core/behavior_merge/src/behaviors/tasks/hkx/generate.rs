@@ -58,7 +58,7 @@ pub(crate) fn generate_hkx_files(
 
                 // NOTE: If the indexes are unknown, Nemesis variables are not replaced.
                 // NOTE: Clone it to release the `DashMap` lock immediately. (It's just 2 small strings.)
-                let indexes = behavior_index_map.0.get(&key).map(|indexes| indexes.clone());
+                let indexes = behavior_index_map.0.get(&key).cloned();
 
                 // Deduplication is prone to unexpected index misalignments, and there is no guarantee that this will not occur.
                 // Furthermore, since values with the same name are synchronized, there are no drawbacks other than wasted resources.

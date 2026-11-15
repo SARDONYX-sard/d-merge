@@ -608,6 +608,7 @@ version = "0.0.0"
 dependencies = [
  "dashmap",
  "fast_hash",
+ "hashbrown 0.17.1",
  "json_patch",
  "nemesis_xml",
  "phf 0.14.0",
@@ -615,7 +616,6 @@ dependencies = [
  "serde",
  "skyrim_anim_data",
  "stdx",
- "tracing",
 ]
 
 [[package]]

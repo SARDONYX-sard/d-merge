@@ -2,16 +2,20 @@
 //!
 //! This module provides two map structures for managing JSON patches:
 //!
-//! - [`OnePatchMap`]: Maintains a mapping from JSON paths to a **single** value with a priority.
-//! - [`SeqPatchMap`]: Maintains a mapping from JSON paths to a **list** of values, supporting parallel insertion and extension.
+//! - [`OnePatchMap`]: Maintains a mapping from JSON paths to a **single** value with a priority, and
+//!   the values that lost to it. A [`PriorityMap`].
+//! - [`SeqPatchMap`]: Maintains a mapping from JSON paths to a **list** of values. A [`ListMap`].
 //!
-//! Both maps utilize `DashMap` for concurrent access and integrate with the `json_patch` crate.
+//! Neither is concurrent: a template has one writer at a time. See `priority_map`.
 //!
 //! These are ideal for use-cases where patches must be merged, prioritized, or combined from multiple threads.
 
-use dashmap::DashMap;
 use json_patch::{JsonPath, ValueWithPriority};
-use rayon::prelude::*;
+
+use super::{
+    list_map::ListMap,
+    priority_map::{PriorityEntry, PriorityMap},
+};
 
 /// A combined borrowed structure that holds both [`OnePatchMap`] and [`SeqPatchMap`].
 ///
@@ -29,176 +33,140 @@ pub struct HkxPatchMaps<'a> {
 
 impl<'a> HkxPatchMaps<'a> {
     #[inline]
-    pub fn len(&self) -> usize {
-        self.one.len() + self.seq.0.len()
+    pub const fn len(&self) -> usize {
+        self.one.len() + self.seq.len()
     }
 
     #[inline]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     #[inline]
-    pub fn merge(&self, other: Self) {
+    pub fn merge(&mut self, other: Self) {
         self.one.merge(other.one);
         self.seq.merge(other.seq);
     }
 }
 
-/// Inserts a patch into the map.
-///
-/// Conflict resolution rules:
-///
-/// 1. If the exact JSON path already exists,
-///    the patch with the highest priority is retained.
-///
-/// 2. All other paths are inserted normally.
-///
-/// This method is thread-safe and may be called concurrently.
+/// One value per JSON path: the patch of the highest priority, and the ones that lost to it. See
+/// [`PriorityMap`]: one writer at a time, which the map of templates around it already makes sure of.
 #[derive(Debug, Clone, Default)]
 pub struct OnePatchMap<'a> {
-    /// Stores the final patch selected for each JSON path.
-    ///
-    /// If multiple patches target the same path, only the patch with the
-    /// highest priority is retained.
-    patches: DashMap<JsonPath<'a>, ValueWithPriority<'a>, fast_hash::RandomState>,
-
-    /// The patches that lost at each JSON path. Not applied: they tell which mods conflict.
-    pub overridden: SeqPatchMap<'a>,
+    map: PriorityMap<JsonPath<'a>, ValueWithPriority<'a>>,
 }
 
 impl<'a> OnePatchMap<'a> {
-    /// Inserts a patch into the map.
-    ///
-    /// If the path already exists, the patch with the highest priority is kept.
+    /// Inserts a patch. Where the path is already, the higher priority is the one applied, and the
+    /// other is kept as a loser: see [`Self::overridden`].
     ///
     /// A new object goes by its id alone (`/#aaaa$1`, its class in the value: see
     /// `nemesis_xml::patch`). So two mods adding one id as other classes (e.g. two versions of one
-    /// mod) meet at one path: only the highest priority is the object, the other is in `overridden`.
-    ///
-    /// This method is safe to call concurrently.
+    /// mod) meet at one path: only the highest priority is the object.
     #[inline]
-    pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
-        // Same-path conflict.
-        if let Some(mut existing) = self.patches.get_mut(&key) {
-            let loser = if new_value.priority > existing.priority {
-                tracing::info!(
-                    "Conflict Path {key:?}: priority {} -> {} (overwritten)",
-                    new_value.priority,
-                    existing.priority,
-                );
-
-                std::mem::replace(&mut *existing, new_value)
-            } else {
-                new_value
-            };
-            drop(existing);
-            self.overridden.insert(key, loser);
-            return;
-        }
-        self.patches.insert(key, new_value);
+    pub fn insert(&mut self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
+        self.map.insert(key, new_value);
     }
 
-    /// Merges another `OnePatchMap` into this one by comparing priorities and keeping the highest.
+    /// Takes in every patch of `other`, as [`Self::insert`] does.
     #[inline]
-    pub fn merge(&self, other: Self) {
-        for (path, new_val) in other.patches {
-            match self.patches.entry(path) {
-                dashmap::Entry::Occupied(mut occ) => {
-                    let path = occ.key().clone();
-                    let existing = occ.get_mut();
-                    let loser = if new_val.priority > existing.priority {
-                        std::mem::replace(existing, new_val)
-                    } else {
-                        new_val
-                    };
-                    drop(occ);
-                    self.overridden.insert(path, loser);
-                }
-                dashmap::Entry::Vacant(v) => {
-                    v.insert(new_val);
-                }
+    pub fn merge(&mut self, other: Self) {
+        self.map.merge(other.map);
+    }
+
+    /// Puts patches at paths that are not in the map yet: what only adds, e.g. FNIS's own objects. See
+    /// [`PriorityMap::extend_unique`].
+    #[inline]
+    pub fn extend_unique(&mut self, patches: impl IntoIterator<Item = (JsonPath<'a>, ValueWithPriority<'a>)>) {
+        self.map.extend_unique(patches);
+    }
+
+    /// The patches that lost at their paths, put back as read from a file: see `PatchJson`.
+    pub fn insert_losers(&mut self, losers: SeqPatchMap<'a>) {
+        for (path, values) in losers.into_groups() {
+            for value in values {
+                self.map.insert(path.clone(), value);
             }
         }
-        self.overridden.merge(other.overridden);
     }
 
-    /// Inserts patches in parallel without conflict resolution.
-    ///
-    /// This method bypasses `insert()` and directly inserts entries into the
-    /// underlying `DashMap`.
-    ///
-    /// # Requirements
-    ///
-    /// - No duplicate JSON paths may exist.
-    /// - No class conflicts may exist.
-    /// - Priority comparison is not performed.
-    ///
-    /// This method should only be used when all patches are known to be unique additions.
-    ///
-    /// For example, FNIS patches only performs additional operations, and this makes it very useful.
+    /// The number of paths.
     #[inline]
-    pub fn par_extend<I>(&mut self, patches: I)
-    where
-        I: IntoParallelIterator<Item = (JsonPath<'a>, ValueWithPriority<'a>)>,
-    {
-        self.patches.par_extend(patches);
-    }
-
-    /// Returns the number of patches stored in this map.
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.patches.len()
+    pub const fn len(&self) -> usize {
+        self.map.len()
     }
 
     /// Returns `true` if no patch is stored.
     #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.patches.is_empty()
+    pub const fn is_empty(&self) -> bool {
+        self.map.is_empty()
     }
 
-    /// Consumes this map and returns the underlying `DashMap` of patches.
+    /// What lost at each path: not applied, but a conflict check shows them. Written as
+    /// `{ path: [patch, ..] }`, only the paths with any.
     #[inline]
-    pub fn into_inner(self) -> DashMap<JsonPath<'a>, ValueWithPriority<'a>, fast_hash::RandomState> {
-        self.patches
+    pub const fn overridden(&self) -> Overridden<'_, 'a> {
+        Overridden(self)
+    }
+
+    /// The patch applied at each path, the map gone: in the order the paths came.
+    #[inline]
+    pub fn into_winners(self) -> impl Iterator<Item = (JsonPath<'a>, ValueWithPriority<'a>)> {
+        self.map.into_winners()
+    }
+
+    /// Each path with the patch applied and those that lost, the map gone.
+    #[inline]
+    pub fn into_entries(self) -> impl Iterator<Item = PriorityEntry<JsonPath<'a>, ValueWithPriority<'a>>> {
+        self.map.into_entries()
     }
 }
 
-/// A map that stores array field patches per JSON path,
-/// allowing parallel insertion and extension.
+/// See [`OnePatchMap::overridden`].
+#[derive(Debug, Clone, Copy)]
+pub struct Overridden<'m, 'a>(&'m OnePatchMap<'a>);
+
+/// Every operation on each array, by its JSON path: all of them are applied, in priority order. See
+/// [`ListMap`]: one writer at a time, as for [`OnePatchMap`].
 #[derive(Debug, Clone, Default)]
-pub struct SeqPatchMap<'a>(pub DashMap<JsonPath<'a>, Vec<ValueWithPriority<'a>>, fast_hash::RandomState>);
+pub struct SeqPatchMap<'a> {
+    map: ListMap<JsonPath<'a>, ValueWithPriority<'a>>,
+}
 
 impl<'a> SeqPatchMap<'a> {
-    /// Inserts a value for the given JSON path.
-    ///
-    /// - If the path already has an entry, the new value is pushed to the list.
-    /// - Otherwise, a new list is created with the value.
+    /// Puts an operation on the array at `key`, after those there.
     #[inline]
-    pub fn insert(&self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
-        match self.0.entry(key) {
-            dashmap::Entry::Occupied(mut existing) => {
-                existing.get_mut().push(new_value);
-            }
-            dashmap::Entry::Vacant(v) => {
-                v.insert(vec![new_value]);
-            }
-        }
+    pub fn insert(&mut self, key: JsonPath<'a>, new_value: ValueWithPriority<'a>) {
+        self.map.insert(key, new_value);
     }
 
-    /// Extends the list of values for the given JSON path.
+    /// Takes in every operation of `other`, after those of `self`.
     #[inline]
-    pub fn merge(&self, other: Self) {
-        for (path, other_vals) in other.0 {
-            match self.0.entry(path) {
-                dashmap::Entry::Occupied(mut occ) => {
-                    occ.get_mut().par_extend(other_vals);
-                }
-                dashmap::Entry::Vacant(v) => {
-                    v.insert(other_vals);
-                }
-            }
-        }
+    pub fn merge(&mut self, other: Self) {
+        self.map.merge(other.map);
+    }
+
+    /// The number of arrays.
+    #[inline]
+    pub const fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    #[inline]
+    pub const fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    /// Each array with its operations, in the order the arrays came. For what only reads them.
+    #[inline]
+    pub fn groups(&self) -> impl Iterator<Item = (&JsonPath<'a>, Vec<&ValueWithPriority<'a>>)> {
+        self.map.groups()
+    }
+
+    /// Each array with its operations, the map gone: what is applied.
+    #[inline]
+    pub fn into_groups(self) -> impl Iterator<Item = (JsonPath<'a>, Vec<ValueWithPriority<'a>>)> {
+        self.map.into_groups()
     }
 }
 
@@ -220,10 +188,25 @@ impl<'a> serde::Serialize for OnePatchMap<'a> {
     {
         use serde::ser::SerializeMap;
 
-        let mut map = serializer.serialize_map(Some(self.patches.len()))?;
-        for item in self.patches.iter() {
-            let joined = item.key().join("/"); // JsonPath -> "a/b/c"
-            map.serialize_entry(&joined, item.value())?;
+        let mut map = serializer.serialize_map(Some(self.map.len()))?;
+        for (path, winner) in self.map.winners() {
+            map.serialize_entry(&path.join("/"), winner)?; // JsonPath -> "a/b/c"
+        }
+        map.end()
+    }
+}
+
+impl serde::Serialize for Overridden<'_, '_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeMap;
+
+        let losers = self.0.map.losers();
+        let mut map = serializer.serialize_map(Some(losers.len()))?;
+        for (path, lost) in losers {
+            map.serialize_entry(&path.join("/"), &lost)?;
         }
         map.end()
     }
@@ -249,12 +232,12 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for OnePatchMap<'a> {
             where
                 M: serde::de::MapAccess<'de>,
             {
-                let patches = DashMap::<_, _, fast_hash::RandomState>::default();
+                let mut patches = OnePatchMap::default();
                 while let Some((key, value)) = access.next_entry::<String, ValueWithPriority<'de>>()? {
                     let json_path = key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
                     patches.insert(json_path, value);
                 }
-                Ok(OnePatchMap { patches, overridden: SeqPatchMap::default() })
+                Ok(patches)
             }
         }
 
@@ -269,10 +252,9 @@ impl<'a> serde::Serialize for SeqPatchMap<'a> {
     {
         use serde::ser::SerializeMap;
 
-        let mut map = serializer.serialize_map(Some(self.0.len()))?;
-        for item in self.0.iter() {
-            let joined = item.key().join("/"); // "a/b/c"
-            map.serialize_entry(&joined, item.value())?;
+        let mut map = serializer.serialize_map(Some(self.map.len()))?;
+        for (path, operations) in self.map.groups() {
+            map.serialize_entry(&path.join("/"), &operations)?; // JsonPath -> "a/b/c"
         }
         map.end()
     }
@@ -298,14 +280,15 @@ impl<'de: 'a, 'a> serde::Deserialize<'de> for SeqPatchMap<'a> {
             where
                 M: serde::de::MapAccess<'de>,
             {
-                let map = DashMap::<_, _, fast_hash::RandomState>::default();
-
-                while let Some((key, value)) = access.next_entry::<String, Vec<ValueWithPriority<'de>>>()? {
-                    let json_path = key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
-                    map.insert(json_path, value);
+                let mut map = SeqPatchMap::default();
+                while let Some((key, values)) = access.next_entry::<String, Vec<ValueWithPriority<'de>>>()? {
+                    let json_path: JsonPath<'a> =
+                        key.split('/').map(|s| std::borrow::Cow::Owned(s.to_string())).collect();
+                    for value in values {
+                        map.insert(json_path.clone(), value);
+                    }
                 }
-
-                Ok(SeqPatchMap(map))
+                Ok(map)
             }
         }
 
@@ -327,23 +310,26 @@ mod tests {
         }
     }
 
+    /// The winner's and the losers' priorities at `path`.
+    fn priorities(map: OnePatchMap<'_>, path: &JsonPath<'_>) -> (usize, Vec<usize>) {
+        let slot = map.into_entries().find(|entry| entry.key == *path).unwrap();
+        (slot.winner.priority, slot.losers.iter().map(|loser| loser.priority).collect())
+    }
+
     #[test]
     fn the_highest_priority_is_kept_and_the_losers_are_remembered() {
-        let map = OnePatchMap::default();
+        let mut map = OnePatchMap::default();
         let path = json_patch::json_path!["#1", "C", "a"];
         map.insert(path.clone(), value(5));
         map.insert(path.clone(), value(9)); // takes over
         map.insert(path.clone(), value(1)); // too low
 
-        assert_eq!(map.patches.get(&path).unwrap().priority, 9);
-        let losers: Vec<usize> = map.overridden.0.get(&path).unwrap().iter().map(|v| v.priority).collect();
-        assert_eq!(losers, [5, 1]);
+        assert_eq!(priorities(map.clone(), &path), (9, vec![5, 1]));
 
-        let other = OnePatchMap::default();
+        let mut other = OnePatchMap::default();
         other.insert(path.clone(), value(20));
         map.merge(other);
-        assert_eq!(map.patches.get(&path).unwrap().priority, 20);
-        assert!(map.overridden.0.get(&path).unwrap().iter().any(|v| v.priority == 9));
+        assert_eq!(priorities(map, &path), (20, vec![5, 1, 9]));
     }
 
     /// Two versions of a mod add `#aaaa$1` as other classes: one path, so one object.
@@ -356,19 +342,18 @@ mod tests {
             },
             priority,
         };
-        let map = OnePatchMap::default();
+        let mut map = OnePatchMap::default();
         let path = json_patch::json_path!["#aaaa$1"];
         map.insert(path.clone(), class("SomeClass", 9));
         map.insert(path.clone(), class("OtherSomeClass", 3));
 
         assert_eq!(map.len(), 1);
-        assert_eq!(map.patches.get(&path).unwrap().priority, 9);
-        assert_eq!(map.overridden.0.get(&path).unwrap().len(), 1, "a conflict a check sees");
+        assert_eq!(priorities(map, &path), (9, vec![3]), "a conflict a check sees");
     }
 
     #[test]
     fn should_not_treat_nested_paths_as_class_adds() {
-        let map = OnePatchMap::default();
+        let mut map = OnePatchMap::default();
 
         let path1 = json_patch::json_path!["#5176", "ClassA", "field1",];
         let path2 = json_patch::json_path!["#5176", "ClassB", "field2",];
@@ -377,7 +362,131 @@ mod tests {
         map.insert(path2.clone(), value(20));
 
         assert_eq!(map.len(), 2);
-        assert!(map.patches.contains_key(&path1));
-        assert!(map.patches.contains_key(&path2));
+        let mut paths: Vec<_> = map.into_winners().map(|(path, _)| path).collect();
+        paths.sort();
+        assert_eq!(paths, [path1, path2]);
+    }
+
+    /// What the old `DashMap` of `SeqPatchMap` did: a list a path, made and grown at each insert.
+    type OldSeq = dashmap::DashMap<JsonPath<'static>, Vec<ValueWithPriority<'static>>, fast_hash::RandomState>;
+
+    fn old_seq_insert(map: &OldSeq, path: JsonPath<'static>, value: ValueWithPriority<'static>) {
+        match map.entry(path) {
+            dashmap::Entry::Occupied(mut existing) => existing.get_mut().push(value),
+            dashmap::Entry::Vacant(vacant) => {
+                vacant.insert(vec![value]);
+            }
+        }
+    }
+
+    /// `PATCHES` patches of paths as a mod writes them: every `same_path_every`th is at the path of
+    /// the one before it.
+    fn bench_patches(same_path_every: usize) -> Vec<(JsonPath<'static>, ValueWithPriority<'static>)> {
+        use std::borrow::Cow;
+
+        (0..BENCH_PATCHES)
+            .map(|at| {
+                let object = if at % same_path_every == 0 && at > 0 { at - 1 } else { at };
+                let path: JsonPath<'static> = vec![
+                    Cow::Owned(format!("#{object:04}")),
+                    Cow::Borrowed("hkbStateMachine"),
+                    Cow::Borrowed("enable"),
+                ];
+                (path, value(at % 7))
+            })
+            .collect()
+    }
+
+    /// What a template gets, about: a million patches.
+    const BENCH_PATCHES: usize = 1_000_000;
+
+    /// `OnePatchMap` (a `PriorityMap`) against the `DashMap`s it replaced: one in ten patches a
+    /// conflict. One writer, as each template has. Prints how long inserting and then taking the winners
+    /// out took; run with `--release --ignored --nocapture`.
+    #[test]
+    #[ignore = "a benchmark: prints timings"]
+    fn priority_map_against_dashmaps() {
+        use std::time::Instant;
+
+        let patches = bench_patches(10);
+
+        // What `OnePatchMap::insert` was: the winners, and a second map of the losers.
+        let old = {
+            let patches = patches.clone();
+            let start = Instant::now();
+            let winners: dashmap::DashMap<JsonPath<'static>, ValueWithPriority<'static>, fast_hash::RandomState> =
+                dashmap::DashMap::default();
+            let losers = OldSeq::default();
+            for (path, value) in patches {
+                if let Some(mut existing) = winners.get_mut(&path) {
+                    let loser = if value.priority > existing.priority {
+                        std::mem::replace(&mut *existing, value)
+                    } else {
+                        value
+                    };
+                    drop(existing);
+                    old_seq_insert(&losers, path, loser);
+                    continue;
+                }
+                winners.insert(path, value);
+            }
+            let inserted = start.elapsed();
+            let applied = winners.into_iter().count();
+            (inserted, start.elapsed(), applied, losers.len())
+        };
+
+        let new = {
+            let start = Instant::now();
+            let mut map = OnePatchMap::default();
+            for (path, value) in patches {
+                map.insert(path, value);
+            }
+            let inserted = start.elapsed();
+            let lost = map.map.losers().len();
+            let applied = map.into_winners().count();
+            (inserted, start.elapsed(), applied, lost)
+        };
+
+        println!("one: DashMap + DashMap of losers: insert {:?}, + take the winners {:?}", old.0, old.1);
+        println!("one: PriorityMap:                 insert {:?}, + take the winners {:?}", new.0, new.1);
+        assert_eq!((old.2, old.3), (new.2, new.3), "the same winners and paths with losers");
+    }
+
+    /// `SeqPatchMap` (a `ListMap`) against the `DashMap` it replaced: arrays with one to a few
+    /// operations (every third is on the array of the one before). Prints how long inserting and then
+    /// taking each array's list out took.
+    #[test]
+    #[ignore = "a benchmark: prints timings"]
+    fn list_map_against_dashmap() {
+        use std::time::Instant;
+
+        let patches = bench_patches(3);
+
+        let old = {
+            let patches = patches.clone();
+            let start = Instant::now();
+            let map = OldSeq::default();
+            for (path, value) in patches {
+                old_seq_insert(&map, path, value);
+            }
+            let inserted = start.elapsed();
+            let operations: usize = map.into_iter().map(|(_, values)| values.len()).sum();
+            (inserted, start.elapsed(), operations)
+        };
+
+        let new = {
+            let start = Instant::now();
+            let mut map = SeqPatchMap::default();
+            for (path, value) in patches {
+                map.insert(path, value);
+            }
+            let inserted = start.elapsed();
+            let operations: usize = map.into_groups().map(|(_, values)| values.len()).sum();
+            (inserted, start.elapsed(), operations)
+        };
+
+        println!("seq: DashMap of lists: insert {:?}, + take the lists {:?}", old.0, old.1);
+        println!("seq: ListMap:          insert {:?}, + take the lists {:?}", new.0, new.1);
+        assert_eq!(old.2, new.2, "every operation is kept");
     }
 }

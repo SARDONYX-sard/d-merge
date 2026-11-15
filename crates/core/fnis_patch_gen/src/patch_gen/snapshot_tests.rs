@@ -64,7 +64,6 @@ fn write_patch(out: &mut String, patch: &ValueWithPriority<'_>) {
 }
 
 /// Writes all that `collect_borrowed_patches` returned, in an order that does not depend on the maps.
-#[expect(clippy::significant_drop_tightening, reason = "A test: nothing else wants the locks of the maps")]
 pub(super) fn dump(
     patches: &PatchCollection<'_>,
     adsf_patches: &[AdsfPatch<'_>],
@@ -74,33 +73,32 @@ pub(super) fn dump(
     let mut out = String::new();
 
     let mut templates: Vec<_> = patches.borrowed_patches.0.iter().collect();
-    templates.sort_unstable_by_key(|template| template.key().to_string());
-    for template in templates {
-        writeln!(out, "# template {}", template.key()).unwrap();
+    templates.sort_unstable_by_key(|(key, _)| key.to_string());
+    for (key, maps) in templates {
+        writeln!(out, "# template {key}").unwrap();
 
-        let one = template.value().one.clone().into_inner();
-        let mut one: Vec<_> = one.iter().collect();
-        one.sort_unstable_by(|a, b| a.key().cmp(b.key()));
-        for field in one {
-            writeln!(out, "one {}", field.key().join("/")).unwrap();
-            write_patch(&mut out, field.value());
+        let mut one: Vec<_> = maps.one.clone().into_winners().collect();
+        one.sort_unstable_by(|a, b| a.0.cmp(&b.0));
+        for (path, patch) in &one {
+            writeln!(out, "one {}", path.join("/")).unwrap();
+            write_patch(&mut out, patch);
         }
 
         // The order inside of a `seq` is what is generated, and it comes first to last: not sorted.
-        let mut seq: Vec<_> = template.value().seq.0.iter().collect();
-        seq.sort_unstable_by(|a, b| a.key().cmp(b.key()));
-        for field in seq {
-            writeln!(out, "seq {}", field.key().join("/")).unwrap();
-            for patch in field.value() {
+        let mut seq: Vec<_> = maps.seq.groups().collect();
+        seq.sort_unstable_by(|a, b| a.0.cmp(b.0));
+        for (path, patches) in seq {
+            writeln!(out, "seq {}", path.join("/")).unwrap();
+            for patch in patches {
                 write_patch(&mut out, patch);
             }
         }
     }
 
     let mut indexes: Vec<_> = patches.behavior_index_map.0.iter().collect();
-    indexes.sort_unstable_by_key(|index| index.key().to_string());
-    for index in indexes {
-        writeln!(out, "# index {} {:?}", index.key(), index.value()).unwrap();
+    indexes.sort_unstable_by_key(|(key, _)| key.to_string());
+    for (key, index) in indexes {
+        writeln!(out, "# index {key} {index:?}").unwrap();
     }
 
     for patch in adsf_patches {

@@ -166,8 +166,7 @@ fn apply_and_gen_patched_hkx<'a>(
 
     let mut template_error_len;
     let owned_templates = {
-        // NOTE: Since `DashSet` cannot solve the lifetime error of `contain`, we have no choice but to replace it with `HashSet`.
-        let needed_template_names = borrowed_patches.0.par_iter().map(|entry| entry.key().clone()).collect();
+        let needed_template_names = borrowed_patches.0.keys().cloned().collect();
 
         let (owned_templates, errors) = owned::collect_templates(&config.resource_dir, needed_template_names);
         template_error_len = errors.len();
