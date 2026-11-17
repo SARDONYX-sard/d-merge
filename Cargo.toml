@@ -102,7 +102,7 @@ skyrim_crc           = { path = "./crates/core/skyrim_crc" }
 skyrim_esp           = { path = "./crates/core/skyrim_esp" }
 stdx                 = { path = "./crates/core/stdx" }
 
-egui_code_editor  = { path = "./crates/gui/egui_code_editor" }
+egui_code_editor  = { path = "./crates/gui/egui_code_editor", features = ["vim"] }
 egui_graph_view   = { path = "./crates/gui/egui_graph_view" }
 egui_tree         = { path = "./crates/gui/egui_tree" }
 egui_widgets      = { path = "./crates/gui/egui_widgets" }

@@ -1,7 +1,7 @@
 use egui::text::{CCursor, CCursorRange};
 
 use super::{popups::apply_quick_fix, text::sorted_chars, *};
-use crate::{Indent, QuickFix, keymap};
+use crate::{Indent, QuickFix};
 
 #[test]
 fn quick_fix_replaces_columns_of_its_line() {
@@ -144,7 +144,9 @@ fn the_right_button_elsewhere_moves_the_cursor() {
 }
 
 /// A language with the same hover over all of its text.
+#[cfg(feature = "vim")]
 struct Hovered(&'static str);
+#[cfg(feature = "vim")]
 impl Language for Hovered {
     fn hover_at(&self, _text: &str, _line: usize, _column: usize) -> Option<String> {
         Some(self.0.to_owned())
@@ -152,6 +154,7 @@ impl Language for Hovered {
 }
 
 /// Presses a key the way a window system reports it: the key, then the text it typed.
+#[cfg(feature = "vim")]
 fn press(frames: &mut Frames, key: egui::Key, modifiers: egui::Modifiers, typed: &str) {
     let mut events = vec![egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }];
     if !typed.is_empty() {
@@ -160,15 +163,18 @@ fn press(frames: &mut Frames, key: egui::Key, modifiers: egui::Modifiers, typed:
     frames.frame(events);
 }
 
+#[cfg(feature = "vim")]
 fn press_shift_k(frames: &mut Frames) {
     press(frames, egui::Key::K, egui::Modifiers::SHIFT, "K");
 }
 
+#[cfg(feature = "vim")]
 fn press_j(frames: &mut Frames) {
     press(frames, egui::Key::J, egui::Modifiers::NONE, "j");
 }
 
 /// `K` twice, in Vim.
+#[cfg(feature = "vim")]
 fn in_hover_of(doc: &'static str) -> Frames {
     // (A leak is fine in a test: a language has to live as long as the frames.)
     let language: &'static Hovered = Box::leak(Box::new(Hovered(doc)));
@@ -181,10 +187,12 @@ fn in_hover_of(doc: &'static str) -> Frames {
     frames
 }
 
+#[cfg(feature = "vim")]
 fn open_hover(frames: &Frames) -> &crate::hover::Open {
     frames.state.hover.open.as_ref().expect("the popup is open")
 }
 
+#[cfg(feature = "vim")]
 #[test]
 fn k_twice_with_nothing_to_do_in_the_hover_leaves_the_keyboard_in_the_editor() {
     let mut frames = in_hover_of("plain text");
@@ -194,6 +202,7 @@ fn k_twice_with_nothing_to_do_in_the_hover_leaves_the_keyboard_in_the_editor() {
     assert!(frames.state.hover.open.is_none(), "the next key closes it");
 }
 
+#[cfg(feature = "vim")]
 #[test]
 fn j_and_k_scroll_a_long_hover() {
     let doc: &'static str = "a line\n\n".repeat(100).leak();
@@ -214,6 +223,7 @@ fn j_and_k_scroll_a_long_hover() {
     assert_eq!(frames.text, "first\nsecond", "nor do they reach the editor");
 }
 
+#[cfg(feature = "vim")]
 #[test]
 fn tab_goes_through_the_links_of_a_hover() {
     let mut frames = in_hover_of("[one](https://example.com/1) and [two](https://example.com/2)");
@@ -229,6 +239,7 @@ fn tab_goes_through_the_links_of_a_hover() {
     assert!(!frames.ctx.memory(|memory| memory.has_focus(frames.id)), "the keyboard is not in the editor");
 }
 
+#[cfg(feature = "vim")]
 #[test]
 fn q_leaves_the_hover_for_the_editor() {
     let mut frames = in_hover_of("[one](https://example.com/1)");
@@ -249,6 +260,7 @@ fn press_tab(frames: &mut Frames) {
     }]);
 }
 
+#[cfg(feature = "vim")]
 fn shift_right_in_vim(frames: &mut Frames) {
     frames.keymap = Keymap::Vim;
     frames.frame(vec![egui::Event::Text(">".to_owned())]);
@@ -270,6 +282,7 @@ fn indents_as_the_language_does() {
     assert_eq!(frames.state.indent.to_string(), "Tab: 4");
 }
 
+#[cfg(feature = "vim")]
 #[test]
 fn vim_shifts_as_the_language_does() {
     let mut frames = Frames::new("a");
@@ -291,20 +304,22 @@ fn a_command_of_the_palette_is_the_command() {
     assert_eq!(EditorCommand::from_action_id("of_the_host"), None);
 }
 
+#[cfg(feature = "vim")]
 #[test]
 fn a_key_that_waits_starts_the_list_of_keys() {
     let mut frames = Frames::new("first");
     frames.keymap = Keymap::Vim;
     frames.frame(vec![egui::Event::Text(" ".to_owned())]);
-    assert!(matches!(frames.state.which_key_waiting, Some((keymap::Prefix::Leader, _))));
+    assert!(matches!(frames.state.which_key_waiting, Some((crate::keymap::Prefix::Leader, _))));
 
     frames.frame(vec![egui::Event::Text("z".to_owned())]);
     assert_eq!(frames.state.which_key_waiting, None, "not a command: the keys are dropped");
 
     frames.frame(vec![egui::Event::Text("g".to_owned())]);
-    assert!(matches!(frames.state.which_key_waiting, Some((keymap::Prefix::G, _))));
+    assert!(matches!(frames.state.which_key_waiting, Some((crate::keymap::Prefix::G, _))));
 }
 
+#[cfg(feature = "vim")]
 #[test]
 fn vim_asks_the_host_for_the_next_change() {
     let mut frames = Frames::new("first");
@@ -316,6 +331,7 @@ fn vim_asks_the_host_for_the_next_change() {
     assert_eq!(frames.text, "first");
 }
 
+#[cfg(feature = "vim")]
 #[test]
 fn vim_space_w_formats_then_saves() {
     let mut frames = Frames::new("first\nsecond");
@@ -328,6 +344,7 @@ fn vim_space_w_formats_then_saves() {
     assert_eq!(frames.command, Some(EditorCommand::Save), "the host saves what is formatted");
 }
 
+#[cfg(feature = "vim")]
 #[test]
 fn vim_space_f_only_formats() {
     let mut frames = Frames::new("first");
@@ -362,7 +379,7 @@ fn selecting_with_the_mouse_asks_for_no_hover() {
 
 #[test]
 fn copy_puts_the_selection_on_the_clipboard() {
-    for keymap in [Keymap::Normal, Keymap::Vim] {
+    for keymap in Keymap::ALL {
         let mut frames = Frames::new(
             "abcdefghijkl
 second line",
@@ -376,6 +393,7 @@ second line",
 }
 
 /// Vim's Visual mode: `Ctrl+C` copies what `v` selected, and leaves the mode.
+#[cfg(feature = "vim")]
 #[test]
 fn copy_in_vim_visual_mode() {
     let mut frames = Frames::new(
@@ -395,7 +413,7 @@ second line",
 /// `Ctrl+Shift+P`: the palette opens with the keyboard in its field, as VS Code's.
 #[test]
 fn the_palette_takes_the_keyboard() {
-    for keymap in [Keymap::Normal, Keymap::Vim] {
+    for keymap in Keymap::ALL {
         let mut frames = Frames::new("abc");
         frames.keymap = keymap;
         frames.frame(Vec::new());
@@ -413,6 +431,7 @@ fn the_palette_takes_the_keyboard() {
 }
 
 /// `Ctrl+/` comments the lines out and back in, in every keymap; Vim's `gcc` too.
+#[cfg(feature = "vim")]
 #[test]
 fn comments_are_toggled() {
     let ctrl_slash = |pressed| egui::Event::Key {
@@ -422,7 +441,7 @@ fn comments_are_toggled() {
         repeat: false,
         modifiers: egui::Modifiers { ctrl: true, command: true, ..Default::default() },
     };
-    for keymap in [Keymap::Normal, Keymap::Vim] {
+    for keymap in Keymap::ALL {
         let mut frames = Frames::new("\t<a/>\n\t<b/>");
         (frames.keymap, frames.language) = (keymap, &crate::languages::Xml);
         frames.frame(Vec::new());

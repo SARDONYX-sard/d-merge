@@ -520,6 +520,7 @@ mod tests {
         assert_eq!(palette.on_keys(enter, &[]), None); // nothing matches the query
     }
 
+    #[cfg(feature = "vim")]
     #[test]
     fn lists_only_what_applies() {
         let labels = EditorLabels::default();

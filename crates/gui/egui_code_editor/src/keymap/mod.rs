@@ -12,6 +12,11 @@
 //! Everything else in the editor only talks to [`KeymapState`], so no other file changes.
 
 pub(crate) mod normal;
+#[cfg(feature = "vim")]
+pub(crate) mod vim;
+// Without Vim: the same API, doing nothing (see `vim_off.rs`).
+#[cfg(not(feature = "vim"))]
+#[path = "vim_off.rs"]
 pub(crate) mod vim;
 
 pub(crate) use self::vim::which_key::Prefix;
@@ -29,8 +34,12 @@ pub enum Keymap {
 }
 
 impl Keymap {
-    /// Every keymap, as a status bar lists them.
+    /// Every keymap, as a status bar lists them: Vim with the `vim` feature only.
+    #[cfg(feature = "vim")]
     pub const ALL: [Self; 2] = [Self::Normal, Self::Vim];
+    /// Every keymap, as a status bar lists them: Vim with the `vim` feature only.
+    #[cfg(not(feature = "vim"))]
+    pub const ALL: [Self; 1] = [Self::Normal];
 
     /// e.g. `Normal`, `Vim`
     #[inline]
@@ -42,11 +51,12 @@ impl Keymap {
         }
     }
 
-    /// `true`: [`Self::Vim`]. e.g. from the app's editor mode: `Keymap::from_vim(mode.is_vim())`
+    /// `true`: [`Self::Vim`] (with the `vim` feature; else `Normal`). e.g. from the app's editor mode:
+    /// `Keymap::from_vim(mode.is_vim())`
     #[inline]
     #[must_use]
     pub const fn from_vim(vim: bool) -> Self {
-        if vim { Self::Vim } else { Self::Normal }
+        if vim && cfg!(feature = "vim") { Self::Vim } else { Self::Normal }
     }
 
     /// Is it [`Self::Vim`]?
@@ -120,6 +130,7 @@ impl StatusMode {
 
 /// A scroll request from a keymap.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(not(feature = "vim"), allow(dead_code, reason = "only Vim aligns and scrolls by lines"))]
 pub(crate) enum Scroll {
     /// Make the cursor visible, scrolling as little as possible.
     IntoView,
