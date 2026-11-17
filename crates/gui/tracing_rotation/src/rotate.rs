@@ -64,14 +64,37 @@ mod tests {
 
     use super::*;
 
+    /// A new empty directory of the test's own under the system's temp directory, removed when
+    /// dropped: the tests run at once, and the temp directory has files of others.
+    struct TempDir(std::path::PathBuf);
+
+    impl TempDir {
+        fn new(test: &str) -> Self {
+            let dir = std::env::temp_dir().join(format!("tracing_rotation_{test}_{}", std::process::id()));
+            let _ = fs::remove_dir_all(&dir); // left by a run that stopped
+            fs::create_dir_all(&dir).unwrap();
+            Self(dir)
+        }
+
+        fn path(&self) -> &std::path::Path {
+            &self.0
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
     fn file_count(dir: &std::path::Path) -> usize {
         fs::read_dir(dir).unwrap().filter_map(|e| e.ok()).filter(|e| e.file_type().is_ok_and(|t| !t.is_dir())).count()
     }
 
     #[test]
     fn caps_at_max_files() -> Result<()> {
-        let temp_dir = std::env::temp_dir();
-        let temp_dir = &temp_dir;
+        let temp_dir = TempDir::new("caps_at_max_files");
+        let temp_dir = temp_dir.path();
 
         for _ in 0..6 {
             rotate_files(temp_dir, "log.log", 3)?;
@@ -84,8 +107,8 @@ mod tests {
 
     #[test]
     fn creates_dir_if_missing() -> Result<()> {
-        let tmp = std::env::temp_dir();
-        let nested = tmp.join("a").join("b").join("c");
+        let tmp = TempDir::new("creates_dir_if_missing");
+        let nested = tmp.path().join("a").join("b").join("c");
 
         rotate_files(&nested, "app.log", 2)?;
         assert!(nested.join("app.log").exists());
@@ -94,8 +117,8 @@ mod tests {
 
     #[test]
     fn renames_active_file_with_timestamp() -> Result<()> {
-        let temp_dir = std::env::temp_dir();
-        let temp_dir = &temp_dir;
+        let temp_dir = TempDir::new("renames_active_file_with_timestamp");
+        let temp_dir = temp_dir.path();
 
         rotate_files(temp_dir, "app.log", 10)?;
         assert!(temp_dir.join("app.log").exists());
