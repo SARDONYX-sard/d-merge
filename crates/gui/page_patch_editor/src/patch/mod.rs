@@ -1107,6 +1107,8 @@ mod user_patch_tests {
             drawn.textures_delta.clear();
         }
         let tool = main.user_patch.tool.as_mut().unwrap();
+        // The window does not wait for its read: three frames may not see it done.
+        tool.wait_job(&mut notify, &i18n);
         assert_eq!(tool.work.place.loaded_for.as_deref(), Some(USER_PATCH_CODE));
 
         tool.apply_bar(ui::top_bar::BarAsk::ClearUserPatch, &mut notify, &i18n);
