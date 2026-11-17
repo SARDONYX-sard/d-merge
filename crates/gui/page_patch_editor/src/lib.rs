@@ -79,6 +79,12 @@ impl PatchEditorPage {
         self.patch.take_user_patch_written()
     }
 
+    /// The conflicts that can be decided all at once: offered in the user patch's window.
+    #[inline]
+    pub fn set_bulk_resolutions(&mut self, list: Vec<gui_shared::patch::BulkResolution>) {
+        self.patch.set_bulk_resolutions(list);
+    }
+
     /// Opens or closes the window of the user patch.
     #[inline]
     pub const fn toggle_user_patch(&mut self) {

@@ -353,6 +353,26 @@ impl Graph {
         &self.entry(node).label
     }
 
+    /// The nodes `node`'s text mentions, first occurrence order (also ids no object has).
+    pub fn children(&self, node: Node) -> &[Node] {
+        &self.entry(node).children
+    }
+
+    /// The objects mentioning `node`, sorted.
+    pub fn parents(&self, node: Node) -> &[Node] {
+        &self.entry(node).parents
+    }
+
+    /// `false`: only a pointer mentions this id.
+    pub fn exists(&self, node: Node) -> bool {
+        self.entry(node).exists
+    }
+
+    /// The node of `id`, also one only a pointer mentions. See [`Self::node_of`].
+    pub fn mentioned(&self, id: &str) -> Option<Node> {
+        self.index.get(id).copied()
+    }
+
     /// A short name for the way to an object: its `name` field, or else its class.
     ///
     /// e.g. `GetUpModList`, `hkbVariableBindingSet`
@@ -444,18 +464,73 @@ fn field_name(text: &str) -> Option<&str> {
 ///
 /// e.g., `name="#0106"`, own = `#0106`, then `#0105 #0109 #0105` -> `["#0105", "#0109"]`
 pub(crate) fn pointers<'a>(text: &'a str, own: &str) -> Vec<&'a str> {
-    let is_id_char = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '$';
-    let mut found: Vec<&str> = Vec::new();
     // A generator can list hundreds of children: a set keeps this linear.
     let mut seen: HashSet<&str> = HashSet::default();
+    ids_in(text).filter(|&id| id != own && seen.insert(id)).collect()
+}
+
+/// Each `#XXXX` / `#mod$N` token of `text`, in order.
+///
+/// e.g. `#0105 #0109 #0105` -> `#0105`, `#0109`, `#0105`
+fn ids_in(text: &str) -> impl Iterator<Item = &str> {
+    let is_id_char = |c: char| c.is_ascii_alphanumeric() || c == '_' || c == '$';
     let mut rest = text;
-    while let Some(at) = rest.find('#') {
-        let len = rest[at + 1..].find(|c: char| !is_id_char(c)).unwrap_or(rest.len() - at - 1);
-        let token = &rest[at..at + 1 + len];
-        if len > 0 && token != own && seen.insert(token) {
-            found.push(token);
+    std::iter::from_fn(move || {
+        loop {
+            let at = rest.find('#')?;
+            let len = rest[at + 1..].find(|c: char| !is_id_char(c)).unwrap_or(rest.len() - at - 1);
+            let token = &rest[at..at + 1 + len];
+            rest = &rest[at + 1 + len..];
+            if len > 0 {
+                return Some(token);
+            }
         }
-        rest = &rest[at + 1 + len..];
+    })
+}
+
+/// A pointer of an object, with the field holding it: an edge of the node graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PointerField<'a> {
+    /// The byte offset of the pointer in the object's text.
+    pub at: usize,
+    /// 0-based, in the object's text.
+    pub line: usize,
+    /// The innermost `<hkparam name="...">` open there. Empty: none.
+    pub field: &'a str,
+    pub id: &'a str,
+}
+
+/// Every pointer of an object (not its own id), each with where it is and its field: those of
+/// [`pointers`], and again each time they are mentioned.
+///
+/// e.g.
+/// ```text
+/// 0 <hkobject name="#0095" class="hkbStateMachine">
+/// 1   <hkparam name="eventToSendWhenStateOrTransitionChanges">#0096</hkparam>
+/// 2   <hkparam name="states" numelements="2">
+/// 3     #0097
+/// 4     #0098
+/// ```
+/// -> `(1, eventToSend..., #0096)`, `(3, states, #0097)`, `(4, states, #0098)`
+pub fn pointer_fields<'a>(text: &'a str, own: &str) -> Vec<PointerField<'a>> {
+    const OPEN: &str = "<hkparam name=\"";
+    let whole = text;
+    let mut open: Vec<&str> = Vec::new();
+    let mut found = Vec::new();
+    for (line, text) in text.lines().enumerate() {
+        if let Some((_, rest)) = text.rsplit_once(OPEN)
+            && let Some((name, _)) = rest.split_once('"')
+        {
+            open.push(name);
+        }
+        let field = open.last().copied().unwrap_or_default();
+        for id in ids_in(text).filter(|&id| id != own) {
+            let at = id.as_ptr() as usize - whole.as_ptr() as usize;
+            found.push(PointerField { at, line, field, id });
+        }
+        if text.contains("</hkparam>") || (text.trim_end().ends_with("/>") && text.contains(OPEN)) {
+            open.pop();
+        }
     }
     found
 }

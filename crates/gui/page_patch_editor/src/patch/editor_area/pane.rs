@@ -66,6 +66,11 @@ pub(super) struct EditorPane {
     pub(super) inline_diff: InlineDiff,
     pub(super) show_inline_diff: bool,
     pub(super) show_preview: bool,
+    /// The node graph is shown in place of the text. See [`super::view`]'s `graph`.
+    pub(super) show_graph: bool,
+    /// The node graph's details panel is folded to a strip.
+    pub(super) details_folded: bool,
+    pub(super) graph_view: egui_graph_view::GraphView<crate::patch::tree::Node>,
     /// The preview scrolls with the cursor.
     pub(super) follow_preview: bool,
     pub(super) preview_view: Option<editor::preview::Preview>,

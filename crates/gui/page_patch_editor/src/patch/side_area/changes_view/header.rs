@@ -7,7 +7,7 @@
 
 use egui_widgets::{
     HoverMarkdown as _,
-    shadcn::{Button, ComboBox, Icon},
+    shadcn::{Button, ComboBox, Icon, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 
@@ -35,7 +35,7 @@ pub(super) fn branch_row(
         ui.label("⎇").on_hover_text(i18n.t(I18nKey::ChangesBranchHover));
         ComboBox::from_id_salt("side_branch").selected_text(current).show_ui(ui, |ui| {
             for name in history.branch_names() {
-                if ui.selectable_label(name == current, name).clicked() && name != current {
+                if ui.add(Button::selectable(name == current, name)).clicked() && name != current {
                     asked = Some(BranchAsk::Switch(name.to_owned()));
                 }
             }
@@ -58,7 +58,7 @@ fn new_branch_field(ui: &mut egui::Ui, i18n: &I18nMap, new_branch: &mut Option<S
         return None;
     };
 
-    let field = egui::TextEdit::singleline(name).hint_text(i18n.t(I18nKey::ChangesNewBranch)).desired_width(120.0);
+    let field = TextEdit::singleline(name).hint_text(i18n.t(I18nKey::ChangesNewBranch)).desired_width(120.0);
     let field = ui.add(field);
     if !field.lost_focus() {
         field.request_focus();
@@ -82,7 +82,7 @@ pub(super) fn commit_box(ui: &mut egui::Ui, i18n: &I18nMap, message: &mut String
             commit |=
                 ui.add_enabled(can_commit, button).on_hover_markdown(i18n.t(I18nKey::ChangesCommitHover)).clicked();
 
-            let field = egui::TextEdit::singleline(message)
+            let field = TextEdit::singleline(message)
                 .hint_text(i18n.t(I18nKey::ChangesCommitMessageHint))
                 .desired_width(ui.available_width());
             let response = ui.add(field);

@@ -11,7 +11,7 @@
 
 use egui_widgets::{
     HoverMarkdown as _,
-    shadcn::{Button, TextEdit},
+    shadcn::{Button, ComboBox, Icon, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::vars::VariableType;
@@ -76,16 +76,13 @@ impl VarsPanel {
                     .hint_text(i18n.t(I18nKey::VarsNewVariableHint))
                     .desired_width(110.0);
                 ui.add(name).on_hover_markdown(i18n.t(I18nKey::VarsNewVariableHover));
-                egui::ComboBox::from_id_salt("nemesis_var_type")
-                    .width(70.0)
-                    .selected_text(type_label(new.kind))
-                    .show_ui(ui, |ui| {
-                        for kind in VariableType::ALL {
-                            ui.selectable_value(&mut new.kind, kind, type_label(kind));
-                        }
-                    })
-                    .response
-                    .on_hover_text(i18n.t(I18nKey::VarsNewVariableTypeHover));
+                let mut kind = VariableType::ALL.iter().position(|kind| *kind == new.kind).unwrap_or_default();
+                let types = ComboBox::from_id_salt("nemesis_var_type").width(90.0);
+                let response =
+                    types.show_index(ui, &mut kind, VariableType::ALL.len(), |at| type_label(VariableType::ALL[at]));
+                if response.on_hover_text(i18n.t(I18nKey::VarsNewVariableTypeHover)).changed() {
+                    new.kind = VariableType::ALL[kind];
+                }
                 ui.add(TextEdit::singleline(&mut new.value).hint_text("0").desired_width(50.0))
                     .on_hover_markdown(i18n.t(I18nKey::VarsNewVariableValueHover));
                 let enabled = value_set.is_some();
@@ -188,7 +185,9 @@ fn name_row(
     }
     // Cut with `…` to the room left (the mod's own have `✎ ✖` after it), the whole on hover.
     let own = index >= template_count;
-    let buttons = if own { 2.0 * (ui.spacing().interact_size.y + ui.spacing().item_spacing.x) } else { 0.0 };
+    // As wide as they are: room for less made each row wider than the list, and the side bar wider
+    // each time the list was shown.
+    let buttons = if own { 2.0 * (Button::SMALL_ICON_WIDTH + ui.spacing().item_spacing.x) } else { 0.0 };
     let color = if own { ui.visuals().strong_text_color() } else { ui.visuals().text_color() };
     let fitted = egui_widgets::fit_text(ui, &names[index], color, ui.available_width() - buttons);
     // Its own hover only: egui's label would show one more for a cut text.
@@ -199,10 +198,10 @@ fn name_row(
     if !own {
         return None;
     }
-    if ui.small_button("✎").on_hover_text(i18n.t(I18nKey::VarsRename)).clicked() {
+    if ui.add(Button::new("").icon(Icon::Pencil).small()).on_hover_text(i18n.t(I18nKey::VarsRename)).clicked() {
         *renaming = Some(Renaming { is_variable, index, text: names[index].clone(), focus: true });
     }
-    ui.small_button("✖").clicked().then_some(if is_variable {
+    ui.add(Button::new("").icon(Icon::X).small()).clicked().then_some(if is_variable {
         Action::RemoveVariable(index)
     } else {
         Action::RemoveEvent(index)

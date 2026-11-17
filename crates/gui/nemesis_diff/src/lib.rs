@@ -22,6 +22,8 @@
 
 pub mod asdsf;
 pub mod conflict;
+pub mod details;
+pub mod fields;
 mod format;
 mod kept_array;
 pub mod schema;

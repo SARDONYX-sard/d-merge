@@ -31,6 +31,7 @@ pub const EDITOR_SAVE: &str = "editor.save";
 pub const EDITOR_FORMAT_AND_SAVE: &str = "editor.formatAndSave";
 pub const EDITOR_TOGGLE_PREVIEW: &str = "editor.togglePreview";
 pub const EDITOR_TOGGLE_INLINE_DIFF: &str = "editor.toggleInlineDiff";
+pub const EDITOR_TOGGLE_GRAPH: &str = "editor.toggleGraph";
 pub const EXPLORER_FOCUS: &str = "explorer.focus";
 pub const EDITOR_NEXT_CHANGE: &str = "editor.nextChange";
 pub const EDITOR_PREVIOUS_CHANGE: &str = "editor.previousChange";
@@ -122,6 +123,11 @@ pub const COMMANDS: &[Command] = &[
         id: EDITOR_TOGGLE_INLINE_DIFF,
         description: "Show or hide the changes inside the editor",
         defaults: &[("space d", VIM_NORMAL_PATCH)],
+    },
+    Command {
+        id: EDITOR_TOGGLE_GRAPH,
+        description: "Show the node graph in place of the text, or the text again",
+        defaults: &[("space g", VIM_NORMAL_PATCH), ("ctrl+shift+b", Some("!inputFocus"))],
     },
     Command {
         id: EDITOR_FORMAT_AND_SAVE,

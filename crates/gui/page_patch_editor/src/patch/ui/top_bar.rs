@@ -16,7 +16,7 @@ use std::path::{Path, PathBuf};
 use egui_widgets::{
     HoverMarkdown as _, PathActions, PathRow,
     notify::Notification,
-    shadcn::{Button, ComboBox, Icon, TextEdit},
+    shadcn::{Button, ComboBox, Icon, MenuItem, TextEdit, menu_button},
 };
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
@@ -223,14 +223,14 @@ fn open_cache(work: &mut Work, shown: Shown<'_>, notify: &mut Notification, i18n
 fn file_menu(ui: &mut egui::Ui, i18n: &I18nMap, recent: &[RecentWork]) -> Option<BarAsk> {
     let mut asked = None;
     // With a frame and an arrow: it should be seen to be a menu.
-    let button = egui::Button::new(format!("{} ▾", i18n.t(I18nKey::FileLabel)));
-    egui::containers::menu::MenuButton::from_button(button).ui(ui, |ui| {
+    let button = Button::new(format!("{} ▾", i18n.t(I18nKey::FileLabel)));
+    menu_button(ui, button, |ui| {
         let items = [
-            (I18nKey::WorkNew, I18nKey::WorkNewHover, BarAsk::NewWork),
-            (I18nKey::ModOpen, I18nKey::ModOpenHover, BarAsk::OpenMod),
+            (I18nKey::WorkNew, I18nKey::WorkNewHover, Icon::FilePlus, BarAsk::NewWork),
+            (I18nKey::ModOpen, I18nKey::ModOpenHover, Icon::FolderOpen, BarAsk::OpenMod),
         ];
-        for (label, hover, ask) in items {
-            if ui.button(i18n.t(label)).on_hover_markdown(i18n.t(hover)).clicked() {
+        for (label, hover, icon, ask) in items {
+            if ui.add(MenuItem::new(i18n.t(label)).icon(icon)).on_hover_markdown(i18n.t(hover)).clicked() {
                 asked = Some(ask);
             }
         }
@@ -242,11 +242,10 @@ fn file_menu(ui: &mut egui::Ui, i18n: &I18nMap, recent: &[RecentWork]) -> Option
         });
 
         ui.separator();
-        let close = ui.button(i18n.t(I18nKey::WorkClose)).on_hover_text(i18n.t(I18nKey::WorkCloseHover));
-        if close.clicked() {
+        let close = ui.add(MenuItem::new(i18n.t(I18nKey::WorkClose)).icon(Icon::X));
+        if close.on_hover_text(i18n.t(I18nKey::WorkCloseHover)).clicked() {
             asked = Some(BarAsk::CloseWork);
         }
-
         if asked.is_some() {
             ui.close();
         }
@@ -416,7 +415,9 @@ pub(super) fn recent_list(ui: &mut egui::Ui, recent: &[RecentWork], i18n: &I18nM
     }
     let mut picked = None;
     for work in recent {
-        if ui.button(format!("{}  {}", work.mod_code, work.output)).clicked() {
+        // Also on the start screen, in no menu: the File menu closes itself once one is picked.
+        let item = MenuItem::new(format!("{}  {}", work.mod_code, work.output)).icon(Icon::FolderOpen).keep_open();
+        if ui.add(item).clicked() {
             picked = Some(work.clone());
         }
     }

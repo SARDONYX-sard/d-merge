@@ -134,10 +134,13 @@ fn menu(ui: &mut egui::Ui, graph: &Graph, (row, index): (Row, usize), i18n: &I18
     }
 
     ui.separator();
-    let below = [(I18nKey::ExpandAllBelow, true), (I18nKey::CollapseAllBelow, false)];
+    let below = [
+        (I18nKey::ExpandAllBelow, egui_widgets::shadcn::Icon::ChevronsUpDown, true),
+        (I18nKey::CollapseAllBelow, egui_widgets::shadcn::Icon::ChevronsDownUp, false),
+    ];
     let mut picked = None;
-    for (label, open) in below {
-        if ui.button(i18n.t(label)).clicked() {
+    for (label, icon, open) in below {
+        if ui.add(egui_widgets::shadcn::MenuItem::new(i18n.t(label)).icon(icon)).clicked() {
             picked = Some(TreeEvent::SetOpenBelow(row.node, open));
         }
     }

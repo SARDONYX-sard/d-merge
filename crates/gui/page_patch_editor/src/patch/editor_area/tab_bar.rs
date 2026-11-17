@@ -2,6 +2,7 @@
 //! ([`super::revision_view`]), drawn with [`egui_widgets::EditorTab`] and its menu. The tabs
 //! themselves are [`crate::patch::editor::tabs`].
 
+use egui_widgets::shadcn::{Icon, MenuItem};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use crate::patch::{TabEvent, editor::tabs::EditorTabs, tree::Graph};
@@ -90,20 +91,18 @@ pub(super) fn tab_bar(
 /// `Copy id / Copy Path / Reveal in File Explorer` of object `id`, the end of a tab's menu.
 fn object_items(ui: &mut egui::Ui, i18n: &I18nMap, id: &str) -> Option<TabEvent> {
     let mut picked = None;
-    if ui.button(i18n.t(I18nKey::CopyId)).clicked() {
+    if ui.add(MenuItem::new(i18n.t(I18nKey::CopyId)).icon(Icon::Copy)).clicked() {
         ui.ctx().copy_text(id.to_owned());
-        ui.close();
     }
     // As the explorer's menu: the file the object is in.
     let hover = i18n.t(I18nKey::ObjectFileHover);
     let files = [
-        (I18nKey::CopyPath, crate::patch::tool::file::FileAction::CopyPath),
-        (gui_shared::i18n::REVEAL_IN_FILE_MANAGER, crate::patch::tool::file::FileAction::Reveal),
+        (I18nKey::CopyPath, Icon::Copy, crate::patch::tool::file::FileAction::CopyPath),
+        (gui_shared::i18n::REVEAL_IN_FILE_MANAGER, Icon::FolderOpen, crate::patch::tool::file::FileAction::Reveal),
     ];
-    for (label, action) in files {
-        if ui.button(i18n.t(label)).on_hover_text(hover).clicked() {
+    for (label, icon, action) in files {
+        if ui.add(MenuItem::new(i18n.t(label)).icon(icon)).on_hover_text(hover).clicked() {
             picked = Some(TabEvent::File(action, id.to_owned()));
-            ui.close();
         }
     }
     picked

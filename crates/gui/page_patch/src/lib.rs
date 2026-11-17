@@ -178,6 +178,18 @@ impl PatchPage {
         std::mem::take(&mut self.user_patch_toggle)
     }
 
+    /// Changes whenever [`Self::bulk_resolutions`] may: the app asks for them again then.
+    #[inline]
+    pub const fn bulk_revision(&self) -> u64 {
+        self.conflicts.revision()
+    }
+
+    /// The conflicts that can be decided all at once, for the user patch's window.
+    #[inline]
+    pub fn bulk_resolutions(&self) -> Vec<gui_shared::patch::BulkResolution> {
+        self.conflicts.bulk_resolutions()
+    }
+
     /// What the user wants to keep from a conflict: the app gives it to the Patch Editor.
     #[inline]
     pub const fn take_resolve(&mut self) -> Option<ResolveRequest> {

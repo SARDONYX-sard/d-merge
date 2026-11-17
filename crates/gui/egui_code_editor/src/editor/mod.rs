@@ -354,8 +354,10 @@ impl<'a> CodeEditor<'a> {
         state.status_cursor = cursor.map(|cursor| (cursor, selection.len()));
         let errors = frame.underlines.iter().filter(|problem| problem.severity == Severity::Error).count();
         state.status_problems = (errors, frame.underlines.len() - errors);
-        let menu_action = context_menu(response, language, text, pointer, &mut state.menu_target, &labels, &selection);
-        changed |= run_menu_action(menu_action, ui, id, state, text, &selection, response);
+        let menu_state = (&mut state.menu_target, &mut state.menu_selection);
+        let menu_action = context_menu(response, language, text, pointer, menu_state, &labels, &selection);
+        let menu_selection = state.menu_selection.clone();
+        changed |= run_menu_action(menu_action, ui, id, state, text, &menu_selection, response);
         let keyboard = navigate_keys.and_then(|references| Some((cursor?, references)));
         let from_menu = match menu_action {
             Some(MenuAction::Navigate { pos, references }) => Some((pos, references)),

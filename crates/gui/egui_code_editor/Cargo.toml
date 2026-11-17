@@ -22,6 +22,11 @@ regex      = { workspace = true } # Vim `/`, the find bar, the search view
 egui_widgets = { workspace = true } # Markdown for hover / completion docs
 stdx         = { workspace = true } # the search view: text ignoring case
 
+[features]
+default = []
+# Vim emulation (`Keymap::Vim`): without it, the editor has the Normal keymap only.
+vim = []
+
 [dev-dependencies]
 # `cargo run -p egui_code_editor --example vscode`: the same features as the app, to share its build.
 eframe = { workspace = true, features = ["accesskit", "clipboard", "default_fonts", "glow", "links"] }

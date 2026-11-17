@@ -110,6 +110,8 @@ struct UserPatchView {
     to_top: bool,
     /// Its editor, from the first time it is needed.
     tool: Option<Box<PatchTool>>,
+    /// What can be decided at once, offered above its editor.
+    bulk: ui::bulk::BulkResolutions,
 }
 
 /// Where the cursor goes when the editor gets the keyboard back.
@@ -135,6 +137,8 @@ struct EditorResult {
     walk_history: Option<bool>,
     /// A problem in the Problems panel was clicked: go to this line.
     jump_to_line: Option<usize>,
+    /// `(object, its new text)`: an edit in the node graph, of the open object or another.
+    graph_edit: Option<(String, String)>,
     /// The `↶` of this place of the inline diff was clicked.
     inline_revert: Option<usize>,
     tab_event: Option<TabEvent>,
@@ -420,6 +424,9 @@ impl PatchTool {
         if let Some(editor_id) = out.enter_tree {
             self.side.enter_tree(ui, editor_id);
         }
+        if let Some(id) = out.edited {
+            self.problems.refresh_in(&mut self.work, self.sel.active, &id);
+        }
         if let Some((action, id)) = out.file {
             tool::file::file_action(ui.ctx(), (&self.work, self.sel.active), (action, &id), notify);
         }
@@ -434,15 +441,29 @@ impl PatchTool {
         tool
     }
 
+    /// See [`crate::PatchEditorPage::set_bulk_resolutions`].
+    pub(crate) fn set_bulk_resolutions(&mut self, list: Vec<gui_shared::patch::BulkResolution>) {
+        self.user_patch.bulk.set(list);
+    }
+
     /// Opens or closes the window of the user patch.
     pub(crate) const fn toggle_user_patch(&mut self) {
         self.user_patch.open = !self.user_patch.open;
         self.user_patch.to_top = self.user_patch.open;
     }
 
-    /// The user patch's editor, up to date. A new output directory has another user patch: what was
-    /// open is saved where it belongs first.
+    /// The user patch's editor, read: for what takes a value in at once (`Use this`). Its read is
+    /// small and waited for here; the window does not wait (see [`Self::user_patch_tool_now`]).
     fn user_patch_tool(&mut self, paths: PatchPaths<'_>, notify: &mut Notification, i18n: &I18nMap) -> &mut Self {
+        let tool = self.user_patch_tool_now(paths, notify, i18n);
+        tool.wait_job(notify, i18n);
+        tool
+    }
+
+    /// The user patch's editor, up to date, its read maybe still running (the window shows how far
+    /// it is). A new output directory has another user patch: what was open is saved where it
+    /// belongs first.
+    fn user_patch_tool_now(&mut self, paths: PatchPaths<'_>, notify: &mut Notification, i18n: &I18nMap) -> &mut Self {
         let output = paths.patch_output_dir.trim();
         if let Some(tool) = self.user_patch.tool.as_mut().filter(|tool| tool.work.place.patch_output != output) {
             tool.leave_user_patch(notify, i18n);
@@ -456,8 +477,6 @@ impl PatchTool {
         }
         let shown = tool.editor.shown(&tool.sel);
         tool.work.sync_workspace(shown, notify, i18n);
-        // Small, and what comes next uses it at once.
-        tool.wait_job(notify, i18n);
         tool
     }
 
@@ -484,6 +503,30 @@ impl PatchTool {
         if invalid.is_empty() { Ok(()) } else { Err(invalid.join("\n")) }
     }
 
+    /// Decides `requests` in the user patch at once (this is its tool), and writes it once. Says how many
+    /// were, and why any was not.
+    /// Returns the indices of the requests taken in.
+    fn resolve_bulk(&mut self, requests: &[ResolveRequest], notify: &mut Notification, i18n: &I18nMap) -> Vec<usize> {
+        let root = PathBuf::from(&self.work.place.template_dir);
+        let resolved = match self.work.resolve_all(requests, &root, i18n) {
+            Ok(done) => {
+                let message = i18n.t(I18nKey::ConflictBulkResolvedMessage);
+                notify.success(format!("{message}: {}/{}", done.resolved.len(), requests.len()));
+                for failed in done.failed.iter().chain(&done.invalid) {
+                    notify.error(format!("{}: {failed}", i18n.t(I18nKey::ConflictTakeFailed)));
+                }
+                done.resolved
+            }
+            Err(err) => {
+                notify.error(format!("{}: {err}", i18n.t(I18nKey::ConflictTakeFailed)));
+                Vec::new()
+            }
+        };
+        self.editor.reload();
+        self.work.mod_written = true;
+        resolved
+    }
+
     /// `Edit...`: the value goes in, and the window shows it.
     pub(crate) fn open_resolution(
         &mut self,
@@ -497,7 +540,7 @@ impl PatchTool {
         if paths.patch_output_dir.trim().is_empty() {
             return; // the window says what to do
         }
-        self.user_patch_tool(paths, notify, i18n).work.resolution = Some(request);
+        self.user_patch_tool_now(paths, notify, i18n).work.resolution = Some(request);
     }
 
     /// The value `Edit...` asked for, taken in: see [`user_patch::take_in_resolution`].
@@ -537,21 +580,36 @@ impl PatchTool {
         }
         let to_top = std::mem::take(&mut self.user_patch.to_top);
         let has_output = !paths.patch_output_dir.trim().is_empty();
-        let mut tool = has_output.then(|| self.user_patch_tool(paths, notify, i18n));
+        let mut bulk = std::mem::take(&mut self.user_patch.bulk);
+        // Not waited for: its read goes on while the window shows how far it is.
+        let mut tool = has_output.then(|| self.user_patch_tool_now(paths, notify, i18n));
 
         let mut open = true;
+        let mut bulk_written = false;
         Modal::new(i18n.t(I18nKey::UserPatchTitle))
             .size(egui::Vec2::new(0.90, 0.95))
             .to_top(to_top)
             // Its editor uses `Esc` (Vim, hovers, quick fixes): the window closes with its `x`.
             .close_on_escape(false)
             .show(ctx, &mut open, |ui| match &mut tool {
-                Some(tool) => tool.user_patch_ui(ui, i18n, notify, (settings, editor), keys),
+                Some(tool) => {
+                    let read = tool.work.job().is_none();
+                    if let Some(requests) = bulk.bar_ui(ui, i18n).filter(|_| read) {
+                        let resolved = tool.resolve_bulk(&requests, notify, i18n);
+                        bulk.mark_resolved(resolved.iter().map(|&at| &requests[at]));
+                        bulk_written = true;
+                    }
+                    tool.user_patch_ui(ui, i18n, notify, (settings, editor), keys);
+                }
                 None => {
                     ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::WorkNeedPatchOutput));
                 }
             });
 
+        self.user_patch.bulk = bulk;
+        // The conflict check reads the user patch again now, not when the window closes: it offers
+        // what is still left after that.
+        self.work.user_patch_written |= bulk_written;
         self.user_patch.open = open;
         if !open {
             self.close_user_patch(notify, i18n);
@@ -569,9 +627,12 @@ impl PatchTool {
     ) {
         self.editor.read_options(editor);
         self.read_view_settings(settings);
+        self.poll_job(ui.ctx(), notify, i18n);
         let shown = self.editor.shown(&self.sel);
         self.work.sync_workspace(shown, notify, i18n);
-        self.take_resolution(notify, i18n);
+        if self.work.job().is_none() {
+            self.take_resolution(notify, i18n); // `Edit...`: into the work once it is read
+        }
         self.take_key_commands(ui.ctx(), Some(keys), i18n, notify);
         self.draw(ui, i18n, notify);
         self.editor.write_options(editor);
@@ -963,7 +1024,10 @@ mod user_patch_tests {
             keep_all_events: false,
         };
         main.open_resolution(request, paths(&output), &mut notify, &i18n);
-        main.user_patch.tool.as_mut().unwrap().take_resolution(&mut notify, &i18n);
+        // As the window does: the value goes in once the user patch is read.
+        let tool = main.user_patch.tool.as_mut().unwrap();
+        tool.wait_job(&mut notify, &i18n);
+        tool.take_resolution(&mut notify, &i18n);
         (main, notify, i18n)
     }
 

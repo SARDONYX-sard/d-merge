@@ -1,6 +1,7 @@
 //! Draws the patch preview. The data is in [`crate::patch::editor::preview`].
 
 use egui_code_editor::languages::Xml;
+use egui_widgets::shadcn::{Button, Icon};
 
 use crate::patch::editor::preview::{Kind, Preview};
 
@@ -12,8 +13,8 @@ pub(super) fn nav_ui(preview: &mut Preview, ui: &mut egui::Ui, hover: &str) {
     if preview.blocks() == 0 {
         return;
     }
-    for (forward, glyph) in [(false, "▲"), (true, "▼")] {
-        if ui.small_button(glyph).on_hover_text(hover).clicked() {
+    for (forward, icon) in [(false, Icon::ChevronUp), (true, Icon::ChevronDown)] {
+        if ui.add(Button::new("").icon(icon).small()).on_hover_text(hover).clicked() {
             preview.step(forward);
         }
     }
@@ -70,7 +71,7 @@ pub(super) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, revert_hover: &
             // `↶` at the start of each block, like git's conflict buttons.
             let gutter = egui::Rect::from_min_size(rect.min, egui::vec2(20.0, row_height));
             if let Some(block) = kind.block()
-                && ui.put(gutter, egui::Button::new("↶").small()).on_hover_text(revert_hover).clicked()
+                && ui.put(gutter, Button::new("").icon(Icon::Undo2).small()).on_hover_text(revert_hover).clicked()
             {
                 event = Some(PreviewEvent::Revert(block));
             }

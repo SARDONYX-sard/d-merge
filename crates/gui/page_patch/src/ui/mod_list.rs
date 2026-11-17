@@ -4,7 +4,7 @@ use std::rc::Rc;
 
 use egui_widgets::{
     HoverMarkdown as _,
-    shadcn::{Button, ComboBox, Icon, TextEdit, theme::ShadcnTheme},
+    shadcn::{Button, Checkbox, ComboBox, Icon, TableHead, TextEdit, theme::ShadcnTheme},
 };
 use gui_shared::{
     i18n::I18nKey,
@@ -216,6 +216,8 @@ impl PatchView<'_> {
                 const LINK_GUTTER: f32 = 18.0;
                 const CHECKBOX_WIDTH: f32 = 24.0;
                 const FLAG_WIDTH: f32 = 18.0;
+                /// The head row: as shadcn's `h-10`, a little lower to keep the list long.
+                const HEAD_HEIGHT: f32 = 28.0;
 
                 ui.add_space(MARGIN * 2.0);
                 let (rect, gutter) = {
@@ -232,11 +234,10 @@ impl PatchView<'_> {
                     // arrow) is not squashed.
                     let spacing = ui.spacing();
                     let padding = spacing.button_padding.x.mul_add(2.0, spacing.item_spacing.x);
-                    let mod_type_width = text_width(ui, ModType::NemesisExt.as_str())
-                        .max(text_width(ui, self.ctx.i18n.t(I18nKey::ColumnModType)))
-                        + padding;
-                    let priority_width =
-                        text_width(ui, &format!("{} ▲", self.ctx.i18n.t(I18nKey::ColumnPriority))) + padding;
+                    let head_width = |key| text_width(ui, self.ctx.i18n.t(key)) + TableHead::EXTRA_WIDTH;
+                    let mod_type_width = (text_width(ui, ModType::NemesisExt.as_str()) + padding)
+                        .max(head_width(I18nKey::ColumnModType));
+                    let priority_width = head_width(I18nKey::ColumnPriority);
                     let (id_width, name_width) = (table_width * 0.20, table_width * 0.28);
 
                     // Site gets the rest. Computed here (not `Column::remainder`): egui_extras keeps a
@@ -265,7 +266,7 @@ impl PatchView<'_> {
                         .column(Self::resizable_column(mod_type_width, changed_width)) // mod type
                         .column(Self::resizable_column(site_width, changed_width).clip(true)) // site
                         .column(egui_extras::Column::exact(priority_width)) // priority
-                        .header(20.0, |mut header| self.render_table_header(&mut header, rows))
+                        .header(HEAD_HEIGHT, |mut header| self.render_table_header(&mut header, rows))
                         .body(|mut body| {
                             let mut widths = [0.0_f32; 7];
                             widths.clone_from_slice(body.widths());
@@ -331,9 +332,7 @@ impl PatchView<'_> {
         let i18n = self.ctx.i18n;
         self.checkbox_header_button(header, rows);
         header.col(|ui| {
-            ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
-                ui.label("±").on_hover_markdown(i18n.t(I18nKey::ConflictScanHover));
-            });
+            ui.add(TableHead::new("±").plain()).on_hover_markdown(i18n.t(I18nKey::ConflictScanHover));
         });
         self.header_button(header, i18n.t(I18nKey::ColumnId), SortColumn::Id);
         self.header_button(header, i18n.t(I18nKey::ColumnName), SortColumn::Name);
@@ -346,8 +345,10 @@ impl PatchView<'_> {
     /// in the draggable table (`rows` = `None`), else only those of the read-only view.
     fn checkbox_header_button(&mut self, header: &mut egui_extras::TableRow<'_, '_>, rows: Option<&[u32]>) {
         header.col(|ui| {
-            ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
-                if ui.add(egui::Checkbox::without_text(&mut self.page.check_all)).clicked() {
+            // The cell's look (its border), with the box in its middle.
+            let cell = ui.add(TableHead::new("").plain()).rect;
+            {
+                if ui.put(cell, Checkbox::without_text(&mut self.page.check_all)).clicked() {
                     let check_all = self.page.check_all;
                     let items = self.ctx.settings.mod_list_mut();
                     match rows {
@@ -361,27 +362,19 @@ impl PatchView<'_> {
                         }
                     }
                 }
-            });
+            }
         });
     }
 
-    /// Renders one sortable header button.
-    ///
-    /// The button label gets a `▲` / `▼` suffix when this column is the
-    /// active sort column.
+    /// One sortable head cell: a click sorts by `column`, or turns the order if it is sorted by it
+    /// already. The column sorted by shows its arrow.
     fn header_button(&mut self, header: &mut egui_extras::TableRow<'_, '_>, label: &str, column: SortColumn) {
         header.col(|ui| {
-            ui.with_layout(egui::Layout::centered_and_justified(egui::Direction::LeftToRight), |ui| {
-                let text = if self.ctx.settings.view_state.sort_column == column {
-                    if self.ctx.settings.view_state.sort_asc { format!("{label} ▲") } else { format!("{label} ▼") }
-                } else {
-                    label.to_string()
-                };
-
-                if ui.button(text).clicked() {
-                    visible_mods::toggle_sort(&mut self.ctx.settings.view_state, column);
-                }
-            });
+            let view = &self.ctx.settings.view_state;
+            let sorted = (view.sort_column == column).then_some(view.sort_asc);
+            if ui.add(TableHead::new(label).sorted(sorted)).clicked() {
+                visible_mods::toggle_sort(&mut self.ctx.settings.view_state, column);
+            }
         });
     }
 }

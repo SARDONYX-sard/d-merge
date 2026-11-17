@@ -260,7 +260,7 @@ fn same_signature(a: &str, b: &str) -> bool {
 }
 
 /// Is `class` `base` or one of its subclasses?
-pub(crate) fn is_subclass(class: &str, base: &str) -> bool {
+pub fn is_subclass(class: &str, base: &str) -> bool {
     let mut current = Some(class);
     while let Some(name) = current {
         if name == base {

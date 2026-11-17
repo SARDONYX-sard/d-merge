@@ -37,6 +37,7 @@ impl Hash for Matcher {
 
 impl Matcher {
     /// `pattern` as a regex. See [`Self::with_options`].
+    #[cfg_attr(not(feature = "vim"), allow(dead_code, reason = "Vim's `/` only"))]
     pub(crate) fn regex(pattern: &str) -> Option<Self> {
         Self::with_options(pattern, false, true)
     }
@@ -78,6 +79,7 @@ impl Matcher {
     }
 
     /// [`Self::find_all`] of a text held as chars (the Vim buffer).
+    #[cfg_attr(not(feature = "vim"), allow(dead_code, reason = "the Vim buffer's only"))]
     pub(crate) fn find_all_chars(&self, chars: &[char]) -> Vec<Range<usize>> {
         self.find_all(&chars.iter().collect::<String>())
     }

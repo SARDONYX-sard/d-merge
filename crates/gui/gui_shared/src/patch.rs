@@ -209,6 +209,48 @@ pub fn is_event_array_conflict(path: &str) -> bool {
     path.rsplit('/').next().is_some_and(|field| matches!(field, "enterNotifyEvents" | "exitNotifyEvents"))
 }
 
+/// A conflict that is decided without picking one mod's value, so that all of its kind can be decided
+/// at once (in the user patch's window).
+///
+/// e.g. `0_master  #1821/hkbStateMachineStateInfo/enterNotifyEvents`, Flinching and Impact: the events
+/// of both are kept.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BulkResolution {
+    pub kind: BulkKind,
+    /// What it does: carried out as `Use this` is.
+    pub request: ResolveRequest,
+    /// The user patch decides it already.
+    pub resolved: bool,
+}
+
+/// How a [`BulkResolution`] decides its conflict.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BulkKind {
+    /// The events of every mod are kept: see [`is_event_array_conflict`].
+    KeepAllEvents,
+}
+
+impl BulkKind {
+    /// The kind a conflict at `path` can be decided by, if any.
+    ///
+    /// e.g. `#1821/hkbStateMachineStateInfo/enterNotifyEvents` -> `KeepAllEvents`
+    #[must_use]
+    pub fn of(path: &str) -> Option<Self> {
+        is_event_array_conflict(path).then_some(Self::KeepAllEvents)
+    }
+}
+
+/// A template as Nemesis names it. The 1st person's has the same file name as the 3rd person's.
+///
+/// e.g. `meshes/actors/character/behaviors/0_master.bin` -> `0_master`,
+/// `meshes/actors/character/_1stperson/behaviors/0_master.bin` -> `_1stperson/0_master`
+#[must_use]
+pub fn template_name(target: &str) -> String {
+    let file = target.rsplit('/').next().unwrap_or(target);
+    let name = file.strip_suffix(".bin").unwrap_or(file);
+    if target.contains("/_1stperson/") { format!("_1stperson/{name}") } else { name.to_owned() }
+}
+
 /// A mod with a value at a conflict. See [`ResolveRequest::sides`].
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResolveSide {

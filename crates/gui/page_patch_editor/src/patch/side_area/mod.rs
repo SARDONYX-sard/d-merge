@@ -392,7 +392,7 @@ fn behavior_select(
         combo.show_ui(ui, |ui| {
             let shown = behaviors.iter().enumerate().filter(|(_, behavior)| !behavior.is_anim_data());
             for (at, behavior) in shown {
-                if ui.selectable_label(at == active, &behavior.name).clicked() {
+                if ui.add(egui_widgets::shadcn::Button::selectable(at == active, &behavior.name)).clicked() {
                     picked = Some(at);
                 }
             }

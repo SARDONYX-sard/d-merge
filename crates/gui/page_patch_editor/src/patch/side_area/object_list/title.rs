@@ -11,7 +11,7 @@ use std::rc::Rc;
 
 use egui_widgets::{
     HoverMarkdown as _,
-    shadcn::{Button, Icon},
+    shadcn::{Button, Checkbox, Icon, MenuItem, menu_button},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 
@@ -88,11 +88,8 @@ fn more_menu(
     selected: Option<(Rc<str>, bool, bool)>,
 ) -> Option<TitleAsk> {
     let mut asked = None;
-    ui.menu_button("⋯", |ui| {
+    menu_button(ui, Button::new("⋯").small(), |ui| {
         menu_items(ui, i18n, anim, (changed_only, unlinked_only), selected, &mut asked);
-        if asked.is_some() {
-            ui.close();
-        }
     });
     asked
 }
@@ -107,22 +104,23 @@ fn menu_items(
     asked: &mut Option<TitleAsk>,
 ) {
     {
-        ui.checkbox(changed_only, i18n.t(I18nKey::ChangedOnly));
+        ui.add(Checkbox::new(changed_only, i18n.t(I18nKey::ChangedOnly)));
         if !anim {
-            ui.checkbox(unlinked_only, i18n.t(I18nKey::ExplorerUnlinkedOnly));
+            ui.add(Checkbox::new(unlinked_only, i18n.t(I18nKey::ExplorerUnlinkedOnly)));
             ui.separator();
-            if ui.button(i18n.t(I18nKey::PandoraDocHover)).clicked() {
+            if ui.add(MenuItem::new(i18n.t(I18nKey::PandoraDocHover)).icon(Icon::Logs)).clicked() {
                 *asked = Some(TitleAsk::OpenPandoraDoc);
             }
         }
 
         let Some((selected, is_new, can_copy)) = selected else { return };
         ui.separator();
-        if ui.add_enabled(can_copy, Button::new(i18n.t(I18nKey::DuplicateButton))).clicked() {
+        if ui.add_enabled(can_copy, MenuItem::new(i18n.t(I18nKey::DuplicateButton)).icon(Icon::Copy)).clicked() {
             *asked = Some(TitleAsk::Duplicate(Rc::clone(&selected)));
         }
-        let label = if is_new { I18nKey::DeleteButton } else { I18nKey::RevertButton };
-        if ui.add(Button::new(i18n.t(label)).destructive()).clicked() {
+        let (label, icon) =
+            if is_new { (I18nKey::DeleteButton, Icon::Trash) } else { (I18nKey::RevertButton, Icon::Undo2) };
+        if ui.add(MenuItem::new(i18n.t(label)).icon(icon).destructive()).clicked() {
             *asked = Some(TitleAsk::RevertOrDelete(selected));
         }
     }

@@ -1,4 +1,13 @@
-//! help dialog, confirmation dialog.
+//! The settings window: in tabs, what the app looks like, its log, and what it is.
+//!
+//! ```text
+//! ┌ Settings ─────────────────────────────────┐
+//! │ [Display] [Log] [About]                    │
+//! │ Display: language, font, background        │
+//! │ Log:     its level, where it is            │
+//! │ About:   version, links, bug report        │
+//! └────────────────────────────────────────────┘
+//! ```
 
 use std::path::{Path, PathBuf};
 
@@ -11,61 +20,87 @@ use gui_shared::{
 
 use crate::{
     app::App,
-    ui::shadcn::{Button, Checkbox, ComboBox, TextEdit},
+    ui::shadcn::{Button, Checkbox, ComboBox, TextEdit, ToggleGroup},
 };
 
 const GRID_SPACING: [f32; 2] = [8.0, 6.0];
 
+/// A tab of the settings window.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum SettingsTab {
+    /// The language, the font, the background.
+    #[default]
+    Display,
+    Log,
+    /// The version, the links, the bug report.
+    About,
+}
+
+impl SettingsTab {
+    /// In the order of the tabs.
+    const ALL: [Self; 3] = [Self::Display, Self::Log, Self::About];
+}
+
+/// A section's title in a tab.
+fn section_title(ui: &mut egui::Ui, title: &str) {
+    ui.add_space(4.0);
+    ui.label(egui::RichText::new(title).strong().size(18.0));
+    ui.add_space(4.0);
+}
+
+fn section_separator(ui: &mut egui::Ui) {
+    ui.add_space(8.0);
+    ui.separator();
+    ui.add_space(8.0);
+}
+
 impl App {
-    /// Renders the help / about window anchored to the viewport centre.
-    pub(crate) fn ui_help_window(&mut self, ctx: &egui::Context) {
-        if !self.show_help {
+    /// Renders the settings window anchored to the viewport centre.
+    pub(crate) fn ui_settings_window(&mut self, ctx: &egui::Context) {
+        if !self.show_settings {
             return;
         }
         // Owned: the content borrows `self` mutably.
-        let title: egui::WidgetText = self.i18n.t(I18nKey::HelpButton).into();
+        let title: egui::WidgetText = self.i18n.t(I18nKey::SettingsButton).into();
         let mut open = true;
         egui_widgets::show_modal(ctx, title, &mut open, |ui| {
-            egui::ScrollArea::vertical().id_salt("help_window_scroll").show(ui, |ui| {
-                fn section_title(ui: &mut egui::Ui, title: &str) {
-                    ui.add_space(4.0);
-                    ui.label(egui::RichText::new(title).strong().size(20.0));
-                    ui.add_space(4.0);
-                }
+            let tabs = [I18nKey::SettingsDisplayLabel, I18nKey::LoggingTitleLabel, I18nKey::SettingsAboutLabel];
+            let mut tab = self.settings_tab as usize;
+            ToggleGroup::new().show_index(ui, &mut tab, tabs.len(), |at| self.i18n.t(tabs[at]));
+            self.settings_tab = SettingsTab::ALL[tab.min(SettingsTab::ALL.len() - 1)];
+            ui.add_space(8.0);
 
-                fn section_separator(ui: &mut egui::Ui) {
-                    ui.add_space(8.0);
-                    ui.separator();
-                    ui.add_space(8.0);
-                }
-
-                section_title(ui, "About");
-                self.ui_help_info(ui);
-                section_separator(ui);
-
-                section_title(ui, self.i18n.t(I18nKey::BugReportTitleLabel));
-                self.ui_bug_report(ui);
-                section_separator(ui);
-
-                section_title(ui, self.i18n.t(I18nKey::FontTitleLabel));
-                self.ui_font_section(ui);
-                section_separator(ui);
-
-                section_title(ui, self.i18n.t(I18nKey::LoggingTitleLabel));
-                self.ui_log_section(ui);
-                section_separator(ui);
-
-                section_title(ui, self.i18n.t(I18nKey::I18nTitleLabel));
-                self.ui_translation_section(ui);
-                section_separator(ui);
-
-                section_title(ui, self.i18n.t(I18nKey::BackgroundTitleLabel));
-                self.ui_background_section(ui);
-                section_separator(ui);
+            egui::ScrollArea::vertical().id_salt("settings_window_scroll").show(ui, |ui| match self.settings_tab {
+                SettingsTab::Display => self.ui_display_tab(ui),
+                SettingsTab::Log => self.ui_log_section(ui),
+                SettingsTab::About => self.ui_about_tab(ui),
             });
         });
 
-        self.show_help &= open;
+        self.show_settings &= open;
+    }
+
+    /// The language, the font and the background.
+    fn ui_display_tab(&mut self, ui: &mut egui::Ui) {
+        section_title(ui, self.i18n.t(I18nKey::I18nTitleLabel));
+        self.ui_translation_section(ui);
+        section_separator(ui);
+
+        section_title(ui, self.i18n.t(I18nKey::FontTitleLabel));
+        self.ui_font_section(ui);
+        section_separator(ui);
+
+        section_title(ui, self.i18n.t(I18nKey::BackgroundTitleLabel));
+        self.ui_background_section(ui);
+    }
+
+    /// What the app is, and where to report a bug.
+    fn ui_about_tab(&self, ui: &mut egui::Ui) {
+        self.ui_help_info(ui);
+        section_separator(ui);
+
+        section_title(ui, self.i18n.t(I18nKey::BugReportTitleLabel));
+        self.ui_bug_report(ui);
     }
 
     fn ui_help_info(&self, ui: &mut egui::Ui) {

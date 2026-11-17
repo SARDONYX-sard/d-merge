@@ -39,8 +39,10 @@ pub(crate) struct App {
     pub async_rt: tokio::runtime::Runtime,
 
     // ── UI state (not persisted) ──────────────────────────────────────────────
-    /// Controls visibility of the help / about window.
-    pub show_help: bool,
+    /// Controls visibility of the settings window.
+    pub show_settings: bool,
+    /// Its tab shown.
+    pub settings_tab: crate::app::ui::window::SettingsTab,
 
     // ── Custom theme panel  ──────────────────────────────────────────────────────
     /// Custom theme editor window state.
@@ -82,6 +84,9 @@ pub(crate) struct App {
 
     /// CRC32 page state (inputs, loaded mod tree).
     pub patch_editor: PatchEditorPage,
+    /// What the Patch Editor was given of the conflicts that can be decided at once: see
+    /// `PatchPage::bulk_revision`.
+    bulk_revision: u64,
 
     /// A page asked for another page to be shown. The router does that, after it drew this frame.
     pub pending_page: Option<gui_shared::settings::ui::Page>,
@@ -115,7 +120,8 @@ impl App {
             #[expect(clippy::unwrap_used)]
             async_rt: tokio::runtime::Runtime::new().unwrap(),
 
-            show_help: false,
+            show_settings: false,
+            settings_tab: crate::app::ui::window::SettingsTab::Display,
 
             theme_manager,
             show_theme_editor: false,
@@ -134,6 +140,7 @@ impl App {
             convert: ConvertPage::default(),
             hkanno,
             patch_editor: PatchEditorPage::default(),
+            bulk_revision: 0,
             pending_page: None,
             keys: keybinding::Keybindings::load(std::path::Path::new(KEYBINDINGS_PATH)),
         }
@@ -162,6 +169,10 @@ impl App {
         if self.patch_editor.take_user_patch_written() {
             self.patch.follow_written_user_patch(&self.settings.pages.patch);
         }
+        // What can be decided at once: for the user patch's window.
+        if std::mem::replace(&mut self.bulk_revision, self.patch.bulk_revision()) != self.bulk_revision {
+            self.patch_editor.set_bulk_resolutions(self.patch.bulk_resolutions());
+        }
         let patch_ctx = PatchPollCtx {
             settings: &mut self.settings.pages.patch,
             i18n: &self.i18n,
@@ -188,7 +199,7 @@ impl App {
     /// Work done every frame **after** the page: floating windows on top of everything.
     pub(crate) fn frame_end(&mut self, ctx: &egui::Context) {
         self.ui_log_window(ctx);
-        self.ui_help_window(ctx);
+        self.ui_settings_window(ctx);
     }
 
     /// Persists everything on shutdown.

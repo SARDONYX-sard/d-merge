@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use egui_widgets::{
     HoverMarkdown as _,
-    shadcn::{Button, TextEdit},
+    shadcn::{Button, Icon, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 use stdx::text::contains_ignore_case;
@@ -164,7 +164,7 @@ fn row(ui: &mut egui::Ui, name: &str, crc: u32, i18n: &I18nMap, is_dir: bool) {
 
 /// `[Copy] 0xbe34c373 3191128947` (drawn right to left). Copies the decimal value.
 fn crc_cells(ui: &mut egui::Ui, crc: u32, i18n: &I18nMap) {
-    if ui.small_button(i18n.t(I18nKey::EditorCopy)).clicked() {
+    if ui.add(Button::new(i18n.t(I18nKey::EditorCopy)).icon(Icon::Copy).small()).clicked() {
         ui.ctx().copy_text(crc.to_string());
     }
     ui.monospace(format!("{crc:#010x}"));

@@ -46,7 +46,7 @@ impl ModCodeChoice {
             ui.add_space(4.0);
             egui::ScrollArea::vertical().max_height(MAX_LIST_HEIGHT).show(ui, |ui| {
                 for code in &self.codes {
-                    if ui.button(row_label(code)).clicked() {
+                    if ui.add(egui_widgets::shadcn::Button::new(row_label(code)).full_width()).clicked() {
                         picked = Some(code.code.clone());
                     }
                 }

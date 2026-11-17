@@ -10,8 +10,8 @@
 use crate::{
     KeyContext, Keybindings,
     commands::{
-        EDITOR_SAVE, FILE_REVEAL, HISTORY_BACK, HISTORY_FORWARD, KEYBINDINGS_OPEN_JSON, TABS_CLOSE, TABS_NEXT,
-        TABS_PREVIOUS,
+        EDITOR_SAVE, EDITOR_TOGGLE_GRAPH, FILE_REVEAL, HISTORY_BACK, HISTORY_FORWARD, KEYBINDINGS_OPEN_JSON,
+        TABS_CLOSE, TABS_NEXT, TABS_PREVIOUS,
     },
     json_editor::JsonEditor,
     recorder::{KeyRecorder, Recorded, RecorderTexts},
@@ -22,7 +22,7 @@ pub const OPEN_JSON_ACTION: &str = "open_keybindings_json";
 
 /// The editor's palette actions that are commands here: `(action id, command)`. The action ids are
 /// those of `egui_code_editor::EditorCommand` and the hosts' own (`go_back`).
-pub const EDITOR_ACTIONS: [(&str, &str); 8] = [
+pub const EDITOR_ACTIONS: [(&str, &str); 9] = [
     ("next_tab", TABS_NEXT),
     ("previous_tab", TABS_PREVIOUS),
     ("close_tab", TABS_CLOSE),
@@ -30,6 +30,7 @@ pub const EDITOR_ACTIONS: [(&str, &str); 8] = [
     ("save", EDITOR_SAVE),
     ("go_back", HISTORY_BACK),
     ("go_forward", HISTORY_FORWARD),
+    ("toggle_graph", EDITOR_TOGGLE_GRAPH),
     (OPEN_JSON_ACTION, KEYBINDINGS_OPEN_JSON),
 ];
 

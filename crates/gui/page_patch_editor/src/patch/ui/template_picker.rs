@@ -170,13 +170,17 @@ fn filtered_ui<'a>(ui: &mut egui::Ui, catalog: &'a [TemplateEntry], filter: &str
     picked
 }
 
-/// `path  Nemesis` or a warned `path  Ext` (only d-merge reads these). Returns "clicked".
+/// The color of the `Ext` tag: of a mode, not of a warning.
+const EXT_COLOR: egui::Color32 = egui::Color32::from_rgb(90, 150, 220);
+
+/// `path  Nemesis`, or `path  Ext` for a template Nemesis does not have: which engine folder Export
+/// writes it to, as a tag of its own color. Returns "clicked".
 fn file_button(ui: &mut egui::Ui, label: &str, entry: &TemplateEntry, i18n: &I18nMap) -> bool {
     let clicked = ui.add(egui::Button::selectable(false, egui::RichText::new(label).monospace())).clicked();
     if entry.nemesis {
-        ui.weak("Nemesis");
+        ui.weak("Nemesis").on_hover_text(i18n.t(I18nKey::TemplateNemesisHover));
     } else {
-        ui.colored_label(ui.visuals().warn_fg_color, "Ext").on_hover_text(i18n.t(I18nKey::ExtOnlyWarning));
+        ui.colored_label(EXT_COLOR, "Ext").on_hover_text(i18n.t(I18nKey::TemplateExtHover));
     }
     clicked
 }

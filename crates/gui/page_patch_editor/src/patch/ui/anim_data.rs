@@ -25,7 +25,7 @@ use egui_widgets::{
     HoverMarkdown as _,
     checklist::{Checklist, ChecklistLabels},
     notify::Notification,
-    shadcn::{Button, ComboBox, TextEdit},
+    shadcn::{Button, Checkbox, ComboBox, NumberInput, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 
@@ -228,7 +228,7 @@ fn clips_ui(ui: &mut egui::Ui, i18n: &I18nMap, rows: &mut [ClipRow]) {
 
 /// The project, and side by side the hkx and the txt of that project.
 fn anim_sets_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) {
-    ui.checkbox(&mut dialog.add_names, i18n.t(I18nKey::AnimNamesToCharacters))
+    ui.add(Checkbox::new(&mut dialog.add_names, i18n.t(I18nKey::AnimNamesToCharacters)))
         .on_hover_markdown(i18n.t(I18nKey::AnimNamesToCharactersHover));
     project_combo(ui, i18n, dialog);
     let AnimDataDialog { hkx, projects, project, .. } = dialog;
@@ -293,7 +293,7 @@ fn clip_row(ui: &mut egui::Ui, row: &mut ClipRow) {
     let title = format!("{on} / {} triggers", info.triggers.len());
     egui::CollapsingHeader::new(title).id_salt(("nemesis_clip_triggers", &row.clip.name)).show(ui, |ui| {
         for ((time, trigger), on) in info.triggers.iter().zip(&mut row.triggers_on) {
-            ui.checkbox(on, egui::RichText::new(format!("{trigger}:{time}")).monospace());
+            ui.add(Checkbox::new(on, egui::RichText::new(format!("{trigger}:{time}")).monospace()));
         }
     });
 }
@@ -342,7 +342,7 @@ impl NewClipsForm {
 
             let hover = i18n.t(I18nKey::ClipCountHover);
             ui.label(i18n.t(I18nKey::ClipCount)).on_hover_markdown(hover);
-            ui.add(egui::DragValue::new(&mut self.count).range(1..=999)).on_hover_markdown(hover);
+            ui.add(NumberInput::new(&mut self.count).range(1..=999).desired_width(80.0)).on_hover_markdown(hover);
             ui.end_row();
         });
     }

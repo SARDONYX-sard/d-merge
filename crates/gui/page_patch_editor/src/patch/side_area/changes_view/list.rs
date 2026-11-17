@@ -13,7 +13,10 @@
 //! They see only the work, the Changes view's state and the selection; what a click asks for is
 //! returned ([`ListOutput`]).
 
-use egui_widgets::{HoverMarkdown as _, shadcn::Button};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, Icon, MenuItem},
+};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::ChangeAction;
@@ -94,7 +97,8 @@ fn object_history(ui: &mut egui::Ui, i18n: &I18nMap, input: &ListInput<'_>) -> O
 
     let title = format!("{}  {id}", i18n.t(I18nKey::ChangesObjectHistory));
     egui::CollapsingHeader::new(title).id_salt("side_object_history").default_open(true).show(ui, |ui| {
-        if ui.small_button(i18n.t(I18nKey::ChangesBlame)).on_hover_text(i18n.t(I18nKey::ChangesBlameHover)).clicked() {
+        let blame = ui.add(Button::new(i18n.t(I18nKey::ChangesBlame)).small());
+        if blame.on_hover_text(i18n.t(I18nKey::ChangesBlameHover)).clicked() {
             picked = Some(ChangeAction::Blame(active, id.to_owned()));
         }
 
@@ -135,16 +139,14 @@ fn object_revision_row(
             (I18nKey::ChangesCompareWorking, ChangeAction::Compare(active, id.to_owned(), number, None)),
         ];
         for (label, action) in items {
-            if ui.button(i18n.t(label)).clicked() {
+            if ui.add(MenuItem::new(i18n.t(label)).icon(Icon::Diff)).clicked() {
                 picked = Some(action);
             }
         }
         ui.separator();
-        if ui.add(Button::new(i18n.t(I18nKey::ChangesRestoreObject)).destructive()).clicked() {
+        let restore = MenuItem::new(i18n.t(I18nKey::ChangesRestoreObject)).icon(Icon::Undo2).destructive();
+        if ui.add(restore).clicked() {
             picked = Some(ChangeAction::RestoreObject(active, id.to_owned(), number));
-        }
-        if picked.is_some() {
-            ui.close();
         }
     });
     picked
@@ -291,7 +293,7 @@ fn change_menu(
         None => vec![(I18nKey::ChangesCompareWorking, workspace.history.head_number(), None)],
     };
     for (label, from, to) in compares {
-        if ui.button(i18n.t(label)).clicked() {
+        if ui.add(MenuItem::new(i18n.t(label)).icon(Icon::Diff)).clicked() {
             picked = Some(ChangeAction::Compare(at, id.to_owned(), from, to));
         }
     }
@@ -303,7 +305,7 @@ fn change_menu(
         None => (I18nKey::ChangesDiscard, ChangeAction::Discard(at, id.to_owned())),
         Some(number) => (I18nKey::ChangesRestoreObject, ChangeAction::RestoreObject(at, id.to_owned(), number)),
     };
-    if ui.add(Button::new(i18n.t(label)).destructive()).clicked() {
+    if ui.add(MenuItem::new(i18n.t(label)).icon(Icon::Undo2).destructive()).clicked() {
         picked = Some(action);
     }
     picked

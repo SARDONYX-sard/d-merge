@@ -6,7 +6,12 @@
 //! The left part is the keymap's (e.g., Vim's mode badge and `:w`, `/foo [2/5]`); keymaps without
 //! modes have none. The right part says where the cursor is and what the text is.
 
+use egui_widgets::shadcn::{Button, ComboBox};
+
 use crate::{CodeEditorState, Keymap, keymap::StatusLine, text_pos::LinePos};
+
+/// The height of the status bar's items.
+const ITEM_HEIGHT: f32 = 20.0;
 
 /// How wide a tab counts for `Col`, like the tabs drawn in the editor.
 const TAB_WIDTH: usize = 4;
@@ -75,20 +80,17 @@ impl<'a> StatusBar<'a> {
         let mut keymap_changed = false;
         let problems = draw(ui, state, keymap, text, |ui| {
             if let Some((open, hover)) = options
-                && ui.add(egui::Button::selectable(*open, "⚙").frame(false)).on_hover_text(hover).clicked()
+                && ui.add(Button::selectable(*open, "⚙").small()).on_hover_text(hover).clicked()
             {
                 *open = !*open;
             }
             if let Some(current) = keymap_select {
-                ui.menu_button(format!("{} ▾", current.label()), |ui| {
-                    for choice in Keymap::ALL {
-                        if ui.selectable_label(*current == choice, choice.label()).clicked() {
-                            keymap_changed |= *current != choice;
-                            *current = choice;
-                            ui.close();
-                        }
-                    }
-                });
+                let mut index = Keymap::ALL.iter().position(|keymap| keymap == current).unwrap_or_default();
+                let select = ComboBox::from_id_salt("status_keymap").trigger_height(ITEM_HEIGHT).width(84.0);
+                if select.show_index(ui, &mut index, Keymap::ALL.len(), |at| Keymap::ALL[at].label()).changed() {
+                    *current = Keymap::ALL[index];
+                    keymap_changed = true;
+                }
             }
         });
         StatusBarOutput { problems, keymap_changed }
