@@ -863,6 +863,15 @@ pub enum I18nKey {
     /// Annotation
     HkannoAnnotationLabel,
 
+    /// Before Save overwrites a file, keep it as `<name>.bak` beside it.
+    ///
+    /// # Notes
+    /// - Once: a `.bak` there already is the file as it was before the first save, and stays
+    HkannoBackupHover,
+
+    /// Back up
+    HkannoBackupLabel,
+
     /// Drop .hkx / .xml files here
     HkannoDropHint,
 

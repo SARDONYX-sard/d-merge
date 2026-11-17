@@ -54,7 +54,8 @@ impl HkannoTab {
         let mut tab = Self {
             settings: HkannoTabSettings {
                 input_path: input_path.to_string(),
-                output_path: infer_output_path(input_path),
+                // Saved over the input: kept first if asked (see `back_up`).
+                output_path: input_path.to_owned(),
                 format,
                 cursor: 0,
             },
@@ -102,11 +103,12 @@ impl HkannoTab {
         document(&self.original, &self.text)
     }
 
-    /// Writes the edited annotations to `output_path` in `format`.
+    /// Writes the edited annotations to `output_path` in `format`. `backup`: the file there is kept
+    /// first (see [`back_up`]).
     ///
     /// # Errors
-    /// Serialization or file write failure.
-    pub(crate) fn save(&mut self) -> Result<(), String> {
+    /// Serialization or file write failure, or the backup's.
+    pub(crate) fn save(&mut self, backup: bool) -> Result<(), String> {
         let input = Path::new(&self.settings.input_path);
         let hkanno = self.to_hkanno();
         let bytes = hkanno
@@ -117,6 +119,9 @@ impl HkannoTab {
         let output = Path::new(&self.settings.output_path);
         if let Some(parent) = output.parent().filter(|p| !p.as_os_str().is_empty()) {
             std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        }
+        if backup {
+            back_up(output)?;
         }
         std::fs::write(output, bytes).map_err(|e| format!("{}: {e}", output.display()))?;
 
@@ -160,7 +165,7 @@ impl HkannoTab {
 
     /// Changes the output format and the output extension with it.
     ///
-    /// e.g., `a.modified.hkx` + `Xml` -> `a.modified.xml`
+    /// e.g., `a.hkx` + `Xml` -> `a.xml`
     pub(crate) fn set_format(&mut self, format: OutputFormat) {
         self.settings.format = format;
         let path = Path::new(&self.settings.output_path).with_extension(format.extension());
@@ -189,17 +194,26 @@ fn infer_format(input_path: &str) -> OutputFormat {
     if is_hkx { OutputFormat::Amd64 } else { OutputFormat::Xml }
 }
 
-/// Never overwrite the input by default.
+/// Where the file at `output` is kept before it is overwritten.
 ///
-/// e.g., `C:/a/attack.hkx` -> `C:/a/attack.modified.hkx`
-fn infer_output_path(input_path: &str) -> String {
-    let path = Path::new(input_path);
-    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("output");
-    let name = match path.extension().and_then(|e| e.to_str()) {
-        Some(ext) => format!("{stem}.modified.{ext}"),
-        None => format!("{stem}.modified"),
-    };
-    path.with_file_name(name).display().to_string()
+/// e.g., `C:/a/attack.hkx` -> `C:/a/attack.hkx.bak`
+fn backup_path(output: &Path) -> std::path::PathBuf {
+    let mut name = output.as_os_str().to_owned();
+    name.push(".bak");
+    name.into()
+}
+
+/// Keeps the file at `output` (if there is one) as [`backup_path`], before it is overwritten. Once:
+/// a backup there already is the file as it was before the first save, and stays.
+///
+/// # Errors
+/// The copy failed.
+fn back_up(output: &Path) -> Result<(), String> {
+    let backup = backup_path(output);
+    if !output.exists() || backup.exists() {
+        return Ok(());
+    }
+    std::fs::copy(output, &backup).map(drop).map_err(|e| format!("{}: {e}", backup.display()))
 }
 
 /// `.txt` bytes -> editor text: UTF-8 (lossy) without a BOM, `\r\n` -> `\n` (the editor's line end).
@@ -226,10 +240,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn output_path_keeps_extension() {
-        // Compare as paths: the separator differs per OS (`a\attack...` on Windows).
-        let output = infer_output_path("a/attack.hkx");
-        assert_eq!(Path::new(&output), Path::new("a/attack.modified.hkx"));
+    fn a_backup_is_beside_the_file() {
+        assert_eq!(backup_path(Path::new("a/attack.hkx")), Path::new("a/attack.hkx.bak"));
+    }
+
+    /// The first save keeps the file; the next ones do not overwrite that.
+    #[test]
+    fn the_file_is_backed_up_once() {
+        let dir = std::env::temp_dir().join(format!("hkanno_backup_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let output = dir.join("attack.hkx");
+        std::fs::write(&output, "original").unwrap();
+
+        back_up(&output).unwrap();
+        std::fs::write(&output, "first save").unwrap();
+        back_up(&output).unwrap();
+        let kept = std::fs::read_to_string(backup_path(&output)).unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+
+        assert_eq!(kept, "original");
     }
 
     #[test]

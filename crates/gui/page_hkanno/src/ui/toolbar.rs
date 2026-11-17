@@ -1,7 +1,7 @@
 //! Bars above the editor and the page's dialogs.
 //!
 //! ```text
-//! Output: [attack.modified.hkx                      ]  Format: [HKX SE (64-bit) ▼]        <- file bar
+//! Output: [attack.hkx                               ]  Format: [HKX SE (64-bit) ▼]        <- file bar
 //! [Save] [Revert] [Format] [⚙]  Keymap: [Vim ▼]                [Hide Preview]  <- toolbar
 //! ```
 
@@ -38,13 +38,15 @@ impl HkannoPage {
         });
     }
 
-    /// `[Save] [Revert] [Format] [⚙]  Keymap: [Vim ▼]   [Hide Preview]`
+    /// `[Save] [x Back up] [Revert] [Format] [⚙]  Keymap: [Vim ▼]   [Hide Preview]`
     pub(crate) fn toolbar(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
         let i18n = ctx.i18n;
         ui.horizontal(|ui| {
             if ui.add(Button::new(i18n.t(I18nKey::SaveButton)).primary()).clicked() {
                 self.save_active(ctx);
             }
+            ui.add(Checkbox::new(&mut ctx.settings.backup, i18n.t(I18nKey::HkannoBackupLabel)))
+                .on_hover_markdown(i18n.t(I18nKey::HkannoBackupHover));
 
             let dirty = self.tabs.get(self.active).is_some_and(|tab| tab.dirty);
             if ui.add_enabled(dirty, Button::new(i18n.t(I18nKey::RevertButton))).clicked() {

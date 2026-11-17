@@ -220,6 +220,8 @@
   "graph_zoom_out_hover": "縮小",
   "graph_zoom_reset_hover": "100%に戻します",
   "hkanno_annotation_label": "アノテーション",
+  "hkanno_backup_hover": "保存で上書きする前に、元のファイルを隣に`<名前>.bak`として残します。\n\n# 注意\n- 1回だけです: すでにある`.bak`は最初の保存前のファイルなので、そのまま残します",
+  "hkanno_backup_label": "バックアップ",
   "hkanno_drop_hint": ".hkx / .xmlファイルをここにドロップ",
   "hkanno_empty_message": ".hkx / .xmlファイルを開くかドロップして、アノテーションを編集します。",
   "hkanno_export_txt": ".txtに書き出し…",

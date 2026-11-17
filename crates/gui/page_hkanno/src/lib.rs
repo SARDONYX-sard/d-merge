@@ -2,7 +2,7 @@
 //!
 //! ```text
 //! ┌ [attack.hkx ✖] [idle.hkx ✖]                                       [Open] ┐  tabs
-//! ├ Output: [attack.modified.hkx                 ]  Format: [Amd64 ▼]         ┤  file bar
+//! ├ Output: [attack.hkx                          ]  Format: [Amd64 ▼]         ┤  file bar
 //! ├ [Save] [Revert] [Format] [⚙] Keymap: [Vim ▼]               [Hide Preview] ┤  toolbar
 //! │ Annotation                              │ Preview (XML)                      │
 //! │ # numOriginalFrames: 38                 │ <hkobject ...>                     │
@@ -149,7 +149,7 @@ impl HkannoPage {
     /// Saves the active tab and reports the result.
     pub(crate) fn save_active(&mut self, ctx: &mut HkannoPageCtx<'_>) {
         let Some(tab) = self.active_tab() else { return };
-        match tab.save() {
+        match tab.save(ctx.settings.backup) {
             Ok(()) => {
                 ctx.notify.success(format!("{}: {}", ctx.i18n.t(I18nKey::SavedMessage), tab.settings.output_path));
             }

@@ -25,12 +25,16 @@ pub struct HkannoSettings {
 
     /// Show the XML preview pane next to the editor.
     pub show_preview: bool,
+
+    /// Before `Save` overwrites a file, keep it as `<name>.bak` beside it (once: see
+    /// `page_hkanno`'s `back_up`).
+    pub backup: bool,
 }
 
 impl Default for HkannoSettings {
     #[inline]
     fn default() -> Self {
-        Self { tabs: Vec::new(), active_tab: 0, show_preview: true }
+        Self { tabs: Vec::new(), active_tab: 0, show_preview: true, backup: true }
     }
 }
 
@@ -41,7 +45,7 @@ pub struct HkannoTabSettings {
     /// The `.hkx`/`.xml` the annotations were read from.
     pub input_path: String,
 
-    /// Where `Save` writes. e.g., `foo.modified.hkx`
+    /// Where `Save` writes: the input by default (see [`HkannoSettings::backup`]). e.g., `foo.hkx`
     pub output_path: String,
 
     /// Output format used by `Save`.
