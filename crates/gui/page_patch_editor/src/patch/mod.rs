@@ -452,9 +452,18 @@ impl PatchTool {
         self.user_patch.to_top = self.user_patch.open;
     }
 
-    /// The user patch's editor, up to date. A new output directory has another user patch: what was
-    /// open is saved where it belongs first.
+    /// The user patch's editor, read: for what takes a value in at once (`Use this`). Its read is
+    /// small and waited for here; the window does not wait (see [`Self::user_patch_tool_now`]).
     fn user_patch_tool(&mut self, paths: PatchPaths<'_>, notify: &mut Notification, i18n: &I18nMap) -> &mut Self {
+        let tool = self.user_patch_tool_now(paths, notify, i18n);
+        tool.wait_job(notify, i18n);
+        tool
+    }
+
+    /// The user patch's editor, up to date, its read maybe still running (the window shows how far
+    /// it is). A new output directory has another user patch: what was open is saved where it
+    /// belongs first.
+    fn user_patch_tool_now(&mut self, paths: PatchPaths<'_>, notify: &mut Notification, i18n: &I18nMap) -> &mut Self {
         let output = paths.patch_output_dir.trim();
         if let Some(tool) = self.user_patch.tool.as_mut().filter(|tool| tool.work.place.patch_output != output) {
             tool.leave_user_patch(notify, i18n);
@@ -468,8 +477,6 @@ impl PatchTool {
         }
         let shown = tool.editor.shown(&tool.sel);
         tool.work.sync_workspace(shown, notify, i18n);
-        // Small, and what comes next uses it at once.
-        tool.wait_job(notify, i18n);
         tool
     }
 
@@ -533,7 +540,7 @@ impl PatchTool {
         if paths.patch_output_dir.trim().is_empty() {
             return; // the window says what to do
         }
-        self.user_patch_tool(paths, notify, i18n).work.resolution = Some(request);
+        self.user_patch_tool_now(paths, notify, i18n).work.resolution = Some(request);
     }
 
     /// The value `Edit...` asked for, taken in: see [`user_patch::take_in_resolution`].
@@ -574,7 +581,8 @@ impl PatchTool {
         let to_top = std::mem::take(&mut self.user_patch.to_top);
         let has_output = !paths.patch_output_dir.trim().is_empty();
         let mut bulk = std::mem::take(&mut self.user_patch.bulk);
-        let mut tool = has_output.then(|| self.user_patch_tool(paths, notify, i18n));
+        // Not waited for: its read goes on while the window shows how far it is.
+        let mut tool = has_output.then(|| self.user_patch_tool_now(paths, notify, i18n));
 
         let mut open = true;
         let mut bulk_written = false;
@@ -585,7 +593,8 @@ impl PatchTool {
             .close_on_escape(false)
             .show(ctx, &mut open, |ui| match &mut tool {
                 Some(tool) => {
-                    if let Some(requests) = bulk.bar_ui(ui, i18n) {
+                    let read = tool.work.job().is_none();
+                    if let Some(requests) = bulk.bar_ui(ui, i18n).filter(|_| read) {
                         let resolved = tool.resolve_bulk(&requests, notify, i18n);
                         bulk.mark_resolved(resolved.iter().map(|&at| &requests[at]));
                         bulk_written = true;
@@ -618,9 +627,12 @@ impl PatchTool {
     ) {
         self.editor.read_options(editor);
         self.read_view_settings(settings);
+        self.poll_job(ui.ctx(), notify, i18n);
         let shown = self.editor.shown(&self.sel);
         self.work.sync_workspace(shown, notify, i18n);
-        self.take_resolution(notify, i18n);
+        if self.work.job().is_none() {
+            self.take_resolution(notify, i18n); // `Edit...`: into the work once it is read
+        }
         self.take_key_commands(ui.ctx(), Some(keys), i18n, notify);
         self.draw(ui, i18n, notify);
         self.editor.write_options(editor);
@@ -1012,7 +1024,10 @@ mod user_patch_tests {
             keep_all_events: false,
         };
         main.open_resolution(request, paths(&output), &mut notify, &i18n);
-        main.user_patch.tool.as_mut().unwrap().take_resolution(&mut notify, &i18n);
+        // As the window does: the value goes in once the user patch is read.
+        let tool = main.user_patch.tool.as_mut().unwrap();
+        tool.wait_job(&mut notify, &i18n);
+        tool.take_resolution(&mut notify, &i18n);
         (main, notify, i18n)
     }
 
