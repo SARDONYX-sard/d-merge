@@ -94,13 +94,19 @@ fn value_row(
 ) -> Option<DetailOut> {
     let mut out = None;
     ui.horizontal(|ui| {
-        let name = match label {
-            Label::Field(name) => std::borrow::Cow::Borrowed(name),
-            Label::Element(index) => std::borrow::Cow::Owned(format!("[{index}]")),
-        };
-        let width = ui.available_width() * NAME_SHARE;
-        ui.add_sized([width, ui.spacing().interact_size.y], egui::Label::new(name.as_ref()).truncate())
-            .on_hover_text(name.as_ref());
+        {
+            let name = match label {
+                Label::Field(name) => std::borrow::Cow::Borrowed(name),
+                Label::Element(index) => std::borrow::Cow::Owned(format!("[{index}]")),
+            };
+            let width = ui.available_width() * NAME_SHARE;
+            // Its type on hover, as the text's: the input already holds only what the type can.
+            let element = matches!(label, Label::Element(_));
+            let res = ui.add_sized([width, ui.spacing().interact_size.y], egui::Label::new(name.as_ref()).truncate());
+            if let Some(kind) = schema.map(|schema| type_text(schema, element)) {
+                res.on_hover_text(kind);
+            }
+        }
 
         let is_pointer = kind == Some(TypeKind::Pointer);
         let go = egui_widgets::shadcn::Button::new("").icon(egui_widgets::shadcn::Icon::ArrowRight).small();
@@ -115,9 +121,31 @@ fn value_row(
     out
 }
 
+/// A field's type for people, as the conflict list tells it; of an element of a list, the
+/// element's.
+///
+/// e.g. `Enum(Int8)`, `Array<Pointer> -> hkbStateMachineStateInfo`; an element of the last:
+/// `Pointer -> hkbStateMachineStateInfo`
+fn type_text(schema: &nemesis_diff::schema::FieldSchema, element: bool) -> String {
+    let kind = if element { format!("{:?}", schema.sub_kind) } else { nemesis_diff::schema::type_label(schema) };
+    match schema.class {
+        Some(class) => format!("{kind} -> {class}"),
+        None => kind,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn types_are_told_as_the_conflict_list_tells_them() {
+        let field =
+            |name| nemesis_diff::schema::xml_fields("hkbStateMachine").find(|field| field.name == name).unwrap();
+        assert_eq!(type_text(field("states"), false), "Array<Pointer> -> hkbStateMachineStateInfo");
+        assert_eq!(type_text(field("states"), true), "Pointer -> hkbStateMachineStateInfo");
+        assert_eq!(type_text(field("startStateId"), false), "Int32");
+    }
 
     #[test]
     fn groups_are_titled_by_name_and_count() {
