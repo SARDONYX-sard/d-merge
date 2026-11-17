@@ -17,7 +17,7 @@ impl HkannoPage {
     /// `Output: [path]  Format: [HKX SE (64-bit) ▼]`
     pub(crate) fn file_bar(&mut self, ui: &mut egui::Ui, ctx: &HkannoPageCtx<'_>) {
         let Some(tab) = self.active_tab() else { return };
-        ui.horizontal(|ui| {
+        egui_widgets::shadcn::field_row(ui, |ui| {
             ui.label(ctx.i18n.t(I18nKey::OutputLabel));
 
             // Right-to-left: the format box takes its width first, the path gets the rest.

@@ -27,5 +27,5 @@ pub use self::{
     menu::{MenuItem, menu_button},
     select::ComboBox,
     table::TableHead,
-    text::{Label, NumberInput, TextEdit},
+    text::{Label, NumberInput, TextEdit, field_label, field_row},
 };

@@ -21,7 +21,8 @@ impl PatchView<'_> {
         let panel = egui::Panel::top("ui_top_options").frame(self.ctx.panel_frame);
 
         panel.show(ui, |ui| {
-            ui.horizontal(|ui| {
+            // As high as its fields: their labels beside them (see `field_row`).
+            egui_widgets::shadcn::field_row(ui, |ui| {
                 self.ui_execution_mode(ui);
 
                 ui.separator();
@@ -65,7 +66,7 @@ impl PatchView<'_> {
     fn ui_target_runtime_box(&mut self, ui: &mut egui::Ui) {
         use skyrim_data_dir::Runtime;
 
-        ui.horizontal_top(|ui| {
+        egui_widgets::shadcn::field_row(ui, |ui| {
             ui.add(Label::new(self.ctx.i18n.t(I18nKey::OutputFormatLabel)))
                 .on_hover_markdown(self.ctx.i18n.t(I18nKey::RuntimeTargetHover));
 
@@ -104,7 +105,7 @@ impl PatchView<'_> {
     }
 
     fn ui_parser_mode(&mut self, ui: &mut egui::Ui) {
-        ui.horizontal_top(|ui| {
+        egui_widgets::shadcn::field_row(ui, |ui| {
             ui.label(self.ctx.i18n.t(I18nKey::ParserModeLabel))
                 .on_hover_markdown(self.ctx.i18n.t(I18nKey::ParserModeHover));
 

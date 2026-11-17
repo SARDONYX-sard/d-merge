@@ -156,6 +156,20 @@ fn field_focus(ui: &egui::Ui, theme: &ShadcnTheme, outer_rect: egui::Rect) {
     paint_focus_ring(ui.painter(), outer_rect, theme.radius, theme.ring);
 }
 
+/// A row as high as a field from the start, its contents in its middle: a label put in before a
+/// field is beside it, not above (in the middle of the lower row `ui.horizontal` starts with).
+///
+/// e.g. `Output format: [HKX SE (64-bit) ▼]`
+pub fn field_row<R>(ui: &mut egui::Ui, add_contents: impl FnOnce(&mut egui::Ui) -> R) -> egui::InnerResponse<R> {
+    let row = egui::vec2(ui.available_width(), FIELD_HEIGHT);
+    ui.allocate_ui_with_layout(row, egui::Layout::left_to_right(egui::Align::Center), add_contents)
+}
+
+/// A label as high as a field, its text in its middle: e.g. in a grid's cell beside a field.
+pub fn field_label(ui: &mut egui::Ui, text: impl Into<egui::WidgetText>) -> egui::Response {
+    field_row(ui, |ui| ui.label(text)).inner
+}
+
 /// A framed number, dragged or typed, like [`egui::DragValue`] in the frame of [`TextEdit`].
 ///
 /// The response is the inner [`egui::DragValue`]'s one.

@@ -200,7 +200,7 @@ fn handle_drop(egui_ctx: &egui::Context, settings: &mut gui_shared::settings::pa
 }
 /// `Output format: [HKX SE (64-bit)] [HKX LE (32-bit)] [XML] [JSON]`
 fn format_row(ui: &mut egui::Ui, ctx: &mut ConvertPageCtx<'_>) {
-    ui.label(ctx.i18n.t(I18nKey::OutputFormatLabel));
+    egui_widgets::shadcn::field_label(ui, ctx.i18n.t(I18nKey::OutputFormatLabel));
     ui.horizontal(|ui| {
         let format = &mut ctx.settings.format;
         for kind in OutputFormat::ALL {
@@ -214,7 +214,8 @@ fn format_row(ui: &mut egui::Ui, ctx: &mut ConvertPageCtx<'_>) {
 
 /// `Output: [Next to each input] [Select] [📂]`
 fn output_row(ui: &mut egui::Ui, ctx: &mut ConvertPageCtx<'_>) {
-    ui.label(ctx.i18n.t(I18nKey::OutputLabel)).on_hover_text(ctx.i18n.t(I18nKey::ConvertOutputHover));
+    egui_widgets::shadcn::field_label(ui, ctx.i18n.t(I18nKey::OutputLabel))
+        .on_hover_text(ctx.i18n.t(I18nKey::ConvertOutputHover));
 
     let output = &mut ctx.settings.output;
     // Right-to-left: the buttons take their width first, the text edit gets the rest.
