@@ -15,6 +15,7 @@ mod controls;
 pub mod icon;
 mod menu;
 mod select;
+mod table;
 mod text;
 pub mod theme;
 
@@ -25,5 +26,6 @@ pub use self::{
     icon::Icon,
     menu::{MenuItem, menu_button},
     select::ComboBox,
+    table::TableHead,
     text::{Label, NumberInput, TextEdit},
 };

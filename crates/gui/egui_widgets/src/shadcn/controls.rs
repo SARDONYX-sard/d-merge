@@ -56,6 +56,8 @@ impl egui::Widget for Checkbox<'_> {
         let galley = ui.painter().layout_no_wrap(text.text().to_owned(), label_font, theme.foreground);
 
         let row_height = ui.spacing().interact_size.y.max(box_size);
+        // Without text, no room for it: the box alone, e.g. centered in a table's cell.
+        let spacing = if galley.size().x > 0.0 { spacing } else { 0.0 };
         let desired = egui::vec2(box_size + galley.size().x + spacing, row_height);
         let (rect, mut response) = ui.allocate_exact_size(desired, egui::Sense::click());
 
