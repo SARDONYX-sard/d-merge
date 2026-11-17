@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use egui_widgets::{
     HoverMarkdown as _,
     notify::Notification,
-    shadcn::{Button, Icon},
+    shadcn::{Button, Icon, MenuItem, menu_button},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
@@ -121,18 +121,17 @@ fn add_menu(ui: &mut egui::Ui, scope: TemplateScope, i18n: &I18nMap) -> Option<A
         (I18nKey::BehaviorsCustomXml, Some(I18nKey::BehaviorsCustomXmlHover), AddEvent::File),
         (I18nKey::AnimDataOpen, Some(I18nKey::AnimDataOpenHover), AddEvent::AnimData),
     ];
-    ui.menu_button("+", |ui| {
+    menu_button(ui, Button::new("").icon(Icon::Plus).small(), |ui| {
         for (label, hover, item) in items {
             if matches!(item, AddEvent::File) && !scope.allows(false) {
                 continue;
             }
-            let mut response = ui.button(i18n.t(label));
+            let mut response = ui.add(MenuItem::new(i18n.t(label)));
             if let Some(hover) = hover {
                 response = response.on_hover_markdown(i18n.t(hover));
             }
             if response.clicked() {
                 event = Some(item);
-                ui.close();
             }
         }
     });

@@ -15,7 +15,13 @@ pub enum Icon {
     ArrowRight,
     Check,
     ChevronDown,
+    ChevronLeft,
     ChevronRight,
+    ChevronUp,
+    /// Collapse all.
+    ChevronsDownUp,
+    /// Expand all.
+    ChevronsUpDown,
     Columns2,
     Copy,
     Crosshair,
@@ -28,6 +34,9 @@ pub enum Icon {
     ListTree,
     Lock,
     Logs,
+    /// Fit to the view.
+    Maximize,
+    Pencil,
     Plus,
     RefreshCcw,
     RefreshCwOff,
@@ -38,6 +47,10 @@ pub enum Icon {
     Trash,
     Undo2,
     Workflow,
+    /// Close, remove.
+    X,
+    ZoomIn,
+    ZoomOut,
 }
 
 impl Icon {
@@ -48,7 +61,11 @@ impl Icon {
             Self::ArrowRight => r#"<path d="M5 12h14" /> <path d="m12 5 7 7-7 7" />"#,
             Self::Check => r#"<path d="M20 6 9 17l-5-5" />"#,
             Self::ChevronDown => r#"<path d="m6 9 6 6 6-6" />"#,
+            Self::ChevronLeft => r#"<path d="m15 18-6-6 6-6" />"#,
             Self::ChevronRight => r#"<path d="m9 18 6-6-6-6" />"#,
+            Self::ChevronUp => r#"<path d="m18 15-6-6-6 6" />"#,
+            Self::ChevronsDownUp => r#"<path d="m7 20 5-5 5 5" /> <path d="m7 4 5 5 5-5" />"#,
+            Self::ChevronsUpDown => r#"<path d="m7 15 5 5 5-5" /> <path d="m7 9 5-5 5 5" />"#,
             Self::Columns2 => r#"<rect width="18" height="18" x="3" y="3" rx="2" /> <path d="M12 3v18" />"#,
             Self::Copy => {
                 r#"<rect width="14" height="14" x="8" y="8" rx="2" ry="2" /> <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />"#
@@ -99,6 +116,17 @@ impl Icon {
             Self::Undo2 => {
                 r#"<path d="M9 14 4 9l5-5" /> <path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11" />"#
             }
+            Self::Maximize => {
+                r#"<path d="M8 3H5a2 2 0 0 0-2 2v3" /> <path d="M21 8V5a2 2 0 0 0-2-2h-3" /> <path d="M3 16v3a2 2 0 0 0 2 2h3" /> <path d="M16 21h3a2 2 0 0 0 2-2v-3" />"#
+            }
+            Self::Pencil => {
+                r#"<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" />"#
+            }
+            Self::X => r#"<path d="M18 6 6 18" /> <path d="m6 6 12 12" />"#,
+            Self::ZoomIn => {
+                r#"<circle cx="11" cy="11" r="8" /> <path d="m21 21-4.35-4.35" /> <path d="M11 8v6" /> <path d="M8 11h6" />"#
+            }
+            Self::ZoomOut => r#"<circle cx="11" cy="11" r="8" /> <path d="m21 21-4.35-4.35" /> <path d="M8 11h6" />"#,
             Self::Workflow => {
                 r#"<rect width="8" height="8" x="3" y="3" rx="2" /> <path d="M7 11v4a2 2 0 0 0 2 2h4" /> <rect width="8" height="8" x="13" y="13" rx="2" />"#
             }

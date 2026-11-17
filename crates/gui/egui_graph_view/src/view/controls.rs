@@ -3,11 +3,12 @@
 //!
 //! ```text
 //! ┌────────────────────────────────────────────────────────┐
-//! │ (-) ━━━━━●━━━━ (+)  100%   ⌖   ⛶   − 3 +               │  at the bottom left, over the graph
+//! │ [-] ━━━━━●━━━━ [+] [100%] [⌖] [⛶]  [−] 3 [+]          │  at the bottom left, over the graph
 //! └────────────────────────────────────────────────────────┘
 //! ```
 
-use egui::{Pos2, Rect, Sense, Stroke, Vec2};
+use egui::{Pos2, Rect, Vec2};
+use egui_widgets::shadcn::{Button, Icon, Slider};
 
 /// The hover texts of the controls, e.g. from the host's translations.
 #[derive(Debug, Clone, Copy)]
@@ -52,8 +53,8 @@ pub(super) enum Control {
 
 /// A zoom button's step.
 const ZOOM_STEP: f32 = 1.25;
-/// The size of an icon button.
-const BUTTON: f32 = 22.0;
+/// The width of the zoom's slider.
+const SLIDER_WIDTH: f32 = 100.0;
 /// How deep the graph can go.
 const DEPTH: std::ops::RangeInclusive<usize> = 1..=8;
 
@@ -64,7 +65,7 @@ pub(super) fn controls_ui(
     labels: &GraphLabels<'_>,
     ((zoom, zoom_range), depth): ((f32, std::ops::RangeInclusive<f32>), usize),
 ) -> Option<Control> {
-    let bar = Rect::from_min_size(view.left_bottom() + egui::vec2(8.0, -46.0), egui::vec2(380.0, 32.0));
+    let bar = Rect::from_min_size(view.left_bottom() + egui::vec2(8.0, -52.0), egui::vec2(440.0, 38.0));
     let builder = egui::UiBuilder::new().max_rect(bar).layout(egui::Layout::left_to_right(egui::Align::Center));
     let mut asked = None;
     ui.scope_builder(builder, |ui| {
@@ -73,10 +74,10 @@ pub(super) fn controls_ui(
             ui.spacing_mut().item_spacing.x = 4.0;
             asked = zoom_ui(ui, labels, (zoom, zoom_range));
             ui.separator();
-            if icon_button(ui, Glyph::Center, labels.center).clicked() {
+            if icon_button(ui, Icon::Crosshair, labels.center).clicked() {
                 asked = Some(Control::Center);
             }
-            if icon_button(ui, Glyph::Fit, labels.fit).clicked() {
+            if icon_button(ui, Icon::Maximize, labels.fit).clicked() {
                 asked = Some(Control::Fit);
             }
             ui.separator();
@@ -95,18 +96,17 @@ fn zoom_ui(
     (zoom, range): (f32, std::ops::RangeInclusive<f32>),
 ) -> Option<Control> {
     let (min, max) = (*range.start(), *range.end());
-    let zoom_out = icon_button(ui, Glyph::ZoomOut, labels.zoom_out).clicked();
+    let zoom_out = icon_button(ui, Icon::ZoomOut, labels.zoom_out).clicked();
     let mut asked = zoom_out.then(|| Control::Zoom((zoom / ZOOM_STEP).max(min)));
     let mut value = zoom;
-    let slider = egui::Slider::new(&mut value, range).logarithmic(true).show_value(false);
-    if ui.add_sized([100.0, BUTTON], slider).changed() {
+    if ui.add(Slider::new(&mut value, range).show_value(false).width(SLIDER_WIDTH)).changed() {
         asked = Some(Control::Zoom(value));
     }
-    if icon_button(ui, Glyph::ZoomIn, labels.zoom_in).clicked() {
+    if icon_button(ui, Icon::ZoomIn, labels.zoom_in).clicked() {
         asked = Some(Control::Zoom((zoom * ZOOM_STEP).min(max)));
     }
     let percent = format!("{:.0}%", zoom * 100.0);
-    if ui.add(egui::Button::new(percent).small().frame(false)).on_hover_text(labels.zoom_reset).clicked() {
+    if ui.add(Button::new(percent).small()).on_hover_text(labels.zoom_reset).clicked() {
         asked = Some(Control::Zoom(1.0));
     }
     asked
@@ -115,73 +115,21 @@ fn zoom_ui(
 /// `− 3 +`
 fn depth_ui(ui: &mut egui::Ui, labels: &GraphLabels<'_>, depth: usize) -> Option<usize> {
     let mut asked = None;
-    let less = ui.add_enabled(depth > *DEPTH.start(), egui::Button::new("−").small()).on_hover_text(labels.depth);
+    let less = ui.add_enabled(depth > *DEPTH.start(), Button::new("−").small()).on_hover_text(labels.depth);
     if less.clicked() {
         asked = Some(depth - 1);
     }
     ui.label(depth.to_string()).on_hover_text(labels.depth);
-    let more = ui.add_enabled(depth < *DEPTH.end(), egui::Button::new("+").small()).on_hover_text(labels.depth);
+    let more = ui.add_enabled(depth < *DEPTH.end(), Button::new("+").small()).on_hover_text(labels.depth);
     if more.clicked() {
         asked = Some(depth + 1);
     }
     asked
 }
 
-/// What an icon button shows.
-#[derive(Debug, Clone, Copy)]
-enum Glyph {
-    ZoomOut,
-    ZoomIn,
-    /// A target.
-    Center,
-    /// Four corners.
-    Fit,
-}
-
-/// A small button drawn as `glyph`.
-fn icon_button(ui: &mut egui::Ui, glyph: Glyph, hover: &str) -> egui::Response {
-    let (rect, response) = ui.allocate_exact_size(Vec2::splat(BUTTON), Sense::click());
-    let visuals = ui.style().interact(&response);
-    if response.hovered() {
-        ui.painter().rect_filled(rect, 4.0, visuals.bg_fill);
-    }
-    draw_glyph(ui.painter(), rect.shrink(4.0), glyph, Stroke::new(1.5, visuals.fg_stroke.color));
-    response.on_hover_text(hover)
-}
-
-fn draw_glyph(painter: &egui::Painter, rect: Rect, glyph: Glyph, stroke: Stroke) {
-    let c = rect.center();
-    match glyph {
-        Glyph::ZoomOut | Glyph::ZoomIn => {
-            let lens = c - egui::vec2(1.5, 1.5);
-            painter.circle_stroke(lens, 5.0, stroke);
-            painter.line_segment([lens + egui::vec2(3.6, 3.6), lens + egui::vec2(7.0, 7.0)], stroke);
-            painter.line_segment([lens - egui::vec2(2.5, 0.0), lens + egui::vec2(2.5, 0.0)], stroke);
-            if matches!(glyph, Glyph::ZoomIn) {
-                painter.line_segment([lens - egui::vec2(0.0, 2.5), lens + egui::vec2(0.0, 2.5)], stroke);
-            }
-        }
-        Glyph::Center => {
-            painter.circle_stroke(c, 4.5, stroke);
-            painter.circle_filled(c, 1.2, stroke.color);
-            for (from, to) in [
-                ((0.0, -7.0), (0.0, -5.0)),
-                ((0.0, 5.0), (0.0, 7.0)),
-                ((-7.0, 0.0), (-5.0, 0.0)),
-                ((5.0, 0.0), (7.0, 0.0)),
-            ] {
-                painter.line_segment([c + Vec2::from(from), c + Vec2::from(to)], stroke);
-            }
-        }
-        Glyph::Fit => {
-            for corner in [rect.left_top(), rect.right_top(), rect.left_bottom(), rect.right_bottom()] {
-                let inward = |to: Pos2| egui::vec2((to.x - corner.x).signum(), (to.y - corner.y).signum()) * 4.0;
-                let toward = inward(c);
-                painter.line_segment([corner, corner + egui::vec2(toward.x, 0.0)], stroke);
-                painter.line_segment([corner, corner + egui::vec2(0.0, toward.y)], stroke);
-            }
-        }
-    }
+/// A small button of `icon` alone (shadcn), with `hover`.
+fn icon_button(ui: &mut egui::Ui, icon: Icon, hover: &str) -> egui::Response {
+    ui.add(Button::new("").icon(icon).small()).on_hover_text(hover)
 }
 
 /// The zoom and pan that show `content` (on screen now, at `zoom` around `origin`) in `view`,

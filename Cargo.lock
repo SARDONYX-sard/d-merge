@@ -1574,6 +1574,7 @@ name = "egui_graph_view"
 version = "0.0.0"
 dependencies = [
  "egui",
+ "egui_widgets",
  "fast_hash",
 ]
 

@@ -55,6 +55,10 @@ pub struct Button {
 }
 
 impl Button {
+    /// The width of a [`Self::small`] button of an icon alone (it is square): to keep room for one
+    /// beside what is cut to fit.
+    pub const SMALL_ICON_WIDTH: f32 = ButtonSize::Small.metrics().0;
+
     #[inline]
     pub fn new(text: impl Into<egui::WidgetText>) -> Self {
         Self {

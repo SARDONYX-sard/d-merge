@@ -10,6 +10,7 @@
 //! ```
 
 use egui_graph_view::{Card, Edge, GraphEdit, GraphSource, Row, Slot};
+use egui_widgets::shadcn::Icon;
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::fields::{self, FieldValue, ObjectField, Token};
 
@@ -259,6 +260,11 @@ fn graph_labels(i18n: &I18nMap) -> egui_graph_view::GraphLabels<'_> {
     }
 }
 
+/// A small button of `icon` alone.
+fn icon_button(ui: &mut egui::Ui, icon: Icon) -> egui::Response {
+    ui.add(egui_widgets::shadcn::Button::new("").icon(icon).small())
+}
+
 /// What the details panel shows: the open object.
 struct Details<'a> {
     id: &'a str,
@@ -287,7 +293,7 @@ fn details_panel(
     if *folded {
         let strip = egui::Panel::right("graph_details_folded").resizable(false).exact_size(28.0);
         strip.show(ui, |ui| {
-            if ui.small_button("«").on_hover_text(i18n.t(I18nKey::GraphDetailsShowHover)).clicked() {
+            if icon_button(ui, Icon::ChevronLeft).on_hover_text(i18n.t(I18nKey::GraphDetailsShowHover)).clicked() {
                 *folded = false;
             }
         });
@@ -302,14 +308,21 @@ fn details_panel(
             ui.horizontal(|ui| {
                 ui.strong(i18n.t(I18nKey::GraphDetailsLabel));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.small_button("»").on_hover_text(i18n.t(I18nKey::GraphDetailsHideHover)).clicked() {
+                    if icon_button(ui, Icon::ChevronRight)
+                        .on_hover_text(i18n.t(I18nKey::GraphDetailsHideHover))
+                        .clicked()
+                    {
                         *folded = true;
                     }
                     ui.separator();
-                    if ui.small_button("−").on_hover_text(i18n.t(I18nKey::GraphDetailsCollapseHover)).clicked() {
+                    let collapse = icon_button(ui, Icon::ChevronsDownUp);
+                    if collapse.on_hover_text(i18n.t(I18nKey::GraphDetailsCollapseHover)).clicked() {
                         open_all = Some(false);
                     }
-                    if ui.small_button("+").on_hover_text(i18n.t(I18nKey::GraphDetailsExpandHover)).clicked() {
+                    if icon_button(ui, Icon::ChevronsUpDown)
+                        .on_hover_text(i18n.t(I18nKey::GraphDetailsExpandHover))
+                        .clicked()
+                    {
                         open_all = Some(true);
                     }
                 });

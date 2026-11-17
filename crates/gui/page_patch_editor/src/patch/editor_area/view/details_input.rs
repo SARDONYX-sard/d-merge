@@ -15,7 +15,13 @@
 //! A number being dragged is kept apart (egui's memory) and written once the drag ends: the
 //! object's text, its graph and its problems are not redone every frame.
 
+use egui_widgets::shadcn::{Checkbox, ComboBox, NumberInput, TextEdit};
 use nemesis_diff::schema::{FieldSchema, TypeKind};
+
+/// The height of an input: a row of the details.
+const HEIGHT: f32 = 24.0;
+/// An enum with more values than this can be searched.
+const SEARCH_FROM: usize = 8;
 
 /// The input of `text`, of `kind` by `schema`. Returns the new text once one is made.
 pub(super) fn value_input(
@@ -29,14 +35,16 @@ pub(super) fn value_input(
         Some(kind) if int_range(kind).is_some() => {
             let (min, max) = int_range(kind)?;
             let current = text.trim().parse::<f64>().ok()?;
-            number_input(ui, id, (current, 1.0, 0), min..=max).map(|n| format!("{n:.0}"))
+            let width = ui.available_width();
+            number_input(ui, id, (current, 1.0, 0), (min..=max, width)).map(|n| format!("{n:.0}"))
         }
         Some(TypeKind::Real | TypeKind::Half) => {
             let current = text.trim().parse::<f64>().ok()?;
-            number_input(ui, id, (current, 0.01, 6), f64::MIN..=f64::MAX).map(format_real)
+            let width = ui.available_width();
+            number_input(ui, id, (current, 0.01, 6), (f64::MIN..=f64::MAX, width)).map(format_real)
         }
         Some(TypeKind::Enum) if !values.is_empty() => enum_input(ui, id, text, values),
-        Some(TypeKind::Flags) if is_flags(text, values) => flags_input(ui, text, values),
+        Some(TypeKind::Flags) if is_flags(text, values) => flags_input(ui, id, text, values),
         Some(TypeKind::Vector4 | TypeKind::Quaternion) => vector_input(ui, id, text),
         _ => text_input(ui, id, text),
     }
@@ -98,19 +106,20 @@ fn flags_text(values: &[&str], on: impl Fn(&str) -> bool) -> String {
 
 fn bool_input(ui: &mut egui::Ui, text: &str) -> Option<String> {
     let mut on = text.trim() == "true";
-    ui.checkbox(&mut on, "").changed().then(|| on.to_string())
+    ui.add(Checkbox::without_text(&mut on)).changed().then(|| on.to_string())
 }
 
-/// A number: dragged (kept apart until it ends) or typed. `(current, speed, decimals)`.
+/// A number: dragged (kept apart until it ends) or typed. `(current, speed, decimals)`,
+/// `(range, width)`.
 fn number_input(
     ui: &mut egui::Ui,
     id: egui::Id,
     (current, speed, decimals): (f64, f64, usize),
-    range: std::ops::RangeInclusive<f64>,
+    (range, width): (std::ops::RangeInclusive<f64>, f32),
 ) -> Option<f64> {
     let mut value = ui.data(|data| data.get_temp::<f64>(id)).unwrap_or(current);
-    let drag = egui::DragValue::new(&mut value).speed(speed).range(range).max_decimals(decimals);
-    let response = ui.add(drag);
+    let input = NumberInput::new(&mut value).speed(speed).range(range).max_decimals(decimals);
+    let response = ui.add(input.desired_width(width).height(HEIGHT));
     if response.dragged() {
         ui.data_mut(|data| data.insert_temp(id, value));
         return None;
@@ -122,23 +131,27 @@ fn number_input(
 }
 
 fn enum_input(ui: &mut egui::Ui, id: egui::Id, text: &str, values: &[&str]) -> Option<String> {
-    let mut picked = None;
-    egui::ComboBox::from_id_salt(id).selected_text(text).width(ui.available_width()).show_ui(ui, |ui| {
-        for &value in values {
-            if ui.selectable_label(value == text, value).clicked() && value != text {
-                picked = Some(value.to_owned());
-            }
-        }
-    });
-    picked
+    let mut index = values.iter().position(|value| *value == text).unwrap_or(usize::MAX);
+    let mut select = ComboBox::from_id_salt(id).selected_text(text).width(ui.available_width()).trigger_height(HEIGHT);
+    if values.len() > SEARCH_FROM {
+        select = select.search_hint("");
+    }
+    let response = select.show_index(ui, &mut index, values.len(), |at| values[at]);
+    response.changed().then(|| values.get(index).map(|value| (*value).to_owned())).flatten()
 }
 
-fn flags_input(ui: &mut egui::Ui, text: &str, values: &[&str]) -> Option<String> {
+/// The flags set, a checkbox per flag in a list that stays open while they are set.
+fn flags_input(ui: &mut egui::Ui, id: egui::Id, text: &str, values: &[&str]) -> Option<String> {
     let mut picked = None;
-    ui.menu_button(text, |ui| {
+    let select = ComboBox::from_id_salt(id)
+        .selected_text(text)
+        .width(ui.available_width())
+        .trigger_height(HEIGHT)
+        .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
+    select.show_ui(ui, |ui| {
         for &value in values {
             let mut on = flags_of(text).any(|flag| flag == value);
-            if ui.checkbox(&mut on, value).changed() {
+            if ui.add(Checkbox::new(&mut on, value)).changed() {
                 let toggled = |flag: &str| if flag == value { on } else { flags_of(text).any(|set| set == flag) };
                 picked = Some(flags_text(values, toggled));
             }
@@ -149,9 +162,11 @@ fn flags_input(ui: &mut egui::Ui, text: &str, values: &[&str]) -> Option<String>
 
 fn vector_input(ui: &mut egui::Ui, id: egui::Id, text: &str) -> Option<String> {
     let Some(mut vector) = parse_vector(text) else { return text_input(ui, id, text) };
+    let spacing = ui.spacing().item_spacing.x;
+    let width = spacing.mul_add(-3.0, ui.available_width()) / 4.0;
     let mut changed = false;
     for (i, part) in vector.iter_mut().enumerate() {
-        if let Some(value) = number_input(ui, id.with(i), (*part, 0.01, 6), f64::MIN..=f64::MAX) {
+        if let Some(value) = number_input(ui, id.with(i), (*part, 0.01, 6), (f64::MIN..=f64::MAX, width)) {
             *part = value;
             changed = true;
         }
@@ -162,7 +177,8 @@ fn vector_input(ui: &mut egui::Ui, id: egui::Id, text: &str) -> Option<String> {
 /// Text, written when the field is left (`Esc`: not). `<` would break the XML: not written.
 fn text_input(ui: &mut egui::Ui, id: egui::Id, text: &str) -> Option<String> {
     let mut buffer = ui.data(|data| data.get_temp::<String>(id)).unwrap_or_else(|| text.to_owned());
-    let response = ui.add(egui::TextEdit::singleline(&mut buffer).id(id).desired_width(ui.available_width()));
+    let field = TextEdit::singleline(&mut buffer).id_salt(id).desired_width(ui.available_width()).height(HEIGHT);
+    let response = ui.add(field);
     if response.has_focus() {
         ui.data_mut(|data| data.insert_temp(id, buffer));
         return None;

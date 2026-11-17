@@ -103,7 +103,8 @@ fn value_row(
             .on_hover_text(name.as_ref());
 
         let is_pointer = kind == Some(TypeKind::Pointer);
-        if is_pointer && token.text.starts_with('#') && ui.small_button("→").clicked() {
+        let go = egui_widgets::shadcn::Button::new("").icon(egui_widgets::shadcn::Icon::ArrowRight).small();
+        if is_pointer && token.text.starts_with('#') && ui.add(go).clicked() {
             out = Some(DetailOut::GoTo(token.text.to_owned()));
         }
         let input_id = ui.make_persistent_id((id, at, token.at));

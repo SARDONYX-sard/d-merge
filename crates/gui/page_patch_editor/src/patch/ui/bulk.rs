@@ -14,7 +14,10 @@
 //! The candidates come from the patch page's conflict check (`PatchPage::bulk_resolutions`). What
 //! the user unchecked stays unchecked when they are found again.
 
-use egui_widgets::{HoverMarkdown as _, shadcn::Button};
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Button, Checkbox},
+};
 use fast_hash::HashSet;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
@@ -108,7 +111,7 @@ fn row_ui(ui: &mut egui::Ui, i18n: &I18nMap, item: &BulkResolution, unchecked: &
 
     let key = key_of(item);
     let mut on = !unchecked.contains(&key);
-    if ui.checkbox(&mut on, egui::RichText::new(place).monospace()).changed() {
+    if ui.add(Checkbox::new(&mut on, egui::RichText::new(place).monospace())).changed() {
         if on {
             unchecked.remove(&key);
         } else {

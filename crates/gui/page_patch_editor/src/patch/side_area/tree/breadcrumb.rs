@@ -34,7 +34,8 @@ pub(super) fn show(
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 2.0;
 
-        if ui.small_button("◎").on_hover_text(i18n.t(I18nKey::ExplorerLocateSelected)).clicked() {
+        let locate = egui_widgets::shadcn::Button::new("").icon(egui_widgets::shadcn::Icon::Crosshair).small();
+        if ui.add(locate).on_hover_text(i18n.t(I18nKey::ExplorerLocateSelected)).clicked() {
             event = Some(TreeEvent::Locate);
         }
 

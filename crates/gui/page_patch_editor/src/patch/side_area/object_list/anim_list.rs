@@ -9,7 +9,10 @@
 //! is returned ([`AnimEvent`]).
 
 use egui_tree::{Nav, TreeKey};
-use egui_widgets::HoverMarkdown as _;
+use egui_widgets::{
+    HoverMarkdown as _,
+    shadcn::{Icon, MenuItem},
+};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
 use super::{RowAction, row_menu};
@@ -164,13 +167,11 @@ fn folder_row(
     let mut event = response.clicked().then(|| AnimEvent::Toggle(name.to_owned()));
 
     response.context_menu(|ui| {
-        if ui.button(i18n.t(I18nKey::ExpandAllBelow)).clicked() {
+        if ui.add(MenuItem::new(i18n.t(I18nKey::ExpandAllBelow)).icon(Icon::ChevronsUpDown)).clicked() {
             event = Some(AnimEvent::ExpandBelow(name.to_owned()));
-            ui.close();
         }
-        if ui.button(i18n.t(I18nKey::CollapseAllBelow)).clicked() {
+        if ui.add(MenuItem::new(i18n.t(I18nKey::CollapseAllBelow)).icon(Icon::ChevronsDownUp)).clicked() {
             event = Some(AnimEvent::CollapseBelow(name.to_owned()));
-            ui.close();
         }
         ui.separator();
         if let Some(pick) = duplicate_items(ui, i18n, input.projects, name) {
@@ -218,11 +219,11 @@ fn duplicate_items(ui: &mut egui::Ui, i18n: &I18nMap, projects: &[String], curre
     let partner = data::partner_of(current);
     if partner != current && projects.contains(&partner) {
         let label = format!("{} {partner}", i18n.t(I18nKey::DuplicateTo));
-        if ui.button(label).on_hover_markdown(hover).clicked() {
+        if ui.add(MenuItem::new(label).icon(Icon::Copy)).on_hover_markdown(hover).clicked() {
             picked = Some(DuplicatePick::To(partner));
         }
     }
-    if ui.button(i18n.t(I18nKey::DuplicateToOther)).on_hover_markdown(hover).clicked() {
+    if ui.add(MenuItem::new(i18n.t(I18nKey::DuplicateToOther)).icon(Icon::Copy)).on_hover_markdown(hover).clicked() {
         picked = Some(DuplicatePick::Choose);
     }
 

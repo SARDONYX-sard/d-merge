@@ -14,7 +14,7 @@ mod title;
 
 use egui_widgets::{
     HoverMarkdown as _,
-    shadcn::{Button, TextEdit},
+    shadcn::{Icon, MenuItem, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 use nemesis_diff::is_existing_mod_code;
@@ -218,19 +218,21 @@ pub(super) const REVEAL_LABEL: I18nKey = gui_shared::i18n::REVEAL_IN_FILE_MANAGE
 /// `Keep Open / New / Duplicate / Repeat / Copy id / Copy path / Reveal in File Explorer / Revert (or Delete for a new object)`, for the flat list and
 /// the tree alike.
 pub(super) fn row_menu(ui: &mut egui::Ui, i18n: &I18nMap, is_new: bool, changed: bool) -> Option<RowAction> {
-    let keep_open = ui.button(i18n.t(I18nKey::KeepOpen)).clicked();
+    let item = |ui: &mut egui::Ui, label: I18nKey, icon: Icon| ui.add(MenuItem::new(i18n.t(label)).icon(icon));
+    let keep_open = item(ui, I18nKey::KeepOpen, Icon::Lock).clicked();
     ui.separator();
-    let new = ui.button(i18n.t(I18nKey::ObjectNew)).clicked();
-    let duplicate = ui.button(i18n.t(I18nKey::DuplicateButton)).clicked();
-    let repeat = ui.button(i18n.t(I18nKey::RepeatTitle)).on_hover_markdown(i18n.t(I18nKey::RepeatHover)).clicked();
-    let copy = ui.button(i18n.t(I18nKey::CopyId)).clicked();
+    let new = item(ui, I18nKey::ObjectNew, Icon::FilePlus).clicked();
+    let duplicate = item(ui, I18nKey::DuplicateButton, Icon::Copy).clicked();
+    let repeat = item(ui, I18nKey::RepeatTitle, Icon::Layers).on_hover_markdown(i18n.t(I18nKey::RepeatHover)).clicked();
+    let copy = item(ui, I18nKey::CopyId, Icon::Copy).clicked();
     let hover = i18n.t(I18nKey::ObjectFileHover);
-    let copy_path = ui.button(i18n.t(I18nKey::CopyPath)).on_hover_text(hover).clicked();
-    let reveal = ui.button(i18n.t(REVEAL_LABEL)).on_hover_text(hover).clicked();
+    let copy_path = item(ui, I18nKey::CopyPath, Icon::Copy).on_hover_text(hover).clicked();
+    let reveal = item(ui, REVEAL_LABEL, Icon::FolderOpen).on_hover_text(hover).clicked();
     let revert = changed && {
         ui.separator();
-        let label = if is_new { I18nKey::DeleteButton } else { I18nKey::RevertButton };
-        ui.add(Button::new(i18n.t(label)).destructive()).clicked()
+        let (label, icon) =
+            if is_new { (I18nKey::DeleteButton, Icon::Trash) } else { (I18nKey::RevertButton, Icon::Undo2) };
+        ui.add(MenuItem::new(i18n.t(label)).icon(icon).destructive()).clicked()
     };
     [
         (keep_open, RowAction::KeepOpen),

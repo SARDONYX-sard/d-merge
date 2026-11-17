@@ -13,6 +13,7 @@ mod alert_dialog;
 mod button;
 mod controls;
 pub mod icon;
+mod menu;
 mod select;
 mod text;
 pub mod theme;
@@ -22,6 +23,7 @@ pub use self::{
     button::Button,
     controls::{Checkbox, RadioButton, Slider, ToggleGroup},
     icon::Icon,
+    menu::{MenuItem, menu_button},
     select::ComboBox,
-    text::{Label, TextEdit},
+    text::{Label, NumberInput, TextEdit},
 };

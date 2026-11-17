@@ -12,11 +12,12 @@ readme                 = "../../../README.md"
 repository.workspace   = true
 rust-version.workspace = true
 
-# NOTE: `egui` only (and the workspace's hash maps). What a node is, what its edges mean and what a
-#       click does are the host's.
+# NOTE: `egui`, the workspace's hash maps and its widgets (the controls are shadcn's). What a node is,
+#       what its edges mean and what a click does are the host's.
 [dependencies]
-egui      = { workspace = true }
-fast_hash = { workspace = true }
+egui         = { workspace = true }
+egui_widgets = { workspace = true }
+fast_hash    = { workspace = true }
 
 [lints]
 workspace = true
