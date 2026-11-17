@@ -39,8 +39,10 @@ pub(crate) struct App {
     pub async_rt: tokio::runtime::Runtime,
 
     // ── UI state (not persisted) ──────────────────────────────────────────────
-    /// Controls visibility of the help / about window.
-    pub show_help: bool,
+    /// Controls visibility of the settings window.
+    pub show_settings: bool,
+    /// Its tab shown.
+    pub settings_tab: crate::app::ui::window::SettingsTab,
 
     // ── Custom theme panel  ──────────────────────────────────────────────────────
     /// Custom theme editor window state.
@@ -118,7 +120,8 @@ impl App {
             #[expect(clippy::unwrap_used)]
             async_rt: tokio::runtime::Runtime::new().unwrap(),
 
-            show_help: false,
+            show_settings: false,
+            settings_tab: crate::app::ui::window::SettingsTab::Display,
 
             theme_manager,
             show_theme_editor: false,
@@ -196,7 +199,7 @@ impl App {
     /// Work done every frame **after** the page: floating windows on top of everything.
     pub(crate) fn frame_end(&mut self, ctx: &egui::Context) {
         self.ui_log_window(ctx);
-        self.ui_help_window(ctx);
+        self.ui_settings_window(ctx);
     }
 
     /// Persists everything on shutdown.

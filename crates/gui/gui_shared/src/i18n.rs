@@ -860,9 +860,6 @@ pub enum I18nKey {
     /// Back to 100%
     GraphZoomResetHover,
 
-    /// Help
-    HelpButton,
-
     /// Annotation
     HkannoAnnotationLabel,
 
@@ -1546,6 +1543,15 @@ pub enum I18nKey {
 
     /// selected
     SelectedLabel,
+
+    /// About
+    SettingsAboutLabel,
+
+    /// Settings
+    SettingsButton,
+
+    /// Display
+    SettingsDisplayLabel,
 
     /// Skyrim Data dir:
     SkyrimDataDirLabel,

@@ -1,4 +1,6 @@
-//! Floating windows: log viewer, help dialog, confirmation dialog.
+//! Floating windows: log viewer, settings, confirmation dialog.
 
-mod help;
+mod settings;
+
+pub(crate) use self::settings::SettingsTab;
 mod log;

@@ -91,9 +91,9 @@ impl Root {
                 flex.add_ui(egui_flex::item(), |ui| {
                     ui.horizontal(|ui| {
                         self.app.ui_theme_box(ui);
-                        let help = Button::new(self.app.i18n.t(I18nKey::HelpButton)).icon(Icon::Toolbox);
-                        if ui.add(help).clicked() {
-                            self.app.show_help ^= true;
+                        let settings = Button::new(self.app.i18n.t(I18nKey::SettingsButton)).icon(Icon::Settings);
+                        if ui.add(settings).clicked() {
+                            self.app.show_settings ^= true;
                         }
                     });
                 });
