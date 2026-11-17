@@ -34,19 +34,23 @@ pub(crate) fn resolve_navigation<'a>(
     }
 }
 
-/// The right-click menu. `menu_target` remembers the symbol under the pointer when it opened.
+/// The right-click menu. `menu_target` and `menu_selection` remember the symbol under the pointer
+/// and the selection when it opened: once it is open, the editor has no cursor (the menu has the
+/// keyboard), so Copy would find nothing selected.
 pub(crate) fn context_menu(
     response: &egui::Response,
     language: &dyn Language,
     text: &str,
     pointer: Option<LinePos>,
-    menu_target: &mut Option<LinePos>,
+    (menu_target, menu_selection): (&mut Option<LinePos>, &mut std::ops::Range<usize>),
     labels: &EditorLabels<'_>,
     selection: &std::ops::Range<usize>,
 ) -> Option<MenuAction> {
     if response.secondary_clicked() {
         *menu_target = pointer.filter(|pos| language.definition(text, pos.line, pos.column).is_some());
+        menu_selection.clone_from(selection);
     }
+    let selection = &*menu_selection;
     let mut action = None;
     response.context_menu(|ui| {
         let definition = menu_target.and_then(|pos| Some((pos, language.definition(text, pos.line, pos.column)?)));

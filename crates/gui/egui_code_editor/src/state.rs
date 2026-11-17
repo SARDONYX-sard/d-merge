@@ -26,6 +26,9 @@ pub struct CodeEditorState {
     pub(crate) layout: layout::LayoutCache,
     /// The symbol the right-click menu was opened on (the pointer moves while it is open).
     pub(crate) menu_target: Option<LinePos>,
+    /// The selection (char range) when the right-click menu opened: its Copy and Cut act on it. The
+    /// editor has no cursor while the menu has the keyboard.
+    pub(crate) menu_selection: std::ops::Range<usize>,
     /// The selection the right button was pressed on, while that button is down.
     pub(crate) held_selection: Option<CCursorRange>,
     /// The text of a read-only editor, to undo what the keymaps do to it.
