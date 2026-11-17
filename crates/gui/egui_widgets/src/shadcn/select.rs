@@ -232,7 +232,7 @@ impl ComboBox {
         ui: &mut egui::Ui,
         menu_contents: impl FnOnce(&mut egui::Ui) -> R,
     ) -> egui::InnerResponse<Option<R>> {
-        let label = (self.label.clone(), self.label_first);
+        let label = (self.label.clone(), self.label_first, self.trigger_height);
         with_label(ui, label, |ui| self.show_ui_impl(ui, menu_contents))
     }
 
@@ -252,7 +252,7 @@ impl ComboBox {
         }
         self.widest_item = Some(widest_item(ui, ui.make_persistent_id(self.id_salt), len, &get));
 
-        let label = (self.label.clone(), self.label_first);
+        let label = (self.label.clone(), self.label_first, self.trigger_height);
         if self.search_hint.is_some() {
             return with_label(ui, label, |ui| {
                 let response = self.show_searchable_index(ui, selected, len, get, None);
@@ -299,7 +299,7 @@ impl ComboBox {
         if self.search_hint.is_none() {
             self.search_hint = Some(egui::WidgetText::default());
         }
-        let label = (self.label.clone(), self.label_first);
+        let label = (self.label.clone(), self.label_first, self.trigger_height);
         with_label(ui, label, |ui| {
             let response = self.show_searchable_index(ui, selected, len, get, Some((create_label, created)));
             egui::InnerResponse::new((), response)
@@ -567,12 +567,15 @@ fn widest_item<Text: Into<egui::WidgetText>>(
 /// Lays the combo box out horizontally with its label, like egui does (only when labelled).
 fn with_label<R>(
     ui: &mut egui::Ui,
-    (label, label_first): (Option<egui::WidgetText>, bool),
+    (label, label_first, height): (Option<egui::WidgetText>, bool, f32),
     add_combo: impl FnOnce(&mut egui::Ui) -> egui::InnerResponse<R>,
 ) -> egui::InnerResponse<R> {
     let Some(label) = label else { return add_combo(ui) };
 
-    ui.horizontal(|ui| {
+    // The row is as high as the box from the start: a label put in first is in its middle, not in
+    // the middle of a lower row the box then makes higher.
+    let row = egui::vec2(ui.available_width(), height);
+    ui.allocate_ui_with_layout(row, egui::Layout::left_to_right(egui::Align::Center), |ui| {
         if label_first {
             let label_response = ui.label(label);
             let mut ir = add_combo(ui);
