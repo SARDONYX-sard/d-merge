@@ -326,6 +326,10 @@ fn point_ui(
                         .on_hover_text(i18n.t(I18nKey::ConflictKeptHover));
                 }
 
+                // The user patch's own value: it decides already, there is nothing of it to take in.
+                if owner.id == gui_shared::patch::USER_PATCH_ID {
+                    return;
+                }
                 let hover = if owner.dir.is_some() { I18nKey::ConflictUseHover } else { I18nKey::ConflictFnisHover };
                 let usable = owner.dir.is_some();
                 if ui
