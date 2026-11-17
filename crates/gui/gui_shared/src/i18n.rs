@@ -813,6 +813,56 @@ pub enum I18nKey {
     /// Go Forward
     GoForward,
 
+    /// Bring the open object to the center
+    GraphCenterHover,
+
+    /// How many layers right of the open object are shown
+    GraphDepthHover,
+
+    /// Collapse all
+    GraphDetailsCollapseHover,
+
+    /// Expand all
+    GraphDetailsExpandHover,
+
+    /// Hide the details
+    GraphDetailsHideHover,
+
+    /// Details
+    GraphDetailsLabel,
+
+    /// Show the details
+    GraphDetailsShowHover,
+
+    /// Show all the nodes
+    GraphFitHover,
+
+    /// Show the neighborhood of this object as a node graph, in place of the text, with the fields
+    /// on each node.
+    ///
+    /// # Notes
+    /// - Click a value to type it (`Enter`: done, `Esc`: cancel)
+    /// - Drag a pin onto a node to point to it, off any node to clear it; `+` adds to a list
+    /// - Click a title to go to that object, double click to edit its text; drag it to move it
+    /// - Click a field's name to edit its line
+    /// - A long list shows a page of it: `‹ ›` turns the page
+    /// - Point at a node to see its own edges; `×N`: N objects point to it
+    /// - A dashed edge is another way to an object shown already (a shared one)
+    /// - Drag the background or wheel to move, `Ctrl` + wheel to zoom, double click to center
+    GraphHover,
+
+    /// Show or hide the node graph (Vim: Space g)
+    GraphToggle,
+
+    /// Zoom in
+    GraphZoomInHover,
+
+    /// Zoom out
+    GraphZoomOutHover,
+
+    /// Back to 100%
+    GraphZoomResetHover,
+
     /// Help
     HelpButton,
 

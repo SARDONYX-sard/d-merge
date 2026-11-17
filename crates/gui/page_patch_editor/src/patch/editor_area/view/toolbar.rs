@@ -39,15 +39,20 @@ pub(super) struct ToolbarInput<'a> {
     pub(super) focused: bool,
     /// `▥` is shown: the object has a preview (not a new one, nor one of another mod).
     pub(super) can_split: bool,
+    /// The node graph's button is shown: see [`super::graph::can_show`].
+    pub(super) can_graph: bool,
 }
 
 /// Draws the row of the object shown.
 pub(super) fn show(ui: &mut egui::Ui, i18n: &I18nMap, input: ToolbarInput<'_>) -> ToolbarOutput {
-    let ToolbarInput { pane, tabs, views, problems, active, id, graph, focused, can_split } = input;
+    let ToolbarInput { pane, tabs, views, problems, active, id, graph, focused, can_split, can_graph } = input;
     let mut output = ToolbarOutput::default();
     ui.horizontal(|ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             split_and_diff_buttons(ui, i18n, pane, can_split);
+            if can_graph && toggle_button(ui, pane.show_graph, Icon::Workflow, i18n.t(I18nKey::GraphHover)) {
+                pane.toggle_graph();
+            }
 
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 let labels = (i18n.t(I18nKey::GoBack), i18n.t(I18nKey::GoForward));
@@ -81,9 +86,16 @@ fn split_and_diff_buttons(ui: &mut egui::Ui, i18n: &I18nMap, pane: &mut EditorPa
 
 /// A small icon button that turns `on` on and off.
 fn toggle(ui: &mut egui::Ui, on: &mut bool, icon: Icon, hover: &str) {
-    if ui.add(Button::selectable(*on, "").icon(icon).small()).on_hover_text(hover).clicked() {
+    if toggle_button(ui, *on, icon, hover) {
         *on = !*on;
     }
+}
+
+/// A small icon button, drawn pressed while `on`. Returns whether it was clicked. `hover` can be
+/// Markdown.
+fn toggle_button(ui: &mut egui::Ui, on: bool, icon: Icon, hover: &str) -> bool {
+    let button = ui.add(Button::selectable(on, "").icon(icon).small());
+    egui_widgets::HoverMarkdown::on_hover_markdown(button, hover).clicked()
 }
 
 /// `▥`'s hover: what a click does.

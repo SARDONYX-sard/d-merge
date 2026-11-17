@@ -310,7 +310,18 @@ impl EditorArea {
         result: EditorResult,
         id: &str,
     ) -> EditorDone {
-        if result.changed {
+        let mut changed = result.changed;
+        let mut edited = None;
+        if let Some((object, text)) = result.graph_edit {
+            if object == id {
+                self.pane.text = text;
+                changed = true; // as if typed
+            } else {
+                Self::write_other(work, sel.active, (&object, &text));
+                edited = Some(object);
+            }
+        }
+        if changed {
             work.workspace.behaviors[sel.active].set_text(id, &self.pane.text);
             self.pane.typed_at = Some(Instant::now());
             self.tabs.pin(sel.active, id); // edited: it stays open
@@ -360,7 +371,14 @@ impl EditorArea {
         }
 
         let focus_tree = result.focus_tree || result.command == Some(EditorCommand::ToggleExplorer);
-        EditorDone { focus_tree, file }
+        EditorDone { focus_tree, file, edited }
+    }
+
+    /// An object that is not open gets `text`: an edit in the node graph.
+    fn write_other(work: &mut Work, active: usize, (id, text): (&str, &str)) {
+        work.workspace.behaviors[active].set_text(id, text);
+        work.object_changed(id);
+        work.note_pandora_edit(active, id);
     }
 
     /// `↶` in the inline diff: puts a changed place of object `id` back to the template.
@@ -394,6 +412,8 @@ struct EditorDone {
     focus_tree: bool,
     /// Copy the path of / reveal the file of an object.
     pub(in crate::patch) file: Option<(FileAction, String)>,
+    /// See [`view::EditorOut::edited`].
+    edited: Option<String>,
 }
 
 #[cfg(test)]

@@ -137,6 +137,8 @@ struct EditorResult {
     walk_history: Option<bool>,
     /// A problem in the Problems panel was clicked: go to this line.
     jump_to_line: Option<usize>,
+    /// `(object, its new text)`: an edit in the node graph, of the open object or another.
+    graph_edit: Option<(String, String)>,
     /// The `↶` of this place of the inline diff was clicked.
     inline_revert: Option<usize>,
     tab_event: Option<TabEvent>,
@@ -421,6 +423,9 @@ impl PatchTool {
         }
         if let Some(editor_id) = out.enter_tree {
             self.side.enter_tree(ui, editor_id);
+        }
+        if let Some(id) = out.edited {
+            self.problems.refresh_in(&mut self.work, self.sel.active, &id);
         }
         if let Some((action, id)) = out.file {
             tool::file::file_action(ui.ctx(), (&self.work, self.sel.active), (action, &id), notify);

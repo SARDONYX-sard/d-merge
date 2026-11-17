@@ -13,7 +13,11 @@
 //! A diff or a blame of the history takes the editor's place: [`super::revision_view`].
 
 mod bottom;
+mod details;
+mod details_input;
 mod editor;
+mod graph;
+mod graph_colors;
 mod merge;
 mod preview;
 mod preview_panel;
@@ -45,6 +49,9 @@ pub(in crate::patch) struct EditorOut {
     pub(in crate::patch) leave_tree: bool,
     /// Copy the path of / reveal the file of an object.
     pub(in crate::patch) file: Option<(FileAction, String)>,
+    /// An object other than the open one was edited (in the node graph): its problems are found
+    /// again.
+    pub(in crate::patch) edited: Option<String>,
 }
 
 impl EditorArea {
@@ -216,6 +223,7 @@ impl EditorArea {
             out.enter_tree = Some(editor_id);
         }
         out.file = out.file.take().or(done.file);
+        out.edited = done.edited;
 
         let reference = egui_code_editor::ReferenceList::window(ui.ctx(), &mut self.pane.references);
         if let Some((document, line)) = reference.map(|(document, line)| (document.to_string(), line)) {

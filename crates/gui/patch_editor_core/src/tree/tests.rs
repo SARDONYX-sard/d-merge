@@ -74,6 +74,33 @@ fn finds_pointers() {
     assert_eq!(pointers(text, "#0106"), ["#0105", "#0109", "#mymod$0"]);
 }
 
+#[test]
+fn finds_the_field_of_each_pointer() {
+    let text = r##"<hkobject name="#0095" class="hkbStateMachine">
+  <hkparam name="eventToSendWhenStateOrTransitionChanges">#0096</hkparam>
+  <hkparam name="states" numelements="2">
+    #0097
+    #0098 #0096
+  </hkparam>
+  <hkparam name="wildcardTransitions">#0099</hkparam>
+</hkobject>"##;
+    let found: Vec<(usize, &str, &str)> =
+        pointer_fields(text, "#0095").iter().map(|p| (p.line, p.field, p.id)).collect();
+    assert_eq!(
+        found,
+        [
+            (1, "eventToSendWhenStateOrTransitionChanges", "#0096"),
+            (3, "states", "#0097"),
+            (4, "states", "#0098"),
+            (4, "states", "#0096"),
+            (6, "wildcardTransitions", "#0099"),
+        ]
+    );
+    let mut seen: HashSet<&str> = HashSet::default();
+    let ids: Vec<&str> = found.iter().map(|p| p.2).filter(|id| seen.insert(*id)).collect();
+    assert_eq!(ids, pointers(text, "#0095"), "the same pointers as the tree's");
+}
+
 /// The "not linked" count must not depend on what is expanded.
 #[test]
 fn unlinked_does_not_depend_on_open_nodes() {

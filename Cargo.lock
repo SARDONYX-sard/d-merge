@@ -1570,6 +1570,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui_graph_view"
+version = "0.0.0"
+dependencies = [
+ "egui",
+ "fast_hash",
+]
+
+[[package]]
 name = "egui_inbox"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4079,6 +4087,7 @@ dependencies = [
  "chrono",
  "egui",
  "egui_code_editor",
+ "egui_graph_view",
  "egui_tree",
  "egui_widgets",
  "fast_hash",

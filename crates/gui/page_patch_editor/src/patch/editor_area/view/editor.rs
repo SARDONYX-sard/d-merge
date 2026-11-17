@@ -37,6 +37,8 @@ use crate::patch::{
 const ACTION_FOCUS_TREE: &str = "focus_tree";
 const ACTION_BACK: &str = "go_back";
 const ACTION_FORWARD: &str = "go_forward";
+/// The palette's "show or hide the node graph".
+const ACTION_TOGGLE_GRAPH: &str = "toggle_graph";
 
 /// What this editor acts on: see [`EditorArea::apply_editor_result`].
 const HOST_COMMANDS: [EditorCommand; 9] = [
@@ -88,6 +90,7 @@ impl EditorArea {
                 graph: &names.graph,
                 focused: editor_focused,
                 can_split: !behavior.added.contains_key(id) && !behavior.is_ref(id) && id != PANDORA_DOC,
+                can_graph: super::graph::can_show(behavior, &names.graph, id),
             };
             let toolbar = super::toolbar::show(ui, i18n, input);
             (result.walk_history, result.tab_event) = (toolbar.walk_history, toolbar.tab_event);
@@ -107,7 +110,11 @@ impl EditorArea {
                 requests: &requests,
                 user_patch: work.user_patch,
             };
-            self.pane.code_editor(ui, i18n, input, &mut result);
+            if self.pane.show_graph && super::graph::can_show(behavior, &names.graph, id) {
+                self.pane.graph_ui(ui, i18n, (behavior, &names.graph), id, &mut result);
+            } else {
+                self.pane.code_editor(ui, i18n, input, &mut result);
+            }
         });
 
         if format_and_save {
@@ -151,6 +158,9 @@ impl EditorPane {
         if keys.take(commands::EDITOR_TOGGLE_INLINE_DIFF) {
             self.show_inline_diff = !self.show_inline_diff;
         }
+        if keys.take(commands::EDITOR_TOGGLE_GRAPH) {
+            self.toggle_graph();
+        }
 
         if keys.take(commands::EDITOR_NEXT_CHANGE) {
             self.step_change(true);
@@ -174,7 +184,7 @@ fn editor_requests(keys: &mut Keys, format_and_save: bool) -> Vec<EditorRequest>
 
 /// The palette's own actions, with their keys as the key bindings have them and a `⚙` to change
 /// them, found by their English names and command ids too, as VS Code's.
-fn palette_actions<'a>(key_ui: &'a keybinding::KeyUi, i18n: &'a I18nMap) -> [EditorAction<'a>; 10] {
+fn palette_actions<'a>(key_ui: &'a keybinding::KeyUi, i18n: &'a I18nMap) -> [EditorAction<'a>; 11] {
     let act = |action: EditorAction<'static>, key: I18nKey| {
         key_ui.palette_action(EditorAction { label: i18n.t(key), ..action }, key.default_eng())
     };
@@ -188,6 +198,7 @@ fn palette_actions<'a>(key_ui: &'a keybinding::KeyUi, i18n: &'a I18nMap) -> [Edi
         act(EditorCommand::CloseTab.action(""), I18nKey::EditorCloseTab),
         act(EditorCommand::TogglePreview.action(""), I18nKey::PreviewToggle),
         act(EditorCommand::ToggleInlineDiff.action(""), I18nKey::InlineDiffToggle),
+        act(new(ACTION_TOGGLE_GRAPH), I18nKey::GraphToggle),
         act(EditorCommand::RevealFile.action(""), gui_shared::i18n::REVEAL_IN_FILE_MANAGER),
         act(new(OPEN_JSON_ACTION), I18nKey::KeybindingOpenJson),
     ]
@@ -291,6 +302,7 @@ impl EditorPane {
 
         // Per object: each tab keeps where it was scrolled to.
         let scroll = egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false);
+        let mut toggle_graph = false;
         scroll.show(ui, |ui| {
             let output = CodeEditor::new(("nemesis_object", user_patch, id), &mut self.text)
                 .language(shown_language)
@@ -309,9 +321,13 @@ impl EditorPane {
             if let Some(cursor) = output.cursor {
                 self.cursor_line = cursor.line;
             }
+            toggle_graph = output.action == Some(ACTION_TOGGLE_GRAPH);
             if let Some(references) = read_output(output, result) {
                 self.references = Some(references);
             }
         });
+        if toggle_graph {
+            self.toggle_graph();
+        }
     }
 }

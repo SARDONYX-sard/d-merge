@@ -1,0 +1,22 @@
+[package]
+name        = "egui_graph_view"
+version     = "0.0.0"
+description = "A node graph view for egui, as a blueprint: the neighborhood of a node in layers, pan and zoom"
+
+authors.workspace      = true
+categories             = ["gui"]
+edition.workspace      = true
+keywords               = ["egui", "graph"]
+license                = "MIT"
+readme                 = "../../../README.md"
+repository.workspace   = true
+rust-version.workspace = true
+
+# NOTE: `egui` only (and the workspace's hash maps). What a node is, what its edges mean and what a
+#       click does are the host's.
+[dependencies]
+egui      = { workspace = true }
+fast_hash = { workspace = true }
+
+[lints]
+workspace = true
