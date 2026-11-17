@@ -110,6 +110,8 @@ struct UserPatchView {
     to_top: bool,
     /// Its editor, from the first time it is needed.
     tool: Option<Box<PatchTool>>,
+    /// What can be decided at once, offered above its editor.
+    bulk: ui::bulk::BulkResolutions,
 }
 
 /// Where the cursor goes when the editor gets the keyboard back.
@@ -434,6 +436,11 @@ impl PatchTool {
         tool
     }
 
+    /// See [`crate::PatchEditorPage::set_bulk_resolutions`].
+    pub(crate) fn set_bulk_resolutions(&mut self, list: Vec<gui_shared::patch::BulkResolution>) {
+        self.user_patch.bulk.set(list);
+    }
+
     /// Opens or closes the window of the user patch.
     pub(crate) const fn toggle_user_patch(&mut self) {
         self.user_patch.open = !self.user_patch.open;
@@ -482,6 +489,30 @@ impl PatchTool {
 
         self.work.user_patch_written = true;
         if invalid.is_empty() { Ok(()) } else { Err(invalid.join("\n")) }
+    }
+
+    /// Decides `requests` in the user patch at once (this is its tool), and writes it once. Says how many
+    /// were, and why any was not.
+    /// Returns the indices of the requests taken in.
+    fn resolve_bulk(&mut self, requests: &[ResolveRequest], notify: &mut Notification, i18n: &I18nMap) -> Vec<usize> {
+        let root = PathBuf::from(&self.work.place.template_dir);
+        let resolved = match self.work.resolve_all(requests, &root, i18n) {
+            Ok(done) => {
+                let message = i18n.t(I18nKey::ConflictBulkResolvedMessage);
+                notify.success(format!("{message}: {}/{}", done.resolved.len(), requests.len()));
+                for failed in done.failed.iter().chain(&done.invalid) {
+                    notify.error(format!("{}: {failed}", i18n.t(I18nKey::ConflictTakeFailed)));
+                }
+                done.resolved
+            }
+            Err(err) => {
+                notify.error(format!("{}: {err}", i18n.t(I18nKey::ConflictTakeFailed)));
+                Vec::new()
+            }
+        };
+        self.editor.reload();
+        self.work.mod_written = true;
+        resolved
     }
 
     /// `Edit...`: the value goes in, and the window shows it.
@@ -537,21 +568,34 @@ impl PatchTool {
         }
         let to_top = std::mem::take(&mut self.user_patch.to_top);
         let has_output = !paths.patch_output_dir.trim().is_empty();
+        let mut bulk = std::mem::take(&mut self.user_patch.bulk);
         let mut tool = has_output.then(|| self.user_patch_tool(paths, notify, i18n));
 
         let mut open = true;
+        let mut bulk_written = false;
         Modal::new(i18n.t(I18nKey::UserPatchTitle))
             .size(egui::Vec2::new(0.90, 0.95))
             .to_top(to_top)
             // Its editor uses `Esc` (Vim, hovers, quick fixes): the window closes with its `x`.
             .close_on_escape(false)
             .show(ctx, &mut open, |ui| match &mut tool {
-                Some(tool) => tool.user_patch_ui(ui, i18n, notify, (settings, editor), keys),
+                Some(tool) => {
+                    if let Some(requests) = bulk.bar_ui(ui, i18n) {
+                        let resolved = tool.resolve_bulk(&requests, notify, i18n);
+                        bulk.mark_resolved(resolved.iter().map(|&at| &requests[at]));
+                        bulk_written = true;
+                    }
+                    tool.user_patch_ui(ui, i18n, notify, (settings, editor), keys);
+                }
                 None => {
                     ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::WorkNeedPatchOutput));
                 }
             });
 
+        self.user_patch.bulk = bulk;
+        // The conflict check reads the user patch again now, not when the window closes: it offers
+        // what is still left after that.
+        self.work.user_patch_written |= bulk_written;
         self.user_patch.open = open;
         if !open {
             self.close_user_patch(notify, i18n);

@@ -159,6 +159,39 @@ impl Work {
         self.write_user_patch()
     }
 
+    /// Each of `requests` goes in (templates at `root`), then the mod is written once. A request that
+    /// cannot be taken in is told, and the others still go in.
+    ///
+    /// # Errors
+    /// The mod could not be written.
+    pub(super) fn resolve_all(
+        &mut self,
+        requests: &[ResolveRequest],
+        root: &Path,
+        i18n: &I18nMap,
+    ) -> Result<BulkDone, String> {
+        if self.workspace.info.name.is_empty() {
+            i18n.t(I18nKey::UserPatchTitle).clone_into(&mut self.workspace.info.name);
+        }
+        let mut done = BulkDone::default();
+        for (at, request) in requests.iter().enumerate() {
+            // What it takes from the mods is theirs.
+            self.workspace.add_ref(Path::new(&request.mod_dir), USER_PATCH_CODE);
+            for side in &request.sides {
+                self.workspace.add_ref(Path::new(&side.mod_dir), USER_PATCH_CODE);
+            }
+            match resolve::apply(&mut self.workspace, root, request) {
+                Ok(_) => done.resolved.push(at),
+                Err(err) => done.failed.push(format!("{}: {err}", request.path)),
+            }
+        }
+        self.workspace.reload_refs(); // behaviors may have been opened
+        self.reset_names();
+
+        done.invalid = self.write_user_patch()?;
+        Ok(done)
+    }
+
     /// Takes everything out of the user patch, and writes that: nothing of it is merged any more.
     pub(super) fn clear_user_patch(&mut self, notify: &mut Notification, i18n: &I18nMap) -> Reshow {
         self.draft = None;
@@ -171,6 +204,17 @@ impl Work {
         }
         Reshow::Nothing
     }
+}
+
+/// What [`Work::resolve_all`] did.
+#[derive(Debug, Default)]
+pub(super) struct BulkDone {
+    /// The requests taken in, by their index.
+    pub(super) resolved: Vec<usize>,
+    /// Why a request was not taken in: `path: why`.
+    pub(super) failed: Vec<String>,
+    /// The patches d-merge's parser rejects.
+    pub(super) invalid: Vec<String>,
 }
 
 /// After the work is synced: the value of `request` goes in, and the editor shows where it went. It

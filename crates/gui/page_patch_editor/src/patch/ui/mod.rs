@@ -2,6 +2,7 @@
 //! modules that do not need an `egui::Ui`, so it can be unit tested.
 
 pub(super) mod anim_data;
+pub(super) mod bulk;
 pub(super) mod class_picker;
 pub(super) mod code_choice;
 pub(super) mod panels;

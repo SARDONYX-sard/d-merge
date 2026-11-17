@@ -41,7 +41,10 @@ use std::{
 use behavior_merge::HiddenPatches;
 use behavior_merge_types::patches::ReadPatchJson;
 use fast_hash::HashMap;
-use gui_shared::{patch::USER_PATCH_ID, settings::pages::patch::mod_item::ModItem};
+use gui_shared::{
+    patch::{BulkKind, BulkResolution, ResolveRequest, ResolveSide, USER_PATCH_ID},
+    settings::pages::patch::mod_item::ModItem,
+};
 use json_patch::{Action, Op, ValueWithPriority};
 use parking_lot::Mutex;
 use simd_json::prelude::{ValueAsArray as _, Writable as _};
@@ -821,6 +824,9 @@ pub(crate) struct ConflictScan {
     /// The highest [`Relation::count`] of [`Self::relations`]: the strongest color.
     relations_max: u32,
     relations_for: u64,
+    /// Changes whenever what [`Self::bulk_resolutions`] finds may: a scan, the user patch read again,
+    /// the load order or what is hidden.
+    revision: u64,
 }
 
 impl ConflictScan {
@@ -913,6 +919,7 @@ impl ConflictScan {
         let found = self.read_result.try_lock().and_then(|mut result| result.take())?;
         let count = found.points.len();
         self.current = Some(Arc::new(found));
+        self.revision += 1;
         self.is_reading = false;
         self.marks_for = 0; // computed again
         Some((count, self.started.take().map_or_else(Default::default, |started| started.elapsed())))
@@ -938,6 +945,7 @@ impl ConflictScan {
             return;
         }
         self.marks_for = hash;
+        self.revision += 1;
         self.priorities =
             list.iter().filter(|item| item.enabled).map(|item| (item.id.clone(), item.priority)).collect();
         if let Some(priority) = user_patch {
@@ -1001,6 +1009,54 @@ impl ConflictScan {
         let Some(current) = &mut self.current else { return };
         Arc::make_mut(current).read_user_patch(user_patch);
         (self.marks_for, self.relations_for) = (0, 0);
+        self.revision += 1;
+    }
+
+    /// See [`Self::bulk_resolutions`].
+    pub(crate) const fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    /// The conflicts of the last scan that can be decided all at once (see [`BulkKind`]), with the
+    /// mods that are on now and what is hidden: those still at odds, and those the user patch decides.
+    pub(crate) fn bulk_resolutions(&self) -> Vec<BulkResolution> {
+        let Some(found) = &self.current else { return Vec::new() };
+        found.points.iter().filter_map(|point| self.bulk_resolution(found, point)).collect()
+    }
+
+    /// `point` as a [`BulkResolution`], if it is of a kind and two mods or more have their own value
+    /// there. Their order is the load order: the first's events come first.
+    fn bulk_resolution(&self, found: &Conflicts, point: &Point) -> Option<BulkResolution> {
+        let kind = BulkKind::of(&point.path)?;
+        let hidden = self.applied_hidden();
+        let mut on: Vec<(usize, &ScannedMod)> = point
+            .values
+            .iter()
+            .map(|value| &found.mods[value.owner as usize])
+            .filter(|owner| !owner.hides(point, hidden))
+            .filter_map(|owner| Some((*self.priorities.get(&owner.id)?, owner)))
+            .collect();
+        on.sort_by_key(|(priority, _)| *priority);
+
+        let resolved = on.iter().any(|(_, owner)| owner.id == USER_PATCH_ID);
+        let sides: Vec<ResolveSide> = on
+            .iter()
+            .filter(|(_, owner)| owner.id != USER_PATCH_ID)
+            .filter_map(|(_, owner)| Some(ResolveSide { name: owner.name.clone(), mod_dir: owner.dir.clone()? }))
+            .collect();
+        let mod_dir = sides.first()?.mod_dir.clone();
+        if sides.len() < 2 {
+            return None;
+        }
+        let request = ResolveRequest {
+            target: point.target.to_string(),
+            path: point.path.to_string(),
+            mod_dir,
+            edit: false,
+            sides,
+            keep_all_events: true,
+        };
+        Some(BulkResolution { kind, request, resolved })
     }
 
     pub(crate) fn mark_of(&self, mod_id: &str) -> Mark {
@@ -1158,6 +1214,56 @@ mod tests {
         // The user patch off: `a` is a conflict again.
         let without = |id: &str| (id != USER_PATCH_ID).then(|| in_order(id)).flatten();
         assert_eq!(found.marks(without, None)["low"], Mark { wins: 0, loses: 2, resolved: 0 });
+    }
+
+    /// `enterNotifyEvents` of two mods can be decided at once, in the load order; one the user patch
+    /// has is decided already, and a field of another kind is not offered.
+    #[test]
+    fn event_arrays_can_be_decided_at_once() {
+        let mut mods = mods();
+        mods.push(ScannedMod {
+            id: USER_PATCH_ID.to_owned(),
+            name: "User Patch".to_owned(),
+            priority: 5,
+            dir: Some("D:/out/user_patch".to_owned()),
+        });
+        let value = |owner, hash| Value { owner, hash, preview: Box::from("") };
+        let point = |path: &str, values| Point { target: Box::from("meshes/m.bin"), path: Box::from(path), values };
+        let found = Conflicts {
+            mods,
+            points: vec![
+                point("#1821/hkbStateMachineStateInfo/enterNotifyEvents", vec![value(1, 2), value(0, 1)]),
+                point("#1/C/a", vec![value(0, 1), value(1, 2)]),
+                point("#1830/hkbStateMachineStateInfo/exitNotifyEvents", vec![value(0, 1), value(1, 2), value(2, 3)]),
+            ],
+            ..Conflicts::default()
+        };
+        let scan = ConflictScan {
+            current: Some(Arc::new(found)),
+            priorities: [("low", 3), ("high", 4), (USER_PATCH_ID, 5)]
+                .map(|(id, at)| (id.to_owned(), at))
+                .into_iter()
+                .collect(),
+            ..ConflictScan::default()
+        };
+
+        let bulk = scan.bulk_resolutions();
+        let found: Vec<(&str, bool, Vec<&str>)> = bulk
+            .iter()
+            .map(|item| {
+                let sides = item.request.sides.iter().map(|side| side.name.as_str()).collect();
+                (item.request.path.as_str(), item.resolved, sides)
+            })
+            .collect();
+        assert_eq!(
+            found,
+            [
+                ("#1821/hkbStateMachineStateInfo/enterNotifyEvents", false, vec!["low", "high"]),
+                ("#1830/hkbStateMachineStateInfo/exitNotifyEvents", true, vec!["low", "high"]),
+            ]
+        );
+        assert!(bulk.iter().all(|item| item.request.keep_all_events && item.kind == BulkKind::KeepAllEvents));
+        assert_eq!(bulk[0].request.mod_dir, "D:/mods/low");
     }
 
     /// MO2's lightning: all it does loses, and nothing of it is kept.

@@ -27,7 +27,7 @@ use egui_widgets::{
 };
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
-    patch::{ResolveRequest, ResolveSide},
+    patch::{ResolveRequest, ResolveSide, template_name},
 };
 use stdx::text::contains_ignore_case;
 
@@ -245,16 +245,6 @@ fn row_text(ui: &egui::Ui, glyph: &str, point: &Point, winner: Option<&str>) -> 
     }
 
     job
-}
-
-/// A template as Nemesis names it. The 1st person's has the same file name as the 3rd person's.
-///
-/// e.g. `meshes/actors/character/behaviors/0_master.bin` -> `0_master`,
-/// `meshes/actors/character/_1stperson/behaviors/0_master.bin` -> `_1stperson/0_master`
-fn template_name(target: &str) -> String {
-    let file = target.rsplit('/').next().unwrap_or(target);
-    let name = file.strip_suffix(".bin").unwrap_or(file);
-    if target.contains("/_1stperson/") { format!("_1stperson/{name}") } else { name.to_owned() }
 }
 
 /// The mods with a value at `point`, to make the result from. The user patch's is what is being edited,

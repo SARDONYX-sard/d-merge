@@ -358,6 +358,20 @@ pub enum I18nKey {
     /// Site
     ColumnSite,
 
+    /// Resolve at once
+    ConflictBulkButton,
+
+    /// Conflicts decided without picking one mod's value, all of them at once.
+    ///
+    /// # Notes
+    /// - `enterNotifyEvents` / `exitNotifyEvents`: the events of every mod are kept
+    /// - Only those checked go into the user patch; it is written once
+    /// - `✓`: the user patch decides it already
+    ConflictBulkHover,
+
+    /// Resolved at once
+    ConflictBulkResolvedMessage,
+
     /// All this mod's patch does loses to other mods: it does nothing in the end.
     ///
     /// # Notes
@@ -1479,6 +1493,9 @@ pub enum I18nKey {
 
     /// Select
     SelectButton,
+
+    /// Select None
+    SelectNone,
 
     /// selected
     SelectedLabel,

@@ -82,6 +82,9 @@ pub(crate) struct App {
 
     /// CRC32 page state (inputs, loaded mod tree).
     pub patch_editor: PatchEditorPage,
+    /// What the Patch Editor was given of the conflicts that can be decided at once: see
+    /// `PatchPage::bulk_revision`.
+    bulk_revision: u64,
 
     /// A page asked for another page to be shown. The router does that, after it drew this frame.
     pub pending_page: Option<gui_shared::settings::ui::Page>,
@@ -134,6 +137,7 @@ impl App {
             convert: ConvertPage::default(),
             hkanno,
             patch_editor: PatchEditorPage::default(),
+            bulk_revision: 0,
             pending_page: None,
             keys: keybinding::Keybindings::load(std::path::Path::new(KEYBINDINGS_PATH)),
         }
@@ -161,6 +165,10 @@ impl App {
         }
         if self.patch_editor.take_user_patch_written() {
             self.patch.follow_written_user_patch(&self.settings.pages.patch);
+        }
+        // What can be decided at once: for the user patch's window.
+        if std::mem::replace(&mut self.bulk_revision, self.patch.bulk_revision()) != self.bulk_revision {
+            self.patch_editor.set_bulk_resolutions(self.patch.bulk_resolutions());
         }
         let patch_ctx = PatchPollCtx {
             settings: &mut self.settings.pages.patch,
