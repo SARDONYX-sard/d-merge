@@ -70,22 +70,22 @@ mod tests {
 
     #[test]
     fn caps_at_max_files() -> Result<()> {
-        let tmp = temp_dir::TempDir::new()?;
-        let dir = tmp.path();
+        let temp_dir = std::env::temp_dir();
+        let temp_dir = &temp_dir;
 
         for _ in 0..6 {
-            rotate_files(dir, "log.log", 3)?;
+            rotate_files(temp_dir, "log.log", 3)?;
             std::thread::sleep(Duration::from_secs(1));
         }
 
-        assert_eq!(file_count(dir), 3);
+        assert_eq!(file_count(temp_dir), 3);
         Ok(())
     }
 
     #[test]
     fn creates_dir_if_missing() -> Result<()> {
-        let tmp = temp_dir::TempDir::new()?;
-        let nested = tmp.path().join("a").join("b").join("c");
+        let tmp = std::env::temp_dir();
+        let nested = tmp.join("a").join("b").join("c");
 
         rotate_files(&nested, "app.log", 2)?;
         assert!(nested.join("app.log").exists());
@@ -94,18 +94,20 @@ mod tests {
 
     #[test]
     fn renames_active_file_with_timestamp() -> Result<()> {
-        let tmp = temp_dir::TempDir::new()?;
-        let dir = tmp.path();
+        let temp_dir = std::env::temp_dir();
+        let temp_dir = &temp_dir;
 
-        rotate_files(dir, "app.log", 10)?;
-        assert!(dir.join("app.log").exists());
+        rotate_files(temp_dir, "app.log", 10)?;
+        assert!(temp_dir.join("app.log").exists());
 
         std::thread::sleep(Duration::from_secs(1));
 
-        rotate_files(dir, "app.log", 10)?;
+        rotate_files(temp_dir, "app.log", 10)?;
 
-        let files: Vec<_> =
-            fs::read_dir(dir)?.filter_map(|e| e.ok()).map(|e| e.file_name().to_string_lossy().into_owned()).collect();
+        let files: Vec<_> = fs::read_dir(temp_dir)?
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
 
         assert_eq!(files.len(), 2);
         assert!(files.iter().any(|n| n == "app.log"));
