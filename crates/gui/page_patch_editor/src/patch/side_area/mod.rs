@@ -248,24 +248,28 @@ impl SideArea {
             return asks;
         }
 
+        // Kept to the side bar's width: a row too wide does not widen it (see `egui_widgets::contained`).
         egui::Panel::left((id, "side_bar")).resizable(true).default_size(320.0).show(ui, |ui| {
-            let (_, _, title, _) = VIEWS.iter().find(|(view, ..)| *view == self.bar.view).copied().unwrap_or(VIEWS[0]);
-            if self.bar.view != SideView::Changes {
-                egui_widgets::side_bar_title(ui, i18n.t(title));
-            }
-            let has_behaviors = !work.workspace.behaviors.is_empty();
-            match self.bar.view {
-                SideView::Explorer => {
-                    asks.extend(self.behaviors_section(ui, i18n, (work, sel), notify));
-                    if has_behaviors {
-                        asks.extend(self.object_list(ui, i18n, (work, sel, keys)));
-                    }
+            egui_widgets::contained(ui, |ui| {
+                let (_, _, title, _) =
+                    VIEWS.iter().find(|(view, ..)| *view == self.bar.view).copied().unwrap_or(VIEWS[0]);
+                if self.bar.view != SideView::Changes {
+                    egui_widgets::side_bar_title(ui, i18n.t(title));
                 }
-                SideView::Search if has_behaviors => asks.extend(self.search_panel(ui, i18n, work, sel)),
-                SideView::Search => {}
-                SideView::Changes => asks.extend(self.changes_view(ui, i18n, (work, sel, keys), notify)),
-                SideView::Variables => asks.extend(self.variables(ui, i18n, work, sel.active)),
-            }
+                let has_behaviors = !work.workspace.behaviors.is_empty();
+                match self.bar.view {
+                    SideView::Explorer => {
+                        asks.extend(self.behaviors_section(ui, i18n, (work, sel), notify));
+                        if has_behaviors {
+                            asks.extend(self.object_list(ui, i18n, (work, sel, keys)));
+                        }
+                    }
+                    SideView::Search if has_behaviors => asks.extend(self.search_panel(ui, i18n, work, sel)),
+                    SideView::Search => {}
+                    SideView::Changes => asks.extend(self.changes_view(ui, i18n, (work, sel, keys), notify)),
+                    SideView::Variables => asks.extend(self.variables(ui, i18n, work, sel.active)),
+                }
+            });
         });
         asks
     }

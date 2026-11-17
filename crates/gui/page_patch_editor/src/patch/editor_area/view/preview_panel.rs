@@ -26,10 +26,13 @@ impl EditorPane {
         let panel = egui::Panel::right(panel_id).default_size(520.0).resizable(true);
 
         panel
+            // Kept to the panel's width: see `egui_widgets::contained`.
             .show(ui, |ui| {
-                self.preview_header(ui, i18n)?;
-                let view = self.preview_view.as_mut()?;
-                super::preview::lines_ui(view, ui, i18n.t(I18nKey::PatchPreviewRevertHunkHover))
+                egui_widgets::contained(ui, |ui| {
+                    self.preview_header(ui, i18n)?;
+                    let view = self.preview_view.as_mut()?;
+                    super::preview::lines_ui(view, ui, i18n.t(I18nKey::PatchPreviewRevertHunkHover))
+                })
             })
             .inner
     }

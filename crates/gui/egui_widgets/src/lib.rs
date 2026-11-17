@@ -14,6 +14,7 @@ pub mod preview_tabs;
 pub mod shadcn;
 
 mod activity_bar;
+mod contained;
 mod cut_hover;
 mod editor_tab;
 mod path_row;
@@ -21,6 +22,7 @@ mod window;
 
 pub use self::{
     activity_bar::{ActivityBar, ActivityItem, section_header, side_bar_title},
+    contained::contained,
     cut_hover::{CutHover, Fitted, fit, fit_text, fitted_button},
     editor_tab::{EditorTab, EditorTabOutput, TabAction, TabMenu},
     markdown::HoverMarkdown,

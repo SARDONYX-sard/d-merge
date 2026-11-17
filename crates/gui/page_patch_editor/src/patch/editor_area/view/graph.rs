@@ -303,34 +303,38 @@ fn details_panel(
     let Details { id, text, title, editable } = details;
     let mut open_all = None;
     let panel = egui::Panel::right("graph_details").resizable(true).default_size(340.0);
+    // Kept to the panel's width: see `egui_widgets::contained`.
     let out = panel
         .show(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.strong(i18n.t(I18nKey::GraphDetailsLabel));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if icon_button(ui, Icon::ChevronRight)
-                        .on_hover_text(i18n.t(I18nKey::GraphDetailsHideHover))
-                        .clicked()
-                    {
-                        *folded = true;
-                    }
-                    ui.separator();
-                    let collapse = icon_button(ui, Icon::ChevronsDownUp);
-                    if collapse.on_hover_text(i18n.t(I18nKey::GraphDetailsCollapseHover)).clicked() {
-                        open_all = Some(false);
-                    }
-                    if icon_button(ui, Icon::ChevronsUpDown)
-                        .on_hover_text(i18n.t(I18nKey::GraphDetailsExpandHover))
-                        .clicked()
-                    {
-                        open_all = Some(true);
-                    }
+            egui_widgets::contained(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.strong(i18n.t(I18nKey::GraphDetailsLabel));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if icon_button(ui, Icon::ChevronRight)
+                            .on_hover_text(i18n.t(I18nKey::GraphDetailsHideHover))
+                            .clicked()
+                        {
+                            *folded = true;
+                        }
+                        ui.separator();
+                        let collapse = icon_button(ui, Icon::ChevronsDownUp);
+                        if collapse.on_hover_text(i18n.t(I18nKey::GraphDetailsCollapseHover)).clicked() {
+                            open_all = Some(false);
+                        }
+                        if icon_button(ui, Icon::ChevronsUpDown)
+                            .on_hover_text(i18n.t(I18nKey::GraphDetailsExpandHover))
+                            .clicked()
+                        {
+                            open_all = Some(true);
+                        }
+                    });
                 });
-            });
-            // What it is of: the object open.
-            ui.add(egui::Label::new(egui::RichText::new(title).monospace().strong()).truncate()).on_hover_text(title);
-            ui.separator();
-            super::details::details_ui(ui, (id, text), (editable, open_all))
+                // What it is of: the object open.
+                ui.add(egui::Label::new(egui::RichText::new(title).monospace().strong()).truncate())
+                    .on_hover_text(title);
+                ui.separator();
+                super::details::details_ui(ui, (id, text), (editable, open_all))
+            })
         })
         .inner;
     match out {
