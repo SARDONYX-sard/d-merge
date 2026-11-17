@@ -744,9 +744,6 @@ pub enum I18nKey {
     /// Written for Pandora
     ExportedPandora,
 
-    /// ⚠ NemesisExt is read by d-merge only (not by Nemesis or Pandora).
-    ExtOnlyWarning,
-
     /// File
     FileLabel,
 
@@ -1592,8 +1589,14 @@ pub enum I18nKey {
     /// Close to the Right
     TabsCloseRight,
 
+    /// Nemesis does not have this template: Export writes it to `Nemesis_EngineExt`, which d-merge reads.
+    TemplateExtHover,
+
     /// Template:
     TemplateLabel,
+
+    /// Nemesis has this template: Export writes it to `Nemesis_Engine`.
+    TemplateNemesisHover,
 
     /// No template found for
     TemplateNotFound,

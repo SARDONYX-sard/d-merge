@@ -22,7 +22,7 @@ use super::{SideArea, SideAsk};
 use crate::patch::{
     tool::{selection::Selection, work_state::Work},
     ui::windows::WindowAsk,
-    workspace::{Behavior, Target, TemplateScope},
+    workspace::{Behavior, TemplateScope},
 };
 
 /// The height of the list before it scrolls: most of the side bar is for the objects.
@@ -155,8 +155,8 @@ fn behavior_rows(
     let mut event = None;
     egui::ScrollArea::both().id_salt("nemesis_behaviors").max_height(LIST_HEIGHT).show(ui, |ui| {
         for (i, behavior) in behaviors.iter().enumerate() {
-            let row = Button::selectable(i == active, row_label(behavior, ext));
-            let response = ui.add(row).on_hover_text(row_hover(behavior, code, ext, i18n));
+            let row = Button::selectable(i == active, row_label(behavior));
+            let response = ui.add(row).on_hover_text(row_hover(behavior, code, ext));
             if response.clicked() && i != active {
                 event = Some(RowEvent::Select(i));
             }
@@ -170,28 +170,17 @@ fn behavior_rows(
     event
 }
 
-/// `0_master (3)`, with the number of changed objects, and `⚠` if only d-merge will read it.
-/// `ext`: see [`Behavior::target`].
-fn row_label(behavior: &Behavior, ext: bool) -> String {
+/// `0_master (3)`, with the number of changed objects.
+fn row_label(behavior: &Behavior) -> String {
     let count = behavior.edits.len() + behavior.added.len();
-    let warn = if is_ext_only(behavior, ext) { "⚠ " } else { "" };
-    if count > 0 { format!("{warn}{} ({count})", behavior.name) } else { format!("{warn}{}", behavior.name) }
+    if count > 0 { format!("{} ({count})", behavior.name) } else { behavior.name.clone() }
 }
 
-/// Is `behavior` written where only d-merge reads it?
-fn is_ext_only(behavior: &Behavior, ext: bool) -> bool {
-    behavior.target(ext) == Target::Ext && !behavior.is_anim_data()
-}
-
-/// The template, where its patches go, and the warning of [`row_label`].
-fn row_hover(behavior: &Behavior, code: &str, ext: bool, i18n: &I18nMap) -> String {
+/// The template, and where Export writes its patches: `Nemesis_Engine` or `Nemesis_EngineExt` is
+/// only the format's choice (`ExportFormat`), nothing to warn of. `ext`: see [`Behavior::target`].
+fn row_hover(behavior: &Behavior, code: &str, ext: bool) -> String {
     let to = behavior.patch_dir(code, ext);
-    let mut hover = format!("{}\n→ {}", behavior.template_path.display(), to.display());
-    if is_ext_only(behavior, ext) {
-        hover.push('\n');
-        hover.push_str(i18n.t(I18nKey::ExtOnlyWarning));
-    }
-    hover
+    format!("{}\n→ {}", behavior.template_path.display(), to.display())
 }
 
 /// `Remove`. Where it is written is the export's choice: see `ExportFormat`.
