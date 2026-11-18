@@ -28,6 +28,23 @@ impl Chord {
         Self { ctrl: modifiers.command, shift: modifiers.shift, alt: modifiers.alt, key }
     }
 
+    /// Is the key a modifier pressed on its own? egui reports one (e.g. `ShiftLeft` on the way to
+    /// `shift+v`), but it is no chord: only a part of the next one.
+    #[inline]
+    pub(crate) const fn is_modifier_only(self) -> bool {
+        matches!(
+            self.key,
+            Key::ShiftLeft
+                | Key::ShiftRight
+                | Key::ControlLeft
+                | Key::ControlRight
+                | Key::AltLeft
+                | Key::AltRight
+                | Key::SuperLeft
+                | Key::SuperRight
+        )
+    }
+
     /// Does the key type a char into a text field? Then its `Text` event goes with it.
     #[inline]
     pub(crate) const fn types_text(self) -> bool {

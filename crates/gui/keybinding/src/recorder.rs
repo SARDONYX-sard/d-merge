@@ -72,8 +72,9 @@ impl KeyRecorder {
         ctx.input_mut(|input| {
             input.events.retain(|event| match event {
                 egui::Event::Key { key, pressed, modifiers, .. } => {
-                    if *pressed && ended.is_none() {
-                        ended = self.on_key(command, Chord::from_event(*key, *modifiers));
+                    let chord = Chord::from_event(*key, *modifiers);
+                    if *pressed && ended.is_none() && !chord.is_modifier_only() {
+                        ended = self.on_key(command, chord);
                     }
                     false
                 }
@@ -174,5 +175,22 @@ mod tests {
         assert_eq!(recorder.keys, parse_keys("c").unwrap(), "a third chord starts over");
         assert_eq!(recorder.on_key(command, chord("escape")), Some(Recorded::Cancelled));
         assert!(!recorder.start("no.such"));
+    }
+
+    /// egui reports `Shift` alone on the way to `ctrl+shift+l`: it is no chord of its own.
+    #[test]
+    fn a_modifier_alone_is_not_recorded() {
+        let mut recorder = KeyRecorder::default();
+        recorder.start(crate::commands::TABS_CLOSE);
+        let key =
+            |key, modifiers| egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers };
+        let ctrl_shift = egui::Modifiers::COMMAND | egui::Modifiers::SHIFT;
+        let events = vec![key(egui::Key::ShiftLeft, ctrl_shift), key(egui::Key::L, ctrl_shift)];
+
+        let ctx = egui::Context::default();
+        let raw = egui::RawInput { events, ..Default::default() };
+        let mut output = ctx.run_ui(raw, |ui| assert_eq!(recorder.take_keys(ui.ctx()), None));
+        output.textures_delta.clear();
+        assert_eq!(recorder.keys, parse_keys("ctrl+shift+l").unwrap());
     }
 }

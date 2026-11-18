@@ -327,6 +327,11 @@ impl Keybindings {
                     continue;
                 };
                 let chord = Chord::from_event(key, modifiers);
+                // `Shift` on the way to `shift+v` after `space`: the sequence still waits.
+                if chord.is_modifier_only() {
+                    at += 1;
+                    continue;
+                }
                 let mut typed = self.pending.clone();
                 typed.push(chord);
                 match self.lookup(&typed, context) {

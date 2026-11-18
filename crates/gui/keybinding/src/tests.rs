@@ -174,6 +174,19 @@ fn a_shifted_key_ends_a_sequence() {
     frame(&ctx, &mut keys, &EDITOR, press("space"), 2.0);
     assert_eq!(keys.pending_since(), 2.0, "its list waits from then");
 
+    // egui reports `Shift` alone first: the sequence still waits for the key it goes with.
+    let shift = egui::Event::Key {
+        key: egui::Key::ShiftLeft,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::SHIFT,
+    };
+    let (commands, left) = frame(&ctx, &mut keys, &EDITOR, vec![shift.clone()], 2.05);
+    assert!(commands.is_empty());
+    assert_eq!(left, [shift], "the widgets see it as it came");
+    assert_eq!(keys.pending(), parse_keys("space").unwrap());
+
     let (commands, left) = frame(&ctx, &mut keys, &EDITOR, press("shift+v"), 2.1);
     assert_eq!(commands, [commands::FILE_REVEAL]);
     assert!(left.is_empty(), "Vim's `V` is not typed: {left:?}");
