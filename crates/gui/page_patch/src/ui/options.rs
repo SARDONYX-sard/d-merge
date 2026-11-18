@@ -71,20 +71,16 @@ impl PatchView<'_> {
                 .on_hover_markdown(self.ctx.i18n.t(I18nKey::RuntimeTargetHover));
 
             const RUNTIMES: [(Runtime, &str); Runtime::ALL.len()] = {
-                const fn make_runtimes() -> [(Runtime, &'static str); Runtime::ALL.len()] {
-                    let mut runtimes = [(Runtime::Le, ""); Runtime::ALL.len()];
-                    let mut i = 0;
+                let mut runtimes = [(Runtime::Le, ""); Runtime::ALL.len()];
 
-                    while i < Runtime::ALL.len() {
-                        let runtime = Runtime::ALL[i];
-                        runtimes[i] = (runtime, runtime.as_str());
-                        i += 1;
-                    }
-
-                    runtimes
+                let mut i = 0;
+                while i < Runtime::ALL.len() {
+                    let runtime = Runtime::ALL[i];
+                    runtimes[i] = (runtime, runtime.as_str());
+                    i += 1;
                 }
 
-                make_runtimes()
+                runtimes
             };
 
             let runtime = &mut self.ctx.settings.behavior.target_runtime;

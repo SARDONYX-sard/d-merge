@@ -7,7 +7,7 @@
 
 use egui_widgets::{
     HoverMarkdown as _,
-    shadcn::{Button, ComboBox, Icon, TextEdit},
+    shadcn::{Button, ComboBox, Icon, Label, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 
@@ -31,8 +31,9 @@ pub(super) fn branch_row(
     let current = history.branch_name();
     let mut asked = None;
 
-    ui.horizontal(|ui| {
-        ui.label("⎇").on_hover_text(i18n.t(I18nKey::ChangesBranchHover));
+    egui_widgets::shadcn::field_row(ui, |ui| {
+        ui.add(Label::new("⎇")).on_hover_text(i18n.t(I18nKey::ChangesBranchHover));
+
         ComboBox::from_id_salt("side_branch").selected_text(current).show_ui(ui, |ui| {
             for name in history.branch_names() {
                 if ui.add(Button::selectable(name == current, name)).clicked() && name != current {

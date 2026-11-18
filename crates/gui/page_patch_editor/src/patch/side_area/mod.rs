@@ -29,7 +29,7 @@ mod search;
 mod tree;
 mod vars_panel;
 
-use egui_widgets::shadcn::Icon;
+use egui_widgets::shadcn::{Icon, Label};
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::pages::patch_editor::PatchEditorSettings,
@@ -390,8 +390,10 @@ fn behavior_select(
 ) -> Option<usize> {
     let current = behaviors.get(active).map_or("", |behavior| behavior.name.as_str());
     let mut picked = None;
-    ui.horizontal(|ui| {
-        ui.label(i18n.t(I18nKey::TemplateLabel));
+
+    egui_widgets::shadcn::field_row(ui, |ui| {
+        ui.add(Label::new(i18n.t(I18nKey::TemplateLabel)));
+
         let combo = egui_widgets::shadcn::ComboBox::from_id_salt("side_vars_behavior").selected_text(current);
         combo.show_ui(ui, |ui| {
             let shown = behaviors.iter().enumerate().filter(|(_, behavior)| !behavior.is_anim_data());
