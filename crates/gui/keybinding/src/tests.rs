@@ -167,3 +167,14 @@ fn vim_g_keys_are_bindings_and_the_rest_is_vims() {
     let left = frame(&ctx, &mut keys, &insert, press("g"), 0.4).1;
     assert!(left.contains(&egui::Event::Text("g".to_owned())), "typed in Insert mode");
 }
+
+#[test]
+fn a_shifted_key_ends_a_sequence() {
+    let (ctx, mut keys) = (egui::Context::default(), Keybindings::default());
+    frame(&ctx, &mut keys, &EDITOR, press("space"), 2.0);
+    assert_eq!(keys.pending_since(), 2.0, "its list waits from then");
+
+    let (commands, left) = frame(&ctx, &mut keys, &EDITOR, press("shift+v"), 2.1);
+    assert_eq!(commands, [commands::FILE_REVEAL]);
+    assert!(left.is_empty(), "Vim's `V` is not typed: {left:?}");
+}

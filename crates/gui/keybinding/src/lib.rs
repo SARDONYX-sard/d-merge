@@ -126,6 +126,8 @@ struct UserFile {
 pub struct Keybindings {
     bindings: Vec<Binding>,
     pending: Keys,
+    /// egui's time the first key of [`Self::pending`] was held at. e.g. `12.3` (seconds)
+    pending_since: f64,
     file: Option<UserFile>,
     /// What of the user file could not be taken: for the app to tell. See [`Self::take_warnings`].
     warnings: Vec<String>,
@@ -159,7 +161,7 @@ impl Keybindings {
         }
         static GENERATIONS: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let generation = GENERATIONS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        Self { bindings, pending: Vec::new(), file: None, warnings, generation }
+        Self { bindings, pending: Vec::new(), pending_since: 0.0, file: None, warnings, generation }
     }
 
     /// The defaults and the user file at `path`. A missing file is made (nothing changed in it), and
@@ -219,6 +221,13 @@ impl Keybindings {
     #[must_use]
     pub fn pending(&self) -> &[Chord] {
         &self.pending
+    }
+
+    /// egui's time [`Self::pending`] started to wait at: its list shows only after a while.
+    #[inline]
+    #[must_use]
+    pub const fn pending_since(&self) -> f64 {
+        self.pending_since
     }
 
     /// What may follow [`Self::pending`] in `context`: `(the rest of the keys, the command)`, each
@@ -328,6 +337,9 @@ impl Keybindings {
                     }
                     Lookup::Prefix => {
                         take_key(&mut input.events, at, chord);
+                        if self.pending.is_empty() {
+                            self.pending_since = input.time;
+                        }
                         self.pending = typed;
                     }
                     Lookup::None if self.pending.is_empty() => at += 1,

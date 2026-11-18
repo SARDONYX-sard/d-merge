@@ -163,6 +163,13 @@ fn which_key(ctx: &egui::Context, bindings: &Keybindings, context: &KeyContext) 
     if bindings.pending().is_empty() {
         return;
     }
+    // As the editor's own list: who knows the keys has typed the rest by then.
+    let waited = ctx.input(|input| input.time) - bindings.pending_since();
+    let left = egui_code_editor::keymap::WHICH_KEY_DELAY_SECONDS - waited;
+    if left > 0.0 {
+        ctx.request_repaint_after_secs(left as f32);
+        return;
+    }
     let mut next: Vec<(std::borrow::Cow<'_, str>, &str)> = bindings
         .continuations(context)
         .into_iter()

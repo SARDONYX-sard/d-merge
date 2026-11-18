@@ -21,6 +21,7 @@ pub(crate) mod vim;
 
 pub(crate) use self::vim::which_key::Prefix;
 pub use self::vim::{VimOptions, which_key::own_g_keys as vim_own_g_keys};
+pub use crate::ui::which_key::DELAY_SECONDS as WHICH_KEY_DELAY_SECONDS;
 use crate::{EditorCommand, search::Matcher};
 
 /// Key binding style of the editor.

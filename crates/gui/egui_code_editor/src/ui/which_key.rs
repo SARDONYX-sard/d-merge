@@ -4,7 +4,9 @@
 use crate::{EditorCommand, keymap::Prefix};
 
 /// Someone who knows the keys has pressed the next one by then: the list would only flash.
-const DELAY_SECONDS: f64 = 0.8;
+///
+/// The host's list of its key bindings' sequences waits as long, so both come up alike.
+pub const DELAY_SECONDS: f64 = 0.8;
 /// Between the list and the edges of the editor.
 const MARGIN: f32 = 8.0;
 
