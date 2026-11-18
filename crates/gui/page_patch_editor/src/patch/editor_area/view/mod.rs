@@ -13,11 +13,8 @@
 //! A diff or a blame of the history takes the editor's place: [`super::revision_view`].
 
 mod bottom;
-mod details;
-mod details_input;
 mod editor;
 mod graph;
-mod graph_colors;
 mod merge;
 mod preview;
 mod preview_panel;

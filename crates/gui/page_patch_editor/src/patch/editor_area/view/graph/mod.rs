@@ -8,6 +8,9 @@
 //! graph  -> work    a value typed, a pin dropped on a node (or off one): the object's text changes,
 //!                   as if typed (see `edited_text`)
 //! ```
+mod details;
+mod details_input;
+mod graph_colors;
 
 use egui_graph_view::{Card, Edge, GraphEdit, GraphSource, Row, Slot};
 use egui_widgets::shadcn::Icon;
@@ -78,7 +81,7 @@ impl GraphSource for ObjectGraph<'_> {
         };
         let exists = self.graph.exists(node);
         let editable = exists && !self.behavior.is_ref(self.graph.id(node));
-        let header = super::graph_colors::of_class(class.trim());
+        let header = self::graph_colors::of_class(class.trim());
         let fan_in = self.graph.parents(node).len();
         Card { title: self.graph.short_name(node), subtitle, header, accent, dimmed: !exists, editable, fan_in }
     }
@@ -102,7 +105,7 @@ impl GraphSource for ObjectGraph<'_> {
 /// e.g. `states` of 2 -> `states[0] ●`, `states[1] ●`, `states +●`
 fn field_rows(field: ObjectField<'_>) -> Vec<Row<'_>> {
     let label = field.name;
-    let color = field.schema.and_then(super::graph_colors::of_field);
+    let color = field.schema.and_then(self::graph_colors::of_field);
     let row = |slot, key| Row { label, index: None, slot, color, key };
     match field.value {
         FieldValue::Inline(token) if field.holds_pointers() => {
@@ -333,16 +336,16 @@ fn details_panel(
                 ui.add(egui::Label::new(egui::RichText::new(title).monospace().strong()).truncate())
                     .on_hover_text(title);
                 ui.separator();
-                super::details::details_ui(ui, (id, text), (editable, open_all))
+                self::details::details_ui(ui, (id, text), (editable, open_all))
             })
         })
         .inner;
     match out {
-        Some(super::details::DetailOut::Edit { at, len, text: value }) => {
+        Some(self::details::DetailOut::Edit { at, len, text: value }) => {
             let token = Token { at, text: &text[at..at + len] };
             result.graph_edit = Some((id.to_owned(), fields::replace(text, token, &value)));
         }
-        Some(super::details::DetailOut::GoTo(target)) => result.definition = Some((target, 0)),
+        Some(self::details::DetailOut::GoTo(target)) => result.definition = Some((target, 0)),
         None => {}
     }
 }
