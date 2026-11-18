@@ -20,7 +20,7 @@ default-members = ["crates/gui/d_merge"]
 [workspace.dependencies]
 bitflags            = "2.13.2"
 bitvec              = "1.0.1"
-chrono              = "0.4.45"
+jiff                = "1.0.1" # Alternative to `chrono`, which has stopped maintenance
 crc                 = "3.4.0"
 dark-light          = "3.0.0"
 dashmap             = "6.2.1"
@@ -68,16 +68,14 @@ wgpu                = "30.0.2"
 winnow              = { version = "1.0.5", features = ["simd"] }
 winres              = "0.1.12"
 
-auto_charset    = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "0ebff43", default-features = false }
-class_generator = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "0ebff43" } # xtask only: class json files
-diff            = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "0ebff43", default-features = false }
-havok_classes = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "0ebff43", default-features = false, features = [
-  "ignore_duplicates",
-] }
-havok_types        = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "0ebff43", default-features = false }
-serde_hkx          = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "0ebff43", default-features = false }
-serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "0ebff43", default-features = false }
-winnow_ext         = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "0ebff43", default-features = false }
+auto_charset       = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "eddd96c", default-features = false }
+class_generator    = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "eddd96c" } # xtask only: class json files
+diff               = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "eddd96c", default-features = false }
+havok_classes      = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "eddd96c", default-features = false, features = ["ignore_duplicates"] }
+havok_types        = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "eddd96c", default-features = false }
+serde_hkx          = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "eddd96c", default-features = false }
+serde_hkx_features = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "eddd96c", default-features = false }
+winnow_ext         = { git = "https://github.com/SARDONYX-forks/d-merge-serde-hkx", rev = "eddd96c", default-features = false }
 
 # dev-dependencies
 pretty_assertions = "1.4.1" # Color diff assertion

@@ -329,7 +329,9 @@ fn file_stem(meshes_path: &str) -> &str {
 /// Seconds since the Unix epoch as the local time, e.g. `2026-11-12 18:00`.
 fn local_time(seconds: u64) -> String {
     let seconds = i64::try_from(seconds).unwrap_or_default();
-    chrono::DateTime::from_timestamp(seconds, 0)
-        .map(|time| time.with_timezone(&chrono::Local).format("%Y-%m-%d %H:%M").to_string())
+
+    jiff::Timestamp::from_second(seconds)
+        .map(|timestamp| timestamp.to_zoned_datetime(jiff::tz::TimeZone::system()))
+        .map(|time| time.strftime("%Y-%m-%d %H:%M").to_string())
         .unwrap_or_default()
 }

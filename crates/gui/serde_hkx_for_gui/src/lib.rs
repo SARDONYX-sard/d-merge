@@ -14,7 +14,7 @@ use serde_hkx_features::Format;
 use self::status::{Payload, Status};
 use crate::{hash::hash_djb2, path::infer::generate_output_path};
 
-/// Converts between HKX and XML (or other supported formats) asynchronously.
+/// Converts between HKX and XML (or other supported formats) asynjiffusly.
 ///
 /// # Returns
 ///

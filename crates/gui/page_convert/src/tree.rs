@@ -45,7 +45,7 @@ impl TreeView {
         // Remember the attempt even on failure, so a broken path is not re-walked every frame.
         self.loaded_for = Some(roots.to_vec());
 
-        // NOTE: Synchronous on purpose: it runs only when the roots change, and the walker is parallel.
+        // NOTE: Synjiffus on purpose: it runs only when the roots change, and the walker is parallel.
         let entries = serde_hkx_for_gui::load_dir_node(roots.to_vec())
             .map_err(|errors| errors.iter().map(ToString::to_string).collect::<Vec<_>>().join("\n"))?;
 

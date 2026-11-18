@@ -86,7 +86,7 @@ pub(crate) fn run_menu_action(
             }
         }
         MenuAction::Paste => {
-            // Reading the clipboard is asynchronous: see `take_requested_paste`.
+            // Reading the clipboard is asynjiffus: see `take_requested_paste`.
             state.pending_paste = Some(ui.input(|i| i.time));
             ctx.send_viewport_cmd(egui::ViewportCommand::RequestPaste);
         }

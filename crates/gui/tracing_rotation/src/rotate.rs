@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 //! Rotation logic: rename the current log file with a timestamp suffix and
 //! delete the oldest files if the cap is exceeded.
 
@@ -7,7 +9,7 @@ use std::{
     time::SystemTime,
 };
 
-use chrono::Local;
+use jiff::ZonedDateTime;
 
 use crate::error::Result;
 
@@ -24,6 +26,7 @@ pub(crate) fn rotate_files(log_dir: impl AsRef<Path>, file_name: &str, max_files
     fs::create_dir_all(log_dir)?;
 
     let stem = file_name_path.file_stem().and_then(|s| s.to_str()).unwrap_or(file_name);
+
     let ext = file_name_path.extension().and_then(|s| s.to_str()).unwrap_or("log");
 
     let mut log_files: Vec<DirEntry> = fs::read_dir(log_dir)?
@@ -43,7 +46,7 @@ pub(crate) fn rotate_files(log_dir: impl AsRef<Path>, file_name: &str, max_files
     let active_path = log_dir.join(file_name);
 
     if active_path.exists() {
-        let timestamp = Local::now().format("%F_%H-%M-%S");
+        let timestamp = ZonedDateTime::now().strftime("%F_%H-%M-%S");
         let archived = log_dir.join(format!("{stem}_{timestamp}.{ext}"));
 
         fs::rename(&active_path, archived)?;
