@@ -175,8 +175,13 @@ fn paragraph_boundary(buf: &Buffer, i: usize, forward: bool) -> usize {
     }
 }
 
-/// `%`: from the first bracket at or after `i` on the line to its partner.
+/// `%`: from the tag the cursor is in (or the first after it), or the first bracket at or after `i`
+/// on the line, to its partner.
 fn match_pair(buf: &Buffer, i: usize) -> Option<usize> {
+    // `<tag>` / `</tag>`, as Vim's `matchit`: see `tags`.
+    if let Some(at) = super::tags::tag_near(buf, i) {
+        return super::tags::matching_tag(buf, at);
+    }
     const PAIRS: [(char, char); 3] = [('(', ')'), ('[', ']'), ('{', '}')];
     let end = buf.line_end(i);
     let (at, c) = (i..end).map(|j| (j, buf.chars[j])).find(|(_, c)| "()[]{}".contains(*c))?;
