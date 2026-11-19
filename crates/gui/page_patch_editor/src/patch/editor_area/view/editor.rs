@@ -211,6 +211,7 @@ fn read_output(output: CodeEditorOutput<'_>, result: &mut EditorResult) -> Optio
     result.changed = output.changed;
     result.inline_revert = output.inline_revert;
     result.command = output.command;
+    result.peek = output.peek;
 
     // The `⚙` of a palette action or an editor command: record its keys.
     result.configure = output.configure.and_then(host::command_of_action);
@@ -233,7 +234,8 @@ fn read_output(output: CodeEditorOutput<'_>, result: &mut EditorResult) -> Optio
             result.definition = Some((location.document.into_owned(), location.line));
             None
         }
-        Some(Navigation::References(references)) => Some(references.into()),
+        // A pointer has few references in each object: all of them shown at once.
+        Some(Navigation::References(references)) => Some(ReferenceList::from(references).unfolded(true)),
         None => None,
     }
 }
@@ -320,10 +322,9 @@ impl EditorPane {
         let read_only = behavior.is_ref(id);
         let features = editor_features(&self.lsp, behavior.is_anim_data());
 
-        // The references found, under the editor, as VS Code's peek: before the editor fills the rest.
+        // The references found, as VS Code's peek: the editor opens it under the line.
         let texts = |document: &str| behavior.text(document).map(str::to_owned);
         let peek = egui_code_editor::PeekInput { texts: &texts, language: shown_language };
-        result.peek = egui_code_editor::ReferenceList::peek(ui, &mut self.references, &peek);
 
         // Per object: each tab keeps where it was scrolled to.
         let scroll = egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false);
@@ -341,6 +342,7 @@ impl EditorPane {
                 .request_keys(key_ui.request_keys())
                 .actions(&actions)
                 .inline_diff(self.show_inline_diff.then_some(&self.inline_diff))
+                .references(&mut self.references, &peek)
                 .show(ui, &mut self.state);
 
             if let Some(cursor) = output.cursor {

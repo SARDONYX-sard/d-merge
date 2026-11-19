@@ -489,3 +489,136 @@ third",
     assert!(!frames.state.palette.open);
     assert_eq!(frames.selection(), 8..8, "at `second` of line 2");
 }
+
+/// The peek's gap: the rows below the line move down by its height; its top is that line's bottom.
+#[test]
+fn a_gap_pushes_the_lines_below_down() {
+    let ctx = egui::Context::default();
+    let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+        let font = egui::FontId::monospace(14.0);
+        let galley = ui.painter().layout_no_wrap(
+            "a
+b
+c"
+            .to_owned(),
+            font,
+            egui::Color32::WHITE,
+        );
+        let gapped = text::with_gap(&galley, 1, 300.0);
+        let tops: Vec<f32> = gapped.rows.iter().map(|row| row.pos.y).collect();
+        assert_eq!(tops[..2], [galley.rows[0].pos.y, galley.rows[1].pos.y], "above: as they were");
+        assert_eq!(tops[2], galley.rows[2].pos.y + 300.0);
+        assert_eq!(gapped.rect.height(), galley.rect.height() + 300.0);
+        assert_eq!(text::gap_top(&gapped, 1), galley.rows[1].rect().bottom());
+    });
+    output.textures_delta.clear();
+}
+
+/// The references' peek has the keys while it is open: `j` the next line, `Esc` closes it, and
+/// none of them reach the editor.
+#[test]
+fn the_peek_has_the_keys() {
+    fn frame(
+        ctx: &egui::Context,
+        (text, state): (&mut String, &mut CodeEditorState),
+        list: &mut Option<ReferenceList>,
+        events: Vec<egui::Event>,
+    ) -> Option<PeekAsk> {
+        let texts = |_: &str| {
+            Some(
+                "a
+b
+c"
+                .to_owned(),
+            )
+        };
+        let input = PeekInput { texts: &texts, language: &crate::languages::Xml };
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 900.0));
+        let raw = egui::RawInput { events, screen_rect: Some(screen), ..Default::default() };
+        let mut asked = None;
+        let mut output = ctx.run_ui(raw, |ui| {
+            asked = CodeEditor::new("editor", text).references(list, &input).show(ui, state).peek;
+        });
+        output.textures_delta.clear();
+        asked
+    }
+    let key = |key| egui::Event::Key {
+        key,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    };
+    let at = |line| Location { document: "#a".into(), line, detail: "".into() };
+
+    let ctx = egui::Context::default();
+    let (mut text, mut state) = (
+        "a
+b
+c"
+        .to_owned(),
+        CodeEditorState::default(),
+    );
+    let mut list = Some(ReferenceList::from(References { symbol: "x".into(), locations: vec![at(0), at(2)] }));
+    frame(&ctx, (&mut text, &mut state), &mut list, Vec::new());
+    frame(&ctx, (&mut text, &mut state), &mut list, vec![key(egui::Key::J)]);
+    assert_eq!(list.as_mut().and_then(|list| list.step(true)), Some(("#a", 0)), "`j` went to the second");
+
+    let asked = frame(&ctx, (&mut text, &mut state), &mut list, vec![key(egui::Key::Escape)]);
+    assert_eq!(asked, Some(PeekAsk::Close));
+    assert!(list.is_none());
+    assert_eq!(
+        text,
+        "a
+b
+c",
+        "the keys did not reach the editor"
+    );
+}
+
+/// The wheel over the references' peek scrolls only it, never the editor around it, even where it
+/// has nothing more to scroll.
+#[test]
+fn the_wheel_over_the_peek_does_not_scroll_the_editor() {
+    fn frame(
+        ctx: &egui::Context,
+        (text, state): (&mut String, &mut CodeEditorState),
+        list: &mut Option<ReferenceList>,
+        events: Vec<egui::Event>,
+    ) -> f32 {
+        let texts = |_: &str| Some("a".to_owned());
+        let input = PeekInput { texts: &texts, language: &crate::languages::Xml };
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0));
+        let raw = egui::RawInput { events, screen_rect: Some(screen), ..Default::default() };
+        let mut top = 0.0;
+        let mut output = ctx.run_ui(raw, |ui| {
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                top = CodeEditor::new("editor", text).references(list, &input).show(ui, state).response.rect.top();
+            });
+        });
+        output.textures_delta.clear();
+        top
+    }
+    let wheel = egui::Event::MouseWheel {
+        unit: egui::MouseWheelUnit::Point,
+        delta: egui::vec2(0.0, -200.0),
+        phase: egui::TouchPhase::Move,
+        source: egui::MouseWheelSource::Unknown,
+        modifiers: egui::Modifiers::NONE,
+    };
+    let at = Location { document: "#a".into(), line: 0, detail: "".into() };
+
+    let ctx = egui::Context::default();
+    let mut text = "line\n".repeat(200);
+    let mut state = CodeEditorState::default();
+    let mut list = Some(ReferenceList::from(References { symbol: "x".into(), locations: vec![at] }));
+    let shown = (&mut text, &mut state);
+    let before = frame(&ctx, shown, &mut list, Vec::new());
+    for _ in 0..10 {
+        // Inside the peek, under the first line.
+        let events = vec![egui::Event::PointerMoved(egui::pos2(400.0, 150.0)), wheel.clone()];
+        frame(&ctx, (&mut text, &mut state), &mut list, events);
+    }
+    let after = frame(&ctx, (&mut text, &mut state), &mut list, Vec::new());
+    assert_eq!(after, before, "the editor stayed");
+}

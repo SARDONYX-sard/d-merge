@@ -21,11 +21,11 @@ use self::{
     menu::{context_menu, resolve_navigation, run_menu_action},
     popups::{accept_completion, run_quick_fix, show_hover, show_signature, show_which_key, update_completion_popup},
     state::CodeEditorState,
-    text::{show_text, sorted_chars},
+    text::{gap_top, show_text, sorted_chars},
 };
 use crate::{
-    Diagnostic, EditorAction, EditorLabels, EditorRequest, InlineDiff, Keymap, Language, Location, References,
-    Severity,
+    Diagnostic, EditorAction, EditorLabels, EditorRequest, InlineDiff, Keymap, Language, Location, PeekAsk, PeekInput,
+    ReferenceList, References, Severity,
     command::{EditorCommand, EditorFeatures},
     popups::{context_menu::MenuAction, palette},
     text_pos::LinePos,
@@ -65,6 +65,8 @@ pub struct CodeEditorOutput<'a> {
     pub configure_request: Option<EditorRequest>,
     /// The `↶` of this [`InlineDiff::hunks`] entry was clicked: the host puts it back.
     pub inline_revert: Option<usize>,
+    /// What the references' peek asked: see [`CodeEditor::references`].
+    pub peek: Option<PeekAsk>,
 }
 
 /// Language used when none is given: no colors, no completion, ...
@@ -93,6 +95,7 @@ pub struct CodeEditor<'a> {
     request_keys: Option<&'a [(EditorRequest, String)]>,
     annotations: &'a [String],
     background: egui::Color32,
+    references: Option<(&'a mut Option<ReferenceList>, &'a PeekInput<'a>)>,
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -123,7 +126,17 @@ impl<'a> CodeEditor<'a> {
             request_keys: None,
             annotations: &[],
             background: egui::Color32::TRANSPARENT,
+            references: None,
         }
+    }
+
+    /// The references found, as VS Code's peek: inside the editor, under the line they were asked
+    /// from, pushing the lines below it down. `list` is `None` once it has closed; what it asked is
+    /// [`CodeEditorOutput::peek`]. See [`ReferenceList`].
+    #[inline]
+    pub const fn references(mut self, list: &'a mut Option<ReferenceList>, input: &'a PeekInput<'a>) -> Self {
+        self.references = Some((list, input));
+        self
     }
 
     /// The color behind the text. Default: none, so the page's own shows, as VS Code's editor is on
@@ -267,11 +280,20 @@ impl<'a> CodeEditor<'a> {
             request_keys,
             annotations,
             background,
+            mut references,
         } = self;
         if read_only {
             // In a buffer that stays: this is every frame.
             text.clone_into(&mut state.read_only_text);
         }
+        // The references' peek opens under the cursor's line, in a gap of its height.
+        let gap = references.as_mut().and_then(|(list, _)| list.as_mut()).map(|list| {
+            list.gap(|| {
+                let state = egui::TextEdit::load_state(ui.ctx(), id);
+                let at = state.and_then(|state| state.cursor.char_range()).map_or(0, |range| range.primary.index.0);
+                LinePos::from_char_index(text, at).line
+            })
+        });
         let frame = EditorFrame {
             id,
             language,
@@ -282,6 +304,7 @@ impl<'a> CodeEditor<'a> {
             requests,
             request_keys,
             background,
+            gap,
         };
 
         state.indent = language.indent();
@@ -342,6 +365,10 @@ impl<'a> CodeEditor<'a> {
             cursor,
         );
         overlays::annotations(ui, placed, gutter_left..gutter_left + notes_width, annotations);
+        let peek = references.and_then(|(list, input)| {
+            let top = placed.1.y + gap_top(placed.0, gap?.0);
+            ReferenceList::show_inline(ui, list, input, top)
+        });
         if let Some(cursor) = anchor {
             scroll_to_cursor(ui, id, cursor, placed.0, input.keys.scroll);
         }
@@ -402,6 +429,7 @@ impl<'a> CodeEditor<'a> {
             configure: input.picked.and_then(palette::Picked::configure),
             configure_request: input.picked.and_then(palette::Picked::configure_request),
             inline_revert,
+            peek,
         }
     }
 }
@@ -422,6 +450,8 @@ struct EditorFrame<'a> {
     request_keys: Option<&'a [(EditorRequest, String)]>,
     /// See [`CodeEditor::background`].
     background: egui::Color32,
+    /// The references' peek: `(the line it opens under, its height)`.
+    gap: Option<(usize, f32)>,
 }
 
 #[cfg(test)]
