@@ -8,16 +8,43 @@ pub struct ModInfo {
     pub site: String,
     /// The mod's version now, written for `Nemesis_EngineExt` only. e.g. `1.2.0`
     pub version: String,
-    /// Mod codes it says it depends on, as it was read. See [`Workspace::deps`].
-    pub(super) deps: Vec<String>,
+    /// The mods it says it depends on, as it was read, and the versions of the referenced mods set
+    /// here. See [`super::Workspace::deps`].
+    pub(super) deps: Vec<DepEntry>,
     /// The lines the editor has no field for, as they were read: the mod's, so they stay.
     ///
     /// e.g. `auto=true`
     pub(super) other: Vec<String>,
 }
 
+/// One mod of `deps`: its code, and the versions of it that work. See [`mod_info::deps`].
+///
+/// e.g. `amco>=1.2.0` -> `amco`, `>=1.2.0`; `bfco` -> `bfco`, `` (any version)
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DepEntry {
+    pub code: String,
+    /// Empty: any version.
+    pub req: String,
+}
+
+/// The entries of the value of `deps`. e.g. `amco>=1.2.0, bfco`
+fn parse_deps(value: &str) -> Vec<DepEntry> {
+    let entry = |dep: ::mod_info::deps::Dep<'_>| DepEntry {
+        code: dep.code.to_owned(),
+        req: dep.req.unwrap_or_default().to_owned(),
+    };
+    ::mod_info::deps::entries(value).map(entry).collect()
+}
+
 pub(crate) fn info_ini(info: &ModInfo) -> String {
-    let deps = info.deps.join(",");
+    let mut deps = String::new();
+    for (at, dep) in info.deps.iter().enumerate() {
+        if at > 0 {
+            deps.push(',');
+        }
+        deps.push_str(&dep.code);
+        deps.push_str(dep.req.trim());
+    }
     let mut out = format!(
         "name={}\nauthor={}\nsite={}\nversion={}\ndeps={deps}\n",
         info.name, info.author, info.site, info.version
@@ -43,10 +70,7 @@ pub(super) fn parse_info(ini: &str) -> ModInfo {
             "site" => info.site = value,
             "version" | "deps" if value.eq_ignore_ascii_case("null") => {}
             "version" => info.version = value,
-            "deps" => {
-                let codes = value.split(',').map(str::trim).filter(|code| !code.is_empty());
-                info.deps = codes.map(str::to_owned).collect();
-            }
+            "deps" => info.deps = parse_deps(&value),
             _ => info.other.push(line.to_owned()),
         }
     }

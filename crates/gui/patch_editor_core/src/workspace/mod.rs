@@ -18,6 +18,7 @@
 
 pub mod behavior;
 pub mod catalog;
+mod deps;
 mod export;
 pub mod history;
 mod import;
@@ -33,6 +34,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+pub use ::mod_info::deps::VersionCheck;
 use rayon::prelude::*;
 
 use self::{
@@ -44,7 +46,7 @@ pub use self::{
     behavior::{ADSF, ASDSF, Behavior, ObjectText, PANDORA_DOC, STRING_DATA, Target},
     catalog::{TemplateEntry, catalog},
     locations::{ModCode, code_of, joined, mod_codes_of_root, mod_root_of, nemesis_folder, patch_dir_of_code},
-    mod_info::ModInfo,
+    mod_info::{DepEntry, ModInfo},
 };
 
 /// Where the works are kept: in the patch page's output directory, so for each profile, not in the mods.
@@ -239,6 +241,10 @@ pub struct Workspace {
     /// their events. Those are read as they are, can be looked at and pointed to, and are not edited
     /// or exported: they come with that mod when merging.
     pub ref_mods: Vec<String>,
+    /// The version each of [`Self::ref_mods`] says, read with them. See [`Self::ref_check`].
+    ///
+    /// e.g. `1.2.0`; empty: it says none
+    ref_versions: Vec<String>,
     /// The revisions of the work. See [`history`].
     pub history: history::History,
     /// How conflicts were resolved, to do it again. See [`crate::editor::merge`].
@@ -315,6 +321,7 @@ impl Workspace {
 
     /// Reads the referenced mods into every behavior. Call when they or the behaviors change.
     pub fn reload_refs(&mut self) {
+        self.ref_versions = self.ref_mods.iter().map(|dir| deps::ref_version(Path::new(dir))).collect();
         for behavior in &mut self.behaviors {
             behavior.refs.clear();
             behavior.ref_events.clear();
@@ -893,10 +900,13 @@ mod tests {
         assert_eq!(workspace.ext_info("name=a", "mine"), "name=a", "nothing known: as Nemesis'");
 
         workspace.info.version = " 1.2.0 ".into();
-        workspace.info.deps = vec!["bfco".into(), "mine".into()];
+        workspace.info.deps = vec![
+            DepEntry { code: "bfco".into(), req: ">=1.0".into() },
+            DepEntry { code: "mine".into(), req: String::new() },
+        ];
         workspace.ref_mods =
             vec!["D:/mods/a/Nemesis_Engine/mod/amco".into(), "D:/mods/b/Nemesis_Engine/mod/bfco".into()];
-        assert_eq!(workspace.ext_info("name=a", "mine"), "name=a\nversion=1.2.0\ndeps=amco,bfco");
+        assert_eq!(workspace.ext_info("name=a", "mine"), "name=a\nversion=1.2.0\ndeps=amco,bfco>=1.0");
     }
 
     #[test]
@@ -906,7 +916,10 @@ mod tests {
             author: "me".into(),
             site: "https://x".into(),
             version: "1.2.0".into(),
-            deps: vec!["amco".into(), "bfco".into()],
+            deps: vec![
+                DepEntry { code: "amco".into(), req: ">=1.2.0".into() },
+                DepEntry { code: "bfco".into(), req: String::new() },
+            ],
             other: vec!["auto=true".into(), "; a comment".into()],
         };
         assert_eq!(parse_info(&info_ini(&info)), info);

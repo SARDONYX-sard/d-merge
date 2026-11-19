@@ -2,8 +2,6 @@
 
 use std::{fmt::Write as _, path::Path};
 
-use stdx::text::push_joined;
-
 use super::{
     Workspace,
     locations::{ENGINES, joined},
@@ -34,16 +32,6 @@ pub(crate) fn remove_owned(output: &Path, file: &str) -> Result<(), String> {
 }
 
 impl Workspace {
-    /// The mod codes this mod depends on: what it said when it was read, and the mods it refers to.
-    ///
-    /// e.g. a reference `D:/mods/a/Nemesis_Engine/mod/amco` -> `amco`
-    pub(super) fn deps(&self, own_code: &str) -> Vec<String> {
-        let refs = self.ref_mods.iter().filter_map(|dir| Path::new(dir).file_name()?.to_str());
-        let all: std::collections::BTreeSet<&str> =
-            self.info.deps.iter().map(String::as_str).chain(refs).filter(|code| *code != own_code).collect();
-        all.into_iter().map(str::to_owned).collect()
-    }
-
     /// `info.ini` of `Nemesis_EngineExt`: `info`, with what only that one has. What is not known is left
     /// out, so that a mod without any of it reads like Nemesis'.
     pub fn ext_info(&self, info: &str, own_code: &str) -> String {
@@ -54,7 +42,13 @@ impl Workspace {
         let deps = self.deps(own_code);
         if !deps.is_empty() {
             out.push_str("\ndeps=");
-            push_joined(&mut out, deps.iter().map(String::as_str), ",");
+            for (at, (code, req)) in deps.into_iter().enumerate() {
+                if at > 0 {
+                    out.push(',');
+                }
+                out.push_str(code); // e.g. `amco>=1.2.0`, `bfco`
+                out.push_str(req);
+            }
         }
         out
     }

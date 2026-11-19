@@ -1,3 +1,4 @@
+pub mod deps;
 pub mod error;
 
 use std::{fs, path::Path};
@@ -184,9 +185,10 @@ pub struct ModInfo {
     #[serde(default, deserialize_with = "deserialize_remove_null")]
     pub version: String,
 
-    /// The mod codes this mod depends on. `Nemesis_EngineExt` only, as [`Self::version`].
+    /// The mod codes this mod depends on. `Nemesis_EngineExt` only, as [`Self::version`]. The
+    /// versions of them it works with are left out: see [`deps`].
     ///
-    /// e.g. `deps=amco, bfco` -> `amco`, `bfco`
+    /// e.g. `deps=amco>=1.2.0, bfco` -> `amco`, `bfco`
     #[serde(default, deserialize_with = "deserialize_mod_codes")]
     pub deps: Vec<String>,
 
@@ -273,7 +275,7 @@ where
     if s.eq_ignore_ascii_case("null") {
         return Ok(Vec::new());
     }
-    Ok(s.split(',').map(str::trim).filter(|code| !code.is_empty()).map(str::to_owned).collect())
+    Ok(deps::entries(&s).map(|dep| dep.code.to_owned()).collect())
 }
 
 /// Remove "null" and prepend "https://" if starts with "www."

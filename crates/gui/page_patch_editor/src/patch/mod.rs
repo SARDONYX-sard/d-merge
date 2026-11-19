@@ -324,7 +324,7 @@ impl PatchTool {
         let start = !user_patch && !self.work.place.is_open();
         let parts = (&mut self.work, &mut self.panels);
         let asks = if user_patch {
-            ui::user_patch::user_patch_bar(ui, i18n, (&*parts.0, parts.1))
+            ui::user_patch::user_patch_bar(ui, i18n, parts)
         } else if start {
             ui::start_screen::start_screen(ui, i18n, (&*parts.0, parts.1), notify)
         } else {

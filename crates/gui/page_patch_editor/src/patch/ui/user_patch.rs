@@ -23,7 +23,7 @@ use crate::patch::{tool::work_state::Work, ui::panels::Panels};
 pub(in crate::patch) fn user_patch_bar(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
-    (work, panels): (&Work, &mut Panels),
+    (work, panels): (&mut Work, &mut Panels),
 ) -> Vec<BarAsk> {
     let mut asks = Vec::new();
 
@@ -42,7 +42,7 @@ pub(in crate::patch) fn user_patch_bar(
         });
     });
     // What it depends on: the mods its values were taken from, whose objects and names it uses.
-    asks.extend(super::top_bar::ref_mods_row(ui, i18n, &work.workspace.ref_mods));
+    asks.extend(super::ref_mods::ref_mods_row(ui, i18n, &mut work.workspace));
     asks
 }
 

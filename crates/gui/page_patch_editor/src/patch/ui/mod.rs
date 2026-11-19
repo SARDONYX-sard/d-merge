@@ -6,6 +6,7 @@ pub(super) mod bulk;
 pub(super) mod class_picker;
 pub(super) mod code_choice;
 pub(super) mod panels;
+pub(super) mod ref_mods;
 pub(super) mod repeat;
 pub(super) mod start_screen;
 pub(super) mod template_picker;
