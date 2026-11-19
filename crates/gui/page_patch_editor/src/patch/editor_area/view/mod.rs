@@ -63,6 +63,7 @@ impl EditorArea {
         let mut out = EditorOut::default();
         let Some(id) = sel.selected.clone() else {
             egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::ObjectSelectHint)));
+            self.back_to_closed(ui, (work, sel, keys));
             return out;
         };
         if let Some(view) = self.views_ui(ui, i18n, (work, sel, keys)) {
@@ -129,6 +130,24 @@ impl EditorArea {
         problems.cursor.focused = true;
         ui.memory_mut(|m| m.surrender_focus(editor));
         true
+    }
+
+    /// Nothing shown (every tab closed): `Alt+←` or the mouse's back button opens the last one again.
+    /// (`Ctrl+O` is Vim's in an editor, which is not there.)
+    fn back_to_closed(&mut self, ui: &egui::Ui, (work, sel, keys): (&Work, &mut Selection, &mut Keys)) {
+        let back = keys.take(commands::HISTORY_BACK) || egui_code_editor::NavHistory::<String>::mouse(ui) == Some(true);
+        if !back {
+            return;
+        }
+        let behavior = &work.workspace.behaviors[sel.active];
+        while let Some(target) = self.pane.history.walk_from_nowhere(true) {
+            if behavior.text(&target).is_some() {
+                sel.selected = Some(target.into());
+                self.pane.focus = Some(FocusAt::Keep);
+                self.moved = true;
+                return;
+            }
+        }
     }
 
     /// The keys that leave this object: close its tab, go back / forward, the next / previous tab.

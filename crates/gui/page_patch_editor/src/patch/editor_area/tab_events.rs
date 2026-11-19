@@ -30,7 +30,8 @@ pub(super) struct TabOutcome {
     pub(super) select: Select,
     /// The open object's tab went: its editor state with it.
     pub(super) close_editor: bool,
-    /// The editor keeps the keyboard (an object's tab was gone to by a key).
+    /// The editor keeps the keyboard (an object's tab was gone to by a key, or the one beside a
+    /// closed one is shown).
     pub(super) keep_focus: bool,
 }
 
@@ -61,8 +62,10 @@ pub(super) fn object_action(
             if id != current {
                 return TabOutcome::default();
             }
+            // As VS Code: the tab beside it is shown, and its editor has the keyboard.
+            let keep_focus = neighbor.is_some();
             let select = neighbor.map_or(Select::Nothing, |id| Select::Object(id.into()));
-            TabOutcome { select, close_editor: true, keep_focus: false }
+            TabOutcome { select, close_editor: true, keep_focus }
         }
         TabAction::CloseOthers => {
             tabs.close_others(active, &id);

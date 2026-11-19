@@ -287,6 +287,10 @@ impl EditorArea {
             TabEvent::View(action, at) => tab_events::view_action(tabs, sel.active, (action, at)),
             TabEvent::File(action, id) => return Some((action, id)),
         };
+        // The object shown was closed: `Ctrl+O` / `Alt+←` comes back to it, as in VS Code.
+        if outcome.close_editor && sel.selected.as_deref() == Some(current) {
+            self.pane.history.visit(current);
+        }
         self.apply_tab_outcome(sel, outcome);
         None
     }
@@ -500,5 +504,26 @@ mod tests {
         work.workspace.behaviors[0] = clip_data(&[]);
         area.reshow(Reshow::Place(Some(place)), &mut work, &mut sel);
         assert_eq!(sel.selected, None);
+    }
+
+    /// Closing the tab shown: the one beside it is shown with the keyboard, and going back
+    /// (`Ctrl+O`) opens the closed one again, as in VS Code.
+    #[test]
+    fn a_closed_tab_is_gone_back_to() {
+        let (mut area, mut work, mut sel) = (EditorArea::default(), Work::default(), Selection::default());
+        work.workspace.behaviors.push(clip_data(&["M~1/a.txt", "M~1/b.txt"]));
+        // Kept open, each: a preview tab would give its place to the next.
+        area.tabs.open(0, "M~1/a.txt", None);
+        area.tabs.pin(0, "M~1/a.txt");
+        area.tabs.open(0, "M~1/b.txt", Some("M~1/a.txt"));
+        sel.selected = Some(Rc::from("M~1/b.txt"));
+
+        let close = TabEvent::Object(egui_widgets::TabAction::Close, "M~1/b.txt".to_owned());
+        area.apply_tab_event(&mut sel, Some(close), "M~1/b.txt");
+        assert_eq!(sel.selected.as_deref(), Some("M~1/a.txt"), "the one beside it");
+        assert!(matches!(area.pane.focus.take(), Some(FocusAt::Keep)), "with the keyboard");
+
+        area.walk_history((&work.workspace.behaviors[0], &mut sel), true, "M~1/a.txt");
+        assert_eq!(sel.selected.as_deref(), Some("M~1/b.txt"), "back to the closed one");
     }
 }

@@ -56,6 +56,13 @@ impl<T> NavHistory<T> {
         to.push(current.to_owned());
         Some(target)
     }
+
+    /// The place to go back (`older`) / forward to, from nowhere (e.g., every tab closed): the other
+    /// way has nothing to come back to.
+    #[inline]
+    pub fn walk_from_nowhere(&mut self, older: bool) -> Option<T> {
+        (if older { &mut self.back } else { &mut self.forward }).pop()
+    }
 }
 
 impl<T> NavHistory<T> {
