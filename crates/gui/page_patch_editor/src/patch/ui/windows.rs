@@ -17,7 +17,7 @@ use gui_shared::i18n::I18nMap;
 use crate::patch::{
     tool::{selection::Selection, work_state::Work},
     ui::{
-        anim_data::{self, AnimDataDialog, DuplicateForm, FormAsk, NewClipsForm},
+        anim_data::{self, AnimDataAsk, AnimDataDialog, DuplicateForm, FormAsk, NewClipsForm},
         code_choice::{ChoiceAsk, ModCodeChoice},
         panels::Panels,
         repeat::{RepeatAsk, RepeatForm},
@@ -131,13 +131,16 @@ impl Panels {
         notify: &mut Notification,
     ) -> Option<WindowDone> {
         let ask = self.anim_data_dialog.as_mut()?.window(ctx, i18n)?;
-        let dialog = self.anim_data_dialog.take()?;
         match ask {
-            FormAsk::Done => {
-                dialog.generate((work, sel), i18n, notify);
+            // It stays open: the other parts may be done next.
+            AnimDataAsk::Do(part) => {
+                self.anim_data_dialog.as_ref()?.apply(part, (work, sel), i18n, notify);
                 Some(WindowDone::Reload)
             }
-            FormAsk::Close => None,
+            AnimDataAsk::Close => {
+                self.anim_data_dialog = None;
+                None
+            }
         }
     }
 

@@ -21,9 +21,6 @@ pub enum I18nKey {
     /// Add
     AddButton,
 
-    /// Add the checked hkx to:
-    AnimDataAddTo,
-
     /// Clips (animationdatasinglefile)
     AnimDataClips,
 
@@ -33,7 +30,7 @@ pub enum I18nKey {
     /// Files
     AnimDataDuplicateFiles,
 
-    /// Generate
+    /// Generate their data
     AnimDataGenerate,
 
     /// The mod's hkx
@@ -74,6 +71,9 @@ pub enum I18nKey {
     /// Anim sets: what the game caches (animationsetdatasinglefile)
     AnimDataSet,
 
+    /// Add to the checked txt
+    AnimDataSetAdd,
+
     /// Adds every checked hkx to every checked txt.
     ///
     /// # Notes
@@ -102,7 +102,7 @@ pub enum I18nKey {
     /// No character template for these actors
     AnimNamesNoCharacter,
 
-    /// Their characters' animationNames (the character's XML)
+    /// Add to their characters' animationNames (the character's XML)
     AnimNamesToCharacters,
 
     /// Adds each checked hkx to the `animationNames` of the characters of its actor, told by its directory. A behavior plays a hkx only if its character lists it.

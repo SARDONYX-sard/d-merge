@@ -6,20 +6,20 @@
 //! │ ▼ Clips                                                  │
 //! │   ☑ Paraglide_Equip  Animations\..\Equip.hkx   3.30 s    │
 //! │   ☐ Broken           Animations\..\Gone.hkx    ✖         │  <- hover: why
+//! │   [Generate their data]                                  │  <- animationdatasinglefile only
 //! │ ▼ The mod's hkx                                          │
 //! │   hkx  1 / 12  [All] [None]  [filter            ]        │
 //! │   ☑ meshes\..\Equip.hkx                                  │
-//! │   Add the checked hkx to:                                │
-//! │   ☑ Their characters' animationNames (the XML)           │  <- anim::character
-//! │   ☑ Anim sets: what the game caches                      │  <- the anim set files
+//! │   [Add to their characters' animationNames]              │  <- the characters' XML only
+//! │   ▼ Anim sets: what the game caches                      │
 //! │       Project: [DefaultMaleData~DefaultMale (1) ▼]       │
 //! │       txt  1 / 374  [All] [None]  [filter       ]        │
 //! │       ☑ 1HMSolo.txt                                      │
-//! │ [Generate]                                               │
+//! │       [Add to the checked txt]                           │  <- animationsetdatasinglefile only
 //! └──────────────────────────────────────────────────────────┘
 //! ```
-//! The clips and the hkx are independent. The hkx are chosen once, then where they go: the
-//! characters a behavior plays them from, the anim sets the game caches them in, or both.
+//! Each button does its part alone, and the window stays: adding the hkx to the characters changes
+//! no clip data. The hkx are chosen once for both of their buttons.
 //! See [`crate::patch::anim::data`] for what is generated.
 
 use std::path::{Path, PathBuf};
@@ -71,11 +71,26 @@ pub(super) struct AnimDataDialog {
     projects: Vec<SetProject>,
     /// The project shown, in `projects`.
     project: usize,
-    /// The checked hkx go to the `animationNames` of their actors' characters. See
+}
+
+/// What one button of the window does: only its part. See the module docs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AnimDataPart {
+    /// The data of the checked clips, in `animationdatasinglefile`.
+    Clips,
+    /// The checked hkx to the `animationNames` of their actors' characters: see
     /// [`crate::patch::anim::character`].
-    add_names: bool,
-    /// The checked hkx go to the checked anim set files.
-    add_sets: bool,
+    Names,
+    /// The checked hkx to the checked txt of `animationsetdatasinglefile`.
+    Sets,
+}
+
+/// What the window asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum AnimDataAsk {
+    Do(AnimDataPart),
+    /// `✖`.
+    Close,
 }
 
 /// What a form's window asked for.
@@ -89,13 +104,15 @@ pub(super) enum FormAsk {
 
 impl AnimDataDialog {
     /// Draws the window. Returns what was asked.
-    pub(super) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<FormAsk> {
+    pub(super) fn window(&mut self, ctx: &egui::Context, i18n: &I18nMap) -> Option<AnimDataAsk> {
         let mut open = true;
         let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::AnimDataOpen)).open(&mut open);
-        let generate =
-            window.default_width(720.0).show(ctx, |ui| dialog_ui(ui, i18n, self)).and_then(|shown| shown.inner);
+        let part = window.default_width(560.0).show(ctx, |ui| dialog_ui(ui, i18n, self)).and_then(|shown| shown.inner);
 
-        if generate == Some(true) { Some(FormAsk::Done) } else { (!open).then_some(FormAsk::Close) }
+        match part.flatten() {
+            Some(part) => Some(AnimDataAsk::Do(part)),
+            None => (!open).then_some(AnimDataAsk::Close),
+        }
     }
 
     fn checked_clips(&self) -> usize {
@@ -106,12 +123,14 @@ impl AnimDataDialog {
         self.projects.iter().map(|project| project.files.checked_count()).sum()
     }
 
-    /// Whether `Generate` has anything to do: clips, or hkx with somewhere to go (the characters, or
-    /// a txt of the anim sets).
-    fn can_generate(&self) -> bool {
+    /// Has `part` anything to do? Clips checked; hkx checked (and txt, for the anim sets).
+    fn can_do(&self, part: AnimDataPart) -> bool {
         let hkx = self.hkx.checked_count() > 0;
-        let to_sets = self.add_sets && self.checked_sets() > 0;
-        self.checked_clips() > 0 || (hkx && (self.add_names || to_sets))
+        match part {
+            AnimDataPart::Clips => self.checked_clips() > 0,
+            AnimDataPart::Names => hkx,
+            AnimDataPart::Sets => hkx && self.checked_sets() > 0,
+        }
     }
 }
 
@@ -135,49 +154,69 @@ impl AnimDataDialog {
         let project = data::default_project(&folders, hkx.first().map(String::as_str));
         let projects =
             sets.into_iter().map(|(folder, files)| SetProject { folder, files: Checklist::new(files) }).collect();
-        let hkx = Checklist::new(hkx);
-        Self { root: root.to_path_buf(), rows, hkx, projects, project, add_names: true, add_sets: true }
+        Self { root: root.to_path_buf(), rows, hkx: Checklist::new(hkx), projects, project }
     }
 
-    /// `Generate`: what was checked goes into `work`, and `sel` goes to the generated files.
-    pub(super) fn generate(self, (work, sel): (&mut Work, &mut Selection), i18n: &I18nMap, notify: &mut Notification) {
+    /// Does `part` alone into `work`, with what is checked. `sel` goes to what it wrote.
+    pub(super) fn apply(
+        &self,
+        part: AnimDataPart,
+        (work, sel): (&mut Work, &mut Selection),
+        i18n: &I18nMap,
+        notify: &mut Notification,
+    ) {
+        let root = PathBuf::from(&work.place.template_dir);
+        let hkx: Vec<&str> = self.hkx.checked_items().collect();
+        let written = match part {
+            AnimDataPart::Clips => self.generate_clips(work, &root, (i18n, notify)).then_some(ADSF),
+            AnimDataPart::Names => {
+                add_names_to_characters(work, (&root, &hkx), i18n, notify);
+                None // characters of several actors: the editor stays where it is
+            }
+            AnimDataPart::Sets => self.add_to_sets(work, (&root, &hkx), (i18n, notify)).then_some(ASDSF),
+        };
+
+        work.reset_names();
+        work.mark_dirty();
+        if let Some(name) = written {
+            sel.active = work.workspace.behaviors.iter().position(|b| b.name == name).unwrap_or(sel.active);
+            sel.selected = None;
+        }
+    }
+
+    /// The data of the checked clips. Returns whether it was written.
+    fn generate_clips(&self, work: &mut Work, root: &Path, (i18n, notify): (&I18nMap, &mut Notification)) -> bool {
         let code = work.place.mod_code.trim().to_owned();
         let chosen: Vec<(&ClipSource, HkxInfo)> =
             self.rows.iter().filter(|row| row.checked).filter_map(chosen_clip).collect();
-        let sets: Vec<String> =
-            if self.add_sets { self.projects.iter().flat_map(project_set_ids).collect() } else { Vec::new() };
-        let request = Generate {
-            code: &code,
-            clips: chosen.iter().map(|(clip, info)| (*clip, info)).collect(),
-            push: AnimSetPush {
-                hkx: self.hkx.checked_items().collect(),
-                sets: sets.iter().map(String::as_str).collect(),
-            },
-        };
-        let summary = format!(
-            "{}: {} clips, {} hkx -> {} txt",
-            i18n.t(I18nKey::AnimDataDone),
-            request.clips.len(),
-            request.push.hkx.len(),
-            request.push.sets.len(),
-        );
-
-        let first_result = if request.clips.is_empty() { ASDSF } else { ADSF };
-        let root = PathBuf::from(&work.place.template_dir);
-        if let Err(err) = data::generate(&mut work.workspace, &root, &request) {
+        let clips = chosen.iter().map(|(clip, info)| (*clip, info)).collect();
+        let request = Generate { code: &code, clips, push: AnimSetPush::default() };
+        if let Err(err) = data::generate(&mut work.workspace, root, &request) {
             notify.error(err);
-            return;
+            return false;
         }
-        notify.success(summary);
-        if self.add_names {
-            add_names_to_characters(work, (&root, &request.push.hkx), i18n, notify);
-        }
+        notify.success(format!("{}: {} clips", i18n.t(I18nKey::AnimDataDone), request.clips.len()));
+        true
+    }
 
-        // To the generated files.
-        work.reset_names();
-        work.mark_dirty();
-        sel.active = work.workspace.behaviors.iter().position(|b| b.name == first_result).unwrap_or(sel.active);
-        sel.selected = None;
+    /// The checked `hkx` to the checked txt. Returns whether they were added.
+    fn add_to_sets(
+        &self,
+        work: &mut Work,
+        (root, hkx): (&Path, &[&str]),
+        (i18n, notify): (&I18nMap, &mut Notification),
+    ) -> bool {
+        let code = work.place.mod_code.trim().to_owned();
+        let sets: Vec<String> = self.projects.iter().flat_map(project_set_ids).collect();
+        let push = AnimSetPush { hkx: hkx.to_vec(), sets: sets.iter().map(String::as_str).collect() };
+        let request = Generate { code: &code, clips: Vec::new(), push };
+        if let Err(err) = data::generate(&mut work.workspace, root, &request) {
+            notify.error(err);
+            return false;
+        }
+        let done = i18n.t(I18nKey::AnimDataDone);
+        notify.success(format!("{done}: {} hkx -> {} txt", request.push.hkx.len(), request.push.sets.len()));
+        true
     }
 }
 
@@ -205,17 +244,28 @@ fn project_set_ids(project: &SetProject) -> impl Iterator<Item = String> + '_ {
     project.files.checked_items().map(|file| format!("{}/{file}", project.folder))
 }
 
-/// The window's contents. Returns whether `Generate` was clicked.
-fn dialog_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) -> bool {
+/// The window's contents. Returns the part whose button was clicked.
+fn dialog_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) -> Option<AnimDataPart> {
+    let mut clicked = None;
     ui.weak(dialog.root.to_string_lossy().as_ref());
     egui::CollapsingHeader::new(i18n.t(I18nKey::AnimDataClips)).default_open(true).show(ui, |ui| {
         clips_ui(ui, i18n, &mut dialog.rows);
+        clicked = part_button(ui, dialog, (AnimDataPart::Clips, i18n.t(I18nKey::AnimDataGenerate))).or(clicked);
     });
     egui::CollapsingHeader::new(i18n.t(I18nKey::AnimDataHkx)).default_open(true).show(ui, |ui| {
-        hkx_ui(ui, i18n, dialog);
+        clicked = hkx_ui(ui, i18n, dialog).or(clicked);
     });
-    ui.separator();
-    ui.add_enabled(dialog.can_generate(), Button::new(i18n.t(I18nKey::AnimDataGenerate)).primary()).clicked()
+    clicked
+}
+
+/// The button of `part`, enabled if it has anything to do. Returns `part` if clicked.
+fn part_button(
+    ui: &mut egui::Ui,
+    dialog: &AnimDataDialog,
+    (part, label): (AnimDataPart, &str),
+) -> Option<AnimDataPart> {
+    let button = Button::new(label).primary();
+    ui.add_enabled(dialog.can_do(part), button).clicked().then_some(part)
 }
 
 fn clips_ui(ui: &mut egui::Ui, i18n: &I18nMap, rows: &mut [ClipRow]) {
@@ -239,31 +289,35 @@ fn checklist_labels(i18n: &I18nMap) -> ChecklistLabels<'_> {
     }
 }
 
-/// The mod's hkx to check, then where the checked ones go: the characters, the anim sets.
-fn hkx_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) {
+/// The mod's hkx to check, then where the checked ones go, each with its own button: the
+/// characters, the anim sets. Returns the part whose button was clicked.
+fn hkx_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) -> Option<AnimDataPart> {
     if dialog.hkx.is_empty() {
         ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::AnimDataNoHkx));
-        return;
+        return None;
     }
     dialog.hkx.show(ui, "hkx", &checklist_labels(i18n), LIST_HEIGHT);
 
-    ui.add_space(4.0);
-    ui.label(i18n.t(I18nKey::AnimDataAddTo));
-    ui.add(Checkbox::new(&mut dialog.add_names, i18n.t(I18nKey::AnimNamesToCharacters)))
-        .on_hover_markdown(i18n.t(I18nKey::AnimNamesToCharactersHover));
-    ui.add(Checkbox::new(&mut dialog.add_sets, i18n.t(I18nKey::AnimDataSet)))
+    let names = Button::new(i18n.t(I18nKey::AnimNamesToCharacters)).primary();
+    let names = ui.add_enabled(dialog.can_do(AnimDataPart::Names), names);
+    let clicked = names.on_hover_markdown(i18n.t(I18nKey::AnimNamesToCharactersHover)).clicked();
+
+    let mut sets = None;
+    egui::CollapsingHeader::new(i18n.t(I18nKey::AnimDataSet))
+        .default_open(true)
+        .show(ui, |ui| sets = anim_sets_ui(ui, i18n, dialog))
+        .header_response
         .on_hover_markdown(i18n.t(I18nKey::AnimDataSetHover));
-    if dialog.add_sets {
-        ui.indent("nemesis_anim_sets", |ui| anim_sets_ui(ui, i18n, dialog));
-    }
+    if clicked { Some(AnimDataPart::Names) } else { sets }
 }
 
-/// The project, and the txt of that project the checked hkx go to.
-fn anim_sets_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) {
+/// The project, the txt of that project, and the button adding the checked hkx to them.
+fn anim_sets_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) -> Option<AnimDataPart> {
     project_combo(ui, i18n, dialog);
     if let Some(project) = dialog.projects.get_mut(dialog.project) {
         project.files.show(ui, "txt", &checklist_labels(i18n), LIST_HEIGHT);
     }
+    part_button(ui, dialog, (AnimDataPart::Sets, i18n.t(I18nKey::AnimDataSetAdd)))
 }
 
 /// `Project: [DefaultMaleData~DefaultMale (1)]`: the count tells where checks are, as each project
