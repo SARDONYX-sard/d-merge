@@ -1,31 +1,34 @@
 //! The widget: a frame of it goes through the steps in the modules here. See the crate docs.
 
+pub(crate) mod comment;
+pub(crate) mod cursor;
 mod decorations;
+pub(crate) mod edit_ops;
 mod input;
+pub(crate) mod layout;
 mod menu;
+pub(crate) mod overlays;
 mod popups;
+pub(crate) mod state;
 mod text;
 
 use egui::text::CCursor;
 
+use self::{
+    cursor::editor_id,
+    decorations::{draw_line_decorations, draw_text_background, scroll_to_cursor, visible_lines},
+    input::{apply_format, read_input, tab_key_follows_indent},
+    menu::{context_menu, resolve_navigation, run_menu_action},
+    popups::{accept_completion, run_quick_fix, show_hover, show_signature, show_which_key, update_completion_popup},
+    state::CodeEditorState,
+    text::{show_text, sorted_chars},
+};
 use crate::{
     Diagnostic, EditorAction, EditorLabels, EditorRequest, InlineDiff, Keymap, Language, Location, References,
     Severity,
     command::{EditorCommand, EditorFeatures},
-    cursor::editor_id,
-    editor::{
-        decorations::{draw_line_decorations, draw_text_background, scroll_to_cursor, visible_lines},
-        input::{apply_format, read_input, tab_key_follows_indent},
-        menu::{context_menu, resolve_navigation, run_menu_action},
-        popups::{
-            accept_completion, run_quick_fix, show_hover, show_signature, show_which_key, update_completion_popup,
-        },
-        text::{show_text, sorted_chars},
-    },
-    palette,
-    state::CodeEditorState,
+    popups::{context_menu::MenuAction, palette},
     text_pos::LinePos,
-    ui::{context_menu::MenuAction, overlays},
 };
 
 /// A resolved `F12` / `Shift+F12` / Vim `gd` / `gD` / `Ctrl+click` / right-click request:
@@ -275,7 +278,7 @@ impl<'a> CodeEditor<'a> {
         // A line found in the palette, or `:42`: the cursor goes there.
         if let Some(palette::Picked::Jump { line, column }) = input.picked {
             let at = crate::text_pos::LinePos { line, column }.to_char_index(text);
-            crate::cursor::set_cursor(ui.ctx(), id, at);
+            crate::editor::cursor::set_cursor(ui.ctx(), id, at);
         }
         tab_key_follows_indent(ui, id, state.indent);
         let mut changed = input.keys.changed | input.pasted | {

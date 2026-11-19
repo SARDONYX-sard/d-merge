@@ -19,7 +19,7 @@ const TAB_WIDTH: usize = 4;
 /// Draws the status bar of an editor showing `text`: [`StatusBar`] without the host's items.
 ///
 /// The badge color follows the mode (see [`crate::StatusMode::color`]). Returns the response of the
-/// problem counts: a click on them shows or hides the host's Problems panel (see [`crate::problems`]).
+/// problem counts: a click on them shows or hides the host's Problems panel (see [`crate::views::problems`]).
 pub fn status_line(ui: &mut egui::Ui, state: &CodeEditorState, keymap: Keymap, text: &str) -> egui::Response {
     StatusBar::new(state, keymap, text).show(ui).problems
 }
@@ -119,7 +119,7 @@ fn draw(
             ui.label(egui::RichText::new(text).monospace());
         }
         let counts = state.host_problems.unwrap_or(state.status_problems);
-        let problem_response = crate::problems::status_counts(ui, counts);
+        let problem_response = crate::views::problems::status_counts(ui, counts);
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.spacing_mut().item_spacing.x = 16.0;

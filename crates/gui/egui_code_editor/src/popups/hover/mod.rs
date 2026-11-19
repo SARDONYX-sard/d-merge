@@ -10,6 +10,8 @@
 //!   keyboard into it if there is anything to do there: `j` / `k` scroll, `Tab` / `Shift+Tab` go
 //!   through the links, `Enter` opens one, `Esc` / `q` close it and return to the editor
 
+mod ui;
+
 use egui::{Galley, Pos2, Rect};
 
 use crate::{

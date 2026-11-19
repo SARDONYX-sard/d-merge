@@ -1,11 +1,9 @@
-//! Draws the find bar and the "go to line" bar. The state and the search are in [`crate::find`].
+//! Draws the find bar and the "go to line" bar. The state and the search are in [`crate::popups::find`].
 
 use egui::Key;
 
-use crate::{
-    find::{FindBar, Kind},
-    search::index_of,
-};
+use super::{FindBar, Kind};
+use crate::search::index_of;
 
 impl FindBar {
     /// Draws the bar at the top right of `editor_rect` (the visible part of the editor), and
@@ -23,7 +21,7 @@ impl FindBar {
         if kind == Kind::Find
             && let Some(current) = self.current_match(ctx, id, text)
         {
-            crate::ui::overlays::block_selection(ui, galley, galley_pos, &[current]);
+            crate::editor::overlays::block_selection(ui, galley, galley_pos, &[current]);
         }
 
         egui::Area::new(id.with("find_bar"))

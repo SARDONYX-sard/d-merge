@@ -1,12 +1,10 @@
 //! Step 4 of a frame: what is drawn beside and under the text, and scrolling.
 
+use super::{cursor::scroll_request_id, overlays, state::CodeEditorState};
 use crate::{
     Keymap,
-    cursor::scroll_request_id,
     keymap::{Scroll, View},
-    state::CodeEditorState,
     text_pos::LinePos,
-    ui::overlays,
 };
 
 /// The line numbers, and the rectangle of Vim's Visual block.

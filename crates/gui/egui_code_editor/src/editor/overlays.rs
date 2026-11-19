@@ -228,7 +228,7 @@ fn chars_rect(
     let font = egui::TextStyle::Monospace.resolve(ui.style());
     let width = ui.fonts_mut(|fonts| fonts.glyph_width(&font, '0'));
     #[expect(clippy::cast_precision_loss, reason = "columns are small")]
-    let x = |char: usize| (crate::status::visual_column(line, char) as f32).mul_add(width, left);
+    let x = |char: usize| (crate::views::status::visual_column(line, char) as f32).mul_add(width, left);
     egui::Rect::from_x_y_ranges(x(chars.start)..=x(chars.end), y)
 }
 

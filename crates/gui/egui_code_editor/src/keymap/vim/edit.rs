@@ -58,14 +58,14 @@ impl VimState {
         }
     }
 
-    /// `gc` on lines `first..=last`, by the language's comment: see [`crate::comment`]. The cursor
+    /// `gc` on lines `first..=last`, by the language's comment: see [`crate::editor::comment`]. The cursor
     /// goes to the first of them.
     fn toggle_comment(&mut self, first: usize, last: usize, exec: &mut Exec) {
         let Some(comment) = self.options.comment else { return };
         let start = exec.buf.nth_line_start(first);
         let end = exec.buf.line_end(exec.buf.nth_line_start(last));
         let block = exec.buf.slice(start..end);
-        let Some((toggled, _)) = crate::comment::toggle(&block, 0, last - first, comment) else { return };
+        let Some((toggled, _)) = crate::editor::comment::toggle(&block, 0, last - first, comment) else { return };
         exec.edit(self.cursor, start..end, &toggled);
         self.cursor = exec.buf.first_non_blank(exec.buf.nth_line_start(first));
     }

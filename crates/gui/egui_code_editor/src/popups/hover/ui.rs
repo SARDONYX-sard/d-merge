@@ -1,8 +1,10 @@
-//! Tracks the pointer and draws the hover popup. The state and its content are in [`crate::hover`].
+//! Tracks the pointer and draws the hover popup. The state and its content are in [`crate::popups::hover`].
 
 use egui::{Galley, Pos2, Rect, text::CCursor};
 
-use crate::hover::{Content, HOVER_DELAY, HoverCtx, HoverPopup, Open, POPUP_MARGIN, SCROLL_STEP, content, max_height};
+use crate::popups::hover::{
+    Content, HOVER_DELAY, HoverCtx, HoverPopup, Open, POPUP_MARGIN, SCROLL_STEP, content, max_height,
+};
 
 /// The width of the popup's border while the keyboard is in it.
 const FOCUSED_BORDER: f32 = 2.0;

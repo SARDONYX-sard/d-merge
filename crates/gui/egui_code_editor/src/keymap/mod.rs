@@ -2,7 +2,7 @@
 //!
 //! A keymap may take keyboard input **before** the `TextEdit` sees it (e.g., Vim's Normal mode)
 //! and edit the text itself. [`Keymap::Normal`] is plain egui editing plus VS Code's line commands
-//! (see [`normal`]); its find bar lives in `crate::find`.
+//! (see [`normal`]); its find bar lives in `crate::popups::find`.
 //!
 //! # Adding a keymap (e.g., Emacs)
 //! 1. add a variant to [`Keymap`]
@@ -21,7 +21,7 @@ pub(crate) mod vim;
 
 pub(crate) use self::vim::which_key::Prefix;
 pub use self::vim::{VimOptions, which_key::own_g_keys as vim_own_g_keys};
-pub use crate::ui::which_key::DELAY_SECONDS as WHICH_KEY_DELAY_SECONDS;
+pub use crate::popups::which_key::DELAY_SECONDS as WHICH_KEY_DELAY_SECONDS;
 use crate::{EditorCommand, search::Matcher};
 
 /// Key binding style of the editor.

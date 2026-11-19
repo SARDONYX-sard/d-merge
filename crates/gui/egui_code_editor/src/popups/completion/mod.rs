@@ -13,13 +13,15 @@
 //!
 //! Keys are consumed **before** the `TextEdit` runs, otherwise Enter would insert a newline.
 
-use super::{
+mod ui;
+
+use crate::{
     language::{CompletionList, Language},
     text_pos::{LinePos, char_to_byte},
 };
 
 #[derive(Debug, Default)]
-pub(super) struct CompletionPopup {
+pub(crate) struct CompletionPopup {
     /// `Some` while open.
     pub(crate) list: Option<CompletionList>,
     /// Line the list was computed for; moving to another line closes the popup.
@@ -31,24 +33,24 @@ pub(super) struct CompletionPopup {
 }
 
 /// Result of accepting a candidate.
-pub(super) struct Accepted {
-    pub(super) text: String,
+pub(crate) struct Accepted {
+    pub(crate) text: String,
     /// Char range to select afterwards (a placeholder, or an empty range after the insertion).
-    pub(super) select: std::ops::Range<usize>,
+    pub(crate) select: std::ops::Range<usize>,
 }
 
 impl CompletionPopup {
-    pub(super) const fn is_open(&self) -> bool {
+    pub(crate) const fn is_open(&self) -> bool {
         self.list.is_some()
     }
 
-    pub(super) fn close(&mut self) {
+    pub(crate) fn close(&mut self) {
         self.list = None;
     }
 
     /// Consumes the navigation keys while open. Returns `true` when the user accepted.
     /// Call before showing the `TextEdit`.
-    pub(super) fn handle_keys(&mut self, ui: &egui::Ui) -> bool {
+    pub(crate) fn handle_keys(&mut self, ui: &egui::Ui) -> bool {
         let Some(len) = self.list.as_ref().map(|list| list.items.len()) else { return false };
         let consume = |key| ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, key));
 
@@ -66,7 +68,7 @@ impl CompletionPopup {
     }
 
     /// Recomputes candidates at `cursor`. Opens/closes the popup accordingly.
-    pub(super) fn refresh(&mut self, language: &dyn Language, text: &str, cursor: LinePos) {
+    pub(crate) fn refresh(&mut self, language: &dyn Language, text: &str, cursor: LinePos) {
         let line = text.split('\n').nth(cursor.line).unwrap_or_default();
         let list = language.complete(line, cursor.column);
 
@@ -82,7 +84,7 @@ impl CompletionPopup {
     /// Decides whether the edit made this frame should (re)open the popup.
     ///
     /// e.g., typing `.` after `PIE` opens it; typing while it is open refreshes (filters) it.
-    pub(super) fn on_text_changed(&mut self, ui: &egui::Ui, language: &dyn Language, text: &str, cursor: LinePos) {
+    pub(crate) fn on_text_changed(&mut self, ui: &egui::Ui, language: &dyn Language, text: &str, cursor: LinePos) {
         let triggers = language.completion_triggers();
         let typed_trigger = ui.input(|i| {
             i.events.iter().any(|event| match event {
@@ -99,14 +101,14 @@ impl CompletionPopup {
     }
 
     /// Closes the popup when the cursor moved to another line.
-    pub(super) fn follow_cursor(&mut self, cursor: Option<LinePos>) {
+    pub(crate) fn follow_cursor(&mut self, cursor: Option<LinePos>) {
         if self.is_open() && cursor.is_none_or(|c| c.line != self.line) {
             self.close();
         }
     }
 
     /// Applies the selected candidate to `text`.
-    pub(super) fn accept(&mut self, text: &str) -> Option<Accepted> {
+    pub(crate) fn accept(&mut self, text: &str) -> Option<Accepted> {
         let list = self.list.take()?;
         let item = list.items.get(self.selected)?;
 

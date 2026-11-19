@@ -188,7 +188,7 @@ fn in_hover_of(doc: &'static str) -> Frames {
 }
 
 #[cfg(feature = "vim")]
-fn open_hover(frames: &Frames) -> &crate::hover::Open {
+fn open_hover(frames: &Frames) -> &crate::popups::hover::Open {
     frames.state.hover.open.as_ref().expect("the popup is open")
 }
 

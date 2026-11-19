@@ -1,6 +1,7 @@
-//! Draws the quick fix menu. See [`crate::quick_fix`].
+//! Draws the quick fix menu. See [`crate::popups::quick_fix`].
 
-use crate::{language::QuickFix, quick_fix::QuickFixMenu};
+use super::QuickFixMenu;
+use crate::language::QuickFix;
 
 impl QuickFixMenu {
     /// Draws the menu below `anchor` (the cursor rect). Returns the fix clicked.

@@ -1,17 +1,14 @@
 //! The right-click menu, and what it and `Ctrl+click` navigate to.
 
+use super::{Navigation, cursor::set_selection, edit_ops, state::CodeEditorState};
 use crate::{
     EditorLabels, Language,
-    cursor::set_selection,
-    edit_ops,
-    editor::Navigation,
-    state::CodeEditorState,
-    text_pos::LinePos,
-    ui,
-    ui::{
+    popups::{
         context_menu,
         context_menu::{MenuAction, MenuContext},
+        palette,
     },
+    text_pos::LinePos,
 };
 
 /// Asks the language about what the keyboard, `Ctrl+click` or the right-click menu requested.
@@ -95,7 +92,7 @@ pub(crate) fn run_menu_action(
         }
         MenuAction::SelectAll => set_selection(ctx, id, 0..text.chars().count()),
         MenuAction::CommandPalette => {
-            ui::palette::open(&mut state.palette, ui, id);
+            palette::ui::open(&mut state.palette, ui, id);
             return false;
         }
         MenuAction::Navigate { .. } => return false,

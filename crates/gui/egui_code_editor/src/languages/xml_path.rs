@@ -10,7 +10,7 @@
 //! A part is named by its `name` attribute, with its `class` if it has one (Havok XML's objects and
 //! fields), else by its tag. Each tag is taken to be on one line, as in Havok XML.
 
-use crate::breadcrumbs::Crumb;
+use crate::views::breadcrumbs::Crumb;
 
 /// A tag found in a line. e.g. `<hkparam name="a">` at char 3
 struct Tag<'a> {

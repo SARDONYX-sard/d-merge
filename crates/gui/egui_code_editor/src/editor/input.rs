@@ -2,18 +2,15 @@
 
 use egui::text::{CCursor, CCursorRange};
 
+use super::{EditorFrame, cursor::set_selection, edit_ops, state::CodeEditorState, text::sorted_chars};
 use crate::{
     EditorAction, EditorLabels, Indent, Keymap, QuickFix,
-    cursor::set_selection,
-    edit_ops,
-    editor::{EditorFrame, text::sorted_chars},
     keymap::KeymapOutput,
-    palette,
-    palette::PaletteContext,
-    state::CodeEditorState,
+    popups::{
+        palette,
+        palette::{PaletteContext, ui::PaletteInput},
+    },
     text_pos::LinePos,
-    ui,
-    ui::palette::PaletteInput,
 };
 
 /// What the keys of this frame asked for. See [`read_input`].
@@ -45,8 +42,8 @@ pub(crate) fn read_input<'a>(
     let context = PaletteContext { keymap, features, inserting: state.keymap.is_inserting(keymap) };
     let palette_input =
         PaletteInput { id, has_focus, context, labels, actions, requests, request_keys, text: text.as_str() };
-    let picked = ui::palette::show(&mut state.palette, ui, palette_input);
-    let triggers = ui::palette::read_triggers(ui, has_focus, requests).with_picked(picked);
+    let picked = palette::ui::show(&mut state.palette, ui, palette_input);
+    let triggers = palette::ui::read_triggers(ui, has_focus, requests).with_picked(picked);
     state.open_requested_menus(ui.ctx(), id, text, language, triggers);
     // While the quick fix menu is open it owns the arrow keys.
     let fix = state.quick_fix.handle_keys(ui);

@@ -18,6 +18,8 @@
 //!
 //! Matching: text, or a regex with `.*` on; smartcase (see [`crate::search`]).
 
+mod ui;
+
 use std::ops::Range;
 
 use egui::{Key, Modifiers};

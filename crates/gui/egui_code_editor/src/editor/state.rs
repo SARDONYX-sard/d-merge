@@ -2,9 +2,16 @@
 
 use egui::text::CCursorRange;
 
+use super::layout;
 use crate::{
-    Indent, Keymap, KeymapState, Language, completion::CompletionPopup, find::FindBar, hover::HoverPopup, keymap::View,
-    layout, palette, palette::Palette, quick_fix::QuickFixMenu, search, text_pos::LinePos, ui,
+    Indent, Keymap, KeymapState, Language,
+    keymap::View,
+    popups::{
+        completion::CompletionPopup, find::FindBar, hover::HoverPopup, palette, palette::Palette,
+        quick_fix::QuickFixMenu, which_key,
+    },
+    search,
+    text_pos::LinePos,
 };
 
 /// Per-document state that is not part of the text. Keep one per open document.
@@ -37,7 +44,7 @@ pub struct CodeEditorState {
     /// What one level of indentation is, for the status bar (drawn before the editor).
     pub(crate) indent: Indent,
     /// The Vim key that waits for another, and since when.
-    pub(crate) which_key_waiting: ui::which_key::Waiting,
+    pub(crate) which_key_waiting: which_key::Waiting,
     /// `(errors, warnings)` of the editor's own diagnostics, for the status bar.
     pub(crate) status_problems: (usize, usize),
     /// What the host shows in their place: e.g. the patch editor, the problems of a whole work. See

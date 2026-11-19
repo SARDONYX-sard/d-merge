@@ -28,56 +28,47 @@
 //! 3. a picked completion / `Shift+Alt+F` formatting is applied to the text
 //! 4. overlays are drawn (cursor line, block cursor, hover, signature help, inlay hints)
 
-mod breadcrumbs;
 mod command;
-mod comment;
-mod completion;
-mod cursor;
-mod diff_view;
-mod edit_ops;
 mod editor;
-mod find;
-mod hover;
 mod inline_diff;
 pub mod keymap;
 pub mod language;
 pub mod languages;
-mod layout;
-mod nav_history;
-mod palette;
-mod popup;
-pub mod problems;
-mod quick_fix;
-mod references;
+mod popups;
 mod request;
 mod search;
-mod search_view;
-mod state;
-mod status;
 pub mod text_pos;
-mod ui;
+mod views;
 
-pub(crate) use self::cursor::scroll_request_id;
+pub(crate) use self::editor::cursor::scroll_request_id;
 pub use self::{
-    breadcrumbs::{Breadcrumbs, Crumb},
     command::{EditorCommand, EditorFeatures},
-    cursor::{editor_id, place_cursor, set_cursor},
-    diff_view::{DiffView, DiffViewOutput},
-    editor::{CodeEditor, CodeEditorOutput, Navigation},
+    editor::{
+        CodeEditor, CodeEditorOutput, Navigation,
+        cursor::{editor_id, place_cursor, set_cursor},
+        layout::line_job,
+        state::CodeEditorState,
+    },
     inline_diff::{CharChange, DiffHunk, InlineDiff},
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
     language::{
         Comment, CompletionItem, CompletionList, Diagnostic, Indent, Language, Location, QuickFix, References,
         Severity, SignatureHelp,
     },
-    layout::line_job,
-    nav_history::NavHistory,
-    palette::{EditorAction, EditorLabels},
-    popup::{AnchoredPopup, widget_frame},
-    problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
-    references::ReferenceList,
+    popups::{
+        AnchoredPopup,
+        palette::{EditorAction, EditorLabels},
+        widget_frame,
+    },
     request::EditorRequest,
-    search_view::{SearchHit, SearchLabels, SearchView},
-    state::CodeEditorState,
-    status::{StatusBar, StatusBarOutput, status_line},
+    views::{
+        breadcrumbs::{Breadcrumbs, Crumb},
+        diff_view::{DiffView, DiffViewOutput},
+        nav_history::NavHistory,
+        problems,
+        problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
+        references::ReferenceList,
+        search_view::{SearchHit, SearchLabels, SearchView},
+        status::{StatusBar, StatusBarOutput, status_line},
+    },
 };

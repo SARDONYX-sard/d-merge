@@ -1,6 +1,6 @@
-//! Draws the completion popup. The list and accepting an item are in [`crate::completion`].
+//! Draws the completion popup. The list and accepting an item are in [`crate::popups::completion`].
 
-use crate::completion::CompletionPopup;
+use crate::popups::completion::CompletionPopup;
 
 impl CompletionPopup {
     /// Draws the list below `anchor` (the cursor rect in screen coordinates).

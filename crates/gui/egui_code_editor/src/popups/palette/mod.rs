@@ -1,5 +1,5 @@
 //! Command palette logic (`Ctrl+Shift+P`, like VS Code / Monaco): run any command by typing its
-//! name. Drawn by [`crate::ui::palette`].
+//! name. Drawn by [`crate::popups::palette::ui`].
 //!
 //! ```text
 //!          ┌───────────────────────────────────┐
@@ -11,6 +11,8 @@
 //! The list has the editor's own commands ([`Builtin`]) and the host's ([`EditorAction`], like
 //! Monaco's `editor.addAction`). A host action only reports its id back
 //! ([`crate::CodeEditorOutput::action`]): what it does is up to the host.
+
+pub(crate) mod ui;
 
 use crate::{EditorFeatures, Keymap};
 
@@ -392,7 +394,7 @@ fn matches_query(query: &str, label: &str) -> bool {
     query.chars().filter(|c| !c.is_whitespace()).all(|q| label.any(|l| l.eq_ignore_ascii_case(&q)))
 }
 
-/// The palette's keys of one frame. Plain data: read in [`crate::ui::palette`].
+/// The palette's keys of one frame. Plain data: read in [`crate::popups::palette::ui`].
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct PaletteKeys {
     pub(crate) up: bool,

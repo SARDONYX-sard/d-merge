@@ -7,6 +7,8 @@
 //!     └──────────────────────────────────┘
 //! ```
 
+mod ui;
+
 use crate::language::QuickFix;
 
 #[derive(Debug, Default)]

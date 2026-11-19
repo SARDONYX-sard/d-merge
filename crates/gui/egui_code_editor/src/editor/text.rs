@@ -2,7 +2,8 @@
 
 use egui::text::CCursorRange;
 
-use crate::{Keymap, editor::EditorFrame, layout, state::CodeEditorState};
+use super::{EditorFrame, layout, state::CodeEditorState};
+use crate::Keymap;
 
 /// Step 2: the `TextEdit`, with the syntax colors, underlines and search matches.
 pub(crate) fn show_text(

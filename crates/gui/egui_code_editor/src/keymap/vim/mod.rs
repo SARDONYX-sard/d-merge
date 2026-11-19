@@ -419,7 +419,7 @@ fn copy_selection(ui: &egui::Ui, id: egui::Id, text: &str) {
         return;
     };
     let (a, b) = (range.primary.index.0, range.secondary.index.0);
-    if let Some(selected) = crate::edit_ops::selected_text(text, &(a.min(b)..a.max(b))) {
+    if let Some(selected) = crate::editor::edit_ops::selected_text(text, &(a.min(b)..a.max(b))) {
         ui.ctx().copy_text(selected.to_owned());
     }
 }

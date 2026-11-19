@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use egui::{Color32, Stroke, text::LayoutJob};
 
-use super::{
+use crate::{
     inline_diff::{InlineDiff, row_shifts},
     language::{Diagnostic, Language},
     search::Matcher,
@@ -24,13 +24,13 @@ use super::{
 /// frame, so without this, holding Vim `j` in a document of a few thousand lines lags behind the
 /// keys. Part of [`crate::CodeEditorState`].
 #[derive(Debug, Default)]
-pub(super) struct LayoutCache {
+pub(crate) struct LayoutCache {
     key: u64,
     galley: Option<Arc<egui::Galley>>,
 }
 
 /// [`layout`], reused while everything it depends on is the same.
-pub(super) fn cached(
+pub(crate) fn cached(
     cache: &mut LayoutCache,
     ui: &egui::Ui,
     text: &str,

@@ -1,17 +1,17 @@
 //! Step 3 of a frame: what opens over the text.
 
+use super::{
+    EditorFrame,
+    cursor::{set_cursor, set_selection},
+    overlays,
+    state::CodeEditorState,
+};
 use crate::{
     Keymap, Language, QuickFix,
     command::EditorCommand,
-    completion::CompletionPopup,
-    cursor::{set_cursor, set_selection},
-    editor::EditorFrame,
-    hover::HoverCtx,
-    state::CodeEditorState,
+    popups::{completion::CompletionPopup, hover::HoverCtx, which_key},
     text_pos,
     text_pos::LinePos,
-    ui,
-    ui::overlays,
 };
 
 /// The list of what can follow a Vim key that waits for another, once it has waited for a moment.
@@ -28,9 +28,9 @@ pub(crate) fn show_which_key(
         return;
     };
     let now = ui.input(|input| input.time);
-    match ui::which_key::wait(&mut state.which_key_waiting, prefix, now) {
+    match which_key::wait(&mut state.which_key_waiting, prefix, now) {
         Some(left) => ui.ctx().request_repaint_after_secs(left as f32),
-        None => ui::which_key::show(ui.ctx(), id, visible, prefix, host_commands),
+        None => which_key::show(ui.ctx(), id, visible, prefix, host_commands),
     }
 }
 

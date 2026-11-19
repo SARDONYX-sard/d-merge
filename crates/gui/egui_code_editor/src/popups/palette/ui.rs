@@ -1,9 +1,11 @@
 //! Draws the command palette and reads the keys it and the editor's commands use.
-//! The logic is in [`crate::palette`].
+//! The logic is in [`crate::popups::palette`].
 
 use egui::{Key, Modifiers};
 
-use crate::palette::{EditorAction, EditorLabels, Palette, PaletteContext, PaletteKeys, Picked, Triggers, commands};
+use crate::popups::palette::{
+    EditorAction, EditorLabels, Palette, PaletteContext, PaletteKeys, Picked, Triggers, commands,
+};
 
 /// What the palette needs from the editor this frame.
 #[derive(Debug, Clone, Copy)]
@@ -17,7 +19,7 @@ pub(crate) struct PaletteInput<'a, 'b> {
     pub(crate) requests: Option<&'b [crate::EditorRequest]>,
     /// See [`crate::CodeEditor::request_keys`].
     pub(crate) request_keys: Option<&'a [(crate::EditorRequest, String)]>,
-    /// The text, for the find mode (see [`crate::palette::Mode`]).
+    /// The text, for the find mode (see [`crate::popups::palette::Mode`]).
     pub(crate) text: &'b str,
 }
 
@@ -52,9 +54,9 @@ pub(crate) fn show<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput
     picked
 }
 
-/// The rows of `query`'s mode: see [`crate::palette::Mode`].
+/// The rows of `query`'s mode: see [`crate::popups::palette::Mode`].
 fn rows<'a>(query: &str, input: &PaletteInput<'a, '_>) -> Vec<Row<'a>> {
-    use crate::palette::{Mode, find_lines, line_of, mode};
+    use crate::popups::palette::{Mode, find_lines, line_of, mode};
     let (mode, rest) = mode(query);
     match mode {
         Mode::Commands => commands(rest, input.context, input.labels, (input.actions, input.request_keys))

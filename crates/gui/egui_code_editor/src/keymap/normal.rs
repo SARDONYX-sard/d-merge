@@ -135,8 +135,8 @@ fn toggle_comment(
 ) -> Option<(String, LinePos, LinePos)> {
     let (start, end) = if primary.line <= secondary.line { (primary, secondary) } else { (secondary, primary) };
     let last = if end.column == 0 && end.line > start.line { end.line - 1 } else { end.line };
-    let (toggled, edits) = crate::comment::toggle(text, start.line, last, comment)?;
-    let follow = |pos: LinePos| LinePos { column: crate::comment::follow(pos.line, pos.column, &edits), ..pos };
+    let (toggled, edits) = crate::editor::comment::toggle(text, start.line, last, comment)?;
+    let follow = |pos: LinePos| LinePos { column: crate::editor::comment::follow(pos.line, pos.column, &edits), ..pos };
     Some((toggled, follow(primary), follow(secondary)))
 }
 
