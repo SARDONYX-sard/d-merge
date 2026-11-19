@@ -562,6 +562,12 @@ pub enum I18nKey {
     /// No .hkx files found.
     CrcNoHkx,
 
+    /// A folder of Dynamic Animation Replacer (DAR) or Open Animation Replacer (OAR): its animations stand in for those of this path, so the CRC32 shown is of it.
+    ///
+    /// # Notes
+    /// - A DLL swaps them in when the behavior plays the one they stand in for: they go into no anim set
+    CrcReplacerHover,
+
     /// CRC32
     CrcTab,
 

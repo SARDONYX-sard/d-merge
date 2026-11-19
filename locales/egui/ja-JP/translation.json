@@ -141,6 +141,7 @@
   "crc_mod_dir_hover": "このディレクトリの下にある`.hkx`をすべて探し、CRC32を一覧します。どのディレクトリでも指定でき、ドロップもできます。\n\n# 例\n- modのルート: `D:\\MO2\\mods\\MyMod`",
   "crc_mod_dir_label": "Nemesis mod:",
   "crc_no_hkx": ".hkxファイルが見つかりません。",
+  "crc_replacer_hover": "Dynamic Animation Replacer(DAR)かOpen Animation Replacer(OAR)のディレクトリです。このアニメーションはこのパスのアニメーションの代わりに再生されるため、表示するCRC32もこのパスのものです。\n\n# 注意\n- 元のアニメーションをbehaviorが再生するときにDLLが差し替えます。anim setには登録しません",
   "crc_tab": "CRC32",
   "crc_text_hint": "例: meshes\\actors\\character\\animations\\mymodやground_bite",
   "crc_text_hover": "小文字にして`/`を`\\`にした文字列の、SkyrimのCRC32です。\n\n# 注意\n- ファイル名は`.hkx`を除いて計算します",

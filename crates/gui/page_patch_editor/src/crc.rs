@@ -11,6 +11,9 @@
 //! # What is hashed (like Skyrim / Nemesis)
 //! - a directory: its path from `meshes\`, lowercase, `\` separated
 //! - a file: its lowercase stem (`ground_bite.hkx` -> `ground_bite`)
+//! - a directory of DAR / OAR: the path its animations stand in for, written after it
+//!   (`...\OpenAnimationReplacer\mod\sub\male` -> `OAR → ...\animations\male`): see
+//!   `patch_editor_core::anim::replacer`
 //!
 //! ref: <https://www.nexusmods.com/skyrim/articles/50508/>
 
@@ -21,6 +24,7 @@ use egui_widgets::{
     shadcn::{Button, Icon, TextEdit},
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
+use patch_editor_core::anim::replacer::{Replacer, stands_for};
 use stdx::text::contains_ignore_case;
 
 /// CRC32 tool state.
@@ -39,6 +43,8 @@ pub(crate) struct CrcTool {
 struct HkxDir {
     /// e.g. `meshes\actors\character\animations\mymod`
     path: String,
+    /// In a DAR / OAR folder: that replacer, and the path it stands in for, whose CRC32 `crc` is.
+    replacer: Option<(Replacer, String)>,
     crc: u32,
     /// `(file name, crc of its lowercase stem)`
     files: Vec<(String, u32)>,
@@ -127,10 +133,10 @@ impl CrcTool {
 
             let id = ui.make_persistent_id(&dir.path);
             egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, true)
-                .show_header(ui, |ui| row(ui, &dir.path, dir.crc, i18n, true))
+                .show_header(ui, |ui| dir_row(ui, dir, i18n))
                 .body(|ui| {
                     for (name, crc) in files {
-                        row(ui, name, *crc, i18n, false);
+                        row(ui, name, *crc, i18n);
                     }
                 });
         }
@@ -148,14 +154,25 @@ impl CrcTool {
     }
 }
 
-/// `name ......... 3191128947  0xbe34c373  [Copy]`
-fn row(ui: &mut egui::Ui, name: &str, crc: u32, i18n: &I18nMap, is_dir: bool) {
+/// `meshes\...\mymod ......... 3191128947  0xbe34c373  [Copy]`; a folder of DAR / OAR with the
+/// path it stands in for after it: `...\Sub\male  OAR → ...\animations\male ... (its crc)`.
+fn dir_row(ui: &mut egui::Ui, dir: &HkxDir, i18n: &I18nMap) {
     ui.horizontal(|ui| {
-        if is_dir {
-            ui.strong(name);
-        } else {
-            ui.label(name);
+        ui.strong(&dir.path);
+        if let Some((replacer, original)) = &dir.replacer {
+            let note = format!("{} → {original}", replacer.short_name());
+            ui.weak(note).on_hover_markdown(i18n.t(I18nKey::CrcReplacerHover));
         }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            crc_cells(ui, dir.crc, i18n);
+        });
+    });
+}
+
+/// `name ......... 3191128947  0xbe34c373  [Copy]`
+fn row(ui: &mut egui::Ui, name: &str, crc: u32, i18n: &I18nMap) {
+    ui.horizontal(|ui| {
+        ui.label(name);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             crc_cells(ui, crc, i18n);
         });
@@ -202,7 +219,9 @@ fn load_hkx_dirs(root: &Path) -> Vec<HkxDir> {
         if !files.is_empty() {
             files.sort();
             let path = game_path(root, &dir);
-            dirs.push(HkxDir { crc: skyrim_crc::calc_crc32(&path), path, files });
+            let replacer = stands_for(&path);
+            let crc = skyrim_crc::calc_crc32(replacer.as_ref().map_or(&path, |(_, original)| original));
+            dirs.push(HkxDir { path, replacer, crc, files });
         }
     }
     dirs.sort_by(|a, b| a.path.cmp(&b.path));

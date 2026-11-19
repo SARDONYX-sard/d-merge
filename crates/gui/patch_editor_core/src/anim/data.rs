@@ -127,13 +127,15 @@ const ANIMATIONS_DIR: &str = "animations";
 /// `.hkx` in an `animations` folder under `meshes`.
 ///
 /// e.g., `meshes/actors/character/animations/A/B.hkx` -> `meshes\actors\character\animations\A\B.hkx`.
-/// `meshes/actors/character/behaviors/0_master.hkx` is not an animation.
+/// `meshes/actors/character/behaviors/0_master.hkx` is not an animation, nor is one in a DAR / OAR
+/// folder: it stands in for another, which is there already (see [`super::replacer`]).
 fn anim_hkx_path(relative: &Path) -> Option<String> {
     let is_hkx = relative.extension().is_some_and(|extension| extension.eq_ignore_ascii_case("hkx"));
     let parts: Vec<&str> = relative.iter().map(std::ffi::OsStr::to_str).collect::<Option<_>>()?;
     let in_animations = parts.iter().any(|part| part.eq_ignore_ascii_case(ANIMATIONS_DIR));
     let in_meshes = parts.first().is_some_and(|part| part.eq_ignore_ascii_case(MESHES_DIR));
-    (is_hkx && in_meshes && in_animations).then(|| parts.join("\\"))
+    let path = (is_hkx && in_meshes && in_animations).then(|| parts.join("\\"))?;
+    (!super::replacer::is_replacer(&path)).then_some(path)
 }
 
 /// The animations of the mod at `mod_root`, sorted, as [`anim_hkx_path`] gives them. Folders that
@@ -594,6 +596,8 @@ mod tests {
         assert_eq!(path("meshes/actors/character/behaviors/0_master.hkx"), None);
         assert_eq!(path("meshes/actors/character/animations/readme.txt"), None);
         assert_eq!(path("animations/a.hkx"), None);
+        let oar = "meshes/actors/character/animations/OpenAnimationReplacer/Mod/Sub/mt_idle.hkx";
+        assert_eq!(path(oar), None, "it stands in for `animations/mt_idle.hkx`");
     }
 
     #[test]
