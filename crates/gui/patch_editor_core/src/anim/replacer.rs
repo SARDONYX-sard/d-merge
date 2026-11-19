@@ -71,6 +71,41 @@ pub fn is_replacer(path: &str) -> bool {
     stands_for(path).is_some()
 }
 
+/// The hkx of DAR / OAR under `mod_root` that stand in for `original` (relative to `mod_root`, `\` or
+/// `/` separated, any case), by path: for a mod that has only them, not the hkx they stand in for.
+///
+/// e.g. `meshes/actors/character/animations/mt_idle.hkx` ->
+/// `[<mod_root>/meshes/actors/character/animations/OpenAnimationReplacer/Mod/Sub/mt_idle.hkx]`
+pub fn stand_ins(mod_root: &std::path::Path, original: &str) -> Vec<std::path::PathBuf> {
+    let wanted = original.replace('/', "\\");
+    let parts: Vec<&str> = wanted.split('\\').collect();
+    let Some(animations) = parts.iter().position(|part| part.eq_ignore_ascii_case("animations")) else {
+        return Vec::new();
+    };
+    let animations_dir = parts[..=animations].iter().fold(mod_root.to_path_buf(), |dir, part| dir.join(part));
+
+    let mut found = Vec::new();
+    let mut dirs: Vec<std::path::PathBuf> =
+        [Replacer::Dar, Replacer::Oar].map(|r| animations_dir.join(r.folder())).into();
+    while let Some(dir) = dirs.pop() {
+        let Ok(entries) = std::fs::read_dir(&dir) else { continue };
+        for path in entries.flatten().map(|entry| entry.path()) {
+            if path.is_dir() {
+                dirs.push(path);
+                continue;
+            }
+            let relative = path.strip_prefix(mod_root).ok().and_then(|relative| relative.to_str());
+            let stands =
+                relative.and_then(stands_for).is_some_and(|(_, original)| original.eq_ignore_ascii_case(&wanted));
+            if stands {
+                found.push(path);
+            }
+        }
+    }
+    found.sort();
+    found
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -95,5 +130,23 @@ mod tests {
 
         assert_eq!(stands_for(r"meshes\actors\character\animations\mymod\idle.hkx"), None);
         assert!(!is_replacer(r"meshes\actors\character\animations\OpenAnimationReplacer\Mod"), "no submod yet");
+    }
+
+    #[test]
+    fn the_stand_ins_of_an_animation_are_found_under_the_mod() {
+        let root = std::env::temp_dir().join(format!("d_merge_stand_ins_{}", std::process::id()));
+        let animations = root.join("meshes/actors/character/animations");
+        let oar = animations.join("OpenAnimationReplacer/Mod/Sub/male");
+        let dar = animations.join("DynamicAnimationReplacer/_CustomConditions/100/male");
+        for dir in [&oar, &dar] {
+            std::fs::create_dir_all(dir).unwrap();
+            std::fs::write(dir.join("MT_Idle.hkx"), "").unwrap();
+            std::fs::write(dir.join("other.hkx"), "").unwrap();
+        }
+
+        let found = stand_ins(&root, "meshes/actors/character/animations/male/mt_idle.hkx");
+        assert_eq!(found, [dar.join("MT_Idle.hkx"), oar.join("MT_Idle.hkx")], "the file in any case, by path");
+        assert!(stand_ins(&root, "meshes/actors/character/animations/mt_idle.hkx").is_empty(), "not in `male`");
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }

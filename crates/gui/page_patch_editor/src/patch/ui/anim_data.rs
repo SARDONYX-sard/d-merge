@@ -345,7 +345,8 @@ fn chosen_clip(row: &ClipRow) -> Option<(&ClipSource, HkxInfo)> {
     Some((&row.clip, info))
 }
 
-/// `☑ Paraglide_Equip  Animations\..\Equip.hkx  3.30 s`, or `✖` with why on hover.
+/// `☑ Paraglide_Equip  Animations\..\Equip.hkx  3.30 s`, or `✖` with why on hover. Read from a DAR / OAR
+/// hkx standing in for it: `OAR` after it, its path on hover.
 /// Below it, the annotations to write as triggers can be turned off.
 fn clip_row(ui: &mut egui::Ui, row: &mut ClipRow) {
     ui.horizontal(|ui| {
@@ -355,6 +356,12 @@ fn clip_row(ui: &mut egui::Ui, row: &mut ClipRow) {
             Ok(info) => ui.label(format!("{:.2} s", info.duration)),
             Err(err) => ui.colored_label(ui.visuals().error_fg_color, "✖").on_hover_text(err),
         };
+        let stand_in = row.info.as_ref().ok().and_then(|info| info.stand_in.as_deref());
+        if let Some(stand_in) = stand_in {
+            let replacer =
+                crate::patch::anim::replacer::stands_for(stand_in).map(|(replacer, _)| replacer.short_name());
+            ui.weak(replacer.unwrap_or_default()).on_hover_text(stand_in);
+        }
     });
     let Ok(info) = &row.info else { return };
     if info.triggers.is_empty() {

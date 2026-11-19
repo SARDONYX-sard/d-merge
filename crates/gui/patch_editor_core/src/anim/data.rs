@@ -62,6 +62,11 @@ pub struct HkxInfo {
     pub triggers: Vec<(f32, String)>,
     /// The root motion, see [`serde_hkx_for_gui::hkanno::parse_root_motion`].
     motion: Vec<[f32; 4]>,
+    /// The mod has no hkx at the clip's path, only DAR / OAR ones standing in for it: the one read,
+    /// relative to the mod's root. See [`super::replacer::stand_ins`].
+    ///
+    /// e.g. `meshes\actors\character\animations\OpenAnimationReplacer\Mod\Sub\idle.hkx`
+    pub stand_in: Option<String>,
 }
 
 /// The value of a field on one line. e.g., `name` in `<hkparam name="name">x</hkparam>` -> `x`
@@ -172,7 +177,16 @@ pub fn default_project(folders: &[&str], hkx: Option<&str>) -> usize {
 /// # Errors
 /// The hkx could not be read or parsed.
 pub fn read_hkx(mod_root: &Path, clip: &ClipSource) -> Result<HkxInfo, String> {
-    let path = joined(mod_root, &[&clip.base, &clip.animation.replace('\\', "/")]);
+    let relative = format!("{}/{}", clip.base, clip.animation.replace('\\', "/"));
+    let mut path = joined(mod_root, &[&relative]);
+    // Only a DAR / OAR one of it: its data is near enough (the same animation, another condition).
+    let mut stand_in = None;
+    if !path.is_file()
+        && let Some(found) = super::replacer::stand_ins(mod_root, &relative).into_iter().next()
+    {
+        stand_in = found.strip_prefix(mod_root).ok().map(|relative| relative.display().to_string());
+        path = found;
+    }
     let error = |e: &dyn std::fmt::Display| format!("{}: {e}", path.display());
     let bytes = std::fs::read(&path).map_err(|e| error(&e))?;
     let hkanno = serde_hkx_for_gui::hkanno::parse_as_hkanno(&bytes, &path).map_err(|e| error(&e))?;
@@ -183,7 +197,7 @@ pub fn read_hkx(mod_root: &Path, clip: &ClipSource) -> Result<HkxInfo, String> {
         .filter_map(|annotation| Some((annotation.time, annotation.text.as_ref()?.to_string())))
         .collect();
     let motion = serde_hkx_for_gui::hkanno::parse_root_motion(&bytes, &path).map_err(|e| error(&e))?;
-    Ok(HkxInfo { duration: hkanno.duration, triggers, motion })
+    Ok(HkxInfo { duration: hkanno.duration, triggers, motion, stand_in })
 }
 
 /// The clip's block: name, id, speed, crop start, crop end, then the triggers.
@@ -422,7 +436,7 @@ fn add_clip_files(adsf: &mut Behavior, code: &str, folder: &str, name: &str, inf
 /// Returns the ids of the files added, of the clips and their motions.
 pub fn add_numbered_clips(adsf: &mut Behavior, code: &str, folder: &str, name: &str, count: usize) -> Vec<String> {
     // A second: the data needs a length, and the hkx decides the real one.
-    let info = HkxInfo { duration: 1.0, triggers: Vec::new(), motion: Vec::new() };
+    let info = HkxInfo { duration: 1.0, triggers: Vec::new(), motion: Vec::new(), stand_in: None };
     let before: std::collections::BTreeSet<String> = adsf.added.keys().cloned().collect();
     for i in 0..count {
         let name = if count == 1 { name.to_owned() } else { format!("{name}_{i}") };
@@ -526,7 +540,7 @@ mod tests {
     }
 
     fn info() -> HkxInfo {
-        HkxInfo { duration: 3.5, triggers: vec![(0.03, "AnimObjDraw".to_owned())], motion: Vec::new() }
+        HkxInfo { duration: 3.5, triggers: vec![(0.03, "AnimObjDraw".to_owned())], motion: Vec::new(), stand_in: None }
     }
 
     /// On a real mod (`PATCH_EDITOR_MOD`, its root): the hkx of its clips can be read, and the
@@ -637,7 +651,7 @@ mod tests {
         assert_eq!(motion, "para$2\n3.5\n1\n3.5 0 0 0\n1\n3.5 0 0 0 1\n");
         validate_adsf("DefaultMale~1/para$2.txt", &motion).unwrap();
 
-        let no_triggers = HkxInfo { duration: 1.0, triggers: Vec::new(), motion: Vec::new() };
+        let no_triggers = HkxInfo { duration: 1.0, triggers: Vec::new(), motion: Vec::new(), stand_in: None };
         validate_adsf("DefaultMale~1/Idle~para$2.txt", &clip_anim_text("Idle", "para$2", &no_triggers)).unwrap();
 
         assert!(validate_adsf("DefaultMale~1/para$2.txt", "not a motion").is_err());
