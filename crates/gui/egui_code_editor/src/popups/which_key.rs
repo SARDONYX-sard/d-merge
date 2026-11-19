@@ -42,7 +42,7 @@ pub(crate) fn show(
         .fixed_pos(area.right_bottom() - egui::vec2(MARGIN, MARGIN))
         .constrain(true)
         .show(ctx, |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
+            crate::widget_frame(ui.style()).show(ui, |ui| {
                 ui.style_mut().wrap_mode = Some(egui::TextWrapMode::Extend);
                 ui.strong(prefix.title());
                 egui::Grid::new(id.with("which_key_grid")).num_columns(2).show(ui, |ui| {

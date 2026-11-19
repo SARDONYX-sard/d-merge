@@ -31,7 +31,7 @@ pub(crate) fn signature_box(
         .fixed_pos(cursor_rect.left_top() - egui::vec2(0.0, 2.0))
         .interactable(false)
         .show(ctx, |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
+            crate::widget_frame(ui.style()).show(ui, |ui| {
                 ui.label(egui::RichText::new(&help.label).monospace());
                 ui.horizontal(|ui| {
                     for (i, param) in help.params.iter().enumerate() {

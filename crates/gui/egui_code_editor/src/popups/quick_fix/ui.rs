@@ -13,7 +13,7 @@ impl QuickFixMenu {
             .fixed_pos(anchor.left_bottom())
             .constrain(true)
             .show(ctx, |ui| {
-                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                crate::widget_frame(ui.style()).show(ui, |ui| {
                     for (i, fix) in fixes.iter().enumerate() {
                         let label = format!("💡 {}", fix.title);
                         if ui.add(egui::Button::selectable(i == *selected, label)).clicked() {

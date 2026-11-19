@@ -233,7 +233,7 @@ fn show(ctx: &egui::Context, id: egui::Id, open: &mut Open, max_height: f32) -> 
 /// The popup's frame. With the keyboard in the popup its border stands out: keys go there, not to the
 /// editor.
 fn popup_frame(style: &egui::Style, focused: bool) -> egui::Frame {
-    let frame = egui::Frame::popup(style).inner_margin(TEXT_MARGIN);
+    let frame = crate::widget_frame(style).inner_margin(TEXT_MARGIN);
     if focused { frame.stroke(egui::Stroke::new(FOCUSED_BORDER, style.visuals.selection.bg_fill)) } else { frame }
 }
 
@@ -286,7 +286,7 @@ mod tests {
         let focused = popup_frame(&style, true).stroke;
         assert!(focused.width > normal.width);
         assert_eq!(focused.color, style.visuals.selection.bg_fill);
-        assert_eq!(normal, egui::Frame::popup(&style).stroke);
+        assert_eq!(normal, crate::widget_frame(&style).stroke);
     }
 
     /// Draws `docs` in the popup for some frames, as a new popup. Returns its last rect.

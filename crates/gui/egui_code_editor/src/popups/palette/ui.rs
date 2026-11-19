@@ -167,7 +167,7 @@ fn draw<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput<'a, '_>, r
         .fixed_pos(top)
         .constrain(true)
         .show(ui.ctx(), |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
+            crate::widget_frame(ui.style()).show(ui, |ui| {
                 ui.set_width(420.0);
                 let field = egui::TextEdit::singleline(&mut palette.query)
                     .id(field_id(input.id))

@@ -29,7 +29,7 @@ impl FindBar {
             .pivot(egui::Align2::RIGHT_TOP)
             .fixed_pos(editor_rect.right_top() + egui::vec2(-16.0, 4.0))
             .show(ctx, |ui| {
-                egui::Frame::popup(ui.style()).show(ui, |ui| {
+                crate::widget_frame(ui.style()).show(ui, |ui| {
                     ui.horizontal(|ui| match kind {
                         Kind::Find => self.find_ui(ui, id, text),
                         Kind::GotoLine => self.goto_ui(ui, id, text),

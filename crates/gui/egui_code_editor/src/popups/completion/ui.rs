@@ -31,7 +31,7 @@ impl CompletionPopup {
             (area.pivot(pivot), list_height)
         };
         let shown = area.show(ctx, |ui| {
-            egui::Frame::popup(ui.style()).show(ui, |ui| {
+            crate::widget_frame(ui.style()).show(ui, |ui| {
                 ui.set_max_width(480.0);
                 // Popups are a separate layer: set the always-visible, solid scroll bars here too.
                 ui.spacing_mut().scroll = egui::style::ScrollStyle::solid();
@@ -74,7 +74,7 @@ impl CompletionPopup {
                 .fixed_pos(egui::pos2(x, y))
                 .pivot(egui::Align2([align_x, align_y]))
                 .show(ctx, |ui| {
-                    egui::Frame::popup(ui.style()).show(ui, |ui| {
+                    crate::widget_frame(ui.style()).show(ui, |ui| {
                         ui.set_max_width(DOC_WIDTH);
                         egui::ScrollArea::vertical().id_salt("doc").max_height(DOC_HEIGHT).show(ui, |ui| {
                             egui_widgets::markdown::markdown(ui, doc);
