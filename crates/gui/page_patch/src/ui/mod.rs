@@ -2,11 +2,11 @@
 
 mod bottom_panel;
 mod conflicts;
-mod dnd_table;
 mod label_ext;
 mod mod_list;
 mod options;
 mod pandora;
+mod table_body;
 
 use crate::{PatchPage, PatchPageCtx};
 

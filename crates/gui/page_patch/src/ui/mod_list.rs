@@ -17,7 +17,7 @@ use mod_info::ModType;
 
 use super::{
     PatchView,
-    dnd_table::{Links, RowConflicts, check_only_table_body, dnd_table_body, paint_links},
+    table_body::{Links, RowConflicts, TableBody, paint_links},
 };
 use crate::visible_mods::{self, is_dnd_allowed};
 
@@ -289,12 +289,12 @@ impl PatchView<'_> {
 
                             let mod_list: &mut [_] =
                                 if self.page.fetch.last_was_empty { &mut [] } else { self.ctx.settings.mod_list_mut() };
-                            let anchor = &mut self.page.selection_anchor;
+                            let selection_anchor = &mut self.page.selection_anchor;
+                            let table =
+                                TableBody { items: mod_list, widths, selection_anchor, conflicts: &mut conflicts };
                             match rows {
-                                None => dnd_table_body(&mut body, mod_list, widths, anchor, &mut conflicts),
-                                Some(rows) => {
-                                    check_only_table_body(body, rows, mod_list, widths, anchor, &mut conflicts);
-                                }
+                                None => table.draggable(&mut body),
+                                Some(rows) => table.check_only(body, rows),
                             }
                             asked = conflicts.asked;
                             links = conflicts.links;
