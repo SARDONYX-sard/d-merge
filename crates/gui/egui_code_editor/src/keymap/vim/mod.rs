@@ -36,6 +36,7 @@ mod parse;
 mod prompt;
 mod registers;
 mod repeat;
+mod tags;
 mod textobj;
 pub(super) mod which_key;
 

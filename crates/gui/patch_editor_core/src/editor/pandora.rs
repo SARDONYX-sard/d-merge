@@ -369,6 +369,7 @@ mod tests {
             kept_array_hover: "",
             in_string_array: false,
             behavior: &behavior,
+            states: &[],
         };
         check(&PandoraXml { inner: &inner });
         std::fs::remove_dir_all(&dir).unwrap();

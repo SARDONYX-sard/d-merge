@@ -26,6 +26,7 @@ use nemesis_diff::{
 };
 use stdx::text::{contains_ignore_case, push_joined, starts_with_ignore_case};
 
+use super::ids::{self, IdKind, assist::IdInfo};
 use crate::{tree::Graph, workspace::Behavior};
 
 /// Nemesis' variable syntaxes and what they complete with.
@@ -131,6 +132,9 @@ pub struct NemesisXml<'a> {
     pub in_string_array: bool,
     /// Every object, for go-to-definition and find-references.
     pub behavior: &'a Behavior,
+    /// The states the state field of the cursor line can take (`toStateId`, ...), by `stateId`. See
+    /// [`ids::assist::state_choices`].
+    pub states: &'a [ids::assist::StateChoice],
 }
 
 impl Language for NemesisXml<'_> {
@@ -178,7 +182,7 @@ impl Language for NemesisXml<'_> {
                     }
                 }
             }
-            None => {}
+            None => self.id_hover(text, (line_no, column), &mut doc),
         }
         // `<hkobject>`, whose class may only be known from the field it is in.
         if line.trim_start().starts_with("<hkobject")
@@ -214,10 +218,13 @@ impl Language for NemesisXml<'_> {
     }
 
     /// `#0106`: that object. `$eventID[x]$`: the line of `x` in the names object, or in that of the
-    /// referenced mod that adds it.
+    /// referenced mod that adds it. A number that is an id: see [`ids::nav`].
     fn definition(&self, text: &str, line: usize, column: usize) -> Option<Location<'_>> {
         let behavior = self.behavior;
-        match symbol_at(text.split('\n').nth(line)?, column)? {
+        let Some(symbol) = symbol_at(text.split('\n').nth(line)?, column) else {
+            return ids::nav::definition(text, (line, column), &ids::IdIndex::new(behavior));
+        };
+        match symbol {
             Symbol::Pointer(word) => {
                 let object = behavior.texts().find(|object| object.id == word)?;
                 Some(Location { document: object.id.into(), line: 0, detail: object.class.into() })
@@ -234,12 +241,15 @@ impl Language for NemesisXml<'_> {
     }
 
     /// Every other object mentioning the `#id` (its first mention), or every line using the
-    /// `$eventID[x]$`. Template objects use plain indices for events and variables, so only
-    /// `$..$` uses (new or edited text) can be found.
+    /// `$eventID[x]$`. A number that is an id (a state, an event, a variable): see [`ids::nav`],
+    /// which finds plain indices too.
     fn references(&self, text: &str, line: usize, column: usize) -> Option<References<'_>> {
+        let Some(symbol) = symbol_at(text.split('\n').nth(line)?, column) else {
+            return ids::nav::references(text, (line, column), &ids::IdIndex::new(self.behavior));
+        };
         let mut locations: Vec<Location<'_>> = Vec::new();
         let symbol =
-            match symbol_at(text.split('\n').nth(line)?, column)? {
+            match symbol {
                 Symbol::Pointer(word) => {
                     for object in self.behavior.texts().filter(|object| object.id != word) {
                         if let Some(at) = find_token(object.text, word) {
@@ -353,19 +363,79 @@ impl NemesisXml<'_> {
             return None;
         }
         let typed = value.trim_start();
+        let replace = column - typed.chars().count()..column;
+
+        // A field that is an id offers only what it names (see `ids`), and `-1` (none) for a name.
+        let kinds: &[(Kind, &str)] = match self.fields.and_then(|(class, _)| ids::kind_of(class, name)) {
+            Some(IdKind::Event) => &[(Kind::Event, "⚡")],
+            Some(IdKind::Variable) => &[(Kind::Variable, "𝑥")],
+            Some(_) => return Some(CompletionList { replace, items: self.state_items(typed) }),
+            None => &[(Kind::Event, "⚡"), (Kind::Variable, "𝑥")],
+        };
+        let mut items: Vec<CompletionItem> =
+            kinds.iter().flat_map(|&(kind, icon)| self.name_items(kind, icon, typed)).collect();
+        if kinds.len() == 1 && "-1".starts_with(typed) {
+            items.push(item("-1", "∅", "-1", "None".to_owned()));
+        }
+        Some(CompletionList { replace, items })
+    }
+
+    /// The paragraph of a number that is an id, at `at`, if it is one. See [`ids::assist::info_at`].
+    ///
+    /// e.g. ``**stateId 1**: `#0102` IdleState, a state of `#0100` ``, `**-1**: none`
+    fn id_hover(&self, text: &str, at: (usize, usize), doc: &mut String) {
+        let Some((value, info)) = ids::assist::info_at(text, at, self.behavior) else { return };
+        let _ = match info {
+            IdInfo::Nothing(_) => write!(doc, "**{value}**: none\n\n"),
+            IdInfo::State { state, name, machine } => {
+                write!(doc, "**stateId {value}**: `{state}` {name}, a state of `{machine}`\n\n")
+            }
+            IdInfo::Missing(_) => write!(doc, "**stateId {value}**: no such state\n\n"),
+            IdInfo::Name(kind, index) => {
+                let kind = if kind == IdKind::Variable { Kind::Variable } else { Kind::Event };
+                match self.names_of(kind).get(index) {
+                    Some(name) => write!(doc, "**{}{name}]$**: {}\n\n", kind.prefix(), self.name_doc(kind, index)),
+                    None => write!(doc, "**{}**: not found\n\n", self.name_doc(kind, index)),
+                }
+            }
+        };
+    }
+
+    /// `$eventID[name]$` / `$variableID[name]$` of every name matching `typed` (its name, or its
+    /// index when digits are typed).
+    fn name_items<'s>(
+        &'s self,
+        kind: Kind,
+        icon: &'static str,
+        typed: &'s str,
+    ) -> impl Iterator<Item = CompletionItem> + 's {
         let wanted = typed.trim_start_matches('$');
-        let items = [(Kind::Event, "⚡"), (Kind::Variable, "𝑥")]
-            .into_iter()
-            .flat_map(|(kind, icon)| {
-                self.names_of(kind).iter().enumerate().filter(move |(_, name)| contains_ignore_case(name, wanted)).map(
-                    move |(index, name)| {
-                        let insert = format!("{}{name}]$", kind.prefix());
-                        item(insert.clone(), icon, insert, self.name_doc(kind, index))
-                    },
+        let names = self.names_of(kind).iter().enumerate();
+        let matching = names.filter(move |(index, name)| {
+            contains_ignore_case(name, wanted) || (!wanted.is_empty() && index.to_string().starts_with(wanted))
+        });
+        matching.map(move |(index, name)| {
+            let insert = format!("{}{name}]$", kind.prefix());
+            item(insert.clone(), icon, insert, self.name_doc(kind, index))
+        })
+    }
+
+    /// The `stateId`s a state field can take (see [`Self::states`]) matching `typed`, as numbers.
+    fn state_items(&self, typed: &str) -> Vec<CompletionItem> {
+        let matching = self.states.iter().filter(|choice| {
+            choice.state_id.to_string().starts_with(typed) || contains_ignore_case(&choice.label, typed)
+        });
+        matching
+            .map(|choice| {
+                let state_id = choice.state_id.to_string();
+                item(
+                    format!("{state_id}  {}", choice.label),
+                    "◇",
+                    state_id,
+                    format!("stateId {}: {}", choice.state_id, choice.label),
                 )
             })
-            .collect();
-        Some(CompletionList { replace: column - typed.chars().count()..column, items })
+            .collect()
     }
 
     /// `<hkparam name="|`: the class's fields (`name">default</hkparam>`), or, at `<` / `<hk..`
@@ -708,5 +778,67 @@ mod tests {
         assert_eq!(find_token("#0105 #01090 #0109\n", "#0109"), Some(13));
         assert_eq!(find_token("#01090", "#0109"), None);
         assert_eq!(line_of("a\nb\nc", 2), 1);
+    }
+
+    /// The language of a state machine's fields, with the events `a`, `b`, the variable `v` and the
+    /// state `3` the cursor line can take.
+    fn with_language(check: impl FnOnce(&NemesisXml<'_>)) {
+        use std::path::Path;
+
+        use crate::workspace::ADSF;
+        let behavior = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
+        let (graph, values) = (Graph::new(&behavior), FieldValues::default());
+        let (events, variables) = (["a".to_owned(), "b".to_owned()], ["v".to_owned()]);
+        let fields: Vec<&'static FieldSchema> = schema::xml_fields("hkbStateMachine").collect();
+        let states = [ids::assist::StateChoice { state_id: 3, label: "`#b` Idle".to_owned() }];
+        let language = NemesisXml {
+            code_action: false,
+            events: &events,
+            variables: &variables,
+            variable_types: &[],
+            values: &values,
+            graph: &graph,
+            fields: Some(("hkbStateMachine", &fields)),
+            pointer_field: None,
+            kept_array_hover: "",
+            in_string_array: false,
+            behavior: &behavior,
+            states: &states,
+        };
+        check(&language);
+    }
+
+    /// The labels of the completion at the end of `line`.
+    fn labels(language: &NemesisXml<'_>, line: &str) -> Vec<String> {
+        let list = language.complete(line, line.chars().count());
+        list.items.into_iter().map(|item| item.label.into_owned()).collect()
+    }
+
+    #[test]
+    fn an_id_field_offers_only_what_it_names() {
+        with_language(|language| {
+            let event = labels(language, "<hkparam name=\"returnToPreviousStateEventId\">");
+            assert_eq!(event, ["$eventID[a]$", "$eventID[b]$", "-1"], "events, and none");
+            assert_eq!(
+                labels(language, "<hkparam name=\"returnToPreviousStateEventId\">1"),
+                ["$eventID[b]$"],
+                "by index"
+            );
+            assert_eq!(labels(language, "<hkparam name=\"syncVariableIndex\">"), ["$variableID[v]$", "-1"]);
+            assert_eq!(labels(language, "<hkparam name=\"startStateId\">"), ["3  `#b` Idle"], "its states, by number");
+
+            let other = labels(language, "<hkparam name=\"maxSimultaneousTransitions\">");
+            assert_eq!(other, ["$eventID[a]$", "$eventID[b]$", "$variableID[v]$"], "an integer: any name");
+        });
+    }
+
+    #[test]
+    fn an_id_number_tells_what_it_names() {
+        with_language(|language| {
+            let text = "<hkobject name=\"#e\" class=\"hkbStateMachine\" signature=\"0x1\">\n<hkparam name=\"returnToPreviousStateEventId\">1</hkparam>\n<hkparam name=\"randomTransitionEventId\">-1</hkparam>\n</hkobject>\n";
+            let hover = |line, column| language.hover_at(text, line, column).unwrap_or_default();
+            assert!(hover(1, 45).starts_with("**$eventID[b]$**: Event #1"), "{}", hover(1, 45));
+            assert!(hover(2, 40).starts_with("**-1**: none"), "{}", hover(2, 40));
+        });
     }
 }

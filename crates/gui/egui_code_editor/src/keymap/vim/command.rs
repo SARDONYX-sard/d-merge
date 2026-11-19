@@ -58,7 +58,7 @@ pub(super) enum Motion {
     ParagraphForward,
     /// `{`
     ParagraphBackward,
-    /// `%`: the matching bracket
+    /// `%`: the matching bracket, or the matching start / end tag (as Vim's `matchit`)
     MatchPair,
     /// `f<c>` / `t<c>` (`forward`), `F<c>` / `T<c>`; `till` stops before the char
     Find {

@@ -23,7 +23,7 @@ use self::{
     anim_list::{DuplicatePick, Files},
     explorer::ListOutput,
 };
-use super::{SideArea, SideAsk};
+use super::{SideArea, SideAsk, tree::Uncommitted};
 use crate::patch::{
     anim::data,
     tool::{file::FileAction, keys::Keys, selection::Selection, work_state::Work},
@@ -74,17 +74,20 @@ impl SideArea {
         let graph = &names.graph;
         let tree_keys =
             if self.explorer.tree_focus { keys.take_mapped(keybinding::host::tree_key) } else { Vec::new() };
+        // (Before the behavior is borrowed below: it is the work's, taken mutably.)
+        let projects = if anim { work.anim_projects(sel.active) } else { Vec::new() };
+        let behavior = &work.workspace.behaviors[sel.active];
+        let uncommitted = Uncommitted { behavior: &behavior.meshes_path, changes: &self.scm.pending.changes };
 
         // A tree from the root container, unless filtering: a filter wants the flat list.
         let output = if anim {
-            let projects = work.anim_projects(sel.active);
-            let is_adsf = work.workspace.behaviors[sel.active].adsf;
-            self.explorer.anim(ui, i18n, (graph, is_adsf, &projects), &tree_keys, &mut sel.selected)
+            let is_adsf = behavior.adsf;
+            self.explorer.anim(ui, i18n, (graph, is_adsf, &projects), (&tree_keys, uncommitted), &mut sel.selected)
         } else if self.explorer.tree_view && self.explorer.filter.is_empty() && !self.explorer.unlinked_only {
-            let path = &work.workspace.behaviors[sel.active].meshes_path;
-            self.explorer.tree(ui, i18n, (graph, path), &tree_keys, &mut sel.selected)
+            let path = &behavior.meshes_path;
+            self.explorer.tree(ui, i18n, (graph, path), (&tree_keys, uncommitted), &mut sel.selected)
         } else {
-            self.explorer.flat(ui, i18n, graph, &tree_keys, &mut sel.selected)
+            self.explorer.flat(ui, i18n, graph, (&tree_keys, uncommitted), &mut sel.selected)
         };
         asks.extend(self.apply_list_output(ui, (work, sel), graph, output));
         asks

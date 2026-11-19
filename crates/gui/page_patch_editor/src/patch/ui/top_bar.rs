@@ -128,7 +128,7 @@ fn project_form(
     }
 
     asks.extend(source_row(ui, i18n, work.place.mod_dir.trim(), notify));
-    asks.extend(ref_mods_row(ui, i18n, &work.workspace.ref_mods));
+    asks.extend(super::ref_mods::ref_mods_row(ui, i18n, &mut work.workspace));
 
     ui.horizontal_wrapped(|ui| {
         // It is in the ids of the new objects and the names of the folders: renamed, not typed over.
@@ -189,8 +189,7 @@ pub(in crate::patch) fn apply(
         BarAsk::ReloadFromMod => work.reload_from_mod(notify, i18n),
 
         BarAsk::RemoveRef(at) => {
-            work.workspace.ref_mods.remove(at);
-            work.workspace.reload_refs();
+            work.workspace.remove_ref(at);
             return Some(refs_changed(work));
         }
         BarAsk::AddRef(dir) => {
@@ -311,51 +310,6 @@ fn source_row(ui: &mut egui::Ui, i18n: &I18nMap, mod_dir: &str, notify: &mut Not
     reload.then_some(BarAsk::ReloadFromMod)
 }
 
-/// `References: [Flinching (flinch) ✖] [+]`, or `None`: the mods this one depends on, see
-/// `Workspace::ref_mods`. The path is on hover.
-pub(super) fn ref_mods_row(ui: &mut egui::Ui, i18n: &I18nMap, ref_mods: &[String]) -> Option<BarAsk> {
-    let mut asked = None;
-    ui.horizontal_wrapped(|ui| {
-        ui.label(i18n.t(I18nKey::RefModsLabel)).on_hover_markdown(i18n.t(I18nKey::RefModsHover));
-        if ref_mods.is_empty() {
-            ui.weak(i18n.t(I18nKey::NoneText));
-        }
-
-        for (at, dir) in ref_mods.iter().enumerate() {
-            if ui.add(Button::new(format!("{} ✖", ref_mod_name(dir))).small()).on_hover_text(dir).clicked() {
-                asked = Some(BarAsk::RemoveRef(at));
-            }
-        }
-
-        let add = ui.add(Button::new("").icon(Icon::Plus).small()).on_hover_markdown(i18n.t(I18nKey::RefModsHover));
-        if add.clicked()
-            && let Some(dir) = gui_shared::rfd::FileDialog::new().pick_folder()
-        {
-            asked = Some(BarAsk::AddRef(dir));
-        }
-    });
-    asked
-}
-
-/// What a referenced mod is shown as: the name of its directory in the mods, and its code. Only the
-/// path is looked at: it is drawn every frame.
-///
-/// e.g. `D:/MO2/mods/Flinching/Nemesis_Engine/mod/flinch` -> `Flinching (flinch)`; a path not of that
-/// shape -> its last name, e.g. `flinch`
-fn ref_mod_name(dir: &str) -> String {
-    fn name_of(path: &Path) -> Option<std::borrow::Cow<'_, str>> {
-        path.file_name().map(|name| name.to_string_lossy())
-    }
-
-    let path = Path::new(dir);
-    let code = name_of(path).unwrap_or_else(|| dir.into());
-    let is_mod_dir = path.parent().and_then(name_of).is_some_and(|name| name.eq_ignore_ascii_case("mod"));
-    match path.ancestors().nth(3).and_then(name_of) {
-        Some(mod_name) if is_mod_dir => format!("{mod_name} ({code})"),
-        _ => code.into_owned(),
-    }
-}
-
 /// `[Rename…]`, then `[newc] [Rename] [Cancel] why not`. See [`crate::patch::tool::rename`].
 /// `(old, cache_root)`: the code now, and where the works are (a new code must be free there).
 fn rename_form(
@@ -422,16 +376,4 @@ pub(super) fn recent_list(ui: &mut egui::Ui, recent: &[RecentWork], i18n: &I18nM
         }
     }
     picked
-}
-
-#[cfg(test)]
-mod ref_mod_name_tests {
-    use super::ref_mod_name;
-
-    /// The function docs' examples.
-    #[test]
-    fn a_referenced_mod_shows_its_mod_s_name_and_code() {
-        assert_eq!(ref_mod_name("D:/MO2/mods/Flinching/Nemesis_Engine/mod/flinch"), "Flinching (flinch)");
-        assert_eq!(ref_mod_name("flinch"), "flinch");
-    }
 }

@@ -61,7 +61,7 @@ impl EditorArea {
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         (work, sel, keys): (&mut Work, &mut Selection, &mut Keys),
-        problems: &mut Problems,
+        (problems, changes): (&mut Problems, &[crate::patch::workspace::history::ObjectChange]),
         id: &str,
     ) -> EditorResult {
         let format_and_save = self.pane.editor_keys(keys);
@@ -85,6 +85,7 @@ impl EditorArea {
                 tabs: &self.tabs,
                 views: &self.views,
                 problems: problems.list.as_deref(),
+                changes: (&behavior.meshes_path, changes),
                 active: sel.active,
                 id,
                 graph: &names.graph,
@@ -253,11 +254,25 @@ struct EditorInput<'a> {
 }
 
 impl EditorPane {
+    /// The path to the cursor line (`#0100 hkbStateMachine › states › ...`); a click puts the
+    /// cursor at the start of that tag.
+    fn crumbs_row(&mut self, ui: &mut egui::Ui) {
+        self.refresh_crumbs();
+        let crumbs = self.crumbs.as_ref().map_or(&[][..], |(_, crumbs)| crumbs.as_slice());
+        if let Some(crumb) = egui_code_editor::Breadcrumbs::new(crumbs).show(ui) {
+            let at = egui_code_editor::text_pos::LinePos { line: crumb.line, column: crumb.column };
+            self.focus = Some(FocusAt::At(at));
+        }
+    }
+
     /// The editor itself, of object `id`, and what it asked for into `result`.
     fn code_editor(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, input: EditorInput<'_>, result: &mut EditorResult) {
         let EditorInput { behavior: (index, behavior), id, names, keymap, key_ui, requests, user_patch } = input;
         let values = self.field_values(index, behavior);
         let is_pandora_doc = id == PANDORA_DOC;
+        if !behavior.is_anim_data() {
+            self.crumbs_row(ui); // above the editor, of the cursor line of last frame
+        }
 
         // The class (and fields) around the cursor line of last frame: field names, hover.
         let context = if is_pandora_doc {
@@ -267,6 +282,10 @@ impl EditorPane {
         };
         let open_field =
             if is_pandora_doc { None } else { nemesis_diff::schema::open_field(&self.text, self.cursor_line) };
+        if !is_pandora_doc {
+            self.refresh_state_choices(behavior);
+        }
+        let states = self.state_choices.as_ref().map_or(&[][..], |(_, choices)| choices.as_slice());
 
         let language = NemesisXml {
             code_action: self.lsp.code_action,
@@ -280,6 +299,7 @@ impl EditorPane {
             kept_array_hover: i18n.t(I18nKey::KeptArrayHover),
             in_string_array: open_field.is_some_and(nemesis_diff::schema::holds_strings),
             behavior,
+            states,
         };
         let anim_language = AnimDataLanguage {
             roles: &self.anim_roles,

@@ -31,6 +31,9 @@ pub(super) struct ToolbarInput<'a> {
     pub(super) views: &'a Views,
     /// The work's problems: the tabs are colored by them.
     pub(super) problems: Option<&'a [ObjectProblems]>,
+    /// The active behavior's template (`meshes_path`), and what changed since the last commit: the
+    /// tabs are marked `A` / `M` by them.
+    pub(super) changes: (&'a str, &'a [crate::patch::workspace::history::ObjectChange]),
     /// The active behavior, and the object shown (`id`).
     pub(super) active: usize,
     pub(super) id: &'a str,
@@ -45,7 +48,7 @@ pub(super) struct ToolbarInput<'a> {
 
 /// Draws the row of the object shown.
 pub(super) fn show(ui: &mut egui::Ui, i18n: &I18nMap, input: ToolbarInput<'_>) -> ToolbarOutput {
-    let ToolbarInput { pane, tabs, views, problems, active, id, graph, focused, can_split, can_graph } = input;
+    let ToolbarInput { pane, tabs, views, problems, changes, active, id, graph, focused, can_split, can_graph } = input;
     let mut output = ToolbarOutput::default();
     ui.horizontal(|ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -58,7 +61,7 @@ pub(super) fn show(ui: &mut egui::Ui, i18n: &I18nMap, input: ToolbarInput<'_>) -
                 let labels = (i18n.t(I18nKey::GoBack), i18n.t(I18nKey::GoForward));
                 output.walk_history = pane.history.buttons(ui, labels);
 
-                let marks = super::super::tab_bar::TabMarks { focused, problems };
+                let marks = super::super::tab_bar::TabMarks { focused, problems, changes };
                 let view_tabs = views.tabs_of(active);
                 output.tab_event =
                     super::super::tab_bar::tab_bar(ui, i18n, tabs, (active, id), graph, marks, &view_tabs);

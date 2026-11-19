@@ -8,7 +8,10 @@
 
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use super::{INDENT, TreeEvent, label::object_button};
+use super::{
+    INDENT, TreeEvent,
+    label::{Uncommitted, object_button},
+};
 use crate::patch::{
     side_area::{
         explorer::{fixed_row, row_height},
@@ -34,7 +37,7 @@ pub(super) fn show(
     graph: &Graph,
     state: &mut TreeState,
     (selected, focused): (Option<&str>, bool),
-    i18n: &I18nMap,
+    (i18n, uncommitted): (&I18nMap, Uncommitted<'_>),
 ) -> Shown {
     let height = row_height(ui);
     let spacing = ui.spacing().item_spacing.y;
@@ -49,7 +52,8 @@ pub(super) fn show(
             let is_selected = selected == Some(graph.id(row.node));
 
             egui_tree::guides::paint(ui, row.lines(), index, (height, INDENT), &guides);
-            if let Some(clicked) = row_ui(ui, graph, (row, index), height, (is_selected, focused), i18n) {
+            if let Some(clicked) = row_ui(ui, graph, (row, index), height, (is_selected, focused), (i18n, uncommitted))
+            {
                 event = Some(clicked);
             }
         }
@@ -84,7 +88,7 @@ fn row_ui(
     (row, index): (Row, usize),
     height: f32,
     (is_selected, focused): (bool, bool),
-    i18n: &I18nMap,
+    (i18n, uncommitted): (&I18nMap, Uncommitted<'_>),
 ) -> Option<TreeEvent> {
     let mut event = None;
     fixed_row(ui, height, |ui| {
@@ -94,7 +98,7 @@ fn row_ui(
             event = Some(TreeEvent::SetOpen(row.node, !row.open));
         }
 
-        let response = object_button(ui, graph, row.node, (is_selected, row.dimmed));
+        let response = object_button(ui, graph, row.node, (is_selected, row.dimmed), uncommitted);
         if response.clicked() {
             event = Some(TreeEvent::Select(index));
         }

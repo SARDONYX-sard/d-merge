@@ -1441,6 +1441,34 @@ pub enum I18nKey {
     /// No problems have been found in the work.
     ProblemsNone,
 
+    /// Any version
+    RefModVersionHint,
+
+    /// The versions of this referenced mod that this mod works with. Empty: any.
+    ///
+    /// # Examples
+    /// - `>=1.2.0`: 1.2.0 or later
+    /// - `^1.2`: 1.2.0 or later, before 2.0.0
+    /// - `<2`: before 2.0.0
+    ///
+    /// # Notes
+    /// - Written to `deps` of the `info.ini` of `Nemesis_EngineExt`, e.g. `deps=amco>=1.2.0`
+    /// - Checked against the `version` of the referenced mod's `info.ini`: `1.2` is read as `1.2.0`
+    /// - Only told here: patching does not stop
+    RefModVersionHover,
+
+    /// Its version can't be read
+    RefModVersionInvalid,
+
+    /// It says no version: it can't be checked
+    RefModVersionMissing,
+
+    /// Not a version constraint, e.g. >=1.2.0
+    RefModVersionReqInvalid,
+
+    /// Not of the versions this mod works with
+    RefModVersionUnmet,
+
     /// The mods this one depends on: an add-on's base, or the mods a user patch takes values from. `+` adds one: its root, or its patch directory.
     ///
     /// # Notes
@@ -1681,6 +1709,13 @@ pub enum I18nKey {
 
     /// User Patch
     UserPatchTitle,
+
+    /// Edit its name, type and initial value (the patches using its name are updated too)
+    ///
+    /// # Notes
+    /// - Only this mod's variables: other mods count on the template's names, types and initial values
+    /// - A click on a name opens its initial value, where one of the template's can be edited all the same
+    VarsEdit,
 
     /// Events
     VarsEvents,

@@ -18,13 +18,20 @@
 //! A new object nothing links to is warned of too ([`diagnostics::not_linked`]). That depends on the
 //! other objects: an edit of `#0106` that adds `#mymod$0` links it. So an edit also checks again the
 //! objects that were or are not linked.
+//!
+//! The ids named by number ([`ids`]) depend on the others too: an edit of a state checks again the
+//! states and transitions of its state machine.
 
 use egui_code_editor::Diagnostic;
 use fast_hash::HashSet;
 use rayon::prelude::*;
 
 use super::{
-    editor::{diagnostics, preview::Preview},
+    editor::{
+        diagnostics,
+        ids::{self, IdIndex},
+        preview::Preview,
+    },
     tool::work_state::Work,
     tree::Graph,
     workspace::{Behavior, ObjectText},
@@ -64,6 +71,8 @@ struct Checker<'a> {
     code: &'a str,
     /// The ids of the new objects nothing links to. See [`Graph::unlinked`].
     not_linked: &'a HashSet<&'a str>,
+    /// What the numbers of the behavior name.
+    id_index: &'a IdIndex<'a>,
 }
 
 /// The ids of `graph`'s new objects nothing links to.
@@ -78,13 +87,15 @@ fn is_checked(behavior: &Behavior, object: &ObjectText<'_>) -> bool {
 
 /// The problems of one object. `None`: it has none.
 fn object_problems(checker: Checker<'_>, object: &ObjectText<'_>) -> Option<ObjectProblems> {
-    let Checker { index, behavior, code, not_linked } = checker;
+    let Checker { index, behavior, code, not_linked, id_index } = checker;
     let (id, text) = (object.id, object.text);
     // Animation data only has the parser's word: see `anim_lines`.
     let mut found: Vec<Diagnostic> = if behavior.is_anim_data() {
         Vec::new()
     } else {
-        diagnostics::field_diagnostics(text, behavior, object.is_new, code)
+        let mut found = diagnostics::field_diagnostics(text, behavior, object.is_new, code);
+        found.extend(ids::id_diagnostics(text, id, id_index));
+        found
     };
     if not_linked.contains(id) {
         found.insert(0, diagnostics::not_linked(text));
@@ -123,7 +134,8 @@ impl Problems {
             let graph = has_new.then(|| Graph::new(behavior));
             let not_linked = graph.as_ref().map(not_linked_ids).unwrap_or_default();
 
-            let checker = Checker { index, behavior, code, not_linked: &not_linked };
+            let ids = IdIndex::new(behavior);
+            let checker = Checker { index, behavior, code, not_linked: &not_linked, id_index: &ids };
             found.extend(behavior_problems(checker));
         }
         sort(&mut found);
@@ -181,16 +193,18 @@ impl Problems {
 
         // (Owned: the list they are read from is changed after.)
         let was_warned = self.warned_not_linked(active);
+        let behavior = &work.workspace.behaviors[active];
+        let index = IdIndex::new(behavior);
         let mut ids: Vec<&str> = std::iter::once(id)
             .chain(not_linked.iter().copied())
             .chain(was_warned.iter().map(String::as_str))
+            .chain(index.related(id))
             .collect();
         ids.sort_unstable();
         ids.dedup();
 
-        let behavior = &work.workspace.behaviors[active];
         let code = work.place.mod_code.trim();
-        let checker = Checker { index: active, behavior, code, not_linked: &not_linked };
+        let checker = Checker { index: active, behavior, code, not_linked: &not_linked, id_index: &index };
         self.refresh_objects(checker, &ids);
     }
 }
@@ -267,7 +281,8 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
         let checker = |behavior: &Behavior| -> Vec<ObjectProblems> {
             let not_linked = HashSet::default();
-            behavior_problems(Checker { index: 0, behavior, code: "m", not_linked: &not_linked })
+            let ids = IdIndex::new(behavior);
+            behavior_problems(Checker { index: 0, behavior, code: "m", not_linked: &not_linked, id_index: &ids })
         };
 
         assert!(checker(&behavior).is_empty(), "nothing changed");

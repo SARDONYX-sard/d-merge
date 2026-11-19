@@ -2,8 +2,9 @@
 //! the pointers between its objects. Kept up to date object by object.
 //!
 //! e.g., typing in `#0106` re-reads that one object; `hkbBehaviorGraphStringData`, which holds the
-//! event and variable names, and `hkbBehaviorGraphData`, which holds the variable types, are only
-//! parsed again when they are the object that changed.
+//! event and variable names, `hkbBehaviorGraphData`, which holds the variable types, and
+//! `hkbVariableValueSet`, which holds their initial values, are only parsed again when they are the
+//! object that changed.
 
 use std::rc::Rc;
 
@@ -11,7 +12,7 @@ use nemesis_diff::vars;
 
 use crate::{
     tree::Graph,
-    vars_edit::GRAPH_DATA,
+    vars_edit::{GRAPH_DATA, VALUE_SET},
     workspace::{Behavior, STRING_DATA},
 };
 
@@ -71,6 +72,10 @@ pub struct Names {
     pub variables: Vec<String>,
     /// The type of each variable by index, e.g. `REAL`.
     pub variable_types: Vec<Box<str>>,
+    /// The initial value of each variable by index, as written: see [`vars::VariableType::show`].
+    ///
+    /// e.g. `1045220557` (`0.2` of a `REAL`)
+    pub variable_words: Vec<i64>,
     /// `events` and `variables` with those of the referenced mods: what can be used, while only the
     /// others can be edited.
     pub usable_events: Vec<String>,
@@ -94,6 +99,9 @@ impl Names {
         if let Some(id) = behavior.object_of_class(GRAPH_DATA) {
             names.read_types(behavior.text(id).unwrap_or_default());
         }
+        if let Some(id) = behavior.object_of_class(VALUE_SET) {
+            names.variable_words = vars::word_values(behavior.text(id).unwrap_or_default());
+        }
         names
     }
 
@@ -105,6 +113,7 @@ impl Names {
             match object {
                 Some(object) if object.class == STRING_DATA => self.read_names(object.text),
                 Some(object) if object.class == GRAPH_DATA => self.read_types(object.text),
+                Some(object) if object.class == VALUE_SET => self.variable_words = vars::word_values(object.text),
                 _ => {}
             }
         }

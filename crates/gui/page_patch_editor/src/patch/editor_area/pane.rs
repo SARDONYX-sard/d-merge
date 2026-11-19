@@ -91,9 +91,41 @@ pub(super) struct EditorPane {
     /// The trigger names of the clip data template, read once; and those known now, for the completion.
     template_triggers: Option<std::collections::BTreeSet<String>>,
     pub(super) trigger_names: Vec<String>,
+    /// `(cursor line, states)`: what the state field of that line can take, for the completion. See
+    /// [`Self::refresh_state_choices`].
+    pub(super) state_choices: Option<(usize, Vec<editor::ids::assist::StateChoice>)>,
+    /// `((cursor line, text length), path)`: the breadcrumbs above the editor. See
+    /// [`Self::refresh_crumbs`].
+    pub(super) crumbs: Option<((usize, usize), Vec<egui_code_editor::Crumb>)>,
 }
 
 impl EditorPane {
+    /// The path of XML elements to the cursor line, read again only when the line or the text's
+    /// length changed: it is read from the start of the text.
+    pub(super) fn refresh_crumbs(&mut self) {
+        let key = (self.cursor_line, self.text.len());
+        if self.crumbs.as_ref().is_none_or(|(at, _)| *at != key) {
+            self.crumbs = Some((key, egui_code_editor::languages::xml_path(&self.text, self.cursor_line)));
+        }
+    }
+
+    /// The states the state field of the cursor line can take (`toStateId`, ...). Read again only
+    /// when the cursor moved to another line, or the text was checked again after typing.
+    pub(super) fn refresh_state_choices(&mut self, behavior: &Behavior) {
+        let line = self.cursor_line;
+        if self.state_choices.as_ref().is_none_or(|(at, _)| *at != line) {
+            // Every state field ends so: `startStateId`, `toStateId`, `to/fromNestedStateId`.
+            let is_state_field = self.text.lines().nth(line).is_some_and(|text| text.contains("StateId\""));
+            let choices = if is_state_field {
+                let index = editor::ids::IdIndex::new(behavior);
+                editor::ids::assist::state_choices(&self.text, line, &index)
+            } else {
+                Vec::new()
+            };
+            self.state_choices = Some((line, choices));
+        }
+    }
+
     /// Notes whether the editor has the keyboard this frame. Returns whether it just got it: the
     /// side bar shows its object again then, as VS Code's explorer follows the file being edited.
     pub(super) const fn note_focus(&mut self, has_focus: bool) -> bool {
@@ -107,6 +139,7 @@ impl EditorPane {
         let Some(at) = self.focus.take() else { return };
         let index = match at {
             FocusAt::Line(line) => egui_code_editor::text_pos::LinePos { line, column: 0 }.to_char_index(&self.text),
+            FocusAt::At(at) => at.to_char_index(&self.text),
             FocusAt::Keep => egui::TextEdit::load_state(ctx, editor)
                 .and_then(|state| state.cursor.char_range())
                 .map_or(0, |range| range.primary.index.0),
@@ -134,6 +167,7 @@ impl EditorPane {
             return false;
         }
 
+        self.state_choices = None; // the states may have changed
         let patch = behavior.patch(settings.code, id);
         let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(id, patch));
         self.problems = self.field_problems(behavior, id, settings.code);
@@ -184,7 +218,10 @@ impl EditorPane {
             Vec::new() // not this mod's to fix
         } else {
             let is_new = behavior.added.contains_key(id);
-            editor::diagnostics::field_diagnostics(&self.text, behavior, is_new, code)
+            let mut problems = editor::diagnostics::field_diagnostics(&self.text, behavior, is_new, code);
+            let index = editor::ids::IdIndex::new(behavior);
+            problems.extend(editor::ids::id_diagnostics(&self.text, id, &index));
+            problems
         }
     }
 

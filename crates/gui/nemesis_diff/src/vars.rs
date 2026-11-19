@@ -36,13 +36,42 @@ impl VariableType {
     pub const ALL: [Self; 5] = [Self::Bool, Self::Int8, Self::Int16, Self::Int32, Self::Real];
 
     /// e.g. `VARIABLE_TYPE_REAL`
-    pub(crate) const fn havok_name(self) -> &'static str {
+    pub const fn havok_name(self) -> &'static str {
         match self {
             Self::Bool => "VARIABLE_TYPE_BOOL",
             Self::Int8 => "VARIABLE_TYPE_INT8",
             Self::Int16 => "VARIABLE_TYPE_INT16",
             Self::Int32 => "VARIABLE_TYPE_INT32",
             Self::Real => "VARIABLE_TYPE_REAL",
+        }
+    }
+
+    /// The type as [`variable_types`] gives it. e.g. `REAL`
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Bool => "BOOL",
+            Self::Int8 => "INT8",
+            Self::Int16 => "INT16",
+            Self::Int32 => "INT32",
+            Self::Real => "REAL",
+        }
+    }
+
+    /// The type named so by [`variable_types`]. `None`: one without a word value (`POINTER`,
+    /// `VECTOR4`, `QUATERNION`). e.g. `REAL` -> `Real`
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|kind| kind.name() == name)
+    }
+
+    /// The `wordVariableValues` value `word` as it is typed: the other way of [`Self::word_value`].
+    ///
+    /// e.g. `Real` + `1045220557` -> `0.2`, `Bool` + `1` -> `true`, `Int32` + `-3` -> `-3`
+    pub fn show(self, word: i64) -> String {
+        match self {
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // the f32 bits, as written
+            Self::Real => format!("{:?}", f32::from_bits(word as u32)),
+            Self::Bool => (word != 0).to_string(),
+            Self::Int8 | Self::Int16 | Self::Int32 => word.to_string(),
         }
     }
 
@@ -115,6 +144,44 @@ pub fn variable_types(graph_data: &str) -> Vec<&str> {
         .filter_map(|line| line.trim().strip_prefix(OPEN)?.strip_suffix("</hkparam>"))
         .map(|kind| kind.strip_prefix("VARIABLE_TYPE_").unwrap_or(kind))
         .collect()
+}
+
+/// The `value` of each element of `wordVariableValues` of a `hkbVariableValueSet`, by index: the
+/// initial value of each variable. See [`VariableType::show`].
+///
+/// e.g. `<hkobject><hkparam name="value">1045220557</hkparam></hkobject>` -> `1045220557`
+pub fn word_values(value_set: &str) -> Vec<i64> {
+    let Some(array) = Array::find(value_set, "wordVariableValues") else { return Vec::new() };
+    let value_of = |lines: &Vec<Cow<'_, str>>| {
+        lines.iter().find_map(|line| {
+            let value = line.trim().strip_prefix("<hkparam name=\"value\">")?.strip_suffix("</hkparam>")?;
+            value.trim().parse::<i64>().ok()
+        })
+    };
+    array.elements.iter().map(|lines| value_of(lines).unwrap_or_default()).collect()
+}
+
+/// The 0-based line element `index` of the array `param` of `object` starts at.
+///
+/// e.g. `wordVariableValues`, 1 -> the line of the second `<hkobject>` of it
+pub fn element_line(object: &str, param: &str, index: usize) -> Option<usize> {
+    let array = Array::find(object, param)?;
+    let before: usize = array.elements.get(..index)?.iter().map(Vec::len).sum();
+    array.elements.get(index)?;
+    Some(array.head.len() + before)
+}
+
+/// `object` with the field `field` of element `index` of the array `param` set to `value`. `None`:
+/// there is no such element or field.
+///
+/// e.g. `variableInfos`, 3, `type`, `VARIABLE_TYPE_REAL`;
+/// `wordVariableValues`, 3, `value`, `1045220557`
+pub fn set_element_field(object: &str, param: &str, index: usize, field: &str, value: &str) -> Option<String> {
+    let mut array = Array::find(object, param)?;
+    let open = format!("<hkparam name=\"{field}\">");
+    let line = array.elements.get_mut(index)?.iter_mut().find(|line| line.trim_start().starts_with(&open))?;
+    *line = Cow::Owned(format!("{}{open}{value}</hkparam>", indent_of(line)));
+    Some(array.join())
 }
 
 /// A field inside a `variableInfos` element, not the next field of the object.
@@ -386,5 +453,26 @@ mod tests {
         let removed = remove(&string_data, "eventNames", 2).unwrap();
         assert_eq!(names(&removed, "eventNames"), ["moveStart", "moveStop"]);
         assert_eq!(VariableType::Real.word_value("0.2"), Some(1_045_220_557));
+    }
+
+    #[test]
+    fn a_variable_s_type_and_initial_value_are_read_and_set() {
+        let (_, graph_data, value_set) =
+            add_variable(STRING_DATA, GRAPH_DATA, VALUE_SET, "a", VariableType::Real, 1_045_220_557).unwrap();
+        assert_eq!(word_values(&value_set), [1_045_220_557]);
+        assert_eq!(VariableType::from_name(variable_types(&graph_data)[0]), Some(VariableType::Real));
+        assert_eq!(VariableType::Real.show(1_045_220_557), "0.2");
+        assert_eq!((VariableType::Bool.show(1), VariableType::Int8.show(-3)), ("true".to_owned(), "-3".to_owned()));
+        assert_eq!(VariableType::from_name("POINTER"), None, "no word value");
+
+        let graph_data = set_element_field(&graph_data, "variableInfos", 0, "type", "VARIABLE_TYPE_INT8").unwrap();
+        assert_eq!(variable_types(&graph_data), ["INT8"]);
+        assert!(graph_data.contains("ROLE_DEFAULT"), "the rest kept");
+        assert_eq!(element_line(&value_set, "wordVariableValues", 0), Some(2), "after the object's and the field's");
+        assert_eq!(element_line(STRING_DATA, "eventNames", 1), Some(3));
+        assert_eq!(element_line(STRING_DATA, "eventNames", 2), None);
+        let value_set = set_element_field(&value_set, "wordVariableValues", 0, "value", "7").unwrap();
+        assert_eq!(word_values(&value_set), [7]);
+        assert!(set_element_field(&value_set, "wordVariableValues", 1, "value", "7").is_none(), "no element 1");
     }
 }

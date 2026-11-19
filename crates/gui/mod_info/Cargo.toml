@@ -15,6 +15,7 @@ rust-version.workspace = true
 [dependencies]
 fast_hash = { workspace = true }
 rayon     = { workspace = true }
+semver    = { workspace = true } # the versions of `deps`
 serde     = { workspace = true } # Implement (De)Serializer
 serde_ini = { workspace = true }
 snafu     = { workspace = true }

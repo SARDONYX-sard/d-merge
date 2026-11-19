@@ -29,6 +29,7 @@ egui_widgets         = { workspace = true }
 fast_hash            = { workspace = true }
 gui_shared           = { workspace = true }
 hkx_io               = { workspace = true }
+mod_info             = { workspace = true } # `deps` of `info.ini`
 nemesis_diff         = { workspace = true }
 nemesis_xml          = { workspace = true } # its errors: see `editor::parser_error`
 pandora_patch        = { workspace = true }

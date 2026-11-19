@@ -121,6 +121,8 @@ enum FocusAt {
     Keep,
     /// A 0-based line (e.g., go to definition).
     Line(usize),
+    /// A place in a line (e.g., the start of a tag of the breadcrumbs).
+    At(egui_code_editor::text_pos::LinePos),
 }
 
 /// What the editor asked for in a frame. See [`editor_area::EditorArea::apply_editor_result`].
@@ -324,7 +326,7 @@ impl PatchTool {
         let start = !user_patch && !self.work.place.is_open();
         let parts = (&mut self.work, &mut self.panels);
         let asks = if user_patch {
-            ui::user_patch::user_patch_bar(ui, i18n, (&*parts.0, parts.1))
+            ui::user_patch::user_patch_bar(ui, i18n, parts)
         } else if start {
             ui::start_screen::start_screen(ui, i18n, (&*parts.0, parts.1), notify)
         } else {
@@ -351,7 +353,7 @@ impl PatchTool {
         }
 
         let parts = (&mut self.work, &mut self.sel, &mut self.keys);
-        let out = self.editor.show(ui, i18n, parts, &mut self.problems);
+        let out = self.editor.show(ui, i18n, parts, (&mut self.problems, self.side.pending_changes()));
         self.apply_editor_out(ui, out, notify);
     }
 

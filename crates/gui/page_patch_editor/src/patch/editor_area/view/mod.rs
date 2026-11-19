@@ -58,7 +58,7 @@ impl EditorArea {
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         (work, sel, keys): (&mut Work, &mut Selection, &mut Keys),
-        problems: &mut Problems,
+        (problems, changes): (&mut Problems, &[crate::patch::workspace::history::ObjectChange]),
     ) -> EditorOut {
         let mut out = EditorOut::default();
         let Some(id) = sel.selected.clone() else {
@@ -82,7 +82,7 @@ impl EditorArea {
         self.refresh_preview((work, problems), sel.active, &id);
 
         let preview_event = self.side_panel(ui, i18n, (work, sel.active), &id);
-        let result = self.editor_panel(ui, i18n, (work, sel, keys), problems, &id);
+        let result = self.editor_panel(ui, i18n, (work, sel, keys), (problems, changes), &id);
         self.after_editor(ui, (work, sel, keys), (&id, editor_id), (result, preview_event), &mut out);
         out
     }

@@ -18,6 +18,7 @@
 
 pub mod behavior;
 pub mod catalog;
+mod deps;
 mod export;
 pub mod history;
 mod import;
@@ -33,6 +34,7 @@ use std::{
     sync::atomic::{AtomicUsize, Ordering},
 };
 
+pub use ::mod_info::deps::VersionCheck;
 use rayon::prelude::*;
 
 use self::{
@@ -44,7 +46,7 @@ pub use self::{
     behavior::{ADSF, ASDSF, Behavior, ObjectText, PANDORA_DOC, STRING_DATA, Target},
     catalog::{TemplateEntry, catalog},
     locations::{ModCode, code_of, joined, mod_codes_of_root, mod_root_of, nemesis_folder, patch_dir_of_code},
-    mod_info::ModInfo,
+    mod_info::{DepEntry, ModInfo},
 };
 
 /// Where the works are kept: in the patch page's output directory, so for each profile, not in the mods.
@@ -107,11 +109,27 @@ fn take_old_force_ext(dir: &Path, entries: &[PathBuf]) -> bool {
 
 /// A behavior of a cache dir: `<dir>/<behavior>/template.path` and its objects. `None`: no behavior.
 /// `done`: counts the objects read.
+/// Reads the referenced mods `ref_mods` (patch directories) into `behaviors` again, a behavior on
+/// each thread: they are thousands of small files, often on another drive. Counts in `done` the files
+/// read.
+fn read_refs(behaviors: &mut [Behavior], ref_mods: &[String], done: &AtomicUsize) {
+    behaviors.par_iter_mut().for_each(|behavior| {
+        behavior.refs.clear();
+        behavior.ref_events.clear();
+        behavior.ref_variables.clear();
+        for dir in ref_mods {
+            behavior.read_ref(Path::new(dir), done);
+        }
+    });
+}
+
+/// The behavior a work kept in `entry`, counting in `done` its template and its patch files.
 fn read_cached_behavior(entry: &Path, done: &AtomicUsize) -> Result<Option<Behavior>, String> {
     let Ok(template) = std::fs::read_to_string(entry.join("template.path")) else {
         return Ok(None);
     };
     let mut behavior = Behavior::open(Path::new(template.trim()))?;
+    done.fetch_add(1, Ordering::Relaxed);
     behavior.pandora_file = std::fs::read_to_string(entry.join("pandora_file")).ok();
     for file in read_dir(entry)?.filter(|p| p.extension().is_some_and(|e| e == "xml")) {
         done.fetch_add(1, Ordering::Relaxed);
@@ -239,6 +257,10 @@ pub struct Workspace {
     /// their events. Those are read as they are, can be looked at and pointed to, and are not edited
     /// or exported: they come with that mod when merging.
     pub ref_mods: Vec<String>,
+    /// The version each of [`Self::ref_mods`] says, read with them. See [`Self::ref_check`].
+    ///
+    /// e.g. `1.2.0`; empty: it says none
+    ref_versions: Vec<String>,
     /// The revisions of the work. See [`history`].
     pub history: history::History,
     /// How conflicts were resolved, to do it again. See [`crate::editor::merge`].
@@ -300,8 +322,10 @@ impl Workspace {
     }
 
     /// Adds the mod at `selected` (its root or a patch directory) to [`Self::ref_mods`], except for
-    /// the code `own_code`, which is this mod.
+    /// the code `own_code`, which is this mod. Only the mods it adds are read: a mod has thousands of
+    /// files, and a user patch adds one for each side of a conflict.
     pub fn add_ref(&mut self, selected: &Path, own_code: &str) {
+        let known = self.ref_mods.len();
         for dir in patch_dirs_of(selected) {
             let is_own = dir.file_name().is_some_and(|name| name.eq_ignore_ascii_case(own_code));
             let dir = dir.display().to_string();
@@ -310,19 +334,35 @@ impl Workspace {
                 self.ref_mods.push(dir);
             }
         }
-        self.reload_refs();
+
+        let added = &self.ref_mods[known..];
+        self.ref_versions.extend(added.iter().map(|dir| deps::ref_version(Path::new(dir))));
+        let none = AtomicUsize::new(0);
+        self.behaviors.par_iter_mut().for_each(|behavior| {
+            for dir in added {
+                behavior.read_ref(Path::new(dir), &none);
+            }
+        });
     }
 
-    /// Reads the referenced mods into every behavior. Call when they or the behaviors change.
+    /// Reads the referenced mods into every behavior. Call when they changed as a whole (one was
+    /// removed, another list of them was set); see [`Self::add_ref`] and [`Self::reload_refs_from`]
+    /// for less.
     pub fn reload_refs(&mut self) {
-        for behavior in &mut self.behaviors {
-            behavior.refs.clear();
-            behavior.ref_events.clear();
-            behavior.ref_variables.clear();
-            for dir in &self.ref_mods {
-                behavior.read_ref(Path::new(dir));
-            }
-        }
+        self.reload_refs_counted(&AtomicUsize::new(0));
+    }
+
+    /// [`Self::reload_refs`], counting in `done` the files read.
+    fn reload_refs_counted(&mut self, done: &AtomicUsize) {
+        self.ref_versions = self.ref_mods.iter().map(|dir| deps::ref_version(Path::new(dir))).collect();
+        read_refs(&mut self.behaviors, &self.ref_mods, done);
+    }
+
+    /// Reads the referenced mods into the behaviors from `first` on, which were opened since they were
+    /// read: e.g. by taking in a conflict's value.
+    pub fn reload_refs_from(&mut self, first: usize) {
+        let Some(opened) = self.behaviors.get_mut(first..) else { return };
+        read_refs(opened, &self.ref_mods, &AtomicUsize::new(0));
     }
 
     /// `<root>/<code>`. `root`: see [`cache_root_of`].
@@ -390,7 +430,8 @@ impl Workspace {
         workspace.history = sonic_rs::from_str(&history).unwrap_or_default();
         let resolutions = std::fs::read_to_string(dir.join(RESOLUTIONS_FILE)).unwrap_or_default();
         workspace.resolutions = sonic_rs::from_str(&resolutions).unwrap_or_default();
-        workspace.reload_refs();
+        // Counted too: they are most of what is read, after the patches of the work.
+        workspace.reload_refs_counted(done);
         let hashes = workspace.files_to_save()?.iter().map(|(path, text)| (path.clone(), text_hash(text))).collect();
         workspace.saved = Some(SavedFiles { dir, hashes });
         Ok(workspace)
@@ -645,6 +686,13 @@ mod tests {
         workspace.add_ref(&dir.join("mods/a"), "upatch");
         workspace.add_ref(&dir.join("mods/a"), "upatch"); // once
 
+        // A behavior opened since has the referenced mods read in only when asked.
+        workspace.behaviors.push(Behavior::open(&template).unwrap());
+        assert!(!workspace.behaviors[1].is_ref("#amco$0"));
+        workspace.reload_refs_from(1);
+        assert!(workspace.behaviors[1].is_ref("#amco$0"));
+        workspace.behaviors.pop();
+
         let behavior = &workspace.behaviors[0];
         let shown = behavior.texts().find(|object| object.id == "#amco$0").map(|object| object.name);
         let (class, is_ref, text, patch, edited) = (
@@ -893,10 +941,13 @@ mod tests {
         assert_eq!(workspace.ext_info("name=a", "mine"), "name=a", "nothing known: as Nemesis'");
 
         workspace.info.version = " 1.2.0 ".into();
-        workspace.info.deps = vec!["bfco".into(), "mine".into()];
+        workspace.info.deps = vec![
+            DepEntry { code: "bfco".into(), req: ">=1.0".into() },
+            DepEntry { code: "mine".into(), req: String::new() },
+        ];
         workspace.ref_mods =
             vec!["D:/mods/a/Nemesis_Engine/mod/amco".into(), "D:/mods/b/Nemesis_Engine/mod/bfco".into()];
-        assert_eq!(workspace.ext_info("name=a", "mine"), "name=a\nversion=1.2.0\ndeps=amco,bfco");
+        assert_eq!(workspace.ext_info("name=a", "mine"), "name=a\nversion=1.2.0\ndeps=amco,bfco>=1.0");
     }
 
     #[test]
@@ -906,7 +957,10 @@ mod tests {
             author: "me".into(),
             site: "https://x".into(),
             version: "1.2.0".into(),
-            deps: vec!["amco".into(), "bfco".into()],
+            deps: vec![
+                DepEntry { code: "amco".into(), req: ">=1.2.0".into() },
+                DepEntry { code: "bfco".into(), req: String::new() },
+            ],
             other: vec!["auto=true".into(), "; a comment".into()],
         };
         assert_eq!(parse_info(&info_ini(&info)), info);

@@ -24,8 +24,9 @@ pub struct CodeEditorState {
     /// The editor had the keyboard focus last frame.
     pub(crate) had_focus: bool,
     pub(crate) layout: layout::LayoutCache,
-    /// The symbol the right-click menu was opened on (the pointer moves while it is open).
-    pub(crate) menu_target: Option<LinePos>,
+    /// The symbol the right-click menu was opened on (the pointer moves while it is open), and the
+    /// document of its definition, asked once when it opened. e.g. `(12:5, "#0106")`
+    pub(crate) menu_target: Option<(LinePos, String)>,
     /// The selection (char range) when the right-click menu opened: its Copy and Cut act on it. The
     /// editor has no cursor while the menu has the keyboard.
     pub(crate) menu_selection: std::ops::Range<usize>,

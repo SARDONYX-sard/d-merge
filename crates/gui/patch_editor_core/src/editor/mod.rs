@@ -2,6 +2,7 @@
 //! beside the text. The drawing is in the page.
 
 pub mod diagnostics;
+pub mod ids;
 pub mod language;
 pub mod merge;
 pub mod names;

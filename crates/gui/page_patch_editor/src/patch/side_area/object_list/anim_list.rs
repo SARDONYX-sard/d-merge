@@ -21,6 +21,7 @@ use crate::patch::{
     side_area::{
         anim_tree::{AnimRow, AnimTreeState, FileKind},
         explorer::{ListScroll, fixed_row, offset_to_show, row_height},
+        tree::Uncommitted,
     },
     tree::{Graph, Node},
 };
@@ -107,6 +108,8 @@ pub(super) struct ListInput<'a> {
     pub(super) scroll: ListScroll,
     /// The projects files can be duplicated to.
     pub(super) projects: &'a [String],
+    /// What changed since the last commit: a file's `A` / `M` after its name.
+    pub(super) uncommitted: Uncommitted<'a>,
 }
 
 /// Draws the rows seen (up and down only, a row cut with `…`). Returns what was asked for, and
@@ -182,7 +185,7 @@ fn folder_row(
     event
 }
 
-/// `    ● Idle~mymod$0.txt`
+/// `    ● Idle~mymod$0.txt  M`: `M` (`A`) if it changed since the last commit, in its color.
 fn file_row(ui: &mut egui::Ui, i18n: &I18nMap, node: Node, name: &str, input: &ListInput<'_>) -> Option<AnimEvent> {
     let graph = input.graph;
     let id = graph.id(node);
@@ -190,6 +193,10 @@ fn file_row(ui: &mut egui::Ui, i18n: &I18nMap, node: Node, name: &str, input: &L
     let marker = if graph.is_changed(node) { "● " } else { "" };
 
     let response = egui_widgets::fitted_button(ui, is_selected, &format!("    {marker}{name}"));
+    if let Some(kind) = input.uncommitted.kind(id) {
+        let color = crate::patch::ui::change_color(ui, kind);
+        ui.label(egui::RichText::new(kind.mark()).monospace().color(color));
+    }
     // A double click keeps it open; a click selects it.
     let mut event = if response.double_clicked() {
         Some(AnimEvent::Menu(node, RowAction::KeepOpen))

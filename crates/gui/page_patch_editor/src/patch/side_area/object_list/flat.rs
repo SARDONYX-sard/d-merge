@@ -12,7 +12,7 @@ use super::{RowAction, row_menu};
 use crate::patch::{
     side_area::{
         explorer::{ListScroll, fixed_row, offset_to_show, row_height},
-        tree::object_button,
+        tree::{Uncommitted, object_button},
     },
     tree::{Graph, Node},
 };
@@ -31,7 +31,7 @@ pub(super) fn show(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
     (graph, rows): (&Graph, &[Node]),
-    selected: Option<&str>,
+    (selected, uncommitted): (Option<&str>, Uncommitted<'_>),
     (scroll_to, scroll): (Option<usize>, ListScroll),
 ) -> (Option<FlatEvent>, ListScroll) {
     let height = row_height(ui);
@@ -47,7 +47,7 @@ pub(super) fn show(
     let output = area.show_rows(ui, height, rows.len(), |ui, range| {
         for &node in &rows[range] {
             let is_selected = selected == Some(graph.id(node));
-            if let Some(asked) = row_ui(ui, i18n, graph, node, (height, is_selected)) {
+            if let Some(asked) = row_ui(ui, i18n, graph, node, (height, is_selected), uncommitted) {
                 event = Some(asked);
             }
         }
@@ -65,8 +65,9 @@ fn row_ui(
     graph: &Graph,
     node: Node,
     (height, selected): (f32, bool),
+    uncommitted: Uncommitted<'_>,
 ) -> Option<FlatEvent> {
-    let response = fixed_row(ui, height, |ui| object_button(ui, graph, node, (selected, false)));
+    let response = fixed_row(ui, height, |ui| object_button(ui, graph, node, (selected, false), uncommitted));
 
     // A double click keeps it open; a click selects it.
     let mut event = if response.double_clicked() {
