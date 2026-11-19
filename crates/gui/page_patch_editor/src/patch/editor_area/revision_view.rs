@@ -149,7 +149,7 @@ impl Views {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     go_to = self.list[at].body.nav(ui, i18n.t(I18nKey::JumpDiffHover));
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                        let marks = super::tab_bar::TabMarks { focused: true, problems: None };
+                        let marks = super::tab_bar::TabMarks { focused: true, problems: None, changes: ("", &[]) };
                         output.tab_event =
                             super::tab_bar::tab_bar(ui, i18n, tabs, (active, ""), graph, marks, &view_tabs);
                     });

@@ -22,6 +22,7 @@ use crate::patch::{
     side_area::{
         anim_tree::{self, AnimFile, AnimRow},
         explorer::{Explorer, ObjectList, take_reveal},
+        tree::Uncommitted,
     },
     tree::{Graph, Node, ObjectTree, TreeKey},
 };
@@ -44,7 +45,7 @@ impl Explorer {
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         (graph, path): (&Graph, &str),
-        keys: &[TreeKey],
+        (keys, uncommitted): (&[TreeKey], Uncommitted<'_>),
         selected: &mut Option<Rc<str>>,
     ) -> ListOutput {
         if !self.trees.contains_key(path) {
@@ -70,7 +71,7 @@ impl Explorer {
         }
 
         let flags = (self.changed_only, self.tree_focus, reveal);
-        let menu = crate::patch::side_area::tree::tree_ui(ui, graph, selected, tree, flags, i18n);
+        let menu = crate::patch::side_area::tree::tree_ui(ui, graph, selected, tree, flags, (i18n, uncommitted));
         ListOutput { menu, ..ListOutput::default() }
     }
 
@@ -81,7 +82,7 @@ impl Explorer {
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         (graph, is_adsf, projects): (&Graph, bool, &[String]),
-        keys: &[TreeKey],
+        (keys, uncommitted): (&[TreeKey], Uncommitted<'_>),
         selected: &mut Option<Rc<str>>,
     ) -> ListOutput {
         self.refresh_list(graph, true);
@@ -118,6 +119,7 @@ impl Explorer {
                 scroll_to: if moved { cursor } else { selected_row.filter(|_| reveal) },
                 scroll: self.list_scroll,
                 projects,
+                uncommitted,
             };
             anim_list::show(ui, i18n, &rows, &input)
         };
@@ -170,7 +172,7 @@ impl Explorer {
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         graph: &Graph,
-        keys: &[TreeKey],
+        (keys, uncommitted): (&[TreeKey], Uncommitted<'_>),
         selected: &mut Option<Rc<str>>,
     ) -> ListOutput {
         self.refresh_list(graph, false);
@@ -190,7 +192,7 @@ impl Explorer {
         }
 
         let scroll = (self.list_scroll_to.take(), self.list_scroll);
-        let (event, scroll) = flat::show(ui, i18n, (graph, rows), selected.as_deref(), scroll);
+        let (event, scroll) = flat::show(ui, i18n, (graph, rows), (selected.as_deref(), uncommitted), scroll);
         self.list_scroll = scroll;
 
         match event {

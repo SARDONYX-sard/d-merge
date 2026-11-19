@@ -5,7 +5,12 @@
 use egui_widgets::shadcn::{Icon, MenuItem};
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use crate::patch::{TabEvent, editor::tabs::EditorTabs, tree::Graph};
+use crate::patch::{
+    TabEvent,
+    editor::tabs::EditorTabs,
+    tree::Graph,
+    workspace::history::{ChangeKind, ObjectChange},
+};
 
 /// What the tabs show of the editor and the work, besides the tabs themselves.
 pub(super) struct TabMarks<'a> {
@@ -13,6 +18,9 @@ pub(super) struct TabMarks<'a> {
     pub(super) focused: bool,
     /// The work's problems: a tab of an object with some is red (errors) or yellow (warnings only).
     pub(super) problems: Option<&'a [crate::patch::problems::ObjectProblems]>,
+    /// The active behavior's template (`meshes_path`), and what changed since the last commit: a tab
+    /// of one is marked `A` / `M` / `D` in its color, as VS Code's git.
+    pub(super) changes: (&'a str, &'a [ObjectChange]),
 }
 
 impl TabMarks<'_> {
@@ -21,6 +29,12 @@ impl TabMarks<'_> {
         let group = self.problems?.iter().find(|group| group.behavior == behavior && group.id == id)?;
         egui_code_editor::problems::worst(&group.problems)
     }
+
+    /// How object `id` of the active behavior changed since the last commit, if it did.
+    fn change(&self, id: &str) -> Option<ChangeKind> {
+        let (behavior, changes) = self.changes;
+        changes.iter().find(|change| change.behavior == behavior && change.id == id).map(|change| change.kind)
+    }
 }
 
 /// `▔▔▔▔▔▔▔▔▔▔▔▔▔`
@@ -28,8 +42,9 @@ impl TabMarks<'_> {
 /// [`crate::patch::editor::tabs`].
 ///
 /// Only the name, to keep the tabs short: the hover has the whole label, and the tree follows the tab.
-/// A click shows a tab, a double click pins it, a middle click or `✖` closes it. `●`: the object is
-/// changed; italic: the preview tab; red / yellow: it has problems.
+/// A click shows a tab, a double click pins it, a middle click or `✖` closes it. `A` / `M` / `D` in
+/// green / yellow / red: it changed since the last commit, as VS Code's git; italic: the preview
+/// tab; red / yellow text: it has problems.
 ///
 /// `views`: the diffs / blames open (see [`super::revision_view::Views`]), as tabs after the objects'.
 /// With one shown, no object's tab is (`current` is `""`).
@@ -54,9 +69,10 @@ pub(super) fn tab_bar(
                     let node = graph.node_of(id);
                     let name = tab_name(node.map_or("", |node| graph.short_name(node)), id);
                     let tone = marks.severity(behavior, id).map(|severity| severity.color(ui.visuals()));
+                    let change = marks.change(id).map(|kind| (kind.mark(), crate::patch::ui::change_color(ui, kind)));
                     egui_widgets::EditorTab::new(egui::RichText::new(name), id == current)
                         .focused(marks.focused)
-                        .modified(node.is_some_and(|node| graph.is_changed(node)))
+                        .decoration(change)
                         .preview(!tab.pinned)
                         .tone(tone)
                         .hover(node.map_or(id, |node| graph.label(node)))

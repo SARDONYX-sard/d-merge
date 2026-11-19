@@ -14,6 +14,16 @@ pub(super) mod top_bar;
 pub(super) mod user_patch;
 pub(super) mod windows;
 
+/// Source Control's colors, also of the tabs: added green, modified yellow, removed red.
+pub(super) fn change_color(ui: &egui::Ui, kind: crate::patch::workspace::history::ChangeKind) -> egui::Color32 {
+    use crate::patch::workspace::history::ChangeKind;
+    match kind {
+        ChangeKind::Added => egui::Color32::from_rgb(0x73, 0xc9, 0x91),
+        ChangeKind::Modified => egui::Color32::from_rgb(0xe2, 0xc0, 0x8d),
+        ChangeKind::Removed => ui.visuals().error_fg_color,
+    }
+}
+
 /// How far the job is, in place of the page while it runs: see [`crate::patch::tool::job`].
 ///
 /// ```text

@@ -353,7 +353,7 @@ impl PatchTool {
         }
 
         let parts = (&mut self.work, &mut self.sel, &mut self.keys);
-        let out = self.editor.show(ui, i18n, parts, &mut self.problems);
+        let out = self.editor.show(ui, i18n, parts, (&mut self.problems, self.side.pending_changes()));
         self.apply_editor_out(ui, out, notify);
     }
 

@@ -71,6 +71,11 @@ pub(in crate::patch) struct SideArea {
 }
 
 impl SideArea {
+    /// What changed since the last commit, as the Changes view lists it: the tabs mark them.
+    pub(in crate::patch) fn pending_changes(&self) -> &[crate::patch::workspace::history::ObjectChange] {
+        &self.scm.pending.changes
+    }
+
     /// The user patch's: its behaviors listed, and only what it changes.
     pub(in crate::patch) fn for_user_patch() -> Self {
         let mut side = Self::default();

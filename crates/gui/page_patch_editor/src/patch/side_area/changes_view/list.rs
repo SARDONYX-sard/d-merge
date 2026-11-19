@@ -24,7 +24,7 @@ use crate::patch::{
     side_area::changes::{Scm, ScmRow},
     workspace::{
         Workspace,
-        history::{ChangeKind, ObjectChange, Revision},
+        history::{ObjectChange, Revision},
     },
 };
 
@@ -235,7 +235,12 @@ fn change_row(
     let mut picked = None;
 
     ui.horizontal(|ui| {
-        ui.label(egui::RichText::new(change.kind.mark()).monospace().strong().color(kind_color(ui, change.kind)));
+        ui.label(
+            egui::RichText::new(change.kind.mark())
+                .monospace()
+                .strong()
+                .color(crate::patch::ui::change_color(ui, change.kind)),
+        );
 
         let text = {
             let name = behavior.map_or_else(|| file_stem(&change.behavior), |at| workspace.behaviors[at].name.as_str());
@@ -309,15 +314,6 @@ fn change_menu(
         picked = Some(action);
     }
     picked
-}
-
-/// Source Control's colors: added green, modified yellow, removed red.
-fn kind_color(ui: &egui::Ui, kind: ChangeKind) -> egui::Color32 {
-    match kind {
-        ChangeKind::Added => egui::Color32::from_rgb(0x73, 0xc9, 0x91),
-        ChangeKind::Modified => egui::Color32::from_rgb(0xe2, 0xc0, 0x8d),
-        ChangeKind::Removed => ui.visuals().error_fg_color,
-    }
 }
 
 /// `meshes/actors/character/behaviors/0_master.bin` -> `0_master`: a behavior the work no longer has.

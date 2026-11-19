@@ -1,7 +1,10 @@
 //! The parents of the rows scrolled to, pinned over the top of the tree, as VS Code's sticky
 //! scroll: without them, a long list of children shows nothing of what they belong to.
 
-use super::{INDENT, TreeEvent, label::object_button};
+use super::{
+    INDENT, TreeEvent,
+    label::{Uncommitted, object_button},
+};
 use crate::patch::tree::{Graph, MAX_STICKY, TreeState};
 
 /// Draws them over the top of `view` (what is seen of the list). `step`: a row's height with its
@@ -10,8 +13,8 @@ pub(super) fn show(
     ui: &mut egui::Ui,
     graph: &Graph,
     state: &TreeState,
-    view: egui::Rect,
-    step: f32,
+    (view, step): (egui::Rect, f32),
+    uncommitted: Uncommitted<'_>,
 ) -> Option<TreeEvent> {
     let rows = state.sticky_rows(step, MAX_STICKY);
     if rows.is_empty() {
@@ -34,7 +37,7 @@ pub(super) fn show(
         let line = state.rows()[row];
         band.horizontal(|ui| {
             ui.add_space(f32::from(line.depth).mul_add(INDENT, -state.scroll_x).max(0.0));
-            if object_button(ui, graph, line.node, (false, false)).clicked() {
+            if object_button(ui, graph, line.node, (false, false), uncommitted).clicked() {
                 event = Some(TreeEvent::Select(row));
             }
         });

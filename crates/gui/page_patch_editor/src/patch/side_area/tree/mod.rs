@@ -21,7 +21,7 @@ use std::rc::Rc;
 
 use gui_shared::i18n::I18nMap;
 
-pub(super) use self::label::object_button;
+pub(super) use self::label::{Uncommitted, object_button};
 use super::object_list::RowAction;
 use crate::patch::tree::{Graph, Node, ObjectTree, TreeState};
 
@@ -56,17 +56,17 @@ pub(super) fn tree_ui(
     selected: &mut Option<Rc<str>>,
     state: &mut TreeState,
     (changed_only, focused, reveal): (bool, bool, bool),
-    i18n: &I18nMap,
+    (i18n, uncommitted): (&I18nMap, Uncommitted<'_>),
 ) -> Option<(Node, RowAction)> {
     let source = ObjectTree { graph, changed_only };
     state.prepare(&source, selected.as_deref());
 
-    unlinked::show(ui, graph, (selected, reveal), i18n);
+    unlinked::show(ui, graph, (selected, reveal), (i18n, uncommitted));
 
     // The later a part is drawn, the more it wins: the pinned rows are over the others.
     let crumb = breadcrumb::show(ui, graph, state, selected.as_deref(), i18n);
-    let shown = rows::show(ui, graph, state, (selected.as_deref(), focused), i18n);
-    let pinned = sticky::show(ui, graph, state, shown.view, shown.step);
+    let shown = rows::show(ui, graph, state, (selected.as_deref(), focused), (i18n, uncommitted));
+    let pinned = sticky::show(ui, graph, state, (shown.view, shown.step), uncommitted);
     let event = pinned.or(shown.event).or(crumb);
 
     apply(event, &source, state, selected)

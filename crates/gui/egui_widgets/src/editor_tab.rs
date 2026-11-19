@@ -12,6 +12,7 @@
 //! | its editor has the keyboard| that line in the accent color (else gray)                 |
 //! | hovered                    | a faint background, and `✖`                               |
 //! | `modified`                 | `●` where `✖` is, `✖` when hovered                         |
+//! | `decoration`               | a letter before `✖` and the text in its color (VS Code's git `M`) |
 //! | `preview`                  | italic: the next tab opened replaces it                   |
 //! | `tone`                     | the text in that color, e.g. red for errors in the file   |
 
@@ -25,6 +26,7 @@ pub struct EditorTab {
     modified: bool,
     preview: bool,
     tone: Option<egui::Color32>,
+    decoration: Option<(&'static str, egui::Color32)>,
     read_only: bool,
     hover: Option<egui::WidgetText>,
     height: f32,
@@ -150,6 +152,7 @@ impl EditorTab {
             modified: false,
             preview: false,
             tone: None,
+            decoration: None,
             read_only: false,
             hover: None,
             height: Self::HEIGHT,
@@ -183,6 +186,14 @@ impl EditorTab {
     #[inline]
     pub const fn tone(mut self, tone: Option<egui::Color32>) -> Self {
         self.tone = tone;
+        self
+    }
+
+    /// A letter before `✖` in its color, the text in that color too unless [`Self::tone`] has one: as
+    /// VS Code marks a file changed in git. e.g. `("M", yellow)`
+    #[inline]
+    pub const fn decoration(mut self, decoration: Option<(&'static str, egui::Color32)>) -> Self {
+        self.decoration = decoration;
         self
     }
 
@@ -225,6 +236,7 @@ impl EditorTab {
         let visuals = ui.visuals();
         let color = self
             .tone
+            .or_else(|| self.decoration.map(|(_, color)| color))
             .unwrap_or_else(|| if self.active { visuals.strong_text_color() } else { visuals.weak_text_color() });
         let text = match self.text {
             egui::WidgetText::RichText(text) if self.preview => {
@@ -236,7 +248,8 @@ impl EditorTab {
             text.into_galley(ui, Some(egui::TextWrapMode::Truncate), self.max_text_width, egui::TextStyle::Body);
         let elided = galley.elided;
         let lock = if self.read_only { Self::CLOSE_SIZE + 2.0 } else { 0.0 };
-        let width = self.padding + galley.size().x + 6.0 + lock + Self::CLOSE_SIZE + self.padding;
+        let letter = if self.decoration.is_some() { Self::CLOSE_SIZE } else { 0.0 };
+        let width = self.padding + galley.size().x + 6.0 + lock + letter + Self::CLOSE_SIZE + self.padding;
         let (rect, response) = ui.allocate_exact_size(egui::vec2(width, self.height), egui::Sense::click());
         // A hand over it, as over a link: it is clicked, not typed in.
         let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
@@ -275,6 +288,11 @@ impl EditorTab {
             let center = egui::pos2(close_rect.left() - 2.0 - Self::CLOSE_SIZE / 2.0, rect.center().y);
             let lock_rect = egui::Rect::from_center_size(center, egui::Vec2::splat(Self::CLOSE_SIZE * 0.75));
             crate::shadcn::icon::paint_icon(painter, lock_rect, crate::shadcn::Icon::Lock, visuals.weak_text_color());
+        }
+        if let Some((letter, letter_color)) = self.decoration {
+            let center = egui::pos2(close_rect.left() - lock - Self::CLOSE_SIZE / 2.0, rect.center().y);
+            let font = egui::FontId::monospace(Self::CLOSE_SIZE * 0.75);
+            painter.text(center, egui::Align2::CENTER_CENTER, letter, font, letter_color);
         }
         let text_pos = egui::pos2(rect.left() + self.padding, rect.center().y - galley.size().y / 2.0);
         painter.galley(text_pos, galley, color);

@@ -6,7 +6,7 @@ use std::rc::Rc;
 use egui_widgets::HoverMarkdown as _;
 use gui_shared::i18n::{I18nKey, I18nMap};
 
-use super::label::object_button;
+use super::label::{Uncommitted, object_button};
 use crate::patch::tree::Graph;
 
 /// How high the list gets before it scrolls.
@@ -14,7 +14,12 @@ const MAX_HEIGHT: f32 = 80.0;
 
 /// Draws the list, if there is anything in it. A click selects that object. `reveal`: the selected
 /// object is scrolled to, if it is here (e.g. a click on its warning in the Problems panel).
-pub(super) fn show(ui: &mut egui::Ui, graph: &Graph, (selected, reveal): (&mut Option<Rc<str>>, bool), i18n: &I18nMap) {
+pub(super) fn show(
+    ui: &mut egui::Ui,
+    graph: &Graph,
+    (selected, reveal): (&mut Option<Rc<str>>, bool),
+    (i18n, uncommitted): (&I18nMap, Uncommitted<'_>),
+) {
     let unlinked = graph.unlinked();
     if unlinked.is_empty() {
         return;
@@ -27,7 +32,7 @@ pub(super) fn show(ui: &mut egui::Ui, graph: &Graph, (selected, reveal): (&mut O
         for &node in unlinked {
             let id = graph.id(node);
             let is_selected = selected.as_deref() == Some(id);
-            let button = object_button(ui, graph, node, (is_selected, false));
+            let button = object_button(ui, graph, node, (is_selected, false), uncommitted);
             if is_selected && reveal {
                 button.scroll_to_me(Some(egui::Align::Center));
             }

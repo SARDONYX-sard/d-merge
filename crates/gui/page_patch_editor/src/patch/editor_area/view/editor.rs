@@ -61,7 +61,7 @@ impl EditorArea {
         ui: &mut egui::Ui,
         i18n: &I18nMap,
         (work, sel, keys): (&mut Work, &mut Selection, &mut Keys),
-        problems: &mut Problems,
+        (problems, changes): (&mut Problems, &[crate::patch::workspace::history::ObjectChange]),
         id: &str,
     ) -> EditorResult {
         let format_and_save = self.pane.editor_keys(keys);
@@ -85,6 +85,7 @@ impl EditorArea {
                 tabs: &self.tabs,
                 views: &self.views,
                 problems: problems.list.as_deref(),
+                changes: (&behavior.meshes_path, changes),
                 active: sel.active,
                 id,
                 graph: &names.graph,
