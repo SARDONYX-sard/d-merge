@@ -21,6 +21,9 @@ pub enum I18nKey {
     /// Add
     AddButton,
 
+    /// Add the checked hkx to:
+    AnimDataAddTo,
+
     /// Clips (animationdatasinglefile)
     AnimDataClips,
 
@@ -32,6 +35,9 @@ pub enum I18nKey {
 
     /// Generate
     AnimDataGenerate,
+
+    /// The mod's hkx
+    AnimDataHkx,
 
     /// New Clips
     AnimDataNewClips,
@@ -59,12 +65,13 @@ pub enum I18nKey {
     /// # Targets
     /// - `animationdatasinglefile`: the clip data of this work's clips, from their hkx
     /// - `animationsetdatasinglefile`: the hkx you choose, added to the anim sets you choose
+    /// - the characters' XML: the hkx you choose, added to the `animationNames` of their characters
     AnimDataOpenHover,
 
     /// Project:
     AnimDataProject,
 
-    /// Anim sets (animationsetdatasinglefile)
+    /// Anim sets: what the game caches (animationsetdatasinglefile)
     AnimDataSet,
 
     /// Adds every checked hkx to every checked txt.
@@ -95,7 +102,7 @@ pub enum I18nKey {
     /// No character template for these actors
     AnimNamesNoCharacter,
 
-    /// Also add the checked hkx to their characters
+    /// Their characters' animationNames (the character's XML)
     AnimNamesToCharacters,
 
     /// Adds each checked hkx to the `animationNames` of the characters of its actor, told by its directory. A behavior plays a hkx only if its character lists it.

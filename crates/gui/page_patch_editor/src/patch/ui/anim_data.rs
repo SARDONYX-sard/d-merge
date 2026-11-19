@@ -1,4 +1,4 @@
-//! The "animation data" window: which clips of the mod get data, and which hkx join which anim sets.
+//! The "animation data" window: which clips of the mod get data, and where the mod's hkx are added.
 //!
 //! ```text
 //! ┌ Animation data ──────────────────────────────────────────┐
@@ -6,17 +6,20 @@
 //! │ ▼ Clips                                                  │
 //! │   ☑ Paraglide_Equip  Animations\..\Equip.hkx   3.30 s    │
 //! │   ☐ Broken           Animations\..\Gone.hkx    ✖         │  <- hover: why
-//! │ ▼ Anim sets                                              │
-//! │   ☑ Also add the checked hkx to their characters         │  <- anim::character
-//! │   Project: [DefaultMaleData~DefaultMale (1) ▼]           │
-//! │   hkx  1 / 12  [All] [None]   txt  1 / 374  [All] [None] │
-//! │   [filter               ]     [filter                ]   │
-//! │   ☑ meshes\..\Equip.hkx       ☑ 1HMSolo.txt              │
-//! │   ☐ meshes\..\Idle.hkx        ☐ 1HMDual.txt              │
+//! │ ▼ The mod's hkx                                          │
+//! │   hkx  1 / 12  [All] [None]  [filter            ]        │
+//! │   ☑ meshes\..\Equip.hkx                                  │
+//! │   Add the checked hkx to:                                │
+//! │   ☑ Their characters' animationNames (the XML)           │  <- anim::character
+//! │   ☑ Anim sets: what the game caches                      │  <- the anim set files
+//! │       Project: [DefaultMaleData~DefaultMale (1) ▼]       │
+//! │       txt  1 / 374  [All] [None]  [filter       ]        │
+//! │       ☑ 1HMSolo.txt                                      │
 //! │ [Generate]                                               │
 //! └──────────────────────────────────────────────────────────┘
 //! ```
-//! The two halves are independent: the user decides which hkx go to which txt.
+//! The clips and the hkx are independent. The hkx are chosen once, then where they go: the
+//! characters a behavior plays them from, the anim sets the game caches them in, or both.
 //! See [`crate::patch::anim::data`] for what is generated.
 
 use std::path::{Path, PathBuf};
@@ -68,9 +71,11 @@ pub(super) struct AnimDataDialog {
     projects: Vec<SetProject>,
     /// The project shown, in `projects`.
     project: usize,
-    /// The checked hkx also go to the `animationNames` of their actors' characters. See
+    /// The checked hkx go to the `animationNames` of their actors' characters. See
     /// [`crate::patch::anim::character`].
     add_names: bool,
+    /// The checked hkx go to the checked anim set files.
+    add_sets: bool,
 }
 
 /// What a form's window asked for.
@@ -101,11 +106,12 @@ impl AnimDataDialog {
         self.projects.iter().map(|project| project.files.checked_count()).sum()
     }
 
-    /// Whether `Generate` has anything to do. hkx without a txt (or the reverse) is not a request,
-    /// unless they go to the characters.
+    /// Whether `Generate` has anything to do: clips, or hkx with somewhere to go (the characters, or
+    /// a txt of the anim sets).
     fn can_generate(&self) -> bool {
         let hkx = self.hkx.checked_count() > 0;
-        self.checked_clips() > 0 || (hkx && (self.checked_sets() > 0 || self.add_names))
+        let to_sets = self.add_sets && self.checked_sets() > 0;
+        self.checked_clips() > 0 || (hkx && (self.add_names || to_sets))
     }
 }
 
@@ -129,7 +135,8 @@ impl AnimDataDialog {
         let project = data::default_project(&folders, hkx.first().map(String::as_str));
         let projects =
             sets.into_iter().map(|(folder, files)| SetProject { folder, files: Checklist::new(files) }).collect();
-        Self { root: root.to_path_buf(), rows, hkx: Checklist::new(hkx), projects, project, add_names: true }
+        let hkx = Checklist::new(hkx);
+        Self { root: root.to_path_buf(), rows, hkx, projects, project, add_names: true, add_sets: true }
     }
 
     /// `Generate`: what was checked goes into `work`, and `sel` goes to the generated files.
@@ -137,7 +144,8 @@ impl AnimDataDialog {
         let code = work.place.mod_code.trim().to_owned();
         let chosen: Vec<(&ClipSource, HkxInfo)> =
             self.rows.iter().filter(|row| row.checked).filter_map(chosen_clip).collect();
-        let sets: Vec<String> = self.projects.iter().flat_map(project_set_ids).collect();
+        let sets: Vec<String> =
+            if self.add_sets { self.projects.iter().flat_map(project_set_ids).collect() } else { Vec::new() };
         let request = Generate {
             code: &code,
             clips: chosen.iter().map(|(clip, info)| (*clip, info)).collect(),
@@ -203,13 +211,9 @@ fn dialog_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) -> 
     egui::CollapsingHeader::new(i18n.t(I18nKey::AnimDataClips)).default_open(true).show(ui, |ui| {
         clips_ui(ui, i18n, &mut dialog.rows);
     });
-    egui::CollapsingHeader::new(i18n.t(I18nKey::AnimDataSet))
-        .default_open(true)
-        .show(ui, |ui| {
-            anim_sets_ui(ui, i18n, dialog);
-        })
-        .header_response
-        .on_hover_markdown(i18n.t(I18nKey::AnimDataSetHover));
+    egui::CollapsingHeader::new(i18n.t(I18nKey::AnimDataHkx)).default_open(true).show(ui, |ui| {
+        hkx_ui(ui, i18n, dialog);
+    });
     ui.separator();
     ui.add_enabled(dialog.can_generate(), Button::new(i18n.t(I18nKey::AnimDataGenerate)).primary()).clicked()
 }
@@ -226,27 +230,40 @@ fn clips_ui(ui: &mut egui::Ui, i18n: &I18nMap, rows: &mut [ClipRow]) {
     });
 }
 
-/// The project, and side by side the hkx and the txt of that project.
-fn anim_sets_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) {
-    ui.add(Checkbox::new(&mut dialog.add_names, i18n.t(I18nKey::AnimNamesToCharacters)))
-        .on_hover_markdown(i18n.t(I18nKey::AnimNamesToCharactersHover));
-    project_combo(ui, i18n, dialog);
-    let AnimDataDialog { hkx, projects, project, .. } = dialog;
-    let labels = ChecklistLabels {
+/// The words of a checklist's row of buttons.
+fn checklist_labels(i18n: &I18nMap) -> ChecklistLabels<'_> {
+    ChecklistLabels {
         all: i18n.t(I18nKey::FilterTextAll),
         none: i18n.t(I18nKey::AnimDataNone),
         filter: i18n.t(I18nKey::FilterLabel),
-    };
-    ui.columns(2, |columns| {
-        if hkx.is_empty() {
-            columns[0].colored_label(columns[0].visuals().warn_fg_color, i18n.t(I18nKey::AnimDataNoHkx));
-        } else {
-            hkx.show(&mut columns[0], "hkx", &labels, LIST_HEIGHT);
-        }
-        if let Some(project) = projects.get_mut(*project) {
-            project.files.show(&mut columns[1], "txt", &labels, LIST_HEIGHT);
-        }
-    });
+    }
+}
+
+/// The mod's hkx to check, then where the checked ones go: the characters, the anim sets.
+fn hkx_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) {
+    if dialog.hkx.is_empty() {
+        ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::AnimDataNoHkx));
+        return;
+    }
+    dialog.hkx.show(ui, "hkx", &checklist_labels(i18n), LIST_HEIGHT);
+
+    ui.add_space(4.0);
+    ui.label(i18n.t(I18nKey::AnimDataAddTo));
+    ui.add(Checkbox::new(&mut dialog.add_names, i18n.t(I18nKey::AnimNamesToCharacters)))
+        .on_hover_markdown(i18n.t(I18nKey::AnimNamesToCharactersHover));
+    ui.add(Checkbox::new(&mut dialog.add_sets, i18n.t(I18nKey::AnimDataSet)))
+        .on_hover_markdown(i18n.t(I18nKey::AnimDataSetHover));
+    if dialog.add_sets {
+        ui.indent("nemesis_anim_sets", |ui| anim_sets_ui(ui, i18n, dialog));
+    }
+}
+
+/// The project, and the txt of that project the checked hkx go to.
+fn anim_sets_ui(ui: &mut egui::Ui, i18n: &I18nMap, dialog: &mut AnimDataDialog) {
+    project_combo(ui, i18n, dialog);
+    if let Some(project) = dialog.projects.get_mut(dialog.project) {
+        project.files.show(ui, "txt", &checklist_labels(i18n), LIST_HEIGHT);
+    }
 }
 
 /// `Project: [DefaultMaleData~DefaultMale (1)]`: the count tells where checks are, as each project
