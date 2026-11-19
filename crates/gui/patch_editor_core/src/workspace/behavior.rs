@@ -341,7 +341,9 @@ impl Behavior {
     ///
     /// Its names object is kept too, as `#0083@amco` (see [`Self::ref_names_objects`]): where its
     /// events and variables are defined, for `$eventID[x]$` to go to.
-    pub fn read_ref(&mut self, mod_dir: &Path) {
+    ///
+    /// `done` counts the files read.
+    pub fn read_ref(&mut self, mod_dir: &Path, done: &std::sync::atomic::AtomicUsize) {
         if self.is_anim_data() {
             return;
         }
@@ -354,6 +356,7 @@ impl Behavior {
             .filter(|path| file_stem(path).starts_with('#'))
             .collect();
         for file in files {
+            done.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let Ok(text) = read_text(&file) else { continue };
             let id = file_stem(&file);
             if self.template_object(&id).is_some_and(|object| object.class == STRING_DATA) {

@@ -15,13 +15,27 @@ pub(super) mod user_patch;
 pub(super) mod windows;
 
 /// How far the job is, in place of the page while it runs: see [`crate::patch::tool::job`].
+///
+/// ```text
+/// ◌ Reading the work: upatch  1615        the total not known: what was read so far
+/// ◌ Renaming the mod code: oldc -> newc
+/// [██████████          120 / 300        ]  the total known: a bar, its count inside it
+/// ```
+///
+/// The spinner is beside the words, not in the bar: egui draws an animated bar's spinner over its text.
 pub(super) fn job_progress(ui: &mut egui::Ui, i18n: &gui_shared::i18n::I18nMap, job: &crate::patch::tool::job::Job) {
     ui.add_space(12.0);
-    ui.label(format!("{}: {}", i18n.t(job.label), job.detail));
     let (done, total) = job.counts();
-    let (ratio, text) = match job.progress() {
-        Some(ratio) => (ratio, format!("{done} / {total}")),
-        None => (0.0, done.to_string()),
-    };
-    ui.add(egui::ProgressBar::new(ratio).text(text).animate(true));
+    let ratio = job.progress();
+
+    ui.horizontal(|ui| {
+        ui.add(egui::Spinner::new());
+        ui.label(format!("{}: {}", i18n.t(job.label), job.detail));
+        if ratio.is_none() && done > 0 {
+            ui.weak(egui::RichText::new(done.to_string()).monospace());
+        }
+    });
+    if let Some(ratio) = ratio {
+        ui.add(egui::ProgressBar::new(ratio).text(format!("{done} / {total}")));
+    }
 }

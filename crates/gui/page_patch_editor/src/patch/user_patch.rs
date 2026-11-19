@@ -150,10 +150,11 @@ impl Work {
         if self.workspace.info.name.is_empty() {
             i18n.t(I18nKey::UserPatchTitle).clone_into(&mut self.workspace.info.name);
         }
+        let opened = self.workspace.behaviors.len();
         // What the value points to is that mod's.
         self.workspace.add_ref(Path::new(&request.mod_dir), USER_PATCH_CODE);
         resolve::apply(&mut self.workspace, root, request)?;
-        self.workspace.reload_refs(); // a behavior may have been opened
+        self.workspace.reload_refs_from(opened); // a behavior may have been opened
         self.reset_names();
 
         self.write_user_patch()
@@ -174,6 +175,7 @@ impl Work {
             i18n.t(I18nKey::UserPatchTitle).clone_into(&mut self.workspace.info.name);
         }
         let mut done = BulkDone::default();
+        let opened = self.workspace.behaviors.len();
         for (at, request) in requests.iter().enumerate() {
             // What it takes from the mods is theirs.
             self.workspace.add_ref(Path::new(&request.mod_dir), USER_PATCH_CODE);
@@ -185,7 +187,7 @@ impl Work {
                 Err(err) => done.failed.push(format!("{}: {err}", request.path)),
             }
         }
-        self.workspace.reload_refs(); // behaviors may have been opened
+        self.workspace.reload_refs_from(opened); // behaviors may have been opened
         self.reset_names();
 
         done.invalid = self.write_user_patch()?;
@@ -228,6 +230,7 @@ pub(super) fn take_in_resolution(
     undo_unedited_draft((work, editor, sel));
     let before = Draft::before(&work.workspace);
     let mark = work.change_mark();
+    let opened = work.workspace.behaviors.len();
     if work.workspace.info.name.is_empty() {
         i18n.t(I18nKey::UserPatchTitle).clone_into(&mut work.workspace.info.name);
     }
@@ -248,7 +251,7 @@ pub(super) fn take_in_resolution(
         Some,
     );
     let Some(resolve::Resolved { behavior, id, line }) = shown else { return };
-    work.workspace.reload_refs(); // a behavior may have been opened
+    work.workspace.reload_refs_from(opened); // a behavior may have been opened
     work.reset_names();
 
     sel.active = behavior;

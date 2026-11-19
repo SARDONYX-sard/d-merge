@@ -419,8 +419,8 @@ impl Work {
         }
 
         self.workspace.behaviors.push(behavior);
-        self.workspace.reload_refs();
         sel.active = self.workspace.behaviors.len() - 1;
+        self.workspace.reload_refs_from(sel.active);
         sel.selected = None; // an id of the other behavior
         self.mark_dirty();
     }
