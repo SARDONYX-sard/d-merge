@@ -4,6 +4,65 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0-alpha.2] - 2026-11-19
+### :sparkles: New Features
+- [`a579a3e`](https://github.com/SARDONYX-sard/d-merge/commit/a579a3e9c810ec0dd1378164639041d326801c5f) - support multi mod ver. class add op *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`bd69aca`](https://github.com/SARDONYX-sard/d-merge/commit/bd69aca397235c54f02327010a961f9ef5f660b4) - **patch**: a mod picked in the list shows what it is to the others, as MO2 *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`7f2458d`](https://github.com/SARDONYX-sard/d-merge/commit/7f2458d13f2821141beaaee3c840325fcc439429) - **patch_editor**: a new object nothing links to is warned of in the editor and the Problems panel *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`54a590b`](https://github.com/SARDONYX-sard/d-merge/commit/54a590b1930234fb53c6cb080a5721a76c8d9812) - use strict mode(always) in code editor *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`d41b3d7`](https://github.com/SARDONYX-sard/d-merge/commit/d41b3d720b7abf9646aec130ae3bd10ce158bcc1) - **patch**: the reading of patches reports each file, not only each mod dir *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4890f07`](https://github.com/SARDONYX-sard/d-merge/commit/4890f07980d69a730cec86cd0f20e0cb8acb1bc2) - **core**: the debug log says how many seconds each mod's patches took to read *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9ae08a3`](https://github.com/SARDONYX-sard/d-merge/commit/9ae08a30a4ded4624542bd93cc60cd3864708111) - **patch_editor**: the merge panel shows the objects each mod's values point to *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4809766`](https://github.com/SARDONYX-sard/d-merge/commit/480976697b24bfd7afb0d76190fd5af5ca42f353) - **patch**: a conflict the user patch decides shows as resolved, apart from what is still to do *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`e4cfb5d`](https://github.com/SARDONYX-sard/d-merge/commit/e4cfb5d540abfb70e87882c290336242cbcf2ac9) - implement markdown hover *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4eb150c`](https://github.com/SARDONYX-sard/d-merge/commit/4eb150c63b871f40d7e0d5f95d4b60d86dde39a0) - **patch_editor**: the tree follows every jump of the editor *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`5f96fc8`](https://github.com/SARDONYX-sard/d-merge/commit/5f96fc89cc1254f28a00b41495d818e35bf16edc) - **user_patch**: resolve conflicts of a kind at once from the user patch's window *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`9551a35`](https://github.com/SARDONYX-sard/d-merge/commit/9551a358295e301419c2be9388da8beef3038dc5) - **patch_editor**: a node graph of the objects, as a blueprint, switched with the text at once *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`e9e26b8`](https://github.com/SARDONYX-sard/d-merge/commit/e9e26b8a5c5ad019f6572cf8db0f8b3f31af15fd) - **code_editor**: Vim is a feature (`vim`, on by default) *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`2d4ac4f`](https://github.com/SARDONYX-sard/d-merge/commit/2d4ac4f0e5c2b389fb2c5d928388fdecd3420488) - **d_merge**: "Help" is "Settings", in tabs *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`43a4d76`](https://github.com/SARDONYX-sard/d-merge/commit/43a4d76d35f0267499ac170437bb9c0fc542da19) - **patch_editor**: a field's type on the hover of its name in the details *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6008aea`](https://github.com/SARDONYX-sard/d-merge/commit/6008aeab92979f689aba9f32212753ed5a44a33f) - **hkanno**: Save writes over the file, backing it up first if asked *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6f83b02`](https://github.com/SARDONYX-sard/d-merge/commit/6f83b02d55fa7e0b78eec7e367650c555cefdfa0) - **gui**: align label *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`c9b7246`](https://github.com/SARDONYX-sard/d-merge/commit/c9b7246cf4d8aac7d6ac8d74764ad37ada5b9de8) - **patch_editor**: the versions of a referenced mod, in `deps` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`3eadbc4`](https://github.com/SARDONYX-sard/d-merge/commit/3eadbc491d454361019c56719968017cb90158c1) - **patch_editor**: ids by number: checked, navigated, hovered and completed *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`fdc491d`](https://github.com/SARDONYX-sard/d-merge/commit/fdc491d3547ed74fb171ea534cb47ad16e8d2e0d) - **patch_editor**: variables listed and edited as `name: TYPE = value` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`ae0b759`](https://github.com/SARDONYX-sard/d-merge/commit/ae0b75926c4372c60ebb36d59d8afba63a37f4c3) - **egui_code_editor**: Vim's `%` between a start and an end tag *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4cc68a8`](https://github.com/SARDONYX-sard/d-merge/commit/4cc68a86de702505bd09b8bf1ad5c753706d6aaa) - **patch_editor**: breadcrumbs of the XML elements above the editor *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`a27100a`](https://github.com/SARDONYX-sard/d-merge/commit/a27100a6e21bbc873e519e2511ec5bf2efffc70c) - **patch_editor**: tabs and the explorer marked as VS Code's git: `A` / `M` since the last commit *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`63f4a47`](https://github.com/SARDONYX-sard/d-merge/commit/63f4a47932f38af060c72e24d888147e89c491aa) - **patch_editor**: the animation data window chooses the hkx, then where they go *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`d2a1e3d`](https://github.com/SARDONYX-sard/d-merge/commit/d2a1e3df09a1def3f9cf70b84a4a74d5cabc3fc8) - **patch_editor**: fix anim path appender *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :bug: Bug Fixes
+- [`29b40b9`](https://github.com/SARDONYX-sard/d-merge/commit/29b40b97deedd00c27a1f12b467880d63d50897d) - **code_editor**: Copy and Cut of the right-click menu act on the selection it opened with *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`f93f7b1`](https://github.com/SARDONYX-sard/d-merge/commit/f93f7b1d37733e9c7bc2d58bd6de7282e1523244) - **patch_editor**: a template Nemesis does not have is a mode, not a warning *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6c141da`](https://github.com/SARDONYX-sard/d-merge/commit/6c141dabf572d87bc420575a59574505ea72bf44) - **user_patch**: its window shows how far its read is, instead of freezing *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`0ba5570`](https://github.com/SARDONYX-sard/d-merge/commit/0ba557023e54fb4c927b1f59e29a080c4e19b2b8) - **patch**: the user patch's own value at a conflict has no `Use this` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`8b0c9a0`](https://github.com/SARDONYX-sard/d-merge/commit/8b0c9a0796b1878b9db4733c2e60f4293992c294) - **patch_editor**: no row too wide widens the side bar or a panel any more *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`765020e`](https://github.com/SARDONYX-sard/d-merge/commit/765020e2a85a972802cef1d3d6ef0933bf02c4c4) - **egui_widgets**: a select's label is in the middle of its row, not above it *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`4226492`](https://github.com/SARDONYX-sard/d-merge/commit/42264924c840af52e3eabdf23fa4d3ab587f258f) - **egui_widgets**: labels beside fields are in their middle, not above them *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`8cd2aa4`](https://github.com/SARDONYX-sard/d-merge/commit/8cd2aa4d25fe6b18c86f60558022e4c7a91679d0) - **keybinding**: the list of a key sequence waits as the editor's own *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`69eed5d`](https://github.com/SARDONYX-sard/d-merge/commit/69eed5de24f099a406fb94539654783517114934) - **keybinding**: `space shift+v` reveals the file instead of Vim's `V` *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`e33558a`](https://github.com/SARDONYX-sard/d-merge/commit/e33558a548fe1be3a1845f300be9cd80f911db02) - **patch_editor**: the hkx of DAR / OAR folders are not the mod's animations *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`614318a`](https://github.com/SARDONYX-sard/d-merge/commit/614318ac3053b736b2460e4bead24c89f0bfc3c9) - **patch_editor**: each part of the animation data window has its own button *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :zap: Performance Improvements
+- [`63aad69`](https://github.com/SARDONYX-sard/d-merge/commit/63aad69ac64120a3404271fcfa15a7b0d8df0b13) - **core**: the patch maps are made for one writer at a time, without DashMap *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`0c8a140`](https://github.com/SARDONYX-sard/d-merge/commit/0c8a1402a233f8187f4b2de6b03f7bbce5885b11) - **patch_editor**: the user patch opens without reading its referenced mods again and again *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :recycle: Refactors
+- [`3d934ed`](https://github.com/SARDONYX-sard/d-merge/commit/3d934edb2f6a0a766a6e1a7504489a87af13731f) - **patch**: the conflict check reads `.patch.json` with the merge's own types *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`6313dbe`](https://github.com/SARDONYX-sard/d-merge/commit/6313dbe4acf24199bd842acfc24077c60235325d) - `nemesis_diff` and `pandora_patch` are in `crates/gui`: the merge does not use them *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`7fe5b13`](https://github.com/SARDONYX-sard/d-merge/commit/7fe5b130cdccae6d83d0706a391128c139cdcf07) - **patch_editor**: the parser's errors are taken with their place, not read back from their report *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`d287edf`](https://github.com/SARDONYX-sard/d-merge/commit/d287edfaccc2c9836159c928a6ee07f9428e9e05) - narrow code effect scope *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :white_check_mark: Tests
+- [`feb0515`](https://github.com/SARDONYX-sard/d-merge/commit/feb05151b8f8c785e43a518c827faea815f41f16) - **tracing_rotation**: each test has a temp directory of its own, with std only *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+- [`f5990ab`](https://github.com/SARDONYX-sard/d-merge/commit/f5990ab7694130d398a46f7f74d5809787588c9f) - **user_patch**: its window's test waits for the read as the window does *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+### :wrench: Chores
+- [`c7ea9a9`](https://github.com/SARDONYX-sard/d-merge/commit/c7ea9a9d5b5faf6e112c156c52487b6c66163ee3) - diable when patching *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
+
+
 ## [3.0.0-alpha.1] - 2026-11-14
 ### :sparkles: New Features
 - [`b8bcffa`](https://github.com/SARDONYX-sard/d-merge/commit/b8bcffa407f0fdb156e2f5c893d11d2c35c25fb1) - **core**: Pandora v5 patches; fixes of the patch and animation data parsers *(commit by [@SARDONYX-sard](https://github.com/SARDONYX-sard))*
@@ -774,3 +833,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [2.8.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.7.5...2.8.0
 [3.0.0-alpha.0]: https://github.com/SARDONYX-sard/d-merge/compare/2.8.0...3.0.0-alpha.0
 [3.0.0-alpha.1]: https://github.com/SARDONYX-sard/d-merge/compare/3.0.0-alpha.0...3.0.0-alpha.1
+[3.0.0-alpha.2]: https://github.com/SARDONYX-sard/d-merge/compare/3.0.0-alpha.1...3.0.0-alpha.2
