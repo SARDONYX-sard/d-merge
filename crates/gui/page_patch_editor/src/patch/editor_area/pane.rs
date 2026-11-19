@@ -54,6 +54,11 @@ pub(super) struct EditorPane {
     pub(super) had_focus: bool,
     /// Where the keyboard goes next frame.
     pub(super) focus: Option<FocusAt>,
+    /// The tab was just opened: once its inline diff is known, if it is shown, the cursor goes to the
+    /// first change, as VS Code's diff editor opens. A tab shown before keeps where it was.
+    pub(super) to_first_change: bool,
+    /// A line the cursor goes to without the keyboard: see [`Self::first_change`].
+    place_at: Option<usize>,
     /// The line of the cursor, last frame.
     pub(super) cursor_line: usize,
     /// The patch of the open object and the parser's word on it. `None`: to compute again, see
@@ -136,6 +141,10 @@ impl EditorPane {
 
     /// Gives the editor the keyboard and moves its cursor, if that was asked for.
     pub(super) fn apply_focus_request(&mut self, ctx: &egui::Context, editor: egui::Id) {
+        if let Some(line) = self.place_at.take() {
+            let index = egui_code_editor::text_pos::LinePos { line, column: 0 }.to_char_index(&self.text);
+            egui_code_editor::place_cursor(ctx, editor, index);
+        }
         let Some(at) = self.focus.take() else { return };
         let index = match at {
             FocusAt::Line(line) => egui_code_editor::text_pos::LinePos { line, column: 0 }.to_char_index(&self.text),
@@ -204,7 +213,20 @@ impl EditorPane {
         self.inline_diff = behavior
             .template_object(id)
             .map_or_else(InlineDiff::default, |template| InlineDiff::between(&template.text, &self.text));
+        self.first_change();
         true
+    }
+
+    /// A tab just opened goes to its first change, if the inline diff is shown and nothing asked for
+    /// another line (e.g., go to definition). The keyboard stays where it is: in the tree, say.
+    fn first_change(&mut self) {
+        if !std::mem::take(&mut self.to_first_change) || !self.show_inline_diff {
+            return;
+        }
+        if matches!(self.focus, Some(FocusAt::Line(_) | FocusAt::At(_))) {
+            return;
+        }
+        self.place_at = self.inline_diff.first_line();
     }
 
     /// The underlines of the text itself (the parser's come after).
@@ -309,6 +331,32 @@ mod tests {
         assert!(!pane.note_focus(true));
         assert!(!pane.note_focus(false));
         assert!(pane.note_focus(true));
+    }
+
+    /// A tab just opened goes to its first change while the inline diff shows, once: unless a line
+    /// was asked for, and not without the inline diff.
+    #[test]
+    fn a_tab_just_opened_goes_to_its_first_change() {
+        let diff = || egui_code_editor::InlineDiff::between("a\nb\nc\nd\n", "a\nb\nx\nd\n");
+        let mut pane = EditorPane { inline_diff: diff(), show_inline_diff: true, ..Default::default() };
+
+        pane.to_first_change = true;
+        pane.first_change();
+        assert_eq!(pane.place_at, Some(2));
+        pane.place_at = None;
+        pane.first_change();
+        assert_eq!(pane.place_at, None, "once");
+
+        pane.to_first_change = true;
+        pane.focus = Some(FocusAt::Line(0)); // e.g. go to definition
+        pane.first_change();
+        assert_eq!(pane.place_at, None, "the line asked for");
+
+        pane.focus = None;
+        pane.to_first_change = true;
+        pane.show_inline_diff = false;
+        pane.first_change();
+        assert_eq!(pane.place_at, None, "no inline diff shown");
     }
 
     /// Vim `]c`: in the text while the inline diff shows, else in the preview.

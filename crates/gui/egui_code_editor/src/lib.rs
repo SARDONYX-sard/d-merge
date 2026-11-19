@@ -60,7 +60,7 @@ pub(crate) use self::cursor::scroll_request_id;
 pub use self::{
     breadcrumbs::{Breadcrumbs, Crumb},
     command::{EditorCommand, EditorFeatures},
-    cursor::{editor_id, set_cursor},
+    cursor::{editor_id, place_cursor, set_cursor},
     diff_view::{DiffView, DiffViewOutput},
     editor::{CodeEditor, CodeEditorOutput, Navigation},
     inline_diff::{CharChange, DiffHunk, InlineDiff},

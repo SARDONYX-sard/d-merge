@@ -112,9 +112,9 @@ impl EditorTabs {
         }
     }
 
-    /// The editor state of the tab about to be shown: as it was left, or a new one.
-    pub fn take_state(&mut self, behavior: usize, id: &str) -> CodeEditorState {
-        self.position(behavior, id).and_then(|at| self.tabs[at].editor.take()).unwrap_or_default()
+    /// The editor state of the tab about to be shown, as it was left. `None`: it was never shown.
+    pub fn take_state(&mut self, behavior: usize, id: &str) -> Option<CodeEditorState> {
+        self.position(behavior, id).and_then(|at| self.tabs[at].editor.take())
     }
 }
 

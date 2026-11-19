@@ -239,7 +239,10 @@ impl EditorArea {
         }
         let current = left.as_ref().filter(|(behavior, _)| *behavior == active).map(|(_, id)| id.as_str());
         self.tabs.open(active, id, current);
-        self.pane.state = self.tabs.take_state(active, id);
+        let left_state = self.tabs.take_state(active, id);
+        // Shown for the first time: at its first change, once it is known (see `EditorPane::first_change`).
+        self.pane.to_first_change = left_state.is_none();
+        self.pane.state = left_state.unwrap_or_default();
 
         let behavior = &work.workspace.behaviors[active];
         self.pane.refresh_trigger_names(behavior, Path::new(&work.place.template_dir));

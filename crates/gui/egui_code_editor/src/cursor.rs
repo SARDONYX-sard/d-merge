@@ -20,6 +20,17 @@ pub fn set_cursor(ctx: &egui::Context, id: egui::Id, index: usize) {
     ctx.data_mut(|data| data.insert_temp(scroll_request_id(id), true));
 }
 
+/// Moves the cursor of the editor `id` and scrolls it into view, as [`set_cursor`], but leaves the
+/// keyboard where it is: e.g., a tab opened from a tree shows its first change while the tree keeps
+/// the keyboard.
+#[inline]
+pub fn place_cursor(ctx: &egui::Context, id: egui::Id, index: usize) {
+    let mut state = egui::TextEdit::load_state(ctx, id).unwrap_or_default();
+    state.cursor.set_char_range(Some(CCursorRange::one(CCursor::new(index))));
+    state.store(ctx, id);
+    ctx.data_mut(|data| data.insert_temp(scroll_request_id(id), true));
+}
+
 /// Temp-memory flag: "scroll the cursor into view on the next `show`".
 pub(crate) fn scroll_request_id(id: egui::Id) -> egui::Id {
     id.with("scroll_to_cursor")
