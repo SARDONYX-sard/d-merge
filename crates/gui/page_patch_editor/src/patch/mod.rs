@@ -121,6 +121,8 @@ enum FocusAt {
     Keep,
     /// A 0-based line (e.g., go to definition).
     Line(usize),
+    /// A place in a line (e.g., the start of a tag of the breadcrumbs).
+    At(egui_code_editor::text_pos::LinePos),
 }
 
 /// What the editor asked for in a frame. See [`editor_area::EditorArea::apply_editor_result`].

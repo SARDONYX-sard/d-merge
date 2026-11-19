@@ -28,6 +28,7 @@
 //! 3. a picked completion / `Shift+Alt+F` formatting is applied to the text
 //! 4. overlays are drawn (cursor line, block cursor, hover, signature help, inlay hints)
 
+mod breadcrumbs;
 mod command;
 mod comment;
 mod completion;
@@ -57,6 +58,7 @@ mod ui;
 
 pub(crate) use self::cursor::scroll_request_id;
 pub use self::{
+    breadcrumbs::{Breadcrumbs, Crumb},
     command::{EditorCommand, EditorFeatures},
     cursor::{editor_id, set_cursor},
     diff_view::{DiffView, DiffViewOutput},

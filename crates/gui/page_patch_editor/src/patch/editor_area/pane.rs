@@ -94,9 +94,21 @@ pub(super) struct EditorPane {
     /// `(cursor line, states)`: what the state field of that line can take, for the completion. See
     /// [`Self::refresh_state_choices`].
     pub(super) state_choices: Option<(usize, Vec<editor::ids::assist::StateChoice>)>,
+    /// `((cursor line, text length), path)`: the breadcrumbs above the editor. See
+    /// [`Self::refresh_crumbs`].
+    pub(super) crumbs: Option<((usize, usize), Vec<egui_code_editor::Crumb>)>,
 }
 
 impl EditorPane {
+    /// The path of XML elements to the cursor line, read again only when the line or the text's
+    /// length changed: it is read from the start of the text.
+    pub(super) fn refresh_crumbs(&mut self) {
+        let key = (self.cursor_line, self.text.len());
+        if self.crumbs.as_ref().is_none_or(|(at, _)| *at != key) {
+            self.crumbs = Some((key, egui_code_editor::languages::xml_path(&self.text, self.cursor_line)));
+        }
+    }
+
     /// The states the state field of the cursor line can take (`toStateId`, ...). Read again only
     /// when the cursor moved to another line, or the text was checked again after typing.
     pub(super) fn refresh_state_choices(&mut self, behavior: &Behavior) {
@@ -127,6 +139,7 @@ impl EditorPane {
         let Some(at) = self.focus.take() else { return };
         let index = match at {
             FocusAt::Line(line) => egui_code_editor::text_pos::LinePos { line, column: 0 }.to_char_index(&self.text),
+            FocusAt::At(at) => at.to_char_index(&self.text),
             FocusAt::Keep => egui::TextEdit::load_state(ctx, editor)
                 .and_then(|state| state.cursor.char_range())
                 .map_or(0, |range| range.primary.index.0),
