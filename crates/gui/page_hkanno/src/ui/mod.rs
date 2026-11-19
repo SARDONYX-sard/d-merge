@@ -88,7 +88,7 @@ impl HkannoPage {
             }
         });
 
-        self.dialogs(ui.ctx(), &mut ctx);
+        self.dialogs(ui.ctx(), &ctx);
         drop_overlay(ui.ctx(), ctx.i18n);
     }
 
@@ -184,6 +184,10 @@ impl HkannoPage {
         }
         if let Some(chosen) = status.keymap {
             ctx.lsp_settings.editor_mode = EditorMode::from_vim(chosen.is_vim());
+        }
+        if let Some(gear) = &status.options {
+            let popup = egui_code_editor::AnchoredPopup::new(gear, &mut self.show_lsp_options);
+            popup.show(|ui| toolbar::lsp_options(ui, ctx.i18n, ctx.lsp_settings));
         }
 
         let Some(tab) = self.tabs.get_mut(self.active) else { return };
@@ -461,6 +465,8 @@ struct StatusAsk {
     toggle_problems: bool,
     /// `Vim ▾` picked another keymap.
     keymap: Option<Keymap>,
+    /// The `⚙`: the language features' popup opens at it.
+    options: Option<egui::Response>,
 }
 
 /// The status bar of `tab`: its counts, `Vim ▾` and `⚙` at its right end, as VS Code's.
@@ -477,7 +483,8 @@ fn status_bar(
                 .keymap_select(&mut chosen)
                 .options(show_options, i18n.t(I18nKey::LspOptionsTitle))
                 .show(ui);
-            StatusAsk { toggle_problems: status.problems.clicked(), keymap: status.keymap_changed.then_some(chosen) }
+            let toggle_problems = status.problems.clicked();
+            StatusAsk { toggle_problems, keymap: status.keymap_changed.then_some(chosen), options: status.options }
         })
         .inner
 }

@@ -118,13 +118,10 @@ impl HkannoPage {
         }
     }
 
-    /// Revert confirmation and the language feature options window.
-    pub(crate) fn dialogs(&mut self, egui_ctx: &egui::Context, ctx: &mut HkannoPageCtx<'_>) {
+    /// Revert confirmation.
+    pub(crate) fn dialogs(&mut self, egui_ctx: &egui::Context, ctx: &HkannoPageCtx<'_>) {
         if self.show_revert {
             self.revert_modal(egui_ctx, ctx);
-        }
-        if self.show_lsp_options {
-            lsp_options_window(egui_ctx, ctx, &mut self.show_lsp_options);
         }
     }
 
@@ -164,25 +161,24 @@ impl HkannoPage {
     }
 }
 
-/// Window with one checkbox per language feature.
-fn lsp_options_window(egui_ctx: &egui::Context, ctx: &mut HkannoPageCtx<'_>, open: &mut bool) {
-    egui_widgets::window_near_pointer(egui_ctx, ctx.i18n.t(I18nKey::LspOptionsTitle))
-        .open(open)
-        .resizable(false)
-        .collapsible(false)
-        .show(egui_ctx, |ui| {
-            let options = [
-                (&mut ctx.lsp_settings.completion, I18nKey::LspCompletion, I18nKey::LspCompletionHover),
-                (&mut ctx.lsp_settings.code_action, I18nKey::LspCodeAction, I18nKey::LspCodeActionHover),
-                (&mut ctx.lsp_settings.diagnostics, I18nKey::LspDiagnostics, I18nKey::LspDiagnosticsHover),
-                (&mut ctx.lsp_settings.formatter, I18nKey::LspFormatter, I18nKey::LspFormatterHover),
-                (&mut ctx.lsp_settings.semantic_tokens, I18nKey::LspSemanticTokens, I18nKey::LspSemanticTokensHover),
-                (&mut ctx.lsp_settings.hover, I18nKey::LspHover, I18nKey::LspHoverHover),
-                (&mut ctx.lsp_settings.inlay_hints, I18nKey::LspInlayHints, I18nKey::LspInlayHintsHover),
-                (&mut ctx.lsp_settings.signature_help, I18nKey::LspSignatureHelp, I18nKey::LspSignatureHelpHover),
-            ];
-            for (value, label, hover) in options {
-                ui.add(Checkbox::new(value, ctx.i18n.t(label))).on_hover_text(ctx.i18n.t(hover));
-            }
-        });
+/// The `⚙` popup: one checkbox per language feature.
+pub(super) fn lsp_options(
+    ui: &mut egui::Ui,
+    i18n: &gui_shared::i18n::I18nMap,
+    lsp: &mut gui_shared::settings::ui::editor::LspOptions,
+) {
+    ui.strong(i18n.t(I18nKey::LspOptionsTitle));
+    let options = [
+        (&mut lsp.completion, I18nKey::LspCompletion, I18nKey::LspCompletionHover),
+        (&mut lsp.code_action, I18nKey::LspCodeAction, I18nKey::LspCodeActionHover),
+        (&mut lsp.diagnostics, I18nKey::LspDiagnostics, I18nKey::LspDiagnosticsHover),
+        (&mut lsp.formatter, I18nKey::LspFormatter, I18nKey::LspFormatterHover),
+        (&mut lsp.semantic_tokens, I18nKey::LspSemanticTokens, I18nKey::LspSemanticTokensHover),
+        (&mut lsp.hover, I18nKey::LspHover, I18nKey::LspHoverHover),
+        (&mut lsp.inlay_hints, I18nKey::LspInlayHints, I18nKey::LspInlayHintsHover),
+        (&mut lsp.signature_help, I18nKey::LspSignatureHelp, I18nKey::LspSignatureHelpHover),
+    ];
+    for (value, label, hover) in options {
+        ui.add(Checkbox::new(value, i18n.t(label))).on_hover_text(i18n.t(hover));
+    }
 }

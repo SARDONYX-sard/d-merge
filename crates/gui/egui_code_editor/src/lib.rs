@@ -45,6 +45,7 @@ pub mod languages;
 mod layout;
 mod nav_history;
 mod palette;
+mod popup;
 pub mod problems;
 mod quick_fix;
 mod references;
@@ -72,6 +73,7 @@ pub use self::{
     layout::line_job,
     nav_history::NavHistory,
     palette::{EditorAction, EditorLabels},
+    popup::{AnchoredPopup, widget_frame},
     problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
     references::ReferenceList,
     request::EditorRequest,

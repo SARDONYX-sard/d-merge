@@ -47,6 +47,9 @@ pub struct StatusBarOutput {
     pub problems: egui::Response,
     /// Another keymap was chosen (it is in the `Keymap` given to [`StatusBar::keymap_select`]).
     pub keymap_changed: bool,
+    /// The `⚙` of [`StatusBar::options`]: the host's options open at it, e.g. in an
+    /// `egui_widgets::AnchoredPopup`.
+    pub options: Option<egui::Response>,
 }
 
 impl std::fmt::Debug for StatusBar<'_> {
@@ -78,11 +81,14 @@ impl<'a> StatusBar<'a> {
     pub fn show(self, ui: &mut egui::Ui) -> StatusBarOutput {
         let Self { state, keymap, text, keymap_select, options } = self;
         let mut keymap_changed = false;
+        let mut gear = None;
         let problems = draw(ui, state, keymap, text, |ui| {
-            if let Some((open, hover)) = options
-                && ui.add(Button::selectable(*open, "⚙").small()).on_hover_text(hover).clicked()
-            {
-                *open = !*open;
+            if let Some((open, hover)) = options {
+                let button = ui.add(Button::selectable(*open, "⚙").small()).on_hover_text(hover);
+                if button.clicked() {
+                    *open = !*open;
+                }
+                gear = Some(button);
             }
             if let Some(current) = keymap_select {
                 let mut index = Keymap::ALL.iter().position(|keymap| keymap == current).unwrap_or_default();
@@ -93,7 +99,7 @@ impl<'a> StatusBar<'a> {
                 }
             }
         });
-        StatusBarOutput { problems, keymap_changed }
+        StatusBarOutput { problems, keymap_changed, options: gear }
     }
 }
 

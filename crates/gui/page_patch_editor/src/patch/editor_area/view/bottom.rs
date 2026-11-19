@@ -30,10 +30,6 @@ impl EditorPane {
     /// The status bar. `user_patch`: the user patch's window. Returns whether its problem counts
     /// were clicked (to show / hide the panel).
     pub(super) fn status_bar(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, keymap: Keymap, user_patch: bool) -> bool {
-        if self.show_lsp_options {
-            lsp_options_window(ui.ctx(), i18n, &mut self.lsp, &mut self.show_lsp_options);
-        }
-
         let status_id = if user_patch { "user_patch_status_bar" } else { "nemesis_status_bar" };
         egui::Panel::bottom(status_id)
             .show(ui, |ui| {
@@ -45,6 +41,10 @@ impl EditorPane {
                     .show(ui);
                 if status.keymap_changed {
                     self.mode = EditorMode::from_vim(chosen.is_vim());
+                }
+                if let Some(gear) = &status.options {
+                    let popup = egui_code_editor::AnchoredPopup::new(gear, &mut self.show_lsp_options);
+                    popup.show(|ui| lsp_options(ui, i18n, &mut self.lsp));
                 }
                 status.problems.clicked()
             })
@@ -88,21 +88,19 @@ pub(super) const fn editor_features(lsp: &LspOptions, anim_data: bool) -> Editor
     }
 }
 
-/// The `⚙` window: the language features that apply to the object editor.
-fn lsp_options_window(ctx: &egui::Context, i18n: &I18nMap, lsp: &mut LspOptions, open: &mut bool) {
-    let window = egui_widgets::window_near_pointer(ctx, i18n.t(I18nKey::LspOptionsTitle));
-    window.open(open).resizable(false).collapsible(false).show(ctx, |ui| {
-        let options = [
-            (&mut lsp.completion, I18nKey::LspCompletion, I18nKey::LspCompletionHover),
-            (&mut lsp.code_action, I18nKey::LspCodeAction, I18nKey::LspCodeActionHover),
-            (&mut lsp.diagnostics, I18nKey::LspDiagnostics, I18nKey::LspDiagnosticsHover),
-            (&mut lsp.formatter, I18nKey::LspFormatter, I18nKey::LspFormatterHover),
-            (&mut lsp.hover, I18nKey::LspHover, I18nKey::LspHoverHover),
-            (&mut lsp.inlay_hints, I18nKey::LspInlayHints, I18nKey::LspInlayHintsHover),
-            (&mut lsp.signature_help, I18nKey::LspSignatureHelp, I18nKey::LspSignatureHelpHover),
-        ];
-        for (value, label, hover) in options {
-            ui.add(Checkbox::new(value, i18n.t(label))).on_hover_text(i18n.t(hover));
-        }
-    });
+/// The `⚙` popup: the language features that apply to the object editor.
+fn lsp_options(ui: &mut egui::Ui, i18n: &I18nMap, lsp: &mut LspOptions) {
+    ui.strong(i18n.t(I18nKey::LspOptionsTitle));
+    let options = [
+        (&mut lsp.completion, I18nKey::LspCompletion, I18nKey::LspCompletionHover),
+        (&mut lsp.code_action, I18nKey::LspCodeAction, I18nKey::LspCodeActionHover),
+        (&mut lsp.diagnostics, I18nKey::LspDiagnostics, I18nKey::LspDiagnosticsHover),
+        (&mut lsp.formatter, I18nKey::LspFormatter, I18nKey::LspFormatterHover),
+        (&mut lsp.hover, I18nKey::LspHover, I18nKey::LspHoverHover),
+        (&mut lsp.inlay_hints, I18nKey::LspInlayHints, I18nKey::LspInlayHintsHover),
+        (&mut lsp.signature_help, I18nKey::LspSignatureHelp, I18nKey::LspSignatureHelpHover),
+    ];
+    for (value, label, hover) in options {
+        ui.add(Checkbox::new(value, i18n.t(label))).on_hover_text(i18n.t(hover));
+    }
 }
