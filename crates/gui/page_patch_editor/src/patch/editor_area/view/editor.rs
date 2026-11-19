@@ -320,6 +320,11 @@ impl EditorPane {
         let read_only = behavior.is_ref(id);
         let features = editor_features(&self.lsp, behavior.is_anim_data());
 
+        // The references found, under the editor, as VS Code's peek: before the editor fills the rest.
+        let texts = |document: &str| behavior.text(document).map(str::to_owned);
+        let peek = egui_code_editor::PeekInput { texts: &texts, language: shown_language };
+        result.peek = egui_code_editor::ReferenceList::peek(ui, &mut self.references, &peek);
+
         // Per object: each tab keeps where it was scrolled to.
         let scroll = egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false);
         let mut toggle_graph = false;

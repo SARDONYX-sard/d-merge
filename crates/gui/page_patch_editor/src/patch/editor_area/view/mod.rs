@@ -83,7 +83,7 @@ impl EditorArea {
 
         let preview_event = self.side_panel(ui, i18n, (work, sel.active), &id);
         let result = self.editor_panel(ui, i18n, (work, sel, keys), (problems, changes), &id);
-        self.after_editor(ui, (work, sel, keys), (&id, editor_id), (result, preview_event), &mut out);
+        self.after_editor((work, sel, keys), (&id, editor_id), (result, preview_event), &mut out);
         out
     }
 
@@ -201,7 +201,6 @@ impl EditorArea {
     /// Does what the editor and the side panel asked for, once both are drawn.
     fn after_editor(
         &mut self,
-        ui: &egui::Ui,
         (work, sel, keys): (&mut Work, &mut Selection, &mut Keys),
         (id, editor_id): (&Rc<str>, egui::Id),
         (result, preview_event): (EditorResult, Option<PreviewEvent>),
@@ -222,8 +221,10 @@ impl EditorArea {
         out.file = out.file.take().or(done.file);
         out.edited = done.edited;
 
-        let reference = egui_code_editor::ReferenceList::window(ui.ctx(), &mut self.pane.references);
-        if let Some((document, line)) = reference.map(|(document, line)| (document.to_string(), line)) {
+        // `F4` / `]q`: the next of the references, as a quickfix list.
+        let step = reference_step(keys);
+        let stepped = step.and_then(|forward| self.pane.references.as_mut()?.step(forward));
+        if let Some((document, line)) = stepped.map(|(document, line)| (document.to_owned(), line)) {
             self.open_location(sel, id, (&document, line));
         }
 
@@ -235,5 +236,17 @@ impl EditorArea {
             }
             None => {}
         }
+    }
+}
+
+/// `F4` / `]q` (`true`) or `Shift+F4` / `[q` (`false`): the next or the previous reference.
+fn reference_step(keys: &mut Keys) -> Option<bool> {
+    use keybinding::commands::{EDITOR_NEXT_REFERENCE, EDITOR_PREVIOUS_REFERENCE};
+    if keys.take(EDITOR_NEXT_REFERENCE) {
+        Some(true)
+    } else if keys.take(EDITOR_PREVIOUS_REFERENCE) {
+        Some(false)
+    } else {
+        None
     }
 }

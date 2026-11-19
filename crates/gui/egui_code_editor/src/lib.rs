@@ -67,7 +67,7 @@ pub use self::{
         nav_history::NavHistory,
         problems,
         problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
-        references::ReferenceList,
+        references::{PeekAsk, PeekInput, ReferenceList},
         search_view::{SearchHit, SearchLabels, SearchView},
         status::{StatusBar, StatusBarOutput, status_line},
     },

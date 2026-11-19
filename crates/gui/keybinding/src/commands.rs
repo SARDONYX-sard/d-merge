@@ -35,6 +35,8 @@ pub const EDITOR_TOGGLE_GRAPH: &str = "editor.toggleGraph";
 pub const EXPLORER_FOCUS: &str = "explorer.focus";
 pub const EDITOR_NEXT_CHANGE: &str = "editor.nextChange";
 pub const EDITOR_PREVIOUS_CHANGE: &str = "editor.previousChange";
+pub const EDITOR_NEXT_REFERENCE: &str = "editor.nextReference";
+pub const EDITOR_PREVIOUS_REFERENCE: &str = "editor.previousReference";
 pub const FILE_COPY_PATH: &str = "file.copyPath";
 pub const FILE_REVEAL: &str = "file.reveal";
 pub const KEYBINDINGS_OPEN_JSON: &str = "keybindings.openJson";
@@ -79,6 +81,8 @@ const EDITOR: Option<&str> = Some("editorFocus");
 const VIM_NORMAL: Option<&str> = Some("editorFocus && vim.mode == 'normal'");
 /// The same, in the patch editor: what only it has (the tree, the inline diff).
 const VIM_NORMAL_PATCH: Option<&str> = Some("editorFocus && vim.mode == 'normal' && page == 'patchEditor'");
+/// The patch editor's code editor has the keyboard, whatever its keymap.
+const PATCH_EDITOR: Option<&str> = Some("editorFocus && page == 'patchEditor'");
 /// The Problems panel has the keyboard.
 const PROBLEMS: Option<&str> = Some("problemsFocus");
 
@@ -103,6 +107,16 @@ pub const COMMANDS: &[Command] = &[
         id: EDITOR_PREVIOUS_CHANGE,
         description: "The previous change (of the inline diff, or the preview)",
         defaults: &[("[ c", VIM_NORMAL_PATCH)],
+    },
+    Command {
+        id: EDITOR_NEXT_REFERENCE,
+        description: "The next of the references found (Shift+F12, Vim gD), as VS Code's F4 and Vim's quickfix list",
+        defaults: &[("f4", PATCH_EDITOR), ("] q", VIM_NORMAL_PATCH)],
+    },
+    Command {
+        id: EDITOR_PREVIOUS_REFERENCE,
+        description: "The previous of the references found, as VS Code's Shift+F4 and Vim's quickfix list",
+        defaults: &[("shift+f4", PATCH_EDITOR), ("[ q", VIM_NORMAL_PATCH)],
     },
     Command {
         id: TABS_CLOSE,

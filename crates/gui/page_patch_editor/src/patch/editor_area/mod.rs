@@ -372,6 +372,12 @@ impl EditorArea {
         if let Some((document, line)) = result.definition {
             self.open_location(sel, id, (&document, line));
         }
+        // The references' panel: one was opened (Enter, a double click), or it closed (Esc, `✖`).
+        match result.peek {
+            Some(egui_code_editor::PeekAsk::Open(document, line)) => self.open_location(sel, id, (&document, line)),
+            Some(egui_code_editor::PeekAsk::Close) => self.pane.focus = Some(FocusAt::Keep),
+            None => {}
+        }
 
         let focus_tree = result.focus_tree || result.command == Some(EditorCommand::ToggleExplorer);
         EditorDone { focus_tree, file, edited }

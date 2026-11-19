@@ -146,6 +146,8 @@ struct EditorResult {
     tab_event: Option<TabEvent>,
     /// The `⚙` of this palette action: record its keys.
     configure: Option<&'static str>,
+    /// What the references' panel asked: go to one, or it closed.
+    peek: Option<egui_code_editor::PeekAsk>,
 }
 
 /// What a click on the tab bar asked for.
