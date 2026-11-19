@@ -335,7 +335,7 @@ pub fn pointer_accepts(field: &FieldSchema, class: &str) -> bool {
 }
 
 /// Tracks the open objects (their classes) and fields (the class their nested objects have).
-fn walk_line<'a>(text: &'a str, objects: &mut Vec<Option<&'a str>>, fields: &mut Vec<Option<&'static str>>) {
+pub(crate) fn walk_line<'a>(text: &'a str, objects: &mut Vec<Option<&'a str>>, fields: &mut Vec<Option<&'static str>>) {
     let trimmed = text.trim();
     if let Some(rest) = trimmed.strip_prefix("<hkobject") {
         let class = attribute(rest, "class").or_else(|| fields.last().copied().flatten());

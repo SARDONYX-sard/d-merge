@@ -91,9 +91,29 @@ pub(super) struct EditorPane {
     /// The trigger names of the clip data template, read once; and those known now, for the completion.
     template_triggers: Option<std::collections::BTreeSet<String>>,
     pub(super) trigger_names: Vec<String>,
+    /// `(cursor line, states)`: what the state field of that line can take, for the completion. See
+    /// [`Self::refresh_state_choices`].
+    pub(super) state_choices: Option<(usize, Vec<editor::ids::assist::StateChoice>)>,
 }
 
 impl EditorPane {
+    /// The states the state field of the cursor line can take (`toStateId`, ...). Read again only
+    /// when the cursor moved to another line, or the text was checked again after typing.
+    pub(super) fn refresh_state_choices(&mut self, behavior: &Behavior) {
+        let line = self.cursor_line;
+        if self.state_choices.as_ref().is_none_or(|(at, _)| *at != line) {
+            // Every state field ends so: `startStateId`, `toStateId`, `to/fromNestedStateId`.
+            let is_state_field = self.text.lines().nth(line).is_some_and(|text| text.contains("StateId\""));
+            let choices = if is_state_field {
+                let index = editor::ids::IdIndex::new(behavior);
+                editor::ids::assist::state_choices(&self.text, line, &index)
+            } else {
+                Vec::new()
+            };
+            self.state_choices = Some((line, choices));
+        }
+    }
+
     /// Notes whether the editor has the keyboard this frame. Returns whether it just got it: the
     /// side bar shows its object again then, as VS Code's explorer follows the file being edited.
     pub(super) const fn note_focus(&mut self, has_focus: bool) -> bool {
@@ -134,6 +154,7 @@ impl EditorPane {
             return false;
         }
 
+        self.state_choices = None; // the states may have changed
         let patch = behavior.patch(settings.code, id);
         let check = patch.as_deref().map_or(Ok(()), |patch| behavior.validate(id, patch));
         self.problems = self.field_problems(behavior, id, settings.code);
@@ -184,7 +205,10 @@ impl EditorPane {
             Vec::new() // not this mod's to fix
         } else {
             let is_new = behavior.added.contains_key(id);
-            editor::diagnostics::field_diagnostics(&self.text, behavior, is_new, code)
+            let mut problems = editor::diagnostics::field_diagnostics(&self.text, behavior, is_new, code);
+            let index = editor::ids::IdIndex::new(behavior);
+            problems.extend(editor::ids::id_diagnostics(&self.text, id, &index));
+            problems
         }
     }
 

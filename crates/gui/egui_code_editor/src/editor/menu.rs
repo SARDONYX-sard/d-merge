@@ -42,19 +42,22 @@ pub(crate) fn context_menu(
     language: &dyn Language,
     text: &str,
     pointer: Option<LinePos>,
-    (menu_target, menu_selection): (&mut Option<LinePos>, &mut std::ops::Range<usize>),
+    (menu_target, menu_selection): (&mut Option<(LinePos, String)>, &mut std::ops::Range<usize>),
     labels: &EditorLabels<'_>,
     selection: &std::ops::Range<usize>,
 ) -> Option<MenuAction> {
     if response.secondary_clicked() {
-        *menu_target = pointer.filter(|pos| language.definition(text, pos.line, pos.column).is_some());
+        // Asked once: the language may read the whole document for it.
+        *menu_target = pointer.and_then(|pos| {
+            let definition = language.definition(text, pos.line, pos.column)?;
+            Some((pos, definition.document.into_owned()))
+        });
         menu_selection.clone_from(selection);
     }
     let selection = &*menu_selection;
     let mut action = None;
     response.context_menu(|ui| {
-        let definition = menu_target.and_then(|pos| Some((pos, language.definition(text, pos.line, pos.column)?)));
-        let symbol = definition.as_ref().map(|(pos, definition)| (*pos, &*definition.document));
+        let symbol = menu_target.as_ref().map(|(pos, document)| (*pos, document.as_str()));
         let menu = MenuContext { symbol, has_selection: !selection.is_empty() };
         action = context_menu::contents(ui, labels, menu);
     });

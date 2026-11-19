@@ -25,6 +25,7 @@ pub mod conflict;
 pub mod details;
 pub mod fields;
 mod format;
+pub mod ids;
 mod kept_array;
 pub mod schema;
 pub mod vars;

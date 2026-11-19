@@ -267,6 +267,10 @@ impl EditorPane {
         };
         let open_field =
             if is_pandora_doc { None } else { nemesis_diff::schema::open_field(&self.text, self.cursor_line) };
+        if !is_pandora_doc {
+            self.refresh_state_choices(behavior);
+        }
+        let states = self.state_choices.as_ref().map_or(&[][..], |(_, choices)| choices.as_slice());
 
         let language = NemesisXml {
             code_action: self.lsp.code_action,
@@ -280,6 +284,7 @@ impl EditorPane {
             kept_array_hover: i18n.t(I18nKey::KeptArrayHover),
             in_string_array: open_field.is_some_and(nemesis_diff::schema::holds_strings),
             behavior,
+            states,
         };
         let anim_language = AnimDataLanguage {
             roles: &self.anim_roles,
