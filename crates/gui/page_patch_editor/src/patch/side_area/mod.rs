@@ -289,11 +289,14 @@ impl SideArea {
 
         let names = work.names(active);
         let behavior = &mut work.workspace.behaviors[active];
-        let changed = self.vars.show(ui, i18n, behavior, &names, &self.explorer.filter);
-        if !changed.is_empty() {
+        let out = self.vars.show(ui, i18n, behavior, &names, &self.explorer.filter);
+        if !out.changed.is_empty() {
             asks.push(SideAsk::Reload); // the open object may be one of them
         }
-        for id in changed {
+        if let Some((id, line)) = out.open {
+            asks.push(SideAsk::OpenLocation(id, line));
+        }
+        for id in out.changed {
             work.object_changed(&id);
         }
         asks

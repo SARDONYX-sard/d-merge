@@ -1710,6 +1710,13 @@ pub enum I18nKey {
     /// User Patch
     UserPatchTitle,
 
+    /// Edit its name, type and initial value (the patches using its name are updated too)
+    ///
+    /// # Notes
+    /// - Only this mod's variables: other mods count on the template's names, types and initial values
+    /// - A click on a name opens its initial value, where one of the template's can be edited all the same
+    VarsEdit,
+
     /// Events
     VarsEvents,
 
