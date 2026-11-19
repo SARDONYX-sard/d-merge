@@ -92,6 +92,7 @@ pub struct CodeEditor<'a> {
     requests: Option<&'a [EditorRequest]>,
     request_keys: Option<&'a [(EditorRequest, String)]>,
     annotations: &'a [String],
+    background: egui::Color32,
 }
 
 impl std::fmt::Debug for CodeEditor<'_> {
@@ -121,7 +122,17 @@ impl<'a> CodeEditor<'a> {
             requests: None,
             request_keys: None,
             annotations: &[],
+            background: egui::Color32::TRANSPARENT,
         }
+    }
+
+    /// The color behind the text. Default: none, so the page's own shows, as VS Code's editor is on
+    /// its window's: e.g., in a window with a see-through color, a color of its own would be a second
+    /// layer over it. e.g., `ui.visuals().text_edit_bg_color()` looks as egui's text fields.
+    #[inline]
+    pub const fn background(mut self, color: egui::Color32) -> Self {
+        self.background = color;
+        self
     }
 
     /// A note per line in a column left of the line numbers, as GitLens' blame: e.g.
@@ -255,6 +266,7 @@ impl<'a> CodeEditor<'a> {
             requests,
             request_keys,
             annotations,
+            background,
         } = self;
         if read_only {
             // In a buffer that stays: this is every frame.
@@ -269,6 +281,7 @@ impl<'a> CodeEditor<'a> {
             inline_diff,
             requests,
             request_keys,
+            background,
         };
 
         state.indent = language.indent();
@@ -407,6 +420,8 @@ struct EditorFrame<'a> {
     requests: Option<&'a [EditorRequest]>,
     /// See [`CodeEditor::request_keys`].
     request_keys: Option<&'a [(EditorRequest, String)]>,
+    /// See [`CodeEditor::background`].
+    background: egui::Color32,
 }
 
 #[cfg(test)]

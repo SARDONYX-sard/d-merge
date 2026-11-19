@@ -595,18 +595,24 @@ impl PatchTool {
             .to_top(to_top)
             // Its editor uses `Esc` (Vim, hovers, quick fixes): the window closes with its `x`.
             .close_on_escape(false)
-            .show(ctx, &mut open, |ui| match &mut tool {
-                Some(tool) => {
-                    let read = tool.work.job().is_none();
-                    if let Some(requests) = bulk.bar_ui(ui, i18n).filter(|_| read) {
-                        let resolved = tool.resolve_bulk(&requests, notify, i18n);
-                        bulk.mark_resolved(resolved.iter().map(|&at| &requests[at]));
-                        bulk_written = true;
+            .show(ctx, &mut open, |ui| {
+                // Its panels (the side bar, the editor's) paint nothing: the window's own color is
+                // the one layer, as in the settings' window. With a see-through theme, a panel's
+                // color over it would show less of what is behind.
+                ui.visuals_mut().panel_fill = egui::Color32::TRANSPARENT;
+                match &mut tool {
+                    Some(tool) => {
+                        let read = tool.work.job().is_none();
+                        if let Some(requests) = bulk.bar_ui(ui, i18n).filter(|_| read) {
+                            let resolved = tool.resolve_bulk(&requests, notify, i18n);
+                            bulk.mark_resolved(resolved.iter().map(|&at| &requests[at]));
+                            bulk_written = true;
+                        }
+                        tool.user_patch_ui(ui, i18n, notify, (settings, editor), keys);
                     }
-                    tool.user_patch_ui(ui, i18n, notify, (settings, editor), keys);
-                }
-                None => {
-                    ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::WorkNeedPatchOutput));
+                    None => {
+                        ui.colored_label(ui.visuals().warn_fg_color, i18n.t(I18nKey::WorkNeedPatchOutput));
+                    }
                 }
             });
 

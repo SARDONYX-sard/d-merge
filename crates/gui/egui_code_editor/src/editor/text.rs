@@ -17,7 +17,13 @@ pub(crate) fn show_text(
     let search = state.search_highlight(frame.keymap);
     // e.g., Vim Normal mode draws a block cursor: no blinking I-beam then.
     let hide_text_cursor = state.keymap.hides_text_cursor(frame.keymap);
-    let look = TextLook { desired_rows, dim_selection: frame.keymap == Keymap::Vim, hide_text_cursor, gutter };
+    let look = TextLook {
+        desired_rows,
+        dim_selection: frame.keymap == Keymap::Vim,
+        hide_text_cursor,
+        gutter,
+        background: frame.background,
+    };
     let mut layouter = |ui: &egui::Ui, buf: &dyn egui::TextBuffer, _wrap_width: f32| {
         layout::cached(
             &mut state.layout,
@@ -86,6 +92,8 @@ pub(crate) struct TextLook {
     pub(crate) hide_text_cursor: bool,
     /// Room to leave for the line numbers.
     pub(crate) gutter: Option<f32>,
+    /// See [`crate::CodeEditor::background`].
+    pub(crate) background: egui::Color32,
 }
 
 /// Shows the `TextEdit`. Returns the gutter's left edge and the output.
@@ -118,6 +126,7 @@ pub(crate) fn show_text_edit(
             egui::TextEdit::multiline(text)
                 .id(id)
                 .code_editor()
+                .background_color(look.background)
                 .desired_width(f32::INFINITY)
                 .desired_rows(look.desired_rows)
                 .min_size(egui::vec2(0.0, fill))
