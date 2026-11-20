@@ -35,8 +35,10 @@ pub(crate) fn scroll_to_cursor(
     galley: &egui::Galley,
     scroll: Option<Scroll>,
 ) {
+    // A jump from outside (a problem, a definition, the next change, the preview): at once, as
+    // VS Code's, not an animation through the text in between.
     if ui.data_mut(|d| d.remove_temp::<bool>(scroll_request_id(id))).unwrap_or(false) {
-        ui.scroll_to_rect(cursor, Some(egui::Align::Center));
+        ui.scroll_to_rect_animation(cursor, Some(egui::Align::Center), instant());
         return;
     }
     match scroll {
