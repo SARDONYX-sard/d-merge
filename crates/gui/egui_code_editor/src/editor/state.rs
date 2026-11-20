@@ -31,6 +31,8 @@ pub struct CodeEditorState {
     /// The editor had the keyboard focus last frame.
     pub(crate) had_focus: bool,
     pub(crate) layout: layout::LayoutCache,
+    /// The minimap's bars, of the last layout. See [`super::minimap`].
+    pub(crate) minimap: Option<super::minimap::Bars>,
     /// The symbol the right-click menu was opened on (the pointer moves while it is open), and the
     /// document of its definition, asked once when it opened. e.g. `(12:5, "#0106")`
     pub(crate) menu_target: Option<(LinePos, String)>,

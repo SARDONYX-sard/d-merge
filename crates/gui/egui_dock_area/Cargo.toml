@@ -1,0 +1,24 @@
+[package]
+name        = "egui_dock_area"
+version     = "0.0.0"
+description = "Tabs to drag and dock for egui, as VS Code's editor groups: split, merged, or out in a window of their own"
+
+authors.workspace      = true
+categories             = ["gui"]
+edition.workspace      = true
+keywords               = ["egui", "dock", "tabs"]
+license                = "MIT"
+readme                 = "../../../README.md"
+repository.workspace   = true
+rust-version.workspace = true
+
+# NOTE: `egui` only. What a tab is and what it shows are the host's (`TabViewer`).
+[dependencies]
+egui = { workspace = true }
+
+[dev-dependencies]
+# The tab of an editor, dragged in the tests as the hosts draw it.
+egui_widgets = { workspace = true }
+
+[lints]
+workspace = true

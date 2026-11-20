@@ -22,7 +22,7 @@ use egui::{Color32, Pos2, Rect, Sense, Stroke, epaint::CubicBezierShape};
 use fast_hash::HashMap;
 
 use super::{Frame, GraphOutput, metrics, rows::NodeRows};
-use crate::layout::Layout;
+use crate::{layout::Layout, tree::Tree};
 
 /// Below this zoom, no edge labels: they could not be read.
 const LABEL_ZOOM: f32 = 0.6;
@@ -37,6 +37,8 @@ pub(super) struct Geometry<'a> {
     pub(super) rows: &'a [NodeRows],
     /// The node under the pointer.
     pub(super) hovered: Option<usize>,
+    /// The whole graph's: its tree, and the room between two columns on screen. See [`whole_route`].
+    pub(super) whole: Option<(&'a Tree, f32)>,
 }
 
 impl Geometry<'_> {
@@ -87,10 +89,19 @@ pub(super) fn edges<N: Copy + Eq + std::hash::Hash>(
     let visuals = ui.visuals();
     let zoom = geometry.frame.zoom;
     for (i, edge) in layout.edges.iter().enumerate() {
-        if edge.to != 0 && geometry.is_paged_out(edge.from, edge.key) {
+        // The whole graph's cards show no rows: none is paged out.
+        if geometry.whole.is_none() && edge.to != 0 && geometry.is_paged_out(edge.from, edge.key) {
             continue;
         }
-        let points = curve(geometry.pin(edge.from, edge.key), geometry.port(edge.to), zoom);
+        let (start, end) = (geometry.pin(edge.from, edge.key), geometry.port(edge.to));
+        if let Some((tree, room)) = geometry.whole {
+            let of_tree = tree.parent(edge.to) == Some(edge.from);
+            let lane_of = if of_tree { None } else { Some(edge.to) };
+            let points = whole_route((start, end), room, lane_of);
+            whole_edge(ui, painter, (geometry, &points), (edge.from, edge.to, edge.key), of_tree);
+            continue;
+        }
+        let points = curve(start, end, zoom);
         if !geometry.frame.rect.intersects(Rect::from_points(&points)) {
             continue;
         }
@@ -119,6 +130,63 @@ pub(super) fn edges<N: Copy + Eq + std::hash::Hash>(
             }
         }
     }
+}
+
+/// The square way of an edge of the whole graph from `start` (a pin) to `end` (a port), `room`
+/// apart from one column to the next (on screen):
+///
+/// ```text
+///  [Parent]●─┬──────>[Child]     of the tree: down its parent's trunk, in the middle of the room,
+///            └──────>[Child]     as the branches of a tree
+///  [Other]●──────┐
+///                └──>[Shared]    else down a lane of its own, nearer the node it goes to
+/// ```
+///
+/// A lane is never a trunk: an edge on one would seem joined to the branches it overlaps. The lanes
+/// of the nodes (`lane_of`) are a few, side by side, so that two of them rarely overlap either. An
+/// edge to the left (a cycle) goes straight.
+fn whole_route((start, end): (Pos2, Pos2), room: f32, lane_of: Option<usize>) -> Vec<Pos2> {
+    /// Where the lanes are, back from the node they go to, as a share of the room: right of the
+    /// trunks, in its middle.
+    const LANES: [f32; 3] = [0.15, 0.25, 0.35];
+    let x = match lane_of {
+        None => room.mul_add(0.5, start.x),
+        Some(node) => room.mul_add(-LANES[node % LANES.len()], end.x),
+    };
+    if x <= start.x {
+        return vec![start, end];
+    }
+    vec![start, egui::pos2(x, start.y), egui::pos2(x, end.y), end]
+}
+
+/// An edge of the whole graph through `points` (see [`whole_route`]). Not of the tree (`tree`):
+/// fainter, but solid: none looks broken off.
+fn whole_edge(
+    ui: &egui::Ui,
+    painter: &egui::Painter,
+    (geometry, points): (&Geometry<'_>, &[Pos2]),
+    (from, to, key): (usize, usize, usize),
+    tree: bool,
+) {
+    if !geometry.frame.rect.intersects(Rect::from_points(points)) {
+        return;
+    }
+    let touched = geometry.hovered.map(|hovered| hovered == from || hovered == to);
+    let color = geometry.edge_color(from, key).unwrap_or_else(|| ui.visuals().weak_text_color());
+    let (stroke, _) = Look::of(tree, touched, color).stroke(geometry.frame.zoom);
+    painter.add(egui::Shape::line(points.to_vec(), stroke));
+    if let [.., before, tip] = points {
+        arrow_along(painter, (*before, *tip), geometry.frame.zoom, stroke.color);
+    }
+}
+
+/// An arrow head at `tip`, pointing the way from `from`.
+fn arrow_along(painter: &egui::Painter, (from, tip): (Pos2, Pos2), zoom: f32, color: Color32) {
+    let size = 6.0 * zoom.max(0.5);
+    let back = (from - tip).normalized() * size;
+    let side = egui::vec2(-back.y, back.x) / 2.0;
+    let points = vec![tip, tip + back + side, tip + back - side];
+    painter.add(egui::Shape::convex_polygon(points, color, Stroke::NONE));
 }
 
 /// How an edge is drawn: see the module docs.
@@ -208,5 +276,24 @@ pub(super) fn hidden_counts<N: Copy + Eq + std::hash::Hash>(
         let below = geometry.rects[last].center_bottom() + egui::vec2(0.0, 6.0 * zoom);
         let font = egui::FontId::proportional(12.0 * zoom);
         painter.text(below, egui::Align2::CENTER_TOP, format!("+{}", layer.hidden), font, color);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A tree edge goes down the middle of the room (the trunk); another down a lane nearer the
+    /// node it goes to, never on the trunk; one to the left, straight.
+    #[test]
+    fn whole_edges_keep_off_the_trunks() {
+        let (start, end) = (egui::pos2(0.0, 0.0), egui::pos2(100.0, 50.0));
+        let x_of = |route: &[Pos2]| route[1].x;
+        assert!((x_of(&whole_route((start, end), 100.0, None)) - 50.0).abs() < f32::EPSILON);
+        for node in 0..3 {
+            let lane = x_of(&whole_route((start, end), 100.0, Some(node)));
+            assert!((60.0..90.0).contains(&lane), "between the trunk and the node: {lane}");
+        }
+        assert_eq!(whole_route((end, start), 100.0, Some(0)).len(), 2, "to the left: straight");
     }
 }

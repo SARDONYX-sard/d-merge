@@ -48,19 +48,22 @@ impl TabMarks<'_> {
 ///
 /// `views`: the diffs / blames open (see [`super::revision_view::Views`]), as tabs after the objects'.
 /// With one shown, no object's tab is (`current` is `""`).
+///
+/// `strip`: the side tab to draw last, if this group has it; each tab and the bar are noted there
+/// for the dock (see `super::groups`).
 pub(super) fn tab_bar(
     ui: &mut egui::Ui,
     i18n: &I18nMap,
     tabs: &EditorTabs,
     (behavior, current): (usize, &str),
     graph: &Graph,
-    marks: TabMarks<'_>,
+    (marks, strip): (TabMarks<'_>, &mut super::groups::TabStrip),
     views: &[super::revision_view::ViewTab<'_>],
 ) -> Option<TabEvent> {
     let menu = egui_widgets::TabMenu::from_texts(gui_shared::i18n::tab_menu_texts(i18n));
     let mut event = None;
 
-    egui::ScrollArea::horizontal().id_salt("nemesis_editor_tabs").show(ui, |ui| {
+    let scroll = egui::ScrollArea::horizontal().id_salt("nemesis_editor_tabs").show(ui, |ui| {
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0; // the tabs touch, with a line between them
             for tab in tabs.of(behavior) {
@@ -83,6 +86,8 @@ pub(super) fn tab_bar(
                 if let Some(picked) = shown.action(&menu, to_event, |ui| object_items(ui, i18n, id)) {
                     event = Some(picked);
                 }
+                let item = super::groups::DragItem::Object(behavior, id.to_owned());
+                strip.tabs.push((shown.response, id.to_owned(), item));
             }
 
             // The diffs and blames, read only: `GetUpModList (#2) ↔ GetUpModList (working) 🔒 ✖`.
@@ -98,9 +103,24 @@ pub(super) fn tab_bar(
                 if let Some(picked) = shown.action(&menu, to_event, |ui| object_items(ui, i18n, view.id)) {
                     event = Some(picked);
                 }
+                strip.tabs.push((shown.response, view.title.to_owned(), super::groups::DragItem::View(view.at)));
+            }
+
+            // The side tab (the patch preview, or a conflict's values), if this group has it.
+            if let Some((title, side_shown)) = strip.side.take() {
+                let shown = egui_widgets::EditorTab::new(egui::RichText::new(&title), side_shown)
+                    .focused(marks.focused)
+                    .read_only(true)
+                    .hover(&title)
+                    .show(ui);
+                if let Some(picked) = shown.action(&menu, TabEvent::Side, |_| None) {
+                    event = Some(picked);
+                }
+                strip.tabs.push((shown.response, title, super::groups::DragItem::Side));
             }
         });
     });
+    strip.bar = Some(scroll.inner_rect);
     event
 }
 

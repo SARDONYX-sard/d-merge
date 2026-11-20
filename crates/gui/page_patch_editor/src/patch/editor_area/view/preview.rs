@@ -23,7 +23,7 @@ pub(super) fn nav_ui(preview: &mut Preview, ui: &mut egui::Ui, hover: &str) {
 
 /// What a click in the preview asked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum PreviewEvent {
+pub(in crate::patch::editor_area) enum PreviewEvent {
     /// `↶`: put this changed block back to the template.
     Revert(usize),
     /// A double click: show this preview row in the editor.
@@ -42,13 +42,17 @@ pub(super) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, revert_hover: &
     // `show_rows` puts `item_spacing` between rows.
     #[expect(clippy::cast_precision_loss, reason = "row counts are small")]
     let row_top = |row: usize| row as f32 * (row_height + ui.spacing().item_spacing.y);
+    // Within what can be scrolled: past the end, the scroll area would go beyond and spring back.
+    let view_height = ui.available_height();
+    let max_offset = (row_top(preview.lines().len()) - ui.spacing().item_spacing.y - view_height).max(0.0);
+    let offset = |top: f32| top.clamp(0.0, max_offset);
     let mut scroll = egui::ScrollArea::both().auto_shrink(false);
     if let Some(row) = preview.take_followed_scroll() {
-        scroll = scroll.vertical_scroll_offset((row_top(row) - ui.available_height() / 2.0).max(0.0));
+        scroll = scroll.vertical_scroll_offset(offset(row_top(row) - view_height / 2.0));
     }
     // After the line above: ▲ / ▼ was asked for last, so it wins. The `OPEN` line lands at the top.
     if let Some(row) = preview.take_scroll_row() {
-        scroll = scroll.vertical_scroll_offset(row_top(row));
+        scroll = scroll.vertical_scroll_offset(offset(row_top(row)));
     }
     let followed = preview.followed_row();
 

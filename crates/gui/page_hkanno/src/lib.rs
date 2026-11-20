@@ -67,6 +67,8 @@ pub struct HkannoPage {
     key_commands: Vec<&'static str>,
     /// The keys of the palette and its `⚙`. See [`keybinding::KeyUi`].
     key_ui: keybinding::KeyUi,
+    /// The editor groups the tabs are in. See [`ui::groups`].
+    groups: ui::groups::Groups,
 }
 
 impl std::fmt::Debug for HkannoPage {
@@ -115,7 +117,8 @@ impl HkannoPage {
                 continue;
             }
             match HkannoTab::open(&path) {
-                Ok(tab) => {
+                Ok(mut tab) => {
+                    tab.group = self.groups.active;
                     self.tabs.push(tab);
                     self.active = self.tabs.len() - 1;
                 }

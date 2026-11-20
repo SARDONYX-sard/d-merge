@@ -656,6 +656,9 @@ pub enum I18nKey {
     /// Go to Line
     EditorGoToLine,
 
+    /// Close this group
+    EditorGroupCloseHover,
+
     /// Next tab (Alt+L, Ctrl+PageDown; Vim: gt, :tabn)
     EditorNextTab,
 
@@ -826,6 +829,9 @@ pub enum I18nKey {
     /// Bring the open object to the center
     GraphCenterHover,
 
+    /// Connect to…
+    GraphConnectHint,
+
     /// How many layers right of the open object are shown
     GraphDepthHover,
 
@@ -844,6 +850,9 @@ pub enum I18nKey {
     /// Show the details
     GraphDetailsShowHover,
 
+    /// Disconnect
+    GraphDisconnectLabel,
+
     /// Show all the nodes
     GraphFitHover,
 
@@ -852,17 +861,24 @@ pub enum I18nKey {
     ///
     /// # Notes
     /// - Click a value to type it (`Enter`: done, `Esc`: cancel)
-    /// - Drag a pin onto a node to point to it, off any node to clear it; `+` adds to a list
+    /// - Drag a pin onto a node to point to it; `+` adds to a list. Dropped off any node, it lists
+    ///   the objects it can point to (type to narrow, `Enter` to pick), and `Disconnect`. Near an
+    ///   edge of the view, a dragged pin scrolls it
     /// - Click a title to go to that object, double click to edit its text; drag it to move it
     /// - Click a field's name to edit its line
     /// - A long list shows a page of it: `‹ ›` turns the page
     /// - Point at a node to see its own edges; `×N`: N objects point to it
     /// - A dashed edge is another way to an object shown already (a shared one)
     /// - Drag the background or wheel to move, `Ctrl` + wheel to zoom, double click to center
+    /// - The `≡` at the bottom shows every object of the file as a tree, to see how all of them
+    ///   connect
     GraphHover,
 
     /// Show or hide the node graph (Vim: Space g)
     GraphToggle,
+
+    /// Every object of the file, not only the neighborhood of the open one
+    GraphWholeFileHover,
 
     /// Zoom in
     GraphZoomInHover,
@@ -1602,6 +1618,9 @@ pub enum I18nKey {
 
     /// Display
     SettingsDisplayLabel,
+
+    /// Hide the side bar (Ctrl+B). Its icon, or a key of a view (e.g. Vim `Space e`), shows it again
+    SideBarHideHover,
 
     /// Skyrim Data dir:
     SkyrimDataDirLabel,

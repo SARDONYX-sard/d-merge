@@ -103,7 +103,7 @@ impl VimState {
             }
             Motion::ParagraphForward => (repeat(cur, &|i| paragraph_boundary(buf, i, true)), Kind::Exclusive),
             Motion::ParagraphBackward => (repeat(cur, &|i| paragraph_boundary(buf, i, false)), Kind::Exclusive),
-            Motion::MatchPair => (match_pair(buf, cur)?, Kind::Inclusive),
+            Motion::MatchPair => (match_pair(buf, cur, self.options.comment)?, Kind::Inclusive),
             Motion::Find { forward, till, ch } => {
                 self.last_find = Some(Find { forward, till, ch });
                 find_char(buf, cur, Find { forward, till, ch }, count, false)?
@@ -176,24 +176,77 @@ fn paragraph_boundary(buf: &Buffer, i: usize, forward: bool) -> usize {
 }
 
 /// `%`: from the tag the cursor is in (or the first after it), or the first bracket at or after `i`
-/// on the line, to its partner.
-fn match_pair(buf: &Buffer, i: usize) -> Option<usize> {
+/// on the line, to its partner, as VS Code's: a bracket pairs with one of the same place, the code or
+/// the same comment / string. e.g. in JSON, the `[` of the code skips the `]` of `// ]`, and the `[`
+/// of `// []` pairs with its own `]`. `comment`: the language's.
+fn match_pair(buf: &Buffer, i: usize, comment: Option<crate::Comment>) -> Option<usize> {
     // `<tag>` / `</tag>`, as Vim's `matchit`: see `tags`.
     if let Some(at) = super::tags::tag_near(buf, i) {
         return super::tags::matching_tag(buf, at);
     }
     const PAIRS: [(char, char); 3] = [('(', ')'), ('[', ']'), ('{', '}')];
+    let places = places(&buf.chars, comment);
     let end = buf.line_end(i);
     let (at, c) = (i..end).map(|j| (j, buf.chars[j])).find(|(_, c)| "()[]{}".contains(*c))?;
+    let counts = |j: usize| places[j] == places[at];
     PAIRS.iter().find_map(|&(open, close)| {
         if c == open {
-            buf.matching_close(at, open, close)
+            buf.matching_close_where(at, (open, close), &counts)
         } else if c == close {
-            buf.matching_open(at, open, close)
+            buf.matching_open_where(at, (open, close), &counts)
         } else {
             None
         }
     })
+}
+
+/// The open and close marks of a block comment, e.g. `/*` and `*/`.
+type Block = (Vec<char>, Vec<char>);
+
+/// The place of each char of `chars`: `0` the code, else the number of the string (`"..."`, to the
+/// line's end at most) or the comment of `comment` it is in (a line comment `//` also has its block
+/// comments `/* */`, as JSONC and Rust), each its own.
+///
+/// e.g. `[1, "]", // ]` -> `[1, ` is 0, `"]"` 1, `// ]` 2.
+fn places(chars: &[char], comment: Option<crate::Comment>) -> Vec<u32> {
+    // A line comment's mark (none: empty), and a block comment's open and close marks.
+    let (line, block): (Vec<char>, Option<Block>) = match comment {
+        Some(crate::Comment::Line(mark)) => {
+            let block = (mark == "//").then(|| (vec!['/', '*'], vec!['*', '/']));
+            (mark.chars().collect(), block)
+        }
+        Some(crate::Comment::Block(open, close)) => {
+            (Vec::new(), Some((open.chars().collect(), close.chars().collect())))
+        }
+        None => (Vec::new(), None),
+    };
+    let at = |i: usize, mark: &[char]| chars.get(i..i + mark.len()) == Some(mark);
+
+    let mut places = vec![0; chars.len()];
+    let mut place = 0;
+    let mut i = 0;
+    while i < chars.len() {
+        let skip_to = if chars[i] == '"' {
+            // To the closing quote (an escaped one does not close it), or the line's end.
+            let mut j = i + 1;
+            while j < chars.len() && chars[j] != '"' && chars[j] != '\n' {
+                j += if chars[j] == '\\' { 2 } else { 1 };
+            }
+            (j + 1).min(chars.len())
+        } else if !line.is_empty() && at(i, &line) {
+            (i..chars.len()).find(|&j| chars[j] == '\n').unwrap_or(chars.len())
+        } else if let Some((open, close)) = block.as_ref().filter(|(open, _)| at(i, open)) {
+            let end = (i + open.len()..chars.len()).find(|&j| at(j, close));
+            end.map_or(chars.len(), |j| j + close.len())
+        } else {
+            i += 1;
+            continue;
+        };
+        place += 1;
+        places[i..skip_to].fill(place);
+        i = skip_to;
+    }
+    places
 }
 
 /// `f`/`t`/`F`/`T` on the current line. `repeating` (`;`, `,`): `t` does not get stuck right
@@ -234,12 +287,25 @@ mod tests {
         assert_eq!(find_char(&b, 9, f(false, false, '('), 1, false), Some((1, Kind::Exclusive)));
         assert_eq!(find_char(&b, 0, f(true, false, 'z'), 1, false), None);
 
-        assert_eq!(match_pair(&b, 0), Some(6));
-        assert_eq!(match_pair(&b, 6), Some(1));
+        assert_eq!(match_pair(&b, 0, None), Some(6));
+        assert_eq!(match_pair(&b, 6, None), Some(1));
 
         let p = Buffer::new("a\nb\n\nc\n\nd");
         assert_eq!(paragraph_boundary(&p, 0, true), 4);
         assert_eq!(paragraph_boundary(&p, 4, true), 7);
         assert_eq!(paragraph_boundary(&p, 9, false), 7);
+    }
+
+    /// As VS Code's `%`: a bracket of the code skips those of comments and strings; one of a comment
+    /// pairs within it.
+    #[test]
+    fn a_pair_is_of_the_same_place() {
+        let line = Some(crate::Comment::Line("//"));
+        let b = Buffer::new("[\n  \"a\",\n  // []\n  \"]\", /* ] */\n]");
+        let last = b.chars.len() - 1;
+        assert_eq!(match_pair(&b, 0, line), Some(last), "the code's `]`");
+        assert_eq!(match_pair(&b, last, line), Some(0));
+        let in_comment = b.chars.iter().collect::<String>().find("[]").unwrap();
+        assert_eq!(match_pair(&b, in_comment, line), Some(in_comment + 1), "`// []` within itself");
     }
 }

@@ -23,6 +23,7 @@ pub const HISTORY_FORWARD: &str = "history.forward";
 pub const SIDE_BAR_EXPLORER: &str = "sideBar.explorer";
 pub const SIDE_BAR_SEARCH: &str = "sideBar.search";
 pub const SIDE_BAR_CHANGES: &str = "sideBar.changes";
+pub const SIDE_BAR_TOGGLE: &str = "sideBar.toggle";
 pub const PROBLEMS_TOGGLE: &str = "problems.toggle";
 pub const EXPLORER_TOGGLE_VIEW: &str = "explorer.toggleView";
 pub const EXPLORER_TOGGLE_CHANGED_ONLY: &str = "explorer.toggleChangedOnly";
@@ -157,6 +158,11 @@ pub const COMMANDS: &[Command] = &[
     Command { id: SIDE_BAR_EXPLORER, description: "Show the explorer", defaults: &[("ctrl+shift+e", None)] },
     Command { id: SIDE_BAR_SEARCH, description: "Show the search", defaults: &[("ctrl+shift+f", None)] },
     Command { id: SIDE_BAR_CHANGES, description: "Show the changes", defaults: &[("ctrl+shift+g", None)] },
+    Command {
+        id: SIDE_BAR_TOGGLE,
+        description: "Show or hide the side bar, as VS Code's Ctrl+B (in a Vim editor too, over its page up)",
+        defaults: &[("ctrl+b", Some("page == 'patchEditor'"))],
+    },
     Command {
         id: PROBLEMS_TOGGLE,
         description: "Show the Problems panel with the keyboard, or hide it",

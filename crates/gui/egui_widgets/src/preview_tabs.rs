@@ -167,6 +167,26 @@ impl<T> PreviewTabs<T> {
         self.close_where(|_, tab| tab.group == group);
     }
 
+    /// Takes tab `at` out, e.g. to another list: as [`Self::close`] does, but it is given back.
+    pub fn take(&mut self, at: usize) -> Option<Tab<T>> {
+        if at >= self.tabs.len() {
+            return None;
+        }
+        self.active = match self.active {
+            Some(active) if active == at => None,
+            Some(active) if active > at => Some(active - 1),
+            active => active,
+        };
+        Some(self.tabs.remove(at))
+    }
+
+    /// No tab is open.
+    #[inline]
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.tabs.is_empty()
+    }
+
     /// Closes every tab: e.g. the groups were replaced, so their indices no longer hold.
     #[inline]
     pub fn clear(&mut self) {

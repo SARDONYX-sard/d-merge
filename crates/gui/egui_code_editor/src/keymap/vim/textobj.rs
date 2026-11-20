@@ -119,9 +119,18 @@ impl Buffer {
 
     /// The `close` matching the `open` at `open_at`.
     pub(super) fn matching_close(&self, open_at: usize, open: char, close: char) -> Option<usize> {
+        self.matching_close_where(open_at, (open, close), &|_| true)
+    }
+
+    /// [`Self::matching_close`] counting only the chars `counts` says: e.g. not in a comment.
+    pub(super) fn matching_close_where(
+        &self,
+        open_at: usize,
+        (open, close): (char, char),
+        counts: &dyn Fn(usize) -> bool,
+    ) -> Option<usize> {
         let mut depth = 0_usize;
-        #[expect(clippy::needless_range_loop)]
-        for j in open_at + 1..self.len() {
+        for j in (open_at + 1..self.len()).filter(|&j| counts(j)) {
             let c = self.chars[j];
             if c == open {
                 depth += 1;
@@ -135,10 +144,16 @@ impl Buffer {
         None
     }
 
-    /// The `open` matching the `close` at `close_at`.
-    pub(super) fn matching_open(&self, close_at: usize, open: char, close: char) -> Option<usize> {
+    /// The `open` matching the `close` at `close_at`, counting only the chars `counts` says: e.g.
+    /// not in a comment.
+    pub(super) fn matching_open_where(
+        &self,
+        close_at: usize,
+        (open, close): (char, char),
+        counts: &dyn Fn(usize) -> bool,
+    ) -> Option<usize> {
         let mut depth = 0_usize;
-        for j in (0..close_at).rev() {
+        for j in (0..close_at).rev().filter(|&j| counts(j)) {
             let c = self.chars[j];
             if c == close {
                 depth += 1;

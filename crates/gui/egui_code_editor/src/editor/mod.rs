@@ -7,6 +7,7 @@ pub(crate) mod edit_ops;
 mod input;
 pub(crate) mod layout;
 mod menu;
+mod minimap;
 pub(crate) mod overlays;
 mod popups;
 pub(crate) mod state;
@@ -94,6 +95,8 @@ pub struct CodeEditor<'a> {
     requests: Option<&'a [EditorRequest]>,
     request_keys: Option<&'a [(EditorRequest, String)]>,
     annotations: &'a [String],
+    /// The width of the minimap; none: not shown. See [`Self::minimap`].
+    minimap: Option<f32>,
     background: egui::Color32,
     references: Option<(&'a mut Option<ReferenceList>, &'a PeekInput<'a>)>,
 }
@@ -105,6 +108,9 @@ impl std::fmt::Debug for CodeEditor<'_> {
 }
 
 impl<'a> CodeEditor<'a> {
+    /// Default of [`Self::minimap_width`].
+    pub const MINIMAP_WIDTH: f32 = 90.0;
+
     /// `id_salt` must be stable per document (cursor and undo history are stored under it).
     pub fn new(id_salt: impl egui::AsIdSalt, text: &'a mut String) -> Self {
         Self {
@@ -125,6 +131,7 @@ impl<'a> CodeEditor<'a> {
             requests: None,
             request_keys: None,
             annotations: &[],
+            minimap: None,
             background: egui::Color32::TRANSPARENT,
             references: None,
         }
@@ -136,6 +143,23 @@ impl<'a> CodeEditor<'a> {
     #[inline]
     pub const fn references(mut self, list: &'a mut Option<ReferenceList>, input: &'a PeekInput<'a>) -> Self {
         self.references = Some((list, input));
+        self
+    }
+
+    /// The minimap at the right of the view, as VS Code's (default: not shown): the whole text
+    /// shrunk, the part in view under a slider; a click or a drag on it scrolls there.
+    #[inline]
+    pub const fn minimap(mut self, show: bool) -> Self {
+        self.minimap = if show { Some(Self::MINIMAP_WIDTH) } else { None };
+        self
+    }
+
+    /// The minimap's width, if shown (default [`Self::MINIMAP_WIDTH`]).
+    #[inline]
+    pub const fn minimap_width(mut self, width: f32) -> Self {
+        if self.minimap.is_some() {
+            self.minimap = Some(width);
+        }
         self
     }
 
@@ -279,6 +303,7 @@ impl<'a> CodeEditor<'a> {
             requests,
             request_keys,
             annotations,
+            minimap,
             background,
             mut references,
         } = self;
@@ -365,6 +390,9 @@ impl<'a> CodeEditor<'a> {
             cursor,
         );
         overlays::annotations(ui, placed, gutter_left..gutter_left + notes_width, annotations);
+        if let Some(width) = minimap {
+            minimap::show(ui, (id, &mut state.minimap), placed, (ui.clip_rect().intersect(response.rect), width));
+        }
         let peek = references.and_then(|(list, input)| {
             let top = placed.1.y + gap_top(placed.0, gap?.0);
             ReferenceList::show_inline(ui, list, input, top)

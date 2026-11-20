@@ -1488,6 +1488,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "egui_dock_area"
+version = "0.0.0"
+dependencies = [
+ "egui",
+ "egui_widgets",
+]
+
+[[package]]
 name = "egui_extras"
 version = "0.37.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4012,6 +4020,7 @@ version = "0.0.0"
 dependencies = [
  "egui",
  "egui_code_editor",
+ "egui_dock_area",
  "egui_widgets",
  "fast_hash",
  "gui_shared",
@@ -4057,6 +4066,7 @@ dependencies = [
  "behavior_merge_types",
  "egui",
  "egui_code_editor",
+ "egui_dock_area",
  "egui_graph_view",
  "egui_tree",
  "egui_widgets",

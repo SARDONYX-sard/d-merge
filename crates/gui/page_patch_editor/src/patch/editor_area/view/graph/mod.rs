@@ -68,6 +68,11 @@ impl GraphSource for ObjectGraph<'_> {
         self.graph.parents(node).iter().copied()
     }
 
+    /// Every object of the behavior: the whole file's graph, and what a pin can be connected to.
+    fn nodes(&self) -> impl Iterator<Item = Node> {
+        self.graph.nodes()
+    }
+
     /// e.g. title `GetUpModList`, subtitle `● #0106  hkbModifierList`
     fn card(&self, node: Node) -> Card<'_> {
         let (head, class, _, _) = self.graph.label_parts(node);
@@ -260,6 +265,9 @@ fn graph_labels(i18n: &I18nMap) -> egui_graph_view::GraphLabels<'_> {
         center: i18n.t(I18nKey::GraphCenterHover),
         fit: i18n.t(I18nKey::GraphFitHover),
         depth: i18n.t(I18nKey::GraphDepthHover),
+        all: i18n.t(I18nKey::GraphWholeFileHover),
+        connect_hint: i18n.t(I18nKey::GraphConnectHint),
+        disconnect: i18n.t(I18nKey::GraphDisconnectLabel),
     }
 }
 

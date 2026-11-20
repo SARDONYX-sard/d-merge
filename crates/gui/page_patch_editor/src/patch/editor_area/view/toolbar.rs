@@ -44,11 +44,14 @@ pub(super) struct ToolbarInput<'a> {
     pub(super) can_split: bool,
     /// The node graph's button is shown: see [`super::graph::can_show`].
     pub(super) can_graph: bool,
+    /// The side tab, and what the tabs tell the dock: see `crate::patch::editor_area::groups`.
+    pub(super) strip: &'a mut crate::patch::editor_area::groups::TabStrip,
 }
 
 /// Draws the row of the object shown.
 pub(super) fn show(ui: &mut egui::Ui, i18n: &I18nMap, input: ToolbarInput<'_>) -> ToolbarOutput {
-    let ToolbarInput { pane, tabs, views, problems, changes, active, id, graph, focused, can_split, can_graph } = input;
+    let ToolbarInput { pane, tabs, views, problems, changes, active, id, graph, focused, can_split, can_graph, strip } =
+        input;
     let mut output = ToolbarOutput::default();
     ui.horizontal(|ui| {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -64,7 +67,7 @@ pub(super) fn show(ui: &mut egui::Ui, i18n: &I18nMap, input: ToolbarInput<'_>) -
                 let marks = super::super::tab_bar::TabMarks { focused, problems, changes };
                 let view_tabs = views.tabs_of(active);
                 output.tab_event =
-                    super::super::tab_bar::tab_bar(ui, i18n, tabs, (active, id), graph, marks, &view_tabs);
+                    super::super::tab_bar::tab_bar(ui, i18n, tabs, (active, id), graph, (marks, strip), &view_tabs);
             });
         });
     });

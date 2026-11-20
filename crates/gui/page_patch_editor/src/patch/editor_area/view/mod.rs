@@ -10,13 +10,18 @@
 //! │ NORMAL  Ln 2, Col 1        ✖ 1 ⚠ 0   Vim ▾  ⚙    ││                              │
 //! └──────────────────────────────────────────────────┘└──────────────────────────────┘
 //! ```
+//! This is one editor group: there may be several, side by side, one above the other, or in windows
+//! of their own, each with its tabs (`dock.rs`, [`super::groups`]). The preview is a tab of one of
+//! them.
+//!
 //! A diff or a blame of the history takes the editor's place: [`super::revision_view`].
 
 mod bottom;
+mod dock;
 mod editor;
 mod graph;
 mod merge;
-mod preview;
+pub(super) mod preview;
 mod preview_panel;
 mod problems;
 mod toolbar;
@@ -32,7 +37,6 @@ use crate::patch::{
     editor_area::EditorArea,
     problems::Problems,
     tool::{file::FileAction, keys::Keys, selection::Selection, work_state::Work},
-    workspace::PANDORA_DOC,
 };
 
 /// What the editor asks of the rest: the side bar, the file of an object.
@@ -52,8 +56,21 @@ pub(in crate::patch) struct EditorOut {
 }
 
 impl EditorArea {
-    /// Draws the editor of the selected object, or what takes its place.
+    /// Draws the editor groups (see [`super::groups`]): each the editor of its selected object, or
+    /// what takes its place.
     pub(in crate::patch) fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        i18n: &I18nMap,
+        (work, sel, keys): (&mut Work, &mut Selection, &mut Keys),
+        problems: (&mut Problems, &[crate::patch::workspace::history::ObjectChange]),
+    ) -> EditorOut {
+        self.groups_ui(ui, i18n, (work, sel, keys), problems)
+    }
+
+    /// One group, the one being drawn ([`EditorArea`]'s `drawing`): the editor of its selected
+    /// object, a diff / blame, or the side tab.
+    pub(super) fn group_ui(
         &mut self,
         ui: &mut egui::Ui,
         i18n: &I18nMap,
@@ -61,16 +78,41 @@ impl EditorArea {
         (problems, changes): (&mut Problems, &[crate::patch::workspace::history::ObjectChange]),
     ) -> EditorOut {
         let mut out = EditorOut::default();
+        let group = self.drawing;
+        let active = group == self.groups.active;
+        let side = self.groups.has_side(group).then(|| (self.side_title(i18n), self.groups.side_shown(group)));
+        self.strip = super::groups::TabStrip { side, ..Default::default() };
+
         let Some(id) = sel.selected.clone() else {
-            egui::CentralPanel::default().show(ui, |ui| ui.weak(i18n.t(I18nKey::ObjectSelectHint)));
-            self.back_to_closed(ui, (work, sel, keys));
+            if self.groups.has_side(group) {
+                self.side_only_ui(ui, i18n, work, sel);
+            } else {
+                // An empty group, as VS Code's: closed by its `✖` while there are others.
+                let closable = self.groups.dock.groups().len() > 1;
+                egui::CentralPanel::default().show(ui, |ui| {
+                    if closable && close_group_button(ui, i18n) {
+                        self.groups.to_close = Some(group);
+                    }
+                    ui.weak(i18n.t(I18nKey::ObjectSelectHint));
+                });
+                if active {
+                    self.back_to_closed(ui, (work, sel, keys));
+                }
+            }
             return out;
         };
-        if let Some(view) = self.views_ui(ui, i18n, (work, sel, keys)) {
+        if !self.groups.side_shown(group)
+            && let Some(view) = self.views_ui(ui, i18n, (work, sel, keys))
+        {
             out.file = view.file;
             return out; // a diff or a blame, as VS Code opens them in its editor
         }
 
+        // Another object opened here (e.g. from the tree): it is shown, not the side tab.
+        let opened = self.pane.opened.as_ref().is_some_and(|(behavior, open)| *behavior == sel.active && **open == *id);
+        if !opened && self.pane.opened.is_some() && self.groups.side_shown(group) {
+            self.groups.side = Some((group, false));
+        }
         self.open_in_editor(work, sel.active, &id);
         let editor_id = egui_code_editor::editor_id(("nemesis_object", work.user_patch, &id));
         self.pane.apply_focus_request(ui.ctx(), editor_id);
@@ -79,13 +121,55 @@ impl EditorArea {
             return out;
         }
 
-        self.pane.expire_preview(ui.ctx());
-        self.refresh_preview((work, problems), sel.active, &id);
+        if active {
+            self.pane.expire_preview(ui.ctx());
+            self.refresh_preview((work, problems), sel.active, &id);
+        }
 
-        let preview_event = self.side_panel(ui, i18n, (work, sel.active), &id);
         let result = self.editor_panel(ui, i18n, (work, sel, keys), (problems, changes), &id);
+        let preview_event = if active { self.side_event.take() } else { None };
         self.after_editor((work, sel, keys), (&id, editor_id), (result, preview_event), &mut out);
         out
+    }
+
+    /// A group with no object, the side tab alone: its bar, and the side tab's content.
+    fn side_only_ui(&mut self, ui: &mut egui::Ui, i18n: &I18nMap, work: &mut Work, sel: &Selection) {
+        egui::CentralPanel::default().show(ui, |ui| {
+            let names = work.names(sel.active);
+            let marks = super::tab_bar::TabMarks { focused: false, problems: None, changes: ("", &[]) };
+            let mut hide = false;
+            let event = ui
+                .horizontal(|ui| {
+                    // `▥` as in the editor's toolbar: here it turns the preview off.
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let button = egui_widgets::shadcn::Button::selectable(true, "")
+                            .icon(egui_widgets::shadcn::Icon::Columns2)
+                            .small();
+                        hide = ui.add(button).on_hover_text(i18n.t(I18nKey::PreviewHide)).clicked();
+                        ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                            super::tab_bar::tab_bar(
+                                ui,
+                                i18n,
+                                &self.tabs,
+                                (sel.active, ""),
+                                &names.graph,
+                                (marks, &mut self.strip),
+                                &[],
+                            )
+                        })
+                        .inner
+                    })
+                    .inner
+                })
+                .inner;
+            if hide {
+                self.side_action(egui_widgets::TabAction::Close);
+            }
+            if let Some(TabEvent::Side(action)) = event {
+                self.side_action(action);
+            }
+            self.side_ui(ui, i18n, work, sel);
+        });
     }
 
     /// Who has the keyboard: the side bar follows the editor (as VS Code's), `Space e` goes to the
@@ -194,29 +278,6 @@ impl EditorArea {
         false
     }
 
-    /// Right of the editor: the mods' values while a conflict is merged, else the patch preview
-    /// (none for a new object: it is written as is).
-    fn side_panel(
-        &mut self,
-        ui: &mut egui::Ui,
-        i18n: &I18nMap,
-        (work, active): (&mut Work, usize),
-        id: &str,
-    ) -> Option<PreviewEvent> {
-        let is_merging = self.pane.merge_values.as_ref().is_some_and(|values| *values.id == *id);
-        if is_merging {
-            self.pane.merge_panel(ui, i18n, (work, active), id);
-            return None;
-        }
-
-        let behavior = &work.workspace.behaviors[active];
-        let is_new = behavior.added.contains_key(id) || behavior.is_ref(id) || id == PANDORA_DOC;
-        if is_new || !self.pane.show_preview {
-            return None;
-        }
-        self.pane.preview_panel(ui, i18n, work.user_patch)
-    }
-
     /// Does what the editor and the side panel asked for, once both are drawn.
     fn after_editor(
         &mut self,
@@ -256,6 +317,15 @@ impl EditorArea {
             None => {}
         }
     }
+}
+
+/// `............ ✖` at the top right of an empty group: returns whether it was clicked.
+fn close_group_button(ui: &mut egui::Ui, i18n: &I18nMap) -> bool {
+    ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+        let button = egui_widgets::shadcn::Button::new("").icon(egui_widgets::shadcn::Icon::X).small();
+        ui.add(button).on_hover_text(i18n.t(I18nKey::EditorGroupCloseHover)).clicked()
+    })
+    .inner
 }
 
 /// `F4` / `]q` (`true`) or `Shift+F4` / `[q` (`false`): the next or the previous reference.

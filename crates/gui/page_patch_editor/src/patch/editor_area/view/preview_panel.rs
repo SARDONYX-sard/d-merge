@@ -14,27 +14,15 @@ use super::preview::PreviewEvent;
 use crate::patch::editor_area::EditorPane;
 
 impl EditorPane {
-    /// Draws the panel. Returns what its lines asked for (revert a block, go to a line).
-    /// `user_patch`: the user patch's window (its panels have ids of their own).
-    pub(super) fn preview_panel(
-        &mut self,
-        ui: &mut egui::Ui,
-        i18n: &I18nMap,
-        user_patch: bool,
-    ) -> Option<PreviewEvent> {
-        let panel_id = if user_patch { "user_patch_preview" } else { "nemesis_preview" };
-        let panel = egui::Panel::right(panel_id).default_size(520.0).resizable(true);
-
-        panel
-            // Kept to the panel's width: see `egui_widgets::contained`.
-            .show(ui, |ui| {
-                egui_widgets::contained(ui, |ui| {
-                    self.preview_header(ui, i18n)?;
-                    let view = self.preview_view.as_mut()?;
-                    super::preview::lines_ui(view, ui, i18n.t(I18nKey::PatchPreviewRevertHunkHover))
-                })
-            })
-            .inner
+    /// Draws the preview in its tab (see `super::dock`). Returns what its lines asked for (revert a
+    /// block, go to a line).
+    pub(super) fn preview_tab(&mut self, ui: &mut egui::Ui, i18n: &I18nMap) -> Option<PreviewEvent> {
+        // Kept to the tab's width: see `egui_widgets::contained`.
+        egui_widgets::contained(ui, |ui| {
+            self.preview_header(ui, i18n)?;
+            let view = self.preview_view.as_mut()?;
+            super::preview::lines_ui(view, ui, i18n.t(I18nKey::PatchPreviewRevertHunkHover))
+        })
     }
 
     /// `Patch preview ▲ ▼ 2/5 ✔ ... ⌖`. `None`: there is no preview yet.

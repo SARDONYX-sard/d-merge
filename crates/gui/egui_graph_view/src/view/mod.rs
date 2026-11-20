@@ -13,12 +13,18 @@
 //! - [`node`]: a node's card and lines, and what is done on them.
 //! - [`wire`]: the edges (strong around the node under the pointer), and the pin being dragged.
 //! - [`scroll`]: the scroll bars, over all the nodes.
-//! - [`controls`]: zoom, center, fit and depth, for the mouse alone.
+//! - [`controls`]: zoom, center, fit, depth and the whole graph, for the mouse alone.
+//! - [`picker`]: the nodes a pin dropped on no node can be connected to.
+//! - [`whole`]: the whole graph as a tree, closer together.
+//!
+//! A pin dragged near an edge of the view scrolls it, to reach a node beyond.
 
 mod controls;
 mod node;
+mod picker;
 mod rows;
 mod scroll;
+mod whole;
 mod wire;
 
 use std::cell::RefCell;
@@ -31,6 +37,7 @@ use self::rows::{Line, NodeRows};
 use crate::{
     GraphEdit, GraphSource,
     layout::{self, Layout, LayoutOptions},
+    tree::Tree,
 };
 
 /// What was done this frame.
@@ -64,12 +71,25 @@ struct LayoutKey<N> {
 }
 
 /// The layout, with the rows kept of each node (the rows themselves are read from the source when
-/// drawn).
+/// drawn), and what follows from them until the layout changes (a page turned changes it too).
+/// Kept, not computed each frame: a whole file has thousands of nodes.
 #[derive(Debug)]
 struct Placement<N> {
     key: LayoutKey<N>,
     layout: Layout<N>,
     rows: Vec<NodeRows>,
+    /// The lines of each node, with the pages turned.
+    lines: Vec<Vec<Line>>,
+    /// The vertical center of each node in the world: see [`Layout::stack`].
+    centers: Vec<f32>,
+    /// See [`pins`].
+    pins: HashMap<(usize, usize), usize>,
+    /// The column of each node: its layer, or its depth in the whole graph's tree.
+    columns: Vec<i32>,
+    /// The whole graph's tree. See [`whole`].
+    tree: Option<Tree>,
+    /// The whole graph was placed by its tree.
+    arranged: bool,
 }
 
 /// A value being typed: `(node, row key)` and the text so far.
@@ -97,6 +117,8 @@ pub struct GraphView<N> {
     editing: Option<Editing<N>>,
     /// The pin being dragged: `(node index, row key)`.
     wire: Option<(usize, usize)>,
+    /// The list of the nodes a pin dropped on no node can be connected to.
+    picker: Option<picker::Picker<N>>,
     /// The page of each paged list: `(node, list)` -> page. None: the first.
     pages: HashMap<(N, usize), usize>,
     /// See [`LayoutKey::pages`].
@@ -149,6 +171,10 @@ impl<N> GraphView<N> {
     pub const NODE_OPACITY: f32 = 0.7;
     /// How far out and in it zooms.
     const ZOOM: std::ops::RangeInclusive<f32> = 0.2..=2.5;
+    /// How close to an edge of the view a dragged pin scrolls it.
+    const SCROLL_EDGE: f32 = 48.0;
+    /// How fast it scrolls then, at the very edge (or beyond), in points a frame.
+    const SCROLL_SPEED: f32 = 16.0;
 
     #[inline]
     #[must_use]
@@ -162,6 +188,7 @@ impl<N> GraphView<N> {
             moved: HashMap::default(),
             editing: None,
             wire: None,
+            picker: None,
             pages: HashMap::default(),
             pages_version: 0,
             followed: None,
@@ -255,30 +282,56 @@ impl<N: Copy + Eq + std::hash::Hash + std::fmt::Debug> GraphView<N> {
         let ui = &mut canvas;
 
         let mut output = GraphOutput::default();
-        let Some(placement) = self.placement.take() else { return output };
+        let Some(mut placement) = self.placement.take() else { return output };
         let painter = ui.painter_at(rect);
         painter.rect_filled(rect, 0.0, ui.visuals().extreme_bg_color);
 
-        let frame = Frame { rect, origin: rect.center() + self.pan, zoom: self.zoom };
-        let lines = self.lines(&placement);
-        let rects = self.rects(&placement, &lines, frame);
-        let pins = pins(&placement, &lines);
         let focus_index = placement.layout.index_of(focus);
+        let centering = std::mem::take(&mut self.center);
+        if centering {
+            self.moved.clear();
+        }
+        self.arrange_whole(&mut placement);
+        let lines = &placement.lines;
+        let world = self.world_rects(&placement);
+        if centering {
+            // The focus in the middle: the world's origin in its neighborhood, anywhere in the whole.
+            let at = focus_index.map_or(Vec2::ZERO, |i| world[i].center().to_vec2());
+            self.pan = -at * self.zoom;
+        }
+        // An end to scrolling, every way: the nodes stay in reach. Before drawing, whatever moved
+        // them (the wheel, a drag, a scroll bar, a pin near an edge): drawn past the end and put
+        // back the next frame, they would shake.
+        if let Some(all) = world.iter().copied().reduce(Rect::union) {
+            let on_screen = Frame { rect, origin: rect.center() + self.pan, zoom: self.zoom }.screen(all);
+            self.pan += scroll::bounds(rect, on_screen);
+        }
+        let frame = Frame { rect, origin: rect.center() + self.pan, zoom: self.zoom };
+        let rects: Vec<Rect> = world.iter().map(|&world| frame.screen(world)).collect();
+        let pins = &placement.pins;
 
+        let room = self.gaps(&placement).x * self.zoom;
+        let whole = placement.tree.as_ref().map(|tree| (tree, room));
         let geometry =
-            wire::Geometry { frame, rects: &rects, pins: &pins, rows: &placement.rows, hovered: self.hovered };
+            wire::Geometry { frame, rects: &rects, pins, rows: &placement.rows, hovered: self.hovered, whole };
         wire::edges(ui, &painter, (&placement.layout, &geometry), (focus_index, highlight), &mut output);
-        let shown = node::Shown { placement: &placement, geometry: &geometry, lines: &lines };
+        let shown = node::Shown { placement: &placement, geometry: &geometry, lines };
         self.hovered = self.nodes_ui(ui, &painter, (source, &shown), (focus_index, highlight), &mut output);
         if let Some(edit) = self.wire_ui(ui, &painter, (source, &placement.layout, &geometry)) {
             output.edit = Some(edit);
+        }
+        if let Some(picker) = &mut self.picker
+            && let picker::Picked::Closed(edit) = picker.ui(ui.ctx(), source, (labels.connect_hint, labels.disconnect))
+        {
+            self.picker = None;
+            output.edit = edit.or(output.edit);
         }
         wire::hidden_counts(&painter, (&placement.layout, &geometry), ui.visuals().weak_text_color());
         let content = rects.iter().copied().reduce(Rect::union);
         if let Some(content) = content {
             self.pan += scroll::scroll_bars(ui, &painter, rect, content);
         }
-        let now = ((self.zoom, Self::ZOOM), self.options.depth_down);
+        let now = ((self.zoom, Self::ZOOM), (self.options.depth_down, self.options.all));
         if let Some(control) = controls::controls_ui(ui, rect, labels, now) {
             self.apply_control(control, rect, content);
             ui.ctx().request_repaint();
@@ -306,6 +359,10 @@ impl<N: Copy + Eq + std::hash::Hash + std::fmt::Debug> GraphView<N> {
                 }
             }
             controls::Control::Depth(depth) => self.options.depth_down = depth,
+            controls::Control::All(all) => {
+                self.options.all = all;
+                self.center = true;
+            }
         }
     }
 
@@ -339,19 +396,36 @@ impl<N: Copy + Eq + std::hash::Hash + std::fmt::Debug> GraphView<N> {
     /// centered. The rows of nodes are read again only when the source changed.
     fn refresh<S: GraphSource<Node = N>>(&mut self, source: &S, focus: N) {
         let key = LayoutKey { focus, version: source.version(), options: self.options, pages: self.pages_version };
-        let old = self.placement.take();
+        let mut old = self.placement.take();
         if old.as_ref().is_some_and(|old| old.key == key) {
             self.placement = old;
             return;
         }
-        if old.as_ref().is_none_or(|old| old.key.focus != focus) {
+        // The whole graph does not depend on the focus: another is only centered.
+        let same_whole =
+            |old: &mut Placement<N>| key.options.all && old.key == LayoutKey { focus: old.key.focus, ..key };
+        if let Some(mut kept) = old.take_if(same_whole) {
+            kept.key.focus = focus;
+            self.center = true;
+            self.placement = Some(kept);
+            return;
+        }
+        if old.as_ref().is_none_or(|old| old.key.focus != focus || old.key.options.all != key.options.all) {
             self.center = true;
         }
 
         // Rows read for the layout are kept for the drawing; of the same source, those of before.
         let mut kept: HashMap<N, NodeRows> = HashMap::default();
-        if let Some(old) = old.filter(|old| old.key.version == key.version) {
+        if let Some(old) = old.filter(|old| old.key.version == key.version && !old.key.options.all) {
             kept.extend(old.layout.nodes.iter().map(|placed| placed.node).zip(old.rows));
+        }
+        // The whole graph: every edge followed (no pages); the rows read once, for the colors of the
+        // edges, the cards show none (see `placed`).
+        if self.options.all {
+            let layout = layout::layout(source, focus, self.options, &|_, _| true);
+            let rows = layout.nodes.iter().map(|placed| NodeRows::read(source.rows(placed.node))).collect();
+            self.placement = Some(self.placed(key, layout, rows));
+            return;
         }
         let cache = RefCell::new(kept);
         let per_page = self.list_page;
@@ -368,37 +442,42 @@ impl<N: Copy + Eq + std::hash::Hash + std::fmt::Debug> GraphView<N> {
             .iter()
             .map(|placed| cache.remove(&placed.node).unwrap_or_else(|| NodeRows::read(source.rows(placed.node))))
             .collect();
-        self.placement = Some(Placement { key, layout, rows });
+        self.placement = Some(self.placed(key, layout, rows));
     }
 
-    /// The lines of each node, with the pages turned now.
-    fn lines(&self, placement: &Placement<N>) -> Vec<Vec<Line>> {
-        let nodes = placement.layout.nodes.iter().zip(&placement.rows);
-        nodes.map(|(placed, rows)| rows.lines(|list| self.page_of(placed.node, list), self.list_page)).collect()
-    }
-
-    /// Each node on screen: the layers stacked by the nodes' heights, then moved by the user.
-    fn rects(&self, placement: &Placement<N>, lines: &[Vec<Line>], frame: Frame) -> Vec<Rect> {
+    /// `layout` with its `rows`, and their lines, centers and pins with the pages turned now.
+    fn placed(&self, key: LayoutKey<N>, layout: Layout<N>, rows: Vec<NodeRows>) -> Placement<N> {
+        let nodes = layout.nodes.iter().zip(&rows);
+        let lines: Vec<Vec<Line>> = if self.options.all {
+            vec![Vec::new(); rows.len()] // cards only: a file's layer holds hundreds of nodes
+        } else {
+            nodes.map(|(placed, rows)| rows.lines(|list| self.page_of(placed.node, list), self.list_page)).collect()
+        };
         let heights: Vec<f32> = lines.iter().map(|lines| node_height(lines.len())).collect();
-        let centers = placement.layout.stack(&heights, self.gap.y);
+        let centers = layout.stack(&heights, self.gap.y);
+        let pins = pins(&rows, &lines);
+        let columns = layout.nodes.iter().map(|placed| placed.layer).collect();
+        let tree = self.options.all.then(|| Tree::of(&layout));
+        Placement { key, layout, rows, lines, centers, pins, columns, tree, arranged: false }
+    }
+
+    /// Each node in the world (zoom 1): in its column, at its center, then moved by the user.
+    fn world_rects(&self, placement: &Placement<N>) -> Vec<Rect> {
+        let column = self.node_width + self.gaps(placement).x;
         let nodes = placement.layout.nodes.iter().enumerate();
         nodes
             .map(|(i, placed)| {
                 #[expect(clippy::cast_precision_loss, reason = "a few layers")]
-                let x = placed.layer as f32 * (self.node_width + self.gap.x);
+                let x = placement.columns[i] as f32 * column;
                 let moved = self.moved.get(&placed.node).copied().unwrap_or_default();
-                let size = egui::vec2(self.node_width, heights[i]);
-                frame.screen(Rect::from_center_size(egui::pos2(x, centers[i]) + moved, size))
+                let size = egui::vec2(self.node_width, node_height(placement.lines[i].len()));
+                Rect::from_center_size(egui::pos2(x, placement.centers[i]) + moved, size)
             })
             .collect()
     }
 
     /// Drag and wheel pan, `Ctrl+wheel` and pinch zoom around the pointer.
     fn pan_and_zoom(&mut self, ui: &egui::Ui, rect: Rect, response: &egui::Response) {
-        if std::mem::take(&mut self.center) {
-            self.pan = Vec2::ZERO; // the focus is at the world's origin
-            self.moved.clear();
-        }
         if response.dragged() {
             self.pan += response.drag_delta();
         }
@@ -500,6 +579,7 @@ impl<N: Copy + Eq + std::hash::Hash + std::fmt::Debug> GraphView<N> {
         ui.ctx().request_repaint();
 
         if ui.input(|input| input.pointer.primary_down()) {
+            self.pan += edge_scroll(geometry.frame.rect, pointer, (Self::SCROLL_EDGE, Self::SCROLL_SPEED));
             return None;
         }
         self.wire = None;
@@ -508,26 +588,41 @@ impl<N: Copy + Eq + std::hash::Hash + std::fmt::Debug> GraphView<N> {
         match target {
             Some(to) if source.accepts(from, key, to) => Some(GraphEdit::Connect { node: from, key, to }),
             Some(_) => None,
+            // On no node: the list of those it can take, the one wanted is often not shown.
             None => {
                 let connected = crate::Slot::Pin { connected: true };
                 let is_connected = source.rows(from).any(|row| row.key == key && row.slot == connected);
-                is_connected.then_some(GraphEdit::Disconnect { node: from, key })
+                let at = pointer.clamp(geometry.frame.rect.min, geometry.frame.rect.max);
+                self.picker = Some(picker::Picker::open(source, (from, key), at, is_connected));
+                None
             }
         }
     }
 }
 
 /// The line of each shown row: `(node index, key)` -> line.
-fn pins<N>(placement: &Placement<N>, lines: &[Vec<Line>]) -> HashMap<(usize, usize), usize> {
+fn pins(rows: &[NodeRows], lines: &[Vec<Line>]) -> HashMap<(usize, usize), usize> {
     let mut pins = HashMap::default();
     for (i, node_lines) in lines.iter().enumerate() {
         for (at, line) in node_lines.iter().enumerate() {
             if let Line::Row(row) = *line {
-                pins.insert((i, placement.rows[i].rows[row].key), at);
+                pins.insert((i, rows[i].rows[row].key), at);
             }
         }
     }
     pins
+}
+
+/// How far the nodes move this frame, a pin being dragged at `pointer` near an edge of `view` (or
+/// beyond it): towards what is past that edge, faster closer to it.
+///
+/// e.g. `edge` 48, `speed` 16: 12 points from the left edge -> `(12, 0)`, the nodes go right.
+fn edge_scroll(view: Rect, pointer: Pos2, (edge, speed): (f32, f32)) -> Vec2 {
+    let closeness = |distance: f32| ((edge - distance) / edge).clamp(0.0, 1.0) * speed;
+    Vec2::new(
+        closeness(pointer.x - view.left()) - closeness(view.right() - pointer.x),
+        closeness(pointer.y - view.top()) - closeness(view.bottom() - pointer.y),
+    )
 }
 
 /// A node with `lines` lines, at zoom 1.
@@ -546,5 +641,86 @@ pub(super) struct Frame {
 impl Frame {
     fn screen(self, world: Rect) -> Rect {
         Rect::from_min_max(self.origin + world.min.to_vec2() * self.zoom, self.origin + world.max.to_vec2() * self.zoom)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `0 -> 1`, each with a field `f` pointing on.
+    struct Mock;
+
+    impl GraphSource for Mock {
+        type Node = u32;
+
+        fn version(&self) -> u64 {
+            0
+        }
+
+        fn edges(&self, node: u32) -> impl Iterator<Item = crate::Edge<'_, u32>> {
+            (node == 0).then_some(crate::Edge { to: 1, label: "f", key: 7 }).into_iter()
+        }
+
+        fn parents(&self, node: u32) -> impl Iterator<Item = u32> {
+            (node == 1).then_some(0).into_iter()
+        }
+
+        fn nodes(&self) -> impl Iterator<Item = u32> {
+            0..2
+        }
+
+        fn card(&self, _: u32) -> crate::Card<'_> {
+            crate::Card {
+                title: "",
+                subtitle: "",
+                header: None,
+                accent: None,
+                dimmed: false,
+                editable: true,
+                fan_in: 0,
+            }
+        }
+
+        fn rows(&self, _: u32) -> impl Iterator<Item = crate::Row<'_>> {
+            std::iter::once(crate::Row {
+                label: "f",
+                index: None,
+                slot: crate::Slot::Pin { connected: true },
+                key: 7,
+                color: None,
+            })
+        }
+    }
+
+    /// The whole graph shows each node's card only: a file's layer holds hundreds of nodes, which
+    /// their rows would make far too tall. Its rows are read still, for the colors of its edges.
+    /// The neighborhood shows the rows.
+    #[test]
+    fn the_whole_graph_shows_cards_only() {
+        let mut view = GraphView::new();
+        view.refresh(&Mock, 1);
+        let placement = view.placement.as_ref().unwrap();
+        assert!(placement.lines.iter().any(|lines| !lines.is_empty()), "the neighborhood has rows");
+
+        view.set_options(LayoutOptions { all: true, ..LayoutOptions::DEFAULT });
+        view.refresh(&Mock, 1);
+        let placement = view.placement.as_ref().unwrap();
+        assert_eq!(placement.layout.nodes.len(), 2);
+        assert!(placement.lines.iter().all(Vec::is_empty), "cards only");
+        let index = placement.layout.index_of(0).unwrap();
+        assert!(placement.rows[index].row_of(7).is_some(), "its rows read, for the colors of its edges");
+        assert_eq!(placement.layout.edges.len(), 1, "its edges are still drawn");
+    }
+
+    /// A pin near an edge scrolls towards it, faster closer to it; in the middle, not at all.
+    #[test]
+    fn a_pin_near_an_edge_scrolls() {
+        let view = Rect::from_min_size(Pos2::ZERO, egui::vec2(400.0, 300.0));
+        let scroll = |x, y| edge_scroll(view, egui::pos2(x, y), (48.0, 16.0));
+        assert_eq!(scroll(200.0, 150.0), Vec2::ZERO);
+        assert_eq!(scroll(36.0, 150.0), egui::vec2(4.0, 0.0), "12 into the left edge: the nodes go right");
+        assert_eq!(scroll(400.0, 300.0), egui::vec2(-16.0, -16.0), "the bottom right corner, at full speed");
+        assert_eq!(scroll(-50.0, 150.0), egui::vec2(16.0, 0.0), "beyond the edge: full speed");
     }
 }
