@@ -236,6 +236,9 @@ impl SideArea {
         let mut asks = Vec::new();
         self.view_keys(ui, keys);
         asks.extend(file_keys(keys, sel));
+        if keys.take(keybinding::commands::SIDE_BAR_TOGGLE) {
+            asks.extend(self.toggle_hidden());
+        }
 
         let id = if work.user_patch { "user_patch" } else { "nemesis" };
         let clicked = egui::Panel::left((id, "activity_bar"))
@@ -254,13 +257,10 @@ impl SideArea {
         }
 
         // Kept to the side bar's width: a row too wide does not widen it (see `egui_widgets::contained`).
+        let mut hide = false;
         egui::Panel::left((id, "side_bar")).resizable(true).default_size(320.0).show(ui, |ui| {
             egui_widgets::contained(ui, |ui| {
-                let (_, _, title, _) =
-                    VIEWS.iter().find(|(view, ..)| *view == self.bar.view).copied().unwrap_or(VIEWS[0]);
-                if self.bar.view != SideView::Changes {
-                    egui_widgets::side_bar_title(ui, i18n.t(title));
-                }
+                hide = self.title_row(ui, i18n);
                 let has_behaviors = !work.workspace.behaviors.is_empty();
                 match self.bar.view {
                     SideView::Explorer => {
@@ -276,7 +276,35 @@ impl SideArea {
                 }
             });
         });
+        if hide {
+            asks.extend(self.toggle_hidden());
+        }
         asks
+    }
+
+    /// `EXPLORER ........ «`: the view's title (the changes' has a header of its own) and the button
+    /// that hides the side bar. Returns whether it was clicked.
+    fn title_row(&self, ui: &mut egui::Ui, i18n: &I18nMap) -> bool {
+        let (_, _, title, _) = VIEWS.iter().find(|(view, ..)| *view == self.bar.view).copied().unwrap_or(VIEWS[0]);
+        ui.horizontal(|ui| {
+            if self.bar.view != SideView::Changes {
+                egui_widgets::side_bar_title(ui, i18n.t(title));
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let button =
+                    egui_widgets::shadcn::Button::new("").icon(egui_widgets::shadcn::Icon::ChevronLeft).small();
+                ui.add(button).on_hover_text(i18n.t(I18nKey::SideBarHideHover)).clicked()
+            })
+            .inner
+        })
+        .inner
+    }
+
+    /// `Ctrl+B` or the `«`: the side bar hides, or shows again. Hidden with the keyboard in the tree,
+    /// it goes back to the editor.
+    fn toggle_hidden(&mut self) -> Option<SideAsk> {
+        self.bar.hidden = !self.bar.hidden;
+        (self.bar.hidden && std::mem::take(&mut self.explorer.tree_focus)).then_some(SideAsk::FocusEditor)
     }
 
     /// The EVENTS / VARIABLES view: of a behavior to pick here as well.
@@ -429,5 +457,21 @@ mod tests {
         assert!(side.hidden);
         assert!(side.toggle(SideView::Changes));
         assert_eq!((side.view, side.hidden), (SideView::Changes, false));
+    }
+
+    /// `Ctrl+B` / `«` hides the side bar, and shows it again; hidden with the keyboard in the tree,
+    /// it goes back to the editor. A key of a view (Vim `Space e`) shows it, as before.
+    #[test]
+    fn the_side_bar_hides_and_shows() {
+        let mut side = SideArea::default();
+        side.explorer.tree_focus = true;
+        assert!(matches!(side.toggle_hidden(), Some(SideAsk::FocusEditor)), "the keyboard to the editor");
+        assert!(side.bar.hidden && !side.explorer.tree_focus);
+        assert!(side.toggle_hidden().is_none());
+        assert!(!side.bar.hidden);
+
+        side.toggle_hidden();
+        side.bar.show(SideView::Explorer);
+        assert!(!side.bar.hidden, "a key of a view shows it");
     }
 }

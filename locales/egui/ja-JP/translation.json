@@ -418,6 +418,7 @@
   "settings_about_label": "情報",
   "settings_button": "設定",
   "settings_display_label": "表示",
+  "side_bar_hide_hover": "サイドバーを隠します(Ctrl+B)。アイコンかビューのキー(Vimの`Space e`など)で再表示します",
   "skyrim_data_dir_label": "Skyrim Dataディレクトリ:",
   "source_code_label": "ソースコード:",
   "start_hint": "新しいパッチmodを作るか、既存のmodを開いて編集します。",

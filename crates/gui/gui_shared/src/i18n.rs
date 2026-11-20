@@ -1616,6 +1616,9 @@ pub enum I18nKey {
     /// Display
     SettingsDisplayLabel,
 
+    /// Hide the side bar (Ctrl+B). Its icon, or a key of a view (e.g. Vim `Space e`), shows it again
+    SideBarHideHover,
+
     /// Skyrim Data dir:
     SkyrimDataDirLabel,
 
