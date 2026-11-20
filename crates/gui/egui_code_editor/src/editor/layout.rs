@@ -117,7 +117,7 @@ fn layout(
         backgrounds.clear();
         backgrounds.resize(len, Color32::TRANSPARENT);
 
-        for (columns, color) in language.highlight(line, visuals) {
+        for (columns, color) in language.highlight_at(line_no, line, visuals) {
             fill(&mut colors, columns, color);
         }
         let first = by_line.partition_point(|diagnostic| diagnostic.line < line_no);
@@ -148,11 +148,22 @@ fn layout(
 /// e.g., a read-only preview that only lays out its visible rows:
 /// `ui.label(code_editor::line_job(ui, line, &Xml))`
 pub fn line_job(ui: &egui::Ui, line: &str, language: &dyn Language) -> LayoutJob {
+    job_of(ui, line, language.highlight(line, ui.visuals()))
+}
+
+/// [`line_job`] of the `line_no`-th line (0-based), for a language whose lines mean what their
+/// place says: see [`Language::highlight_at`].
+pub fn line_job_at(ui: &egui::Ui, line_no: usize, line: &str, language: &dyn Language) -> LayoutJob {
+    job_of(ui, line, language.highlight_at(line_no, line, ui.visuals()))
+}
+
+/// `line` in its `colored` ranges, the rest in the text color.
+fn job_of(ui: &egui::Ui, line: &str, colored: Vec<(std::ops::Range<usize>, Color32)>) -> LayoutJob {
     let font_id = egui::TextStyle::Monospace.resolve(ui.style());
     let visuals = ui.visuals();
 
     let mut colors = vec![visuals.text_color(); line.chars().count()];
-    for (columns, color) in language.highlight(line, visuals) {
+    for (columns, color) in colored {
         fill(&mut colors, columns, color);
     }
     let underlines = vec![None; colors.len()];

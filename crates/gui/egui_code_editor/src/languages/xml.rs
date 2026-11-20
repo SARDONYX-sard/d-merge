@@ -50,19 +50,23 @@ impl Language for Xml {
     }
 }
 
-/// One Dark / One Light colors (same family as the hkanno editor).
-struct Palette {
-    punct: Color32,
-    tag: Color32,
-    attr: Color32,
-    string: Color32,
-    number: Color32,
-    pointer: Color32,
-    comment: Color32,
+/// One Dark / One Light colors (same family as the hkanno editor): XML's, and of the languages
+/// that color as it does (e.g. the patch editor's animation data).
+#[derive(Debug, Clone, Copy)]
+pub struct Palette {
+    pub punct: Color32,
+    pub tag: Color32,
+    pub attr: Color32,
+    pub string: Color32,
+    pub number: Color32,
+    pub pointer: Color32,
+    pub comment: Color32,
 }
 
 impl Palette {
-    const fn new(dark: bool) -> Self {
+    /// For a dark theme (`dark`), or a light one.
+    #[must_use]
+    pub const fn new(dark: bool) -> Self {
         const fn rgb(dark: bool, d: (u8, u8, u8), l: (u8, u8, u8)) -> Color32 {
             let (r, g, b) = if dark { d } else { l };
             Color32::from_rgb(r, g, b)

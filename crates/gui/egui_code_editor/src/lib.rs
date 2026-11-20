@@ -46,7 +46,7 @@ pub use self::{
     editor::{
         CodeEditor, CodeEditorOutput, Navigation,
         cursor::{editor_id, place_cursor, set_cursor},
-        layout::line_job,
+        layout::{line_job, line_job_at},
         state::CodeEditorState,
     },
     inline_diff::{CharChange, DiffHunk, InlineDiff},

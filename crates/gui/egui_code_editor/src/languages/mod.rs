@@ -3,4 +3,7 @@
 mod xml;
 mod xml_path;
 
-pub use self::{xml::Xml, xml_path::xml_path};
+pub use self::{
+    xml::{Palette, Xml},
+    xml_path::xml_path,
+};

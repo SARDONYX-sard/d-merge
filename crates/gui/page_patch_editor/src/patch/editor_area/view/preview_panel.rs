@@ -20,8 +20,16 @@ impl EditorPane {
         // Kept to the tab's width: see `egui_widgets::contained`.
         egui_widgets::contained(ui, |ui| {
             self.preview_header(ui, i18n)?;
+            // The animation data colored as in its editor; the rest as XML.
+            let anim = crate::patch::anim::lines::AnimDataLanguage {
+                roles: &self.preview_roles,
+                cursor_line: 0,
+                trigger_names: &[],
+            };
+            let language: &dyn egui_code_editor::Language =
+                if self.preview_roles.is_empty() { &egui_code_editor::languages::Xml } else { &anim };
             let view = self.preview_view.as_mut()?;
-            super::preview::lines_ui(view, ui, i18n.t(I18nKey::PatchPreviewRevertHunkHover))
+            super::preview::lines_ui(view, ui, (i18n.t(I18nKey::PatchPreviewRevertHunkHover), language))
         })
     }
 

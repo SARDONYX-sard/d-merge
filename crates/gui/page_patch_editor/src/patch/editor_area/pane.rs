@@ -93,6 +93,8 @@ pub(super) struct EditorPane {
     pub(super) field_values: Option<(usize, Rc<editor::language::FieldValues>)>,
     /// What each line of an animation data file is. See [`anim::lines`].
     pub(super) anim_roles: Vec<anim::lines::LineRole>,
+    /// The same, of each line of the preview (the patch, with its markers): for its colors.
+    pub(super) preview_roles: Vec<anim::lines::LineRole>,
     /// The trigger names of the clip data template, read once; and those known now, for the completion.
     template_triggers: Option<std::collections::BTreeSet<String>>,
     pub(super) trigger_names: Vec<String>,
@@ -205,6 +207,11 @@ impl EditorPane {
             (nemesis_view, check)
         };
         self.preview_view = view;
+        // Its rows are the patch's lines: colored by what each is, as the editor's.
+        self.preview_roles = match patch.as_deref() {
+            Some(patch) if behavior.is_anim_data() => anim::lines::roles(behavior.adsf, id, patch),
+            _ => Vec::new(),
+        };
         if let Some(view) = &mut self.preview_view {
             view.keep_current(current);
         }
@@ -322,6 +329,34 @@ impl EditorPane {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The preview of animation data is colored as its editor: each of its rows (the patch's lines,
+    /// markers too) has its role; a path is a string.
+    #[test]
+    fn the_preview_of_anim_data_has_its_roles() {
+        use egui_code_editor::Language as _;
+        let mut adsf = Behavior::open(Path::new("meshes/animationdatasinglefile.bin")).unwrap();
+        let header = "$header$/$header$.txt";
+        adsf.added.insert(
+            header.to_owned(),
+            "A.txt
+<!-- MOD_CODE ~m~ OPEN -->
+New.txt
+<!-- CLOSE -->
+"
+            .to_owned(),
+        );
+        let mut pane = EditorPane::default();
+        let settings = PreviewSettings { code: "m", export_format: ExportFormat::default(), not_linked: false };
+        pane.refresh_preview(&adsf, header, settings);
+
+        let rows = pane.preview_view.as_ref().map_or(0, |view| view.lines().len());
+        assert!(pane.preview_roles.len() >= rows, "a role for each row: {} of {rows}", pane.preview_roles.len());
+        let anim = anim::lines::AnimDataLanguage { roles: &pane.preview_roles, cursor_line: 0, trigger_names: &[] };
+        let visuals = egui::Visuals::dark();
+        let palette = egui_code_editor::languages::Palette::new(true);
+        assert_eq!(anim.highlight_at(2, "New.txt", &visuals), [(0..7, palette.string)], "a path, green");
+    }
 
     /// Only getting the keyboard asks: keeping it does not, or the side bar could not be scrolled.
     #[test]

@@ -59,7 +59,10 @@
 
 use std::{borrow::Cow, ops::Range};
 
-use egui_code_editor::{CompletionList, Language, languages::Xml};
+use egui_code_editor::{
+    CompletionList, Language,
+    languages::{Palette, Xml},
+};
 
 use crate::{
     anim::patch_file::{AdsfFile, AsdsfFile},
@@ -462,6 +465,92 @@ fn walk_template_side(is_adsf: bool, id: &str, lines: &[&str], parts: &[Part]) -
     (walk.roles, fits)
 }
 
+impl LineRole {
+    /// How the whole value of a line of this role is colored; `None`: by its tokens.
+    const fn color(self, p: &Palette) -> Option<egui::Color32> {
+        Some(match self {
+            Self::TriggersLen
+            | Self::ConditionsLen
+            | Self::AttacksLen
+            | Self::AttackClipsLen(_)
+            | Self::AnimInfosLen
+            | Self::ClipTriggersLen
+            | Self::TranslationsLen
+            | Self::RotationsLen => p.punct,
+            Self::Version => p.tag,
+            Self::Trigger(_)
+            | Self::ConditionVariable(_)
+            | Self::AttackTrigger(_)
+            | Self::AttackClip(_)
+            | Self::ClipName => p.string,
+            Self::ConditionA(_)
+            | Self::ConditionB(_)
+            | Self::AttackContextual(_)
+            | Self::AnimExtension(_)
+            | Self::ClipId
+            | Self::Speed
+            | Self::CropStart
+            | Self::CropEnd
+            | Self::MotionId
+            | Self::Duration
+            | Self::Translation(_)
+            | Self::Rotation(_) => p.number,
+            Self::AnimDir(_) | Self::AnimFile(_) | Self::ClipTrigger(_) | Self::Other => return None,
+        })
+    }
+}
+
+/// The colors of `line`, of `role`, as char ranges. e.g. a clip's trigger `Draw:0.5`: the name, the
+/// `:`, the time; `$crc32[...]$` as a pointer; a line of no known role (a header's): its numbers.
+fn role_colors(role: LineRole, line: &str, p: &Palette) -> Vec<(Range<usize>, egui::Color32)> {
+    let chars: Vec<char> = line.chars().collect();
+    let start = chars.iter().position(|c| !c.is_whitespace()).unwrap_or(chars.len());
+    let end = chars.iter().rposition(|c| !c.is_whitespace()).map_or(start, |at| at + 1);
+    if let Some(color) = role.color(p) {
+        return vec![(start..end, color)];
+    }
+    if chars.get(start) == Some(&'$') {
+        return vec![(start..end, p.pointer)];
+    }
+    match role {
+        LineRole::ClipTrigger(_) => match chars[..end].iter().rposition(|c| *c == ':') {
+            Some(colon) => vec![(start..colon, p.string), (colon..colon + 1, p.punct), (colon + 1..end, p.number)],
+            None => vec![(start..end, p.string)],
+        },
+        LineRole::AnimDir(_) | LineRole::AnimFile(_) => vec![(start..end, p.number)],
+        // A header's line (e.g. `DefaultMale.txt`), or what does not fit: a path as a string, else
+        // its numbers.
+        _ if is_path(line.trim()) => vec![(start..end, p.string)],
+        _ => numbers(&chars, p.number),
+    }
+}
+
+/// Does `text` look like a path: a file with an extension (letters after its last `.`), or a folder
+/// (`\` or `/`)? e.g. `DefaultMale.txt`, `Animations\idle.hkx`; not `1.000000`.
+fn is_path(text: &str) -> bool {
+    let has_extension = text
+        .rsplit_once('.')
+        .is_some_and(|(stem, ext)| !stem.is_empty() && !ext.is_empty() && ext.chars().all(|c| c.is_ascii_alphabetic()));
+    has_extension || text.contains(['\\', '/'])
+}
+
+/// The runs of digits (a `-`, a `.` with them) of `chars`, each a number.
+fn numbers(chars: &[char], color: egui::Color32) -> Vec<(Range<usize>, egui::Color32)> {
+    let is_number = |c: char| c.is_ascii_digit() || matches!(c, '.' | '-');
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i].is_ascii_digit() || (chars[i] == '-' && chars.get(i + 1).is_some_and(char::is_ascii_digit)) {
+            let end = (i..chars.len()).find(|&j| !is_number(chars[j])).unwrap_or(chars.len());
+            out.push((i..end, color));
+            i = end;
+        } else {
+            i += 1;
+        }
+    }
+    out
+}
+
 /// The editor's language for these files.
 #[derive(Debug)]
 pub struct AnimDataLanguage<'a> {
@@ -479,9 +568,22 @@ impl Language for AnimDataLanguage<'_> {
         egui_code_editor::Indent::Tab(4)
     }
 
-    /// The markers are colored like in XML.
+    /// The markers are colored like in XML; the rest by what each line is (see [`LineRole::color`]).
     fn highlight(&self, line: &str, visuals: &egui::Visuals) -> Vec<(std::ops::Range<usize>, egui::Color32)> {
         Xml.highlight(line, visuals)
+    }
+
+    fn highlight_at(
+        &self,
+        line_no: usize,
+        line: &str,
+        visuals: &egui::Visuals,
+    ) -> Vec<(std::ops::Range<usize>, egui::Color32)> {
+        if line.trim_start().starts_with("<!--") {
+            return Xml.highlight(line, visuals);
+        }
+        let role = self.roles.get(line_no).copied().unwrap_or(LineRole::Other);
+        role_colors(role, line, &Palette::new(visuals.dark_mode))
     }
 
     fn hover_at(&self, _text: &str, line: usize, _column: usize) -> Option<String> {
@@ -656,5 +758,28 @@ mod tests {
         let list = language.complete("", 0);
         assert_eq!(list.items[0].insert, "7891816");
         assert_eq!(language.inlay_hints_at(5, "1"), ["animInfos[0].dir"]);
+    }
+
+    /// Each line by what it is: a count dim, a name a string, a number a number, a trigger's name,
+    /// `:` and time apart, a marker as XML's comment; a header's line, its numbers.
+    #[test]
+    fn lines_are_colored_by_their_roles() {
+        let p = Palette::new(true);
+        let clip = "Idle\n1\n1.5\n0\n0\n1\nDraw:0.5\n";
+        let roles = roles(true, "D~1/Idle~348.txt", clip);
+        let lang = AnimDataLanguage { roles: &roles, cursor_line: 0, trigger_names: &[] };
+        let visuals = egui::Visuals::dark();
+        let colors = |no: usize, line: &str| lang.highlight_at(no, line, &visuals);
+        assert_eq!(colors(0, "Idle"), [(0..4, p.string)], "the clip's name");
+        assert_eq!(colors(2, "1.5"), [(0..3, p.number)], "its speed");
+        assert_eq!(colors(5, "1"), [(0..1, p.punct)], "the count of its triggers");
+        assert_eq!(colors(6, "Draw:0.5"), [(0..4, p.string), (4..5, p.punct), (5..8, p.number)]);
+        assert_eq!(colors(9, "<!-- CLOSE -->"), Xml.highlight("<!-- CLOSE -->", &visuals), "a marker as XML's");
+        assert_eq!(numbers(&"3 Proj.txt".chars().collect::<Vec<_>>(), p.number), [(0..1, p.number)]);
+        let header = super::roles(true, "$header$/$header$.txt", "DefaultMale.txt\n3\n");
+        let lang = AnimDataLanguage { roles: &header, cursor_line: 0, trigger_names: &[] };
+        let colors = |no: usize, line: &str| lang.highlight_at(no, line, &visuals);
+        assert_eq!(colors(0, "DefaultMale.txt"), [(0..15, p.string)], "a path as a string");
+        assert_eq!(colors(1, "3"), [(0..1, p.number)], "a number still");
     }
 }

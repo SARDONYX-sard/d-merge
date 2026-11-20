@@ -1,6 +1,5 @@
 //! Draws the patch preview. The data is in [`crate::patch::editor::preview`].
 
-use egui_code_editor::languages::Xml;
 use egui_widgets::shadcn::{Button, Icon};
 
 use crate::patch::editor::preview::{Kind, Preview};
@@ -31,7 +30,12 @@ pub(in crate::patch::editor_area) enum PreviewEvent {
 }
 
 /// The lines (only the visible ones are laid out).
-pub(super) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, revert_hover: &str) -> Option<PreviewEvent> {
+/// `language`: of the patch's lines (XML, or the animation data's).
+pub(super) fn lines_ui(
+    preview: &mut Preview,
+    ui: &mut egui::Ui,
+    (revert_hover, language): (&str, &dyn egui_code_editor::Language),
+) -> Option<PreviewEvent> {
     let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 2.0;
     let font = egui::TextStyle::Monospace.resolve(ui.style());
     // The painter below does not grow the rows, so the horizontal scroll needs the real width.
@@ -86,7 +90,7 @@ pub(super) fn lines_ui(preview: &mut Preview, ui: &mut egui::Ui, revert_hover: &
                 ui.painter().text(pos, egui::Align2::LEFT_CENTER, text, font.clone(), color);
             } else {
                 // Colored per visible row only, so huge files stay fast.
-                let job = egui_code_editor::line_job(ui, text, &Xml);
+                let job = egui_code_editor::line_job_at(ui, first_row + i, text, language);
                 let galley = ui.painter().layout_job(job);
                 let top = pos - egui::vec2(0.0, galley.size().y / 2.0);
                 ui.painter().galley(top, galley, ui.visuals().text_color());

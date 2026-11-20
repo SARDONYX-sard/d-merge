@@ -60,6 +60,13 @@ pub trait Language {
         Vec::new()
     }
 
+    /// Like [`Self::highlight`], for languages whose lines mean what their position says (e.g. the
+    /// n-th line of a record is its speed). `line_no` is 0-based.
+    fn highlight_at(&self, line_no: usize, line: &str, visuals: &egui::Visuals) -> Vec<(Range<usize>, Color32)> {
+        let _ = line_no;
+        self.highlight(line, visuals)
+    }
+
     /// Completion candidates at `column`.
     fn complete(&self, line: &str, column: usize) -> CompletionList {
         let _ = (line, column);
