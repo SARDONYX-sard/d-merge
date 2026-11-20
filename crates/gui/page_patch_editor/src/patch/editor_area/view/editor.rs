@@ -353,6 +353,7 @@ impl EditorPane {
                 .actions(&actions)
                 .inline_diff(self.show_inline_diff.then_some(&self.inline_diff))
                 .references(&mut self.references, &peek)
+                .minimap(true)
                 .show(ui, &mut self.state);
 
             if let Some(cursor) = output.cursor {
