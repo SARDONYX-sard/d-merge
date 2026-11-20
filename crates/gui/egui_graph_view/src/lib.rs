@@ -22,6 +22,7 @@
 //!   the drawing. Only what is on screen is drawn.
 
 pub mod layout;
+pub mod tree;
 pub mod view;
 
 pub use layout::{Layout, LayoutOptions};
@@ -116,6 +117,12 @@ pub trait GraphSource {
 
     /// The nodes with an edge to `node`.
     fn parents(&self, node: Self::Node) -> impl Iterator<Item = Self::Node>;
+
+    /// Every node: those [`LayoutOptions::all`] shows, and those a dragged pin can be connected to
+    /// from the list when dropped where no node is. None by default.
+    fn nodes(&self) -> impl Iterator<Item = Self::Node> {
+        std::iter::empty()
+    }
 
     fn card(&self, node: Self::Node) -> Card<'_>;
 

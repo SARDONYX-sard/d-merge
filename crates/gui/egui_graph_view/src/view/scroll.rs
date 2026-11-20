@@ -9,6 +9,8 @@
 //! └────────────────────────────────┘
 //! ```
 //! A bar is shown only when the nodes go beyond the view that way.
+//!
+//! The scrolling has an end ([`bounds`]): the view goes no further than the nodes, with a margin.
 
 use egui::{Rect, Sense, Vec2};
 
@@ -53,6 +55,25 @@ fn bar(ui: &egui::Ui, painter: &egui::Painter, (view, all): (Rect, Rect), axis: 
     if response.dragged() { -response.drag_delta()[axis] / scale } else { 0.0 }
 }
 
+/// The margin the nodes keep from the view's edges, at the ends of the scrolling.
+const MARGIN: f32 = 40.0;
+
+/// How far the nodes (`content`, on screen) must move to be in reach of `view`, along each axis:
+/// - larger than the view: the view goes no further than their ends, with a margin
+/// - smaller: they stay in the view, a margin in from its edges
+///
+/// e.g. a view 0..100, nodes 0..300 moved to -250..50: `+10`, the view ends 40 past their end.
+pub(super) fn bounds(view: Rect, content: Rect) -> Vec2 {
+    let axis = |axis: usize| {
+        let (start, end) = (content.min[axis], content.max[axis]);
+        let (low, high) = (view.min[axis] + MARGIN, view.max[axis] - MARGIN);
+        // Larger: start <= low and end >= high. Smaller: start >= low and end <= high.
+        let (min, max) = if end - start > high - low { (high - end, low - start) } else { (low - start, high - end) };
+        0.0_f32.clamp(min, max)
+    };
+    Vec2::new(axis(0), axis(1))
+}
+
 /// Along the bottom (`axis` 0) or the right of `view`, short of the corner.
 fn track(view: Rect, axis: usize) -> Rect {
     if axis == 0 {
@@ -65,5 +86,27 @@ fn track(view: Rect, axis: usize) -> Rect {
             egui::pos2(view.right() - THICKNESS, view.top()),
             egui::pos2(view.right(), view.bottom() - THICKNESS),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn span(x: std::ops::RangeInclusive<f32>) -> Rect {
+        Rect::from_x_y_ranges(x, 0.0..=1.0)
+    }
+
+    /// The view goes no further than large nodes' ends; small nodes stay in the view; within the
+    /// ends, nothing moves.
+    #[test]
+    fn scrolling_ends_at_the_nodes() {
+        let view = Rect::from_x_y_ranges(0.0..=100.0, -100.0..=100.0);
+        let x = |content: Rect| bounds(view, content).x;
+        assert!((x(span(-250.0..=50.0)) - 10.0).abs() < f32::EPSILON, "past the right end: back");
+        assert!((x(span(70.0..=370.0)) + 30.0).abs() < f32::EPSILON, "past the left end: back");
+        assert!(x(span(-100.0..=200.0)).abs() < f32::EPSILON, "within: stays");
+        assert!((x(span(80.0..=90.0)) + 30.0).abs() < f32::EPSILON, "small, past the right edge: in");
+        assert!(x(span(45.0..=55.0)).abs() < f32::EPSILON, "small, in the view: stays");
     }
 }

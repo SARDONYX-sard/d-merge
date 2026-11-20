@@ -1,10 +1,11 @@
 //! The controls over the graph, for the mouse alone: the zoom (a slider between two magnifiers),
-//! back to 100 %, the focus to the center, all the nodes in view, and how deep the graph goes.
+//! back to 100 %, the focus to the center, all the nodes in view, how deep the graph goes, and the
+//! whole graph in place of the neighborhood.
 //!
 //! ```text
-//! ┌────────────────────────────────────────────────────────┐
-//! │ [-] ━━━━━●━━━━ [+] [100%] [⌖] [⛶]  [−] 3 [+]          │  at the bottom left, over the graph
-//! └────────────────────────────────────────────────────────┘
+//! ┌──────────────────────────────────────────────────────────────┐
+//! │ [-] ━━━━━●━━━━ [+] [100%] [⌖] [⛶]  [−] 3 [+]  [≡]           │  at the bottom left, over the graph
+//! └──────────────────────────────────────────────────────────────┘
 //! ```
 
 use egui::{Pos2, Rect, Vec2};
@@ -21,6 +22,12 @@ pub struct GraphLabels<'a> {
     pub fit: &'a str,
     /// Of the depth's `− 3 +`.
     pub depth: &'a str,
+    /// Of the button that shows every node, not the neighborhood.
+    pub all: &'a str,
+    /// In the search of the nodes a pin dropped on no node can take.
+    pub connect_hint: &'a str,
+    /// In that list: the pin points nowhere then.
+    pub disconnect: &'a str,
 }
 
 impl GraphLabels<'static> {
@@ -31,6 +38,9 @@ impl GraphLabels<'static> {
         center: "Bring the focus to the center",
         fit: "Show all the nodes",
         depth: "How many layers right of the focus are shown",
+        all: "Every node, not only the neighborhood of the focus",
+        connect_hint: "Connect to…",
+        disconnect: "Disconnect",
     };
 }
 
@@ -49,6 +59,8 @@ pub(super) enum Control {
     Center,
     Fit,
     Depth(usize),
+    /// Every node (`true`), or the neighborhood.
+    All(bool),
 }
 
 /// A zoom button's step.
@@ -58,14 +70,14 @@ const SLIDER_WIDTH: f32 = 100.0;
 /// How deep the graph can go.
 const DEPTH: std::ops::RangeInclusive<usize> = 1..=8;
 
-/// Draws the controls at the bottom left of `view`. `(zoom, depth)`: as they are now.
+/// Draws the controls at the bottom left of `view`. `(zoom, (depth, all))`: as they are now.
 pub(super) fn controls_ui(
     ui: &mut egui::Ui,
     view: Rect,
     labels: &GraphLabels<'_>,
-    ((zoom, zoom_range), depth): ((f32, std::ops::RangeInclusive<f32>), usize),
+    ((zoom, zoom_range), (depth, all)): ((f32, std::ops::RangeInclusive<f32>), (usize, bool)),
 ) -> Option<Control> {
-    let bar = Rect::from_min_size(view.left_bottom() + egui::vec2(8.0, -52.0), egui::vec2(440.0, 38.0));
+    let bar = Rect::from_min_size(view.left_bottom() + egui::vec2(8.0, -52.0), egui::vec2(490.0, 38.0));
     let builder = egui::UiBuilder::new().max_rect(bar).layout(egui::Layout::left_to_right(egui::Align::Center));
     let mut asked = None;
     ui.scope_builder(builder, |ui| {
@@ -81,8 +93,13 @@ pub(super) fn controls_ui(
                 asked = Some(Control::Fit);
             }
             ui.separator();
-            if let Some(depth) = depth_ui(ui, labels, depth) {
+            // The whole graph has no depth.
+            if let Some(depth) = ui.add_enabled_ui(!all, |ui| depth_ui(ui, labels, depth)).inner {
                 asked = Some(Control::Depth(depth));
+            }
+            let whole = ui.add(Button::selectable(all, "").icon(Icon::Layers).small()).on_hover_text(labels.all);
+            if whole.clicked() {
+                asked = Some(Control::All(!all));
             }
         });
     });

@@ -95,6 +95,10 @@ pub(super) fn node_ui<S: GraphSource>(
     }
 
     title(ui, painter, (header, input.zoom), &card);
+    // A card alone (the whole graph's) reads no rows: the source may parse them for each call.
+    if input.lines.0.is_empty() {
+        return done;
+    }
     let rows: Vec<Row<'_>> = input.source.rows(input.node).collect();
     for (at, line) in input.lines.0.iter().enumerate() {
         let top = metrics::below(input.rect.top(), metrics::line_top(at), input.zoom);

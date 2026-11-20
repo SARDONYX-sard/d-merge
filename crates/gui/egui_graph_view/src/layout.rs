@@ -4,6 +4,8 @@
 //! 1. find    from the focus (layer 0): its edges give layer 1, theirs layer 2, ...; its parents
 //!            give layer -1, theirs -2, ... A full layer hides the rest (`Layer::hidden`). Edges
 //!            the caller does not `keep` (e.g. of a page of a list not shown) are not followed.
+//!            With `LayoutOptions::all`: every node, from the roots (layer 0), as deep as they go;
+//!            what no root reaches (a cycle) from itself, in layer 0 too.
 //! 2. edges   every kept edge between two shown nodes. Those the walk went along are the tree's:
 //!            the others (to a node met already, e.g. a shared one) can be drawn faintly.
 //! 3. deepen  a node pointed to from several places goes right of the deepest of them, so that
@@ -32,11 +34,15 @@ pub struct LayoutOptions {
     pub depth_down: usize,
     /// Nodes in a layer: the rest are counted in [`Layer::hidden`].
     pub max_per_layer: usize,
+    /// Every node of the source ([`GraphSource::nodes`]), from the roots: not the neighborhood of
+    /// the focus. The other options are not used then. The view shows each node's card only, its
+    /// rows left out: a layer of a whole file holds hundreds of nodes, stacked.
+    pub all: bool,
 }
 
 impl LayoutOptions {
     /// Parents, and three layers down: e.g. a state machine, its states, their generators.
-    pub const DEFAULT: Self = Self { depth_up: 1, depth_down: 3, max_per_layer: 40 };
+    pub const DEFAULT: Self = Self { depth_up: 1, depth_down: 3, max_per_layer: 40, all: false };
 }
 
 impl Default for LayoutOptions {
@@ -131,7 +137,7 @@ pub fn layout<S: GraphSource>(
     options: LayoutOptions,
     keep: Keep<'_, S::Node>,
 ) -> Layout<S::Node> {
-    let found = find_layers(source, (focus, keep), options);
+    let found = if options.all { find_all(source, keep) } else { find_layers(source, (focus, keep), options) };
 
     let mut nodes: Vec<Placed<S::Node>> =
         found.order.iter().map(|&(node, layer)| Placed { node, layer, row: 0 }).collect();
@@ -185,6 +191,31 @@ fn find_layers<S: GraphSource>(
         source.edges(node).filter(move |edge| keep(node, edge.key)).map(|edge| edge.to)
     });
     walk(&mut found, (focus, options.depth_up, -1, max), |node| source.parents(node));
+    found
+}
+
+/// Every node of `source`: the roots (no parent) in layer 0, and what they point to right of them;
+/// then each node not reached (only in a cycle), in layer 0 too.
+fn find_all<S: GraphSource>(source: &S, keep: Keep<'_, S::Node>) -> Found<S::Node> {
+    let mut found = Found {
+        order: Vec::new(),
+        layer_of: HashMap::default(),
+        parent_of: HashMap::default(),
+        hidden: BTreeMap::new(),
+    };
+    let nodes: Vec<S::Node> = source.nodes().collect();
+    let roots = nodes.iter().filter(|&&node| source.parents(node).next().is_none());
+    let rest = nodes.iter().filter(|&&node| source.parents(node).next().is_some());
+    for &start in roots.chain(rest) {
+        if found.layer_of.contains_key(&start) {
+            continue;
+        }
+        found.layer_of.insert(start, 0);
+        found.order.push((start, 0));
+        walk(&mut found, (start, usize::MAX, 1, usize::MAX), |node| {
+            source.edges(node).filter(move |edge| keep(node, edge.key)).map(|edge| edge.to)
+        });
+    }
     found
 }
 
@@ -359,6 +390,13 @@ mod tests {
             0
         }
 
+        fn nodes(&self) -> impl Iterator<Item = u32> {
+            let mut nodes: Vec<u32> = self.0.iter().flat_map(|&edge| <[u32; 2]>::from(edge)).collect();
+            nodes.sort_unstable();
+            nodes.dedup();
+            nodes.into_iter()
+        }
+
         fn edges(&self, node: u32) -> impl Iterator<Item = Edge<'_, u32>> {
             self.0.iter().filter(move |e| e.0 == node).map(|&(_, to)| Edge { to, label: "", key: to as usize })
         }
@@ -425,7 +463,7 @@ mod tests {
         let mut edges: Vec<(u32, u32)> = (1..=5).map(|child| (0, child)).collect();
         edges.push((1, 10));
         let source = Mock(edges);
-        let options = LayoutOptions { depth_up: 0, depth_down: 1, max_per_layer: 3 };
+        let options = LayoutOptions { depth_up: 0, depth_down: 1, max_per_layer: 3, all: false };
         let layout = layout(&source, 0, options, &|_, _| true);
         assert_eq!(layer_of(&layout, 10), None, "beyond the depth");
         let first = layout.layers.iter().find(|layer| layer.layer == 1).copied();
@@ -440,6 +478,19 @@ mod tests {
         let row = |node| layout.index_of(node).map(|i| layout.nodes[i].row);
         assert!(row(1) < row(2));
         assert!(row(4) < row(3), "under their parents: {:?}", layout.nodes);
+    }
+
+    /// The whole graph: every root in layer 0 and what it points to right of it, wherever the
+    /// focus is; a cycle no root reaches is shown too.
+    #[test]
+    fn all_the_nodes_from_the_roots() {
+        // 0 -> 1 -> 2, 5 -> 2, and 7 <-> 8 apart.
+        let source = Mock(vec![(0, 1), (1, 2), (5, 2), (7, 8), (8, 7)]);
+        let options = LayoutOptions { all: true, ..LayoutOptions::DEFAULT };
+        let layout = layout(&source, 2, options, &|_, _| true);
+        let layers = [0, 1, 2, 5, 7, 8].map(|n| layer_of(&layout, n));
+        assert_eq!(layers, [Some(0), Some(1), Some(2), Some(0), Some(0), Some(1)]);
+        assert_eq!(layout.edges.len(), 5);
     }
 
     #[test]
