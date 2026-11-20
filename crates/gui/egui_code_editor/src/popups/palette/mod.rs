@@ -414,6 +414,8 @@ pub(crate) struct Palette {
     /// Just opened: its field takes the keyboard when it is drawn. (A focus asked for by id before
     /// the field exists is lost: the field's own response asks, as the find bar's does.)
     pub(crate) focus_field: bool,
+    /// The keys moved the selection: the list scrolls to it when it is drawn.
+    pub(crate) scroll_to_selected: bool,
 }
 
 impl Palette {
@@ -432,6 +434,7 @@ impl Palette {
         if keys.down {
             self.selected = if self.selected >= last { 0 } else { self.selected + 1 };
         }
+        self.scroll_to_selected |= keys.up || keys.down;
         if keys.enter { commands.get(self.selected).copied() } else { None }
     }
 }
@@ -514,7 +517,9 @@ mod tests {
 
         assert_eq!(palette.on_keys(down, &COMMANDS.map(|c| c.picked)), None);
         assert_eq!(palette.selected, 1);
+        assert!(std::mem::take(&mut palette.scroll_to_selected), "the list follows it");
         assert_eq!(palette.on_keys(enter, &COMMANDS.map(|c| c.picked)), Some(Picked::Host("b")));
+        assert!(!palette.scroll_to_selected, "Enter moves nothing");
         palette.on_keys(down, &COMMANDS.map(|c| c.picked)); // wraps around
         assert_eq!(palette.selected, 0);
         palette.on_keys(up, &COMMANDS.map(|c| c.picked));

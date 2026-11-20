@@ -196,6 +196,7 @@ fn draw<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput<'a, '_>, r
                 }
                 // As tall as the editor allows, whatever is listed; long lists of found lines scroll.
                 let list = egui::ScrollArea::vertical().max_height(list_height).auto_shrink([false, false]);
+                let follow = std::mem::take(&mut palette.scroll_to_selected);
                 list.show(ui, |ui| {
                     for (i, command) in rows.iter().enumerate() {
                         ui.horizontal(|ui| {
@@ -203,7 +204,13 @@ fn draw<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput<'a, '_>, r
                             let gear = if command.configurable { CONFIGURE_WIDTH } else { 0.0 };
                             let button = egui::Button::selectable(i == palette.selected, command.label.as_ref())
                                 .right_text(command.shortcut);
-                            if ui.add_sized([ui.available_width() - gear, 0.0], button).clicked() {
+                            let row = ui.add_sized([ui.available_width() - gear, 0.0], button);
+                            if follow && i == palette.selected {
+                                // At once, as the editor's keymap moves: it wraps from the end to the top.
+                                let instant = egui::style::ScrollAnimation::none();
+                                ui.scroll_to_rect_animation(row.rect, None, instant);
+                            }
+                            if row.clicked() {
                                 clicked = Some(command.picked);
                             }
                             let configure = match command.picked {
