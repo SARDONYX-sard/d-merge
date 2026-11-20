@@ -252,8 +252,10 @@ impl EditorArea {
         let current = left.as_ref().filter(|(behavior, _)| *behavior == active).map(|(_, id)| id.as_str());
         self.tabs.open(active, id, current);
         let left_state = self.tabs.take_state(active, id);
-        // Shown for the first time: at its first change, once it is known (see `EditorPane::first_change`).
-        self.pane.to_first_change = left_state.is_none();
+        // Shown for the first time from the tree: at its first change, once it is known (see
+        // `EditorPane::first_change`). Not when it was opened to go somewhere (go to definition, a
+        // reference, history): that place is taken this frame, before the change is known.
+        self.pane.to_first_change = left_state.is_none() && self.pane.focus.is_none();
         self.pane.state = left_state.unwrap_or_default();
 
         let behavior = &work.workspace.behaviors[active];
@@ -539,6 +541,21 @@ mod tests {
         work.workspace.behaviors[0] = clip_data(&[]);
         area.reshow(Reshow::Place(Some(place)), &mut work, &mut sel);
         assert_eq!(sel.selected, None);
+    }
+
+    /// Opened from the tree: at its first change. Opened to go to a line (go to definition): there,
+    /// not at the change.
+    #[test]
+    fn only_the_tree_opens_at_the_first_change() {
+        let (mut area, mut work) = (EditorArea::default(), Work::default());
+        work.workspace.behaviors.push(clip_data(&["M~1/a.txt", "M~1/b.txt"]));
+
+        area.open_in_editor(&work, 0, "M~1/a.txt");
+        assert!(area.pane.to_first_change, "from the tree");
+
+        area.open_location(&mut Selection::default(), "M~1/a.txt", ("M~1/b.txt", 3));
+        area.open_in_editor(&work, 0, "M~1/b.txt");
+        assert!(!area.pane.to_first_change, "go to definition");
     }
 
     /// Closing the tab shown: the one beside it is shown with the keyboard, and going back

@@ -224,13 +224,10 @@ impl EditorPane {
         true
     }
 
-    /// A tab just opened goes to its first change, if the inline diff is shown and nothing asked for
-    /// another line (e.g., go to definition). The keyboard stays where it is: in the tree, say.
+    /// A tab just opened from the tree goes to its first change, if the inline diff is shown (see
+    /// `to_first_change`). The keyboard stays where it is: in the tree, say.
     fn first_change(&mut self) {
         if !std::mem::take(&mut self.to_first_change) || !self.show_inline_diff {
-            return;
-        }
-        if matches!(self.focus, Some(FocusAt::Line(_) | FocusAt::At(_))) {
             return;
         }
         self.place_at = self.inline_diff.first_line();
@@ -368,8 +365,8 @@ New.txt
         assert!(pane.note_focus(true));
     }
 
-    /// A tab just opened goes to its first change while the inline diff shows, once: unless a line
-    /// was asked for, and not without the inline diff.
+    /// A tab just opened goes to its first change while the inline diff shows, once; not without the
+    /// inline diff.
     #[test]
     fn a_tab_just_opened_goes_to_its_first_change() {
         let diff = || egui_code_editor::InlineDiff::between("a\nb\nc\nd\n", "a\nb\nx\nd\n");
@@ -382,12 +379,6 @@ New.txt
         pane.first_change();
         assert_eq!(pane.place_at, None, "once");
 
-        pane.to_first_change = true;
-        pane.focus = Some(FocusAt::Line(0)); // e.g. go to definition
-        pane.first_change();
-        assert_eq!(pane.place_at, None, "the line asked for");
-
-        pane.focus = None;
         pane.to_first_change = true;
         pane.show_inline_diff = false;
         pane.first_change();
