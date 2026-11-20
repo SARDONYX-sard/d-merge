@@ -622,3 +622,49 @@ fn the_wheel_over_the_peek_does_not_scroll_the_editor() {
     let after = frame(&ctx, (&mut text, &mut state), &mut list, Vec::new());
     assert_eq!(after, before, "the editor stayed");
 }
+
+/// The palette is as tall as the editor allows, whatever it lists: a text of 5 lines (few found
+/// lines) gives it the same height as one of 200; a taller editor, a taller one.
+#[test]
+fn the_palette_is_sized_by_the_editor() {
+    fn palette_height(lines: usize, screen_height: f32) -> f32 {
+        let ctx = egui::Context::default();
+        let mut text = "<a>\n".repeat(lines);
+        let mut state = CodeEditorState::default();
+        let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, screen_height));
+        let open = egui::Event::Key {
+            key: egui::Key::P,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+        };
+        // Without the `>` it opens with: the lines found, as many as the text has at most.
+        let erase = egui::Event::Key {
+            key: egui::Key::Backspace,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: egui::Modifiers::NONE,
+        };
+        let find = egui::Event::Text("a".to_owned());
+        let mut id = egui::Id::NULL;
+        for events in [Vec::new(), vec![open], Vec::new(), vec![erase], vec![find], Vec::new(), Vec::new()] {
+            let raw = egui::RawInput { events, screen_rect: Some(screen), ..Default::default() };
+            let mut output = ctx.run_ui(raw, |ui| {
+                egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
+                    id = CodeEditor::new("e", &mut text).show(ui, &mut state).response.id;
+                });
+            });
+            if !state.palette.open {
+                ctx.memory_mut(|m| m.request_focus(id));
+            }
+            output.textures_delta.clear();
+        }
+        assert_eq!(state.palette.query, "a", "finding lines");
+        state.palette.rect.map_or(0.0, |rect| rect.height())
+    }
+    let (short, long) = (palette_height(5, 900.0), palette_height(200, 900.0));
+    assert!((short - long).abs() < 1.0, "5 lines: {short}, 200 lines: {long}");
+    assert!(palette_height(5, 500.0) < short, "a shorter editor, a shorter palette");
+}

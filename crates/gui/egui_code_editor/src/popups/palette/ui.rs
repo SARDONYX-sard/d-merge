@@ -7,6 +7,12 @@ use crate::popups::palette::{
     EditorAction, EditorLabels, Palette, PaletteContext, PaletteKeys, Picked, Triggers, commands,
 };
 
+/// The list's height, as a share of the editor's view: by the editor, not by how many rows there
+/// are (a short text finds few lines), within [`LIST_HEIGHT`].
+const LIST_SHARE: f32 = 0.5;
+/// The list's height at least and at most, in points.
+const LIST_HEIGHT: std::ops::RangeInclusive<f32> = 120.0..=480.0;
+
 /// What the palette needs from the editor this frame.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct PaletteInput<'a, 'b> {
@@ -160,7 +166,9 @@ fn close_if_done(palette: &mut Palette, ui: &egui::Ui, editor: egui::Id, done: b
 /// Draws the field and the list at the top of the view. Returns the command clicked.
 fn draw<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput<'a, '_>, rows: &[Row<'a>]) -> Option<Picked<'a>> {
     let mut clicked = None;
-    let top = ui.clip_rect().center_top() + egui::vec2(0.0, 8.0);
+    let view = ui.clip_rect();
+    let top = view.center_top() + egui::vec2(0.0, 8.0);
+    let list_height = list_height(view.height());
     let area = egui::Area::new(input.id.with("palette"))
         .order(egui::Order::Foreground)
         .pivot(egui::Align2::CENTER_TOP)
@@ -186,8 +194,9 @@ fn draw<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput<'a, '_>, r
                 if field.changed() {
                     palette.selected = 0;
                 }
-                // Long lists of found lines scroll.
-                egui::ScrollArea::vertical().max_height(360.0).show(ui, |ui| {
+                // As tall as the editor allows, whatever is listed; long lists of found lines scroll.
+                let list = egui::ScrollArea::vertical().max_height(list_height).auto_shrink([false, false]);
+                list.show(ui, |ui| {
                     for (i, command) in rows.iter().enumerate() {
                         ui.horizontal(|ui| {
                             // VS Code's `⚙`: change the keys of the command.
@@ -217,6 +226,13 @@ fn draw<'a>(palette: &mut Palette, ui: &egui::Ui, input: PaletteInput<'a, '_>, r
         });
     palette.rect = Some(area.response.rect);
     clicked
+}
+
+/// The list's height in an editor whose view is `view_height` tall. See [`LIST_SHARE`].
+///
+/// e.g. a view 600 tall -> 300; 100 tall -> 120
+fn list_height(view_height: f32) -> f32 {
+    (view_height * LIST_SHARE).clamp(*LIST_HEIGHT.start(), *LIST_HEIGHT.end())
 }
 
 /// The room of a row's `⚙`.
