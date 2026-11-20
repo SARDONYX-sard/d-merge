@@ -239,9 +239,20 @@ impl FindBar {
     /// [`Self::current`] while it is still valid: the cursor is at its end (not moved by the
     /// user) and the text there still matches.
     pub(crate) fn current_match(&self, ctx: &egui::Context, id: egui::Id, text: &str) -> Option<Range<usize>> {
+        self.current_in(ctx, id, &self.matcher()?.find_all(text))
+    }
+
+    /// [`Self::current_match`] among `matches`, the query's in the text (found once a frame: a long
+    /// text takes a while).
+    pub(crate) fn current_in(
+        &self,
+        ctx: &egui::Context,
+        id: egui::Id,
+        matches: &[Range<usize>],
+    ) -> Option<Range<usize>> {
         let current = self.current.clone()?;
         let cursor = selection(ctx, id)?;
-        (cursor.end == current.end && self.matcher()?.find_all(text).contains(&current)).then_some(current)
+        (cursor.end == current.end && matches.contains(&current)).then_some(current)
     }
 }
 

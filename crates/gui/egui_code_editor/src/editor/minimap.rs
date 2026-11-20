@@ -25,7 +25,9 @@ const BAR: f32 = 0.75;
 /// layout's sections do, along its text).
 #[derive(Debug, Default)]
 pub(crate) struct Bars {
-    /// The layout they are of, by its address: another one, they are read again.
+    /// The layout they are of, by the address of its job: another one, they are read again. Not the
+    /// galley's address: egui copies the galley (not its job) to paint a selection, every frame
+    /// there is one.
     of: usize,
     rows: Vec<Vec<(f32, f32, egui::Color32)>>,
 }
@@ -68,8 +70,13 @@ impl Bars {
                 bars
             })
             .collect();
-        Self { of: std::ptr::from_ref(galley) as usize, rows }
+        Self { of: layout_of(galley), rows }
     }
+}
+
+/// What [`Bars::of`] says which layout it is of. See there.
+fn layout_of(galley: &Galley) -> usize {
+    std::sync::Arc::as_ptr(&galley.job) as usize
 }
 
 /// Draws the minimap at the right of `view` (the editor's part on screen), `width` wide, for the
@@ -100,7 +107,7 @@ pub(crate) fn show(
     let painter = ui.painter_at(rect);
     let visuals = ui.visuals();
     painter.rect_filled(rect, 0.0, visuals.extreme_bg_color.gamma_multiply(0.6));
-    if bars.as_ref().is_none_or(|bars| bars.of != std::ptr::from_ref(galley) as usize) {
+    if bars.as_ref().is_none_or(|bars| bars.of != layout_of(galley)) {
         *bars = Some(Bars::of(galley));
     }
     let rows = bars.as_ref().map_or(&[][..], |bars| &bars.rows);
@@ -194,6 +201,10 @@ ef",
             let colors: Vec<Vec<egui::Color32>> =
                 bars.rows.iter().map(|row| row.iter().map(|bar| bar.2).collect()).collect();
             assert_eq!(colors, [vec![red, red, blue], vec![blue]], "`ab` `c` `d` / `ef`");
+
+            // What egui does to paint a selection: the same layout, not read again.
+            let copied = (*galley).clone();
+            assert_eq!(layout_of(&copied), bars.of, "a copy of the galley");
         });
         output.textures_delta.clear();
     }

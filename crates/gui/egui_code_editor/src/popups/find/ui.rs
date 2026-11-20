@@ -20,9 +20,13 @@ impl FindBar {
     ) -> bool {
         let Some(kind) = self.open else { return false };
         let ctx = ui.ctx();
-        if kind == Kind::Find
-            && let Some(current) = self.current_match(ctx, id, text)
-        {
+        // Once a frame, for the mark and the counter.
+        let matches = if kind == Kind::Find {
+            self.matcher().map(|matcher| matcher.find_all(text)).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        if let Some(current) = self.current_in(ctx, id, &matches) {
             crate::editor::overlays::block_selection(ui, galley, galley_pos, &[current]);
         }
 
@@ -33,7 +37,7 @@ impl FindBar {
             .show(ctx, |ui| {
                 crate::widget_frame(ui.style())
                     .show(ui, |ui| match kind {
-                        Kind::Find => self.find_and_replace_ui(ui, (id, editable), text),
+                        Kind::Find => self.find_and_replace_ui(ui, (id, editable), text, &matches),
                         Kind::GotoLine => {
                             ui.horizontal(|ui| self.goto_ui(ui, id, text));
                             false
@@ -45,7 +49,14 @@ impl FindBar {
     }
 
     /// The find row, and the replace row under it while it is shown. Returns whether it replaced.
-    fn find_and_replace_ui(&mut self, ui: &mut egui::Ui, (id, editable): (egui::Id, bool), text: &mut String) -> bool {
+    /// `matches`: the query's in `text`.
+    fn find_and_replace_ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        (id, editable): (egui::Id, bool),
+        text: &mut String,
+        matches: &[std::ops::Range<usize>],
+    ) -> bool {
         let replacing = editable && self.replacing;
         ui.horizontal(|ui| {
             // `˃` / `˅`, as VS Code's: the replace field shown or not.
@@ -56,7 +67,7 @@ impl FindBar {
                     self.replacing = !self.replacing;
                 }
             }
-            self.find_ui(ui, id, text);
+            self.find_ui(ui, id, text, matches);
         });
         if !replacing {
             return false;
@@ -100,7 +111,7 @@ impl FindBar {
     }
 
     /// `[query] .* 2/5 ↑ ↓ ✖`
-    fn find_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, text: &str) {
+    fn find_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, text: &str, matches: &[std::ops::Range<usize>]) {
         let field = ui.add(
             egui::TextEdit::singleline(&mut self.query)
                 .hint_text("Find")
@@ -118,9 +129,8 @@ impl FindBar {
             self.regex = !self.regex;
             self.select_from_origin(ui.ctx(), id, text);
         }
-        let matches = self.matcher().map(|matcher| matcher.find_all(text)).unwrap_or_default();
         let total = matches.len();
-        let current = self.current_match(ui.ctx(), id, text).and_then(|range| index_of(&matches, range.start));
+        let current = self.current_in(ui.ctx(), id, matches).and_then(|range| index_of(matches, range.start));
         let counter = match (total, current) {
             (0, _) if self.query.is_empty() => String::new(),
             (0, _) => "No results".to_string(),
