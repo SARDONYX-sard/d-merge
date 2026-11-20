@@ -78,6 +78,37 @@ impl Matcher {
         found
     }
 
+    /// `text` with its matches replaced by `with`, and how many were: all of them, or only the one
+    /// starting at char `only`. A regex's `with` may name its groups (`$1`, `${name}`); text's is
+    /// taken as it is.
+    ///
+    /// e.g. `"a1 b2"`, regex `([a-z])(\d)`, `with` `$2$1` -> `("1a 2b", 2)`; `only` 3 -> `("a1 2b", 1)`
+    pub(crate) fn replace(&self, text: &str, with: &str, only: Option<usize>) -> (String, usize) {
+        let mut out = String::with_capacity(text.len());
+        let (mut copied, mut count) = (0, 0);
+        // As in `find_all`: the byte offsets go up, the char offsets are counted along.
+        let (mut chars, mut char_at) = (text.char_indices().map(|(byte, _)| byte).peekable(), 0);
+        for captures in self.regex.captures_iter(text) {
+            let Some(found) = captures.get(0).filter(|found| !found.is_empty()) else { continue };
+            while chars.next_if(|&at| at < found.start()).is_some() {
+                char_at += 1;
+            }
+            if only.is_some_and(|only| only != char_at) {
+                continue;
+            }
+            out.push_str(&text[copied..found.start()]);
+            if self.source.2 {
+                captures.expand(with, &mut out);
+            } else {
+                out.push_str(with);
+            }
+            copied = found.end();
+            count += 1;
+        }
+        out.push_str(&text[copied..]);
+        (out, count)
+    }
+
     /// [`Self::find_all`] of a text held as chars (the Vim buffer).
     #[cfg_attr(not(feature = "vim"), allow(dead_code, reason = "the Vim buffer's only"))]
     pub(crate) fn find_all_chars(&self, chars: &[char]) -> Vec<Range<usize>> {
@@ -132,6 +163,17 @@ mod tests {
         fn new(pattern: &str) -> Option<Self> {
             Self::with_options(pattern, false, false)
         }
+    }
+
+    /// All, or the one at a char (after a multibyte char); a regex's groups; text taken as it is.
+    #[test]
+    fn matches_are_replaced() {
+        let regex = Matcher::with_options(r"([a-z])(\d)", false, true).unwrap();
+        assert_eq!(regex.replace("a1 b2", "$2$1", None), ("1a 2b".to_owned(), 2));
+        assert_eq!(regex.replace("é1 b2", "$2$1", Some(3)), ("é1 2b".to_owned(), 1));
+        assert_eq!(regex.replace("a1", "x", Some(5)), ("a1".to_owned(), 0), "none there");
+        let text = Matcher::new("a").unwrap();
+        assert_eq!(text.replace("a b a", "$1", None), ("$1 b $1".to_owned(), 2));
     }
 
     #[test]

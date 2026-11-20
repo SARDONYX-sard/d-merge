@@ -399,7 +399,10 @@ impl<'a> CodeEditor<'a> {
             scroll_to_cursor(ui, id, cursor, placed.0, input.keys.scroll);
         }
         let visible = response.rect.intersect(ui.clip_rect());
-        state.find.ui(ui, id, visible, text, placed);
+        if state.find.ui(ui, (id, !read_only), visible, text, placed) {
+            changed = true;
+            ui.ctx().request_repaint(); // laid out before the replace: again, with it
+        }
         show_which_key(ui, id, state, keymap, visible, host_commands);
         state.view = visible_lines(ui, placed.0, placed.1);
         state.had_focus = response.has_focus();

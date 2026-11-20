@@ -66,7 +66,7 @@ pub fn editor_request(command: &str) -> Option<egui_code_editor::EditorRequest> 
     use crate::commands::{
         EDITOR_COMMAND_PALETTE, EDITOR_COPY_LINES_DOWN, EDITOR_COPY_LINES_UP, EDITOR_DELETE_LINES, EDITOR_FIND,
         EDITOR_FIND_REFERENCES, EDITOR_FORMAT, EDITOR_GO_TO_DEFINITION, EDITOR_GO_TO_LINE, EDITOR_INSERT_LINE_ABOVE,
-        EDITOR_INSERT_LINE_BELOW, EDITOR_MOVE_LINES_DOWN, EDITOR_MOVE_LINES_UP, EDITOR_QUICK_FIX,
+        EDITOR_INSERT_LINE_BELOW, EDITOR_MOVE_LINES_DOWN, EDITOR_MOVE_LINES_UP, EDITOR_QUICK_FIX, EDITOR_REPLACE,
         EDITOR_TOGGLE_COMMENT, EDITOR_TRIGGER_SUGGEST,
     };
     Some(match command {
@@ -77,6 +77,7 @@ pub fn editor_request(command: &str) -> Option<egui_code_editor::EditorRequest> 
         EDITOR_GO_TO_DEFINITION => Request::GoToDefinition,
         EDITOR_FIND_REFERENCES => Request::FindReferences,
         EDITOR_FIND => Request::Find,
+        EDITOR_REPLACE => Request::Replace,
         EDITOR_GO_TO_LINE => Request::GoToLine,
         EDITOR_DELETE_LINES => Request::DeleteLines,
         EDITOR_MOVE_LINES_UP => Request::MoveLinesUp,

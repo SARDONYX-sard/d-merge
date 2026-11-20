@@ -2,9 +2,10 @@
 //! Vim has its own `/`, `n`, `N`, `*` and `:<line>` (see `keymap::vim::prompt`).
 //!
 //! ```text
-//!                                   ┌──────────────────────────────────┐
-//!                                   │ [animmotion        ] 2/5  ↑ ↓ ✖ │  <- top right of the editor
-//!                                   └──────────────────────────────────┘
+//!                               ┌───────────────────────────────────────┐
+//!                               │ ˅ [animmotion        ] .* 2/5  ↑ ↓ ✖ │  <- top right of the editor
+//!                               │   [walk              ] (R) (R*)       │  <- with `Ctrl+H` / `˃`
+//!                               └───────────────────────────────────────┘
 //! ```
 //!
 //! | Key                       | Action                                            |
@@ -13,10 +14,14 @@
 //! | `Enter` / `Shift+Enter`   | Next / previous match (in the find field)         |
 //! | `F3` / `Shift+F3`         | Next / previous match (anywhere)                  |
 //! | `Ctrl+F3`                 | Find the word under the cursor                    |
+//! | `Ctrl+H`                  | Find and replace                                  |
+//! | `Enter` (replace field)   | Replace the current match, select the next        |
+//! | `Ctrl+Alt+Enter`          | Replace all (in the replace field)                |
 //! | `Ctrl+G`                  | Go to line                                        |
 //! | `Esc`                     | Close                                             |
 //!
-//! Matching: text, or a regex with `.*` on; smartcase (see [`crate::search`]).
+//! Matching: text, or a regex with `.*` on; smartcase (see [`crate::search`]). A regex's
+//! replacement may name its groups (`$1`).
 
 mod ui;
 
@@ -51,6 +56,9 @@ pub(crate) struct FindBar {
     pub(crate) current: Option<Range<usize>>,
     /// `.*`: the query is a regex (as VS Code's toggle). Off: text.
     pub(crate) regex: bool,
+    /// The replace field is shown (`Ctrl+H`, or `˃` beside the query).
+    pub(crate) replacing: bool,
+    pub(crate) replacement: String,
 }
 
 impl FindBar {
@@ -104,12 +112,17 @@ impl FindBar {
         }
         // NOTE: `consume_key` ignores extra Shift/Alt: the Shift variant must be tried first.
         let own = requests.is_none();
-        let (find, goto, word, prev, next, escape) = ui.input_mut(|i| {
+        let (find, replace, goto, word, prev, next, escape) = ui.input_mut(|i| {
             (
                 if own {
                     i.consume_key(Modifiers::COMMAND, Key::F)
                 } else {
                     crate::request::asked(requests, crate::EditorRequest::Find)
+                },
+                if own {
+                    i.consume_key(Modifiers::COMMAND, Key::H)
+                } else {
+                    crate::request::asked(requests, crate::EditorRequest::Replace)
                 },
                 if own {
                     i.consume_key(Modifiers::COMMAND, Key::G)
@@ -125,8 +138,9 @@ impl FindBar {
         });
         let selection = selection(ui.ctx(), id);
 
-        if find {
+        if find || replace {
             self.open_find(ui.ctx(), id, text);
+            self.replacing |= replace; // `Ctrl+F` keeps it as it was, as VS Code's
         }
         if goto {
             self.open_go_to_line(ui.ctx(), id);
@@ -177,6 +191,49 @@ impl FindBar {
     pub(crate) fn select(&mut self, ctx: &egui::Context, id: egui::Id, range: Range<usize>) {
         select(ctx, id, range.clone());
         self.current = Some(range);
+    }
+
+    /// Replaces the current match and selects the next one; without a current match, only selects
+    /// the next one (as VS Code's first `Replace`). Returns whether `text` changed.
+    pub(crate) fn replace_current(&mut self, ctx: &egui::Context, id: egui::Id, text: &mut String) -> bool {
+        let Some(matcher) = self.matcher() else { return false };
+        let Some(current) = self.current_match(ctx, id, text) else {
+            self.jump(ctx, id, text, true);
+            return false;
+        };
+        let (replaced, count) = matcher.replace(text, &self.replacement, Some(current.start));
+        if count == 0 {
+            return false;
+        }
+        // What was put in: the new text's chars less those kept around it.
+        let kept = text.chars().count() - current.len();
+        let end = current.start + (replaced.chars().count() - kept);
+        *text = replaced;
+        // The next one after what was put in (which may match itself, e.g. `a` -> `aa`).
+        let matches = matcher.find_all(text);
+        let next = matches.iter().find(|m| m.start >= end).or_else(|| matches.first()).cloned();
+        if let Some(next) = next {
+            self.select(ctx, id, next);
+        } else {
+            select(ctx, id, end..end);
+            self.current = None;
+        }
+        true
+    }
+
+    /// Replaces every match. Returns whether `text` changed.
+    pub(crate) fn replace_all(&mut self, ctx: &egui::Context, id: egui::Id, text: &mut String) -> bool {
+        let Some(matcher) = self.matcher() else { return false };
+        let (replaced, count) = matcher.replace(text, &self.replacement, None);
+        if count == 0 {
+            return false;
+        }
+        *text = replaced;
+        // Where the cursor was, within the new text.
+        let at = selection(ctx, id).map_or(0, |range| range.start).min(text.chars().count());
+        select(ctx, id, at..at);
+        self.current = None;
+        true
     }
 
     /// [`Self::current`] while it is still valid: the cursor is at its end (not moved by the
@@ -242,6 +299,27 @@ mod tests {
         collapse();
         bar.jump(&ctx, id, text, false);
         assert_eq!(bar.current, Some(0..2));
+    }
+
+    /// `Replace`: the first press selects a match, then each replaces it and selects the next;
+    /// `All` replaces the rest.
+    #[test]
+    fn replace_one_then_all() {
+        let ctx = egui::Context::default();
+        let id = egui::Id::unique("editor");
+        let mut text = "ab x ab x ab".to_owned();
+        let mut bar = FindBar { query: "ab".to_owned(), replacement: "c".to_owned(), ..Default::default() };
+        select(&ctx, id, 0..0);
+
+        assert!(!bar.replace_current(&ctx, id, &mut text), "selects first");
+        assert_eq!(bar.current, Some(5..7));
+        assert!(bar.replace_current(&ctx, id, &mut text));
+        assert_eq!(text, "ab x c x ab");
+        assert_eq!(bar.current, Some(9..11), "the next one, after what was put in");
+
+        assert!(bar.replace_all(&ctx, id, &mut text));
+        assert_eq!(text, "c x c x c");
+        assert!(!bar.replace_all(&ctx, id, &mut text), "none left");
     }
 
     #[test]

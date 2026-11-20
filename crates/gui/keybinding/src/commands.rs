@@ -49,6 +49,7 @@ pub const EDITOR_GO_TO_DEFINITION: &str = "editor.goToDefinition";
 pub const EDITOR_FIND_REFERENCES: &str = "editor.findReferences";
 pub const EDITOR_FIND: &str = "editor.find";
 pub const EDITOR_GO_TO_LINE: &str = "editor.goToLine";
+pub const EDITOR_REPLACE: &str = "editor.replace";
 pub const EDITOR_DELETE_LINES: &str = "editor.deleteLines";
 pub const EDITOR_MOVE_LINES_UP: &str = "editor.moveLinesUp";
 pub const EDITOR_MOVE_LINES_DOWN: &str = "editor.moveLinesDown";
@@ -256,6 +257,11 @@ pub const COMMANDS: &[Command] = &[
         id: EDITOR_FIND,
         description: "The find bar (Normal keymap; Vim has /)",
         defaults: &[("ctrl+f", NORMAL_EDITOR)],
+    },
+    Command {
+        id: EDITOR_REPLACE,
+        description: "The find bar with its replace field (Normal keymap; Vim has :s)",
+        defaults: &[("ctrl+h", NORMAL_EDITOR)],
     },
     Command {
         id: EDITOR_GO_TO_LINE,

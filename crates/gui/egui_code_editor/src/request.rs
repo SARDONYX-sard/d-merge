@@ -10,6 +10,7 @@
 //! | `GoToDefinition` | `F12`                  |                                               |
 //! | `FindReferences` | `Shift+F12`            |                                               |
 //! | `Find`           | `Ctrl+F` (Normal)      | the find bar                                  |
+//! | `Replace`        | `Ctrl+H` (Normal)      | the find bar with its replace field           |
 //! | `GoToLine`       | `Ctrl+G` (Normal)      |                                               |
 //! | `DeleteLines` ...| `Ctrl+Shift+K` ...     | the line commands of the Normal keymap        |
 //! | `ToggleComment`  | `Ctrl+/`               | comments the lines out / in                   |
@@ -26,6 +27,7 @@ pub enum EditorRequest {
     GoToDefinition,
     FindReferences,
     Find,
+    Replace,
     GoToLine,
     DeleteLines,
     MoveLinesUp,

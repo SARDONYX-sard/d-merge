@@ -1,6 +1,7 @@
 //! Draws the find bar and the "go to line" bar. The state and the search are in [`crate::popups::find`].
 
 use egui::Key;
+use egui_widgets::shadcn::{Button, Icon};
 
 use super::{FindBar, Kind};
 use crate::search::index_of;
@@ -8,15 +9,16 @@ use crate::search::index_of;
 impl FindBar {
     /// Draws the bar at the top right of `editor_rect` (the visible part of the editor), and
     /// marks the current match (the editor shows no selection while the bar has the focus).
+    /// `editable`: the replace field can be shown. Returns whether it replaced in `text`.
     pub(crate) fn ui(
         &mut self,
         ui: &egui::Ui,
-        id: egui::Id,
+        (id, editable): (egui::Id, bool),
         editor_rect: egui::Rect,
-        text: &str,
+        text: &mut String,
         (galley, galley_pos): (&egui::Galley, egui::Pos2),
-    ) {
-        let Some(kind) = self.open else { return };
+    ) -> bool {
+        let Some(kind) = self.open else { return false };
         let ctx = ui.ctx();
         if kind == Kind::Find
             && let Some(current) = self.current_match(ctx, id, text)
@@ -29,17 +31,76 @@ impl FindBar {
             .pivot(egui::Align2::RIGHT_TOP)
             .fixed_pos(editor_rect.right_top() + egui::vec2(-16.0, 4.0))
             .show(ctx, |ui| {
-                crate::widget_frame(ui.style()).show(ui, |ui| {
-                    ui.horizontal(|ui| match kind {
-                        Kind::Find => self.find_ui(ui, id, text),
-                        Kind::GotoLine => self.goto_ui(ui, id, text),
-                    });
-                });
-            });
+                crate::widget_frame(ui.style())
+                    .show(ui, |ui| match kind {
+                        Kind::Find => self.find_and_replace_ui(ui, (id, editable), text),
+                        Kind::GotoLine => {
+                            ui.horizontal(|ui| self.goto_ui(ui, id, text));
+                            false
+                        }
+                    })
+                    .inner
+            })
+            .inner
+    }
+
+    /// The find row, and the replace row under it while it is shown. Returns whether it replaced.
+    fn find_and_replace_ui(&mut self, ui: &mut egui::Ui, (id, editable): (egui::Id, bool), text: &mut String) -> bool {
+        let replacing = editable && self.replacing;
+        ui.horizontal(|ui| {
+            // `˃` / `˅`, as VS Code's: the replace field shown or not.
+            if editable {
+                let chevron = if replacing { Icon::ChevronDown } else { Icon::ChevronRight };
+                let toggle = ui.add(Button::new("").icon(chevron).small());
+                if toggle.on_hover_text("Toggle Replace (Ctrl+H)").clicked() {
+                    self.replacing = !self.replacing;
+                }
+            }
+            self.find_ui(ui, id, text);
+        });
+        if !replacing {
+            return false;
+        }
+        ui.horizontal(|ui| {
+            // Under the query, past the toggle.
+            ui.add_space(ui.spacing().interact_size.y + ui.spacing().item_spacing.x);
+            self.replace_ui(ui, id, text)
+        })
+        .inner
+    }
+
+    /// `[replacement] (replace) (replace all)`. Returns whether it replaced.
+    fn replace_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, text: &mut String) -> bool {
+        let field = ui.add(
+            egui::TextEdit::singleline(&mut self.replacement)
+                .hint_text("Replace")
+                .desired_width(200.0)
+                .id(id.with("find_replacement")),
+        );
+        let (enter, all_keys) = ui.input(|i| (i.key_pressed(Key::Enter), i.modifiers.command && i.modifiers.alt));
+        // A single-line `TextEdit` gives up the focus on `Enter`: take it back.
+        let submitted = field.lost_focus() && enter;
+        if submitted {
+            field.request_focus();
+        }
+        let one = ui.add(Button::new("").icon(Icon::Replace).small()).on_hover_text("Replace (Enter)").clicked()
+            || (submitted && !all_keys);
+        let all = ui
+            .add(Button::new("").icon(Icon::ReplaceAll).small())
+            .on_hover_text("Replace All (Ctrl+Alt+Enter)")
+            .clicked()
+            || (submitted && all_keys);
+        if all {
+            self.replace_all(ui.ctx(), id, text)
+        } else if one {
+            self.replace_current(ui.ctx(), id, text)
+        } else {
+            false
+        }
     }
 
     /// `[query] .* 2/5 ↑ ↓ ✖`
-    pub(crate) fn find_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, text: &str) {
+    fn find_ui(&mut self, ui: &mut egui::Ui, id: egui::Id, text: &str) {
         let field = ui.add(
             egui::TextEdit::singleline(&mut self.query)
                 .hint_text("Find")
