@@ -9,5 +9,6 @@ pub mod names;
 pub mod pandora;
 pub mod parser_error;
 pub mod preview;
+mod rename;
 pub mod resolve;
 pub mod tabs;

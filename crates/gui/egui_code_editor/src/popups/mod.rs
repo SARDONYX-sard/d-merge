@@ -6,6 +6,7 @@
 //! | `hover`        | the pointer resting on a char, Vim `K`     |
 //! | `find`         | `Ctrl+F`, `Ctrl+G` (the normal keymap)     |
 //! | `quick_fix`    | `Ctrl+.`                                   |
+//! | `rename`       | `F2`                                       |
 //! | `palette`      | `Ctrl+Shift+P`                             |
 //! | `which_key`    | a key waiting for the next (Vim `g`, ...)  |
 //! | `context_menu` | a right click                              |
@@ -19,6 +20,7 @@ mod frame;
 pub(crate) mod hover;
 pub(crate) mod palette;
 pub(crate) mod quick_fix;
+pub(crate) mod rename;
 pub(crate) mod which_key;
 
 pub use self::frame::{AnchoredPopup, widget_frame};

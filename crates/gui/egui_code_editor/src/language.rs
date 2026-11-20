@@ -105,6 +105,29 @@ pub trait Language {
         None
     }
 
+    /// LSP `textDocument/prepareRename`: the char columns of `line` holding the symbol at `column`,
+    /// if it can be renamed (`F2`). e.g. `$eventID[moveStart]$` -> the columns of `moveStart`
+    fn prepare_rename(&self, text: &str, line: usize, column: usize) -> Option<Range<usize>> {
+        let _ = (text, line, column);
+        None
+    }
+
+    /// LSP `textDocument/rename`: the edits, in every document, that give the symbol at `line` /
+    /// `column` of the **whole document** `text` the name `new_name`.
+    ///
+    /// # Errors
+    /// Why it can't (e.g. the name is taken), shown under the name being typed.
+    fn rename(
+        &self,
+        text: &str,
+        line: usize,
+        column: usize,
+        new_name: &str,
+    ) -> Result<Vec<DocumentEdit<'_>>, Cow<'_, str>> {
+        let _ = (text, line, column, new_name);
+        Err(Cow::Borrowed("Nothing to rename here"))
+    }
+
     /// The signature being typed at `column`.
     fn signature_help(&self, line: &str, column: usize) -> Option<SignatureHelp> {
         let _ = (line, column);
@@ -160,6 +183,61 @@ pub struct Location<'a> {
     pub line: usize,
     /// One line for lists. e.g., `hkbClipGenerator`
     pub detail: Cow<'a, str>,
+}
+
+/// One edit of [`Language::rename`]: `columns` of `line` of `document` become `new_text`.
+///
+/// The editor has one text only: it hands them to its host, which applies them (see
+/// [`Self::apply`]) to each document, the open one too.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DocumentEdit<'a> {
+    /// The document, in terms the host understands. e.g., an object id such as `#0106`.
+    pub document: Cow<'a, str>,
+    /// 0-based line.
+    pub line: usize,
+    /// Char columns to replace.
+    pub columns: Range<usize>,
+    pub new_text: String,
+}
+
+impl DocumentEdit<'_> {
+    /// `text` with `edits` (of its document) applied. Edits that overlap, or are off the text, are
+    /// left out.
+    ///
+    /// e.g. `"a b\nc"`, edits `0:2..3 -> "x"` and `1:0..1 -> "y"` -> `"a x\ny"`
+    #[must_use]
+    pub fn apply<'e>(text: &str, edits: impl IntoIterator<Item = &'e Self>) -> String
+    where
+        Self: 'e,
+    {
+        // Byte ranges, last first: each leaves the bytes before it where they were.
+        let line_starts: Vec<usize> =
+            std::iter::once(0).chain(text.match_indices('\n').map(|(at, _)| at + 1)).collect();
+        let byte_at = |line: usize, column: usize| {
+            let start = *line_starts.get(line)?;
+            let line_text = &text[start..text[start..].find('\n').map_or(text.len(), |end| start + end)];
+            let offset = line_text.char_indices().map(|(at, _)| at).chain([line_text.len()]).nth(column)?;
+            Some(start + offset)
+        };
+        let mut ranges: Vec<(Range<usize>, &str)> = edits
+            .into_iter()
+            .filter_map(|edit| {
+                let range = byte_at(edit.line, edit.columns.start)?..byte_at(edit.line, edit.columns.end)?;
+                Some((range, edit.new_text.as_str()))
+            })
+            .collect();
+        ranges.sort_by_key(|(range, _)| std::cmp::Reverse(range.start));
+
+        let mut out = text.to_owned();
+        let mut limit = text.len();
+        for (range, new_text) in ranges {
+            if range.end <= limit && range.start <= range.end {
+                out.replace_range(range.clone(), new_text);
+                limit = range.start;
+            }
+        }
+        out
+    }
 }
 
 /// Result of [`Language::references`].

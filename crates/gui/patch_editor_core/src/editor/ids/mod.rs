@@ -230,21 +230,21 @@ fn id_problem(field: &IdField, (text, id): (&str, &str), index: &IdIndex<'_>, to
 }
 
 #[cfg(test)]
-mod tests {
+pub(in crate::editor) mod tests {
     use std::path::Path;
 
     use super::*;
     use crate::workspace::ADSF;
 
     /// A behavior of only new objects.
-    pub(super) fn behavior_of(objects: Vec<(String, String)>) -> Behavior {
+    pub(in crate::editor) fn behavior_of(objects: Vec<(String, String)>) -> Behavior {
         let mut behavior = Behavior::open(&Path::new("meshes").join(format!("{ADSF}.bin"))).unwrap();
         behavior.added.extend(objects);
         behavior
     }
 
     /// `(id, text)` of an object.
-    pub(super) fn object(id: &str, class: &str, fields: &str) -> (String, String) {
+    pub(in crate::editor) fn object(id: &str, class: &str, fields: &str) -> (String, String) {
         (id.to_owned(), format!("<hkobject name=\"{id}\" class=\"{class}\" signature=\"0x1\">\n{fields}</hkobject>\n"))
     }
 

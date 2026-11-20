@@ -49,6 +49,7 @@ pub const EDITOR_GO_TO_DEFINITION: &str = "editor.goToDefinition";
 pub const EDITOR_FIND_REFERENCES: &str = "editor.findReferences";
 pub const EDITOR_FIND: &str = "editor.find";
 pub const EDITOR_GO_TO_LINE: &str = "editor.goToLine";
+pub const EDITOR_RENAME: &str = "editor.rename";
 pub const EDITOR_REPLACE: &str = "editor.replace";
 pub const EDITOR_DELETE_LINES: &str = "editor.deleteLines";
 pub const EDITOR_MOVE_LINES_UP: &str = "editor.moveLinesUp";
@@ -252,6 +253,11 @@ pub const COMMANDS: &[Command] = &[
         id: EDITOR_FIND_REFERENCES,
         description: "Find the references",
         defaults: &[("shift+f12", EDITOR), ("g shift+d", VIM_NORMAL)],
+    },
+    Command {
+        id: EDITOR_RENAME,
+        description: "Rename the symbol (an event or a variable the mod adds)",
+        defaults: &[("f2", EDITOR)],
     },
     Command {
         id: EDITOR_FIND,

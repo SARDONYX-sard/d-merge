@@ -13,8 +13,8 @@
 use std::rc::Rc;
 
 use egui_code_editor::{
-    CodeEditor, CodeEditorOutput, EditorAction, EditorCommand, EditorLabels, EditorRequest, Keymap, Language,
-    Navigation, ReferenceList,
+    CodeEditor, CodeEditorOutput, DocumentEdit, EditorAction, EditorCommand, EditorLabels, EditorRequest, Keymap,
+    Language, Navigation, ReferenceList,
 };
 use gui_shared::i18n::{I18nKey, I18nMap};
 use keybinding::{
@@ -217,6 +217,20 @@ fn palette_actions<'a>(key_ui: &'a keybinding::KeyUi, i18n: &'a I18nMap) -> [Edi
 
 /// What the editor asked for this frame, into `result`. Returns the references to list, owned: they
 /// are kept past this frame's borrows.
+/// `F2`: the new text of each object `edits` change. The open one's is the work's too: the editor's
+/// text goes to it on every change.
+fn renamed_texts(behavior: &crate::patch::workspace::Behavior, edits: &[DocumentEdit<'_>]) -> Vec<(String, String)> {
+    let mut documents: Vec<&str> = edits.iter().map(|edit| edit.document.as_ref()).collect();
+    documents.sort_unstable();
+    documents.dedup();
+    let renamed = documents.into_iter().filter_map(|document| {
+        let text = behavior.text(document)?;
+        let of_it = edits.iter().filter(|edit| edit.document == document);
+        Some((document.to_owned(), DocumentEdit::apply(text, of_it)))
+    });
+    renamed.collect()
+}
+
 fn read_output(output: CodeEditorOutput<'_>, result: &mut EditorResult) -> Option<ReferenceList> {
     result.changed = output.changed;
     result.inline_revert = output.inline_revert;
@@ -340,7 +354,7 @@ impl EditorPane {
         let scroll = egui::ScrollArea::both().id_salt(("nemesis_editor_scroll", id)).auto_shrink(false);
         let mut toggle_graph = false;
         scroll.show(ui, |ui| {
-            let output = CodeEditor::new(("nemesis_object", user_patch, id), &mut self.text)
+            let mut output = CodeEditor::new(("nemesis_object", user_patch, id), &mut self.text)
                 .language(shown_language)
                 .read_only(read_only)
                 .diagnostics(&self.problems)
@@ -358,6 +372,9 @@ impl EditorPane {
 
             if let Some(cursor) = output.cursor {
                 self.cursor_line = cursor.line;
+            }
+            if let Some(edits) = output.rename.take() {
+                result.renamed = renamed_texts(behavior, &edits);
             }
             toggle_graph = output.action == Some(ACTION_TOGGLE_GRAPH);
             if let Some(references) = read_output(output, result) {

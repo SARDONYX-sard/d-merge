@@ -50,9 +50,9 @@ pub(in crate::patch) struct EditorOut {
     pub(in crate::patch) leave_tree: bool,
     /// Copy the path of / reveal the file of an object.
     pub(in crate::patch) file: Option<(FileAction, String)>,
-    /// An object other than the open one was edited (in the node graph): its problems are found
-    /// again.
-    pub(in crate::patch) edited: Option<String>,
+    /// Objects other than the open one were edited (in the node graph, by a rename): their problems
+    /// are found again.
+    pub(in crate::patch) edited: Vec<String>,
 }
 
 impl EditorArea {

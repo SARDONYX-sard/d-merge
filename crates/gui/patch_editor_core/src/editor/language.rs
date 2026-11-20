@@ -18,7 +18,9 @@
 use std::{borrow::Cow, fmt::Write as _, ops::Range};
 
 use egui::Color32;
-use egui_code_editor::{CompletionItem, CompletionList, Language, Location, QuickFix, References, languages::Xml};
+use egui_code_editor::{
+    CompletionItem, CompletionList, DocumentEdit, Language, Location, QuickFix, References, languages::Xml,
+};
 use fast_hash::HashMap;
 use nemesis_diff::{
     schema::{self, FieldSchema, TypeKind},
@@ -30,17 +32,17 @@ use super::ids::{self, IdKind, assist::IdInfo};
 use crate::{tree::Graph, workspace::Behavior};
 
 /// Nemesis' variable syntaxes and what they complete with.
-const PREFIXES: [(&str, Kind); 2] = [("$eventID[", Kind::Event), ("$variableID[", Kind::Variable)];
+pub(super) const PREFIXES: [(&str, Kind); 2] = [("$eventID[", Kind::Event), ("$variableID[", Kind::Variable)];
 
-#[derive(Clone, Copy)]
-enum Kind {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Kind {
     Event,
     Variable,
 }
 
 impl Kind {
     /// The array of `hkbBehaviorGraphStringData` that holds the names.
-    const fn names_field(self) -> &'static str {
+    pub(super) const fn names_field(self) -> &'static str {
         match self {
             Self::Event => "eventNames",
             Self::Variable => "variableNames",
@@ -57,7 +59,7 @@ impl Kind {
 
 /// What can be navigated to in an object's text. Borrows from the line.
 #[derive(Clone, Copy)]
-enum Symbol<'a> {
+pub(super) enum Symbol<'a> {
     /// `#0106`, `#mymod$0`: another object.
     Pointer(&'a str),
     /// `$eventID[moveStart]$` -> `(Event, "moveStart")`
@@ -72,7 +74,7 @@ fn name_in<'t>((id, text): (&'t str, &str), field: &str, name: &str) -> Option<(
     Some((id, vars::name_line(text, field, name)?))
 }
 
-fn symbol_at(line: &str, column: usize) -> Option<Symbol<'_>> {
+pub(super) fn symbol_at(line: &str, column: usize) -> Option<Symbol<'_>> {
     let at = line.char_indices().nth(column).map_or(line.len(), |(i, _)| i);
 
     // `$eventID[name]$`. The prefix ignores case, as d-merge's parser does.
@@ -238,6 +240,22 @@ impl Language for NemesisXml<'_> {
                 Some(Location { document: id.into(), line, detail: field.into() })
             }
         }
+    }
+
+    /// An event or a variable the mod adds: see [`super::rename`].
+    fn prepare_rename(&self, text: &str, line: usize, column: usize) -> Option<Range<usize>> {
+        super::rename::name_at(text, line, column).map(|(_, columns, _)| columns)
+    }
+
+    fn rename(
+        &self,
+        text: &str,
+        line: usize,
+        column: usize,
+        new_name: &str,
+    ) -> Result<Vec<DocumentEdit<'_>>, Cow<'_, str>> {
+        let (kind, _, old) = super::rename::name_at(text, line, column).ok_or("Nothing to rename here")?;
+        super::rename::edits(self.behavior, kind, (old, new_name))
     }
 
     /// Every other object mentioning the `#id` (its first mention), or every line using the

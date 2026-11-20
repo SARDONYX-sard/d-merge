@@ -8,7 +8,7 @@ use crate::{
     keymap::View,
     popups::{
         completion::CompletionPopup, find::FindBar, hover::HoverPopup, palette, palette::Palette,
-        quick_fix::QuickFixMenu, which_key,
+        quick_fix::QuickFixMenu, rename::RenameBox, which_key,
     },
     search,
     text_pos::LinePos,
@@ -24,6 +24,8 @@ pub struct CodeEditorState {
     pub(crate) find: FindBar,
     /// `Ctrl+Shift+P`.
     pub(crate) palette: Palette,
+    /// `F2`.
+    pub(crate) rename: RenameBox,
     /// State of the key binding styles (e.g., Vim mode and registers).
     pub keymap: KeymapState,
     /// Lines visible last frame (Vim `H`, `Ctrl+D`, ...).

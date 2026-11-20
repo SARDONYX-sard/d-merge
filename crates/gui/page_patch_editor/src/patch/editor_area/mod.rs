@@ -355,14 +355,14 @@ impl EditorArea {
         id: &str,
     ) -> EditorDone {
         let mut changed = result.changed;
-        let mut edited = None;
-        if let Some((object, text)) = result.graph_edit {
+        let mut edited = Vec::new();
+        for (object, text) in result.graph_edit.into_iter().chain(result.renamed) {
             if object == id {
                 self.pane.text = text;
                 changed = true; // as if typed
             } else {
                 Self::write_other(work, sel.active, (&object, &text));
-                edited = Some(object);
+                edited.push(object);
             }
         }
         if changed {
@@ -463,7 +463,7 @@ struct EditorDone {
     /// Copy the path of / reveal the file of an object.
     pub(in crate::patch) file: Option<(FileAction, String)>,
     /// See [`view::EditorOut::edited`].
-    edited: Option<String>,
+    edited: Vec<String>,
 }
 
 #[cfg(test)]

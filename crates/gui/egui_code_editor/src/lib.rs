@@ -52,8 +52,8 @@ pub use self::{
     inline_diff::{CharChange, DiffHunk, InlineDiff},
     keymap::{Keymap, KeymapState, StatusLine, StatusMode, VimOptions},
     language::{
-        Comment, CompletionItem, CompletionList, Diagnostic, Indent, Language, Location, QuickFix, References,
-        Severity, SignatureHelp,
+        Comment, CompletionItem, CompletionList, Diagnostic, DocumentEdit, Indent, Language, Location, QuickFix,
+        References, Severity, SignatureHelp,
     },
     popups::{
         AnchoredPopup,

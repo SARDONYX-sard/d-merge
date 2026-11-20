@@ -68,7 +68,7 @@ impl GroupViewer for GroupsViewer<'_> {
             self.out = out;
         } else {
             self.out.file = self.out.file.take().or(out.file);
-            self.out.edited = self.out.edited.take().or(out.edited);
+            self.out.edited.extend(out.edited);
             let pressed = ui.input(|input| input.pointer.any_pressed());
             let in_group = pressed && ui.rect_contains_pointer(ui.max_rect()) && !drags.dragging();
             if in_group && self.area.groups.takes_focus(group) {

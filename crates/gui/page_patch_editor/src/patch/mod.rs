@@ -141,6 +141,8 @@ struct EditorResult {
     jump_to_line: Option<usize>,
     /// `(object, its new text)`: an edit in the node graph, of the open object or another.
     graph_edit: Option<(String, String)>,
+    /// `(object, its new text)` of each object a rename (`F2`) changed, the open one too.
+    renamed: Vec<(String, String)>,
     /// The `↶` of this place of the inline diff was clicked.
     inline_revert: Option<usize>,
     tab_event: Option<TabEvent>,
@@ -430,7 +432,7 @@ impl PatchTool {
         if let Some(editor_id) = out.enter_tree {
             self.side.enter_tree(ui, editor_id);
         }
-        if let Some(id) = out.edited {
+        for id in out.edited {
             self.problems.refresh_in(&mut self.work, self.sel.active, &id);
         }
         if let Some((action, id)) = out.file {

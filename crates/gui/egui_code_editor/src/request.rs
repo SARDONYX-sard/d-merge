@@ -9,6 +9,7 @@
 //! | `CommandPalette` | `Ctrl+Shift+P`         | the palette                                   |
 //! | `GoToDefinition` | `F12`                  |                                               |
 //! | `FindReferences` | `Shift+F12`            |                                               |
+//! | `Rename`         | `F2`                   | the rename box of the symbol at the cursor    |
 //! | `Find`           | `Ctrl+F` (Normal)      | the find bar                                  |
 //! | `Replace`        | `Ctrl+H` (Normal)      | the find bar with its replace field           |
 //! | `GoToLine`       | `Ctrl+G` (Normal)      |                                               |
@@ -26,6 +27,7 @@ pub enum EditorRequest {
     CommandPalette,
     GoToDefinition,
     FindReferences,
+    Rename,
     Find,
     Replace,
     GoToLine,

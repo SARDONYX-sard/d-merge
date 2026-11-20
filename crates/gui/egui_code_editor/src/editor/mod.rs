@@ -26,8 +26,8 @@ use self::{
     text::{line_bottom, show_text, sorted_chars},
 };
 use crate::{
-    Diagnostic, EditorAction, EditorLabels, EditorRequest, InlineDiff, Keymap, Language, Location, PeekAsk, PeekInput,
-    ReferenceList, References, Severity,
+    Diagnostic, DocumentEdit, EditorAction, EditorLabels, EditorRequest, InlineDiff, Keymap, Language, Location,
+    PeekAsk, PeekInput, ReferenceList, References, Severity,
     command::{EditorCommand, EditorFeatures},
     popups::{context_menu::MenuAction, palette},
     text_pos::LinePos,
@@ -69,6 +69,9 @@ pub struct CodeEditorOutput<'a> {
     pub inline_revert: Option<usize>,
     /// What the references' peek asked: see [`CodeEditor::references`].
     pub peek: Option<PeekAsk>,
+    /// `F2` renamed a symbol: the edits of every document, the open one too, for the host to apply
+    /// (see [`DocumentEdit::apply`]).
+    pub rename: Option<Vec<DocumentEdit<'a>>>,
 }
 
 /// Language used when none is given: no colors, no completion, ...
@@ -341,6 +344,11 @@ impl<'a> CodeEditor<'a> {
             let at = crate::text_pos::LinePos { line, column }.to_char_index(text);
             crate::editor::cursor::set_cursor(ui.ctx(), id, at);
         }
+        if !read_only && rename_asked(ui, id, requests) {
+            let at = egui::TextEdit::load_state(ui.ctx(), id).and_then(|state| state.cursor.char_range());
+            let at = at.map_or(0, |range| range.primary.index.0);
+            state.rename.open(language, text, LinePos::from_char_index(text, at));
+        }
         tab_key_follows_indent(ui, id, state.indent);
         let mut changed = input.keys.changed | input.pasted | {
             let asked = input.triggers.format || input.keys.format;
@@ -403,6 +411,7 @@ impl<'a> CodeEditor<'a> {
             changed = true;
             ui.ctx().request_repaint(); // laid out before the replace: again, with it
         }
+        let rename = state.rename.ui(ui, id, (language, text), placed);
         show_which_key(ui, id, state, keymap, visible, host_commands);
         state.view = visible_lines(ui, placed.0, placed.1);
         state.had_focus = response.has_focus();
@@ -467,6 +476,7 @@ impl<'a> CodeEditor<'a> {
             configure_request: input.picked.and_then(palette::Picked::configure_request),
             inline_revert,
             peek,
+            rename,
         }
     }
 }
@@ -487,6 +497,15 @@ struct EditorFrame<'a> {
     request_keys: Option<&'a [(EditorRequest, String)]>,
     /// See [`CodeEditor::background`].
     background: egui::Color32,
+}
+
+/// `F2` (or the host's request) while the editor has the keyboard.
+fn rename_asked(ui: &egui::Ui, id: egui::Id, requests: Option<&[EditorRequest]>) -> bool {
+    if requests.is_some() {
+        return crate::request::asked(requests, EditorRequest::Rename);
+    }
+    ui.memory(|memory| memory.has_focus(id))
+        && ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::F2))
 }
 
 #[cfg(test)]
