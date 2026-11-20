@@ -9,10 +9,11 @@
 //! - the explorer: a click opens a file in the preview tab (`PreviewTabs`), a double click keeps it
 //! - the tabs (`EditorTab` + `action`): click, double click, `✖`, middle click, the right-click menu
 //! - the editor (`CodeEditor`) and its status line; `Compare` opens a read-only diff tab (`DiffView`)
-//! - the search of every file (`SearchView`): a click opens that line
+//! - the search of every file (`SearchView`): a click opens that line; `˃` replaces
 
 use egui_code_editor::{
-    CodeEditor, CodeEditorState, DiffView, Keymap, SearchLabels, SearchView, languages::Xml, text_pos::LinePos,
+    CodeEditor, CodeEditorState, DiffView, DocumentEdit, Keymap, SearchAsk, SearchLabels, SearchView, languages::Xml,
+    text_pos::LinePos,
 };
 use egui_widgets::{ActivityBar, ActivityItem, EditorTab, TabAction, TabMenu, preview_tabs::PreviewTabs, shadcn::Icon};
 
@@ -80,17 +81,29 @@ impl App {
             egui_widgets::side_bar_title(ui, "Search");
             let docs = self.docs.iter().map(|doc| (doc.name, doc.text.as_str()));
             self.search.refresh(self.docs.iter().map(|doc| doc.text.len()).sum::<usize>(), docs);
-            let labels =
-                SearchLabels { hint: "Search", regex_hover: "Regex", results_in: "results in", documents: "files" };
+            let labels = SearchLabels {
+                hint: "Search",
+                regex_hover: "Regex",
+                results_in: "results in",
+                documents: "files",
+                replace_hint: "Replace",
+                replace_all_hover: "Replace All",
+                replace_line_hover: "Replace",
+                toggle_replace_hover: "Toggle Replace",
+            };
             let label = |job: &mut egui::text::LayoutJob, name: &str, visuals: &egui::Visuals| {
                 job.append(name, 0.0, egui::TextFormat::simple(egui::FontId::monospace(12.0), visuals.text_color()));
             };
-            if let Some((name, line)) = self.search.show(ui, &labels, &Xml, label) {
-                let doc = self.docs.iter().position(|doc| *doc.name == *name).unwrap_or_default();
-                self.open(doc, true);
-                let id = egui_code_editor::editor_id(("doc", doc));
-                let at = LinePos { line, column: 0 }.to_char_index(&self.docs[doc].text);
-                egui_code_editor::set_cursor(ui.ctx(), id, at);
+            match self.search.show(ui, &labels, &Xml, label) {
+                Some(SearchAsk::Open(name, line)) => {
+                    let doc = self.docs.iter().position(|doc| *doc.name == *name).unwrap_or_default();
+                    self.open(doc, true);
+                    let id = egui_code_editor::editor_id(("doc", doc));
+                    let at = LinePos { line, column: 0 }.to_char_index(&self.docs[doc].text);
+                    egui_code_editor::set_cursor(ui.ctx(), id, at);
+                }
+                Some(SearchAsk::Replace(only)) => self.replace(only),
+                None => {}
             }
             return;
         }
@@ -104,6 +117,23 @@ impl App {
     }
 
     /// Shows `doc` in its tab, or the preview tab; `keep`: pinned.
+    /// The search's replace: in the line of hit `only`, or everywhere.
+    fn replace(&mut self, only: Option<usize>) {
+        let replaced: Vec<(usize, String)> = {
+            let edits = self.search.replace_edits(self.docs.iter().map(|doc| (doc.name, doc.text.as_str())), only);
+            let changed =
+                self.docs.iter().enumerate().filter(|(_, doc)| edits.iter().any(|edit| edit.document == doc.name));
+            changed
+                .map(|(at, doc)| {
+                    (at, DocumentEdit::apply(&doc.text, edits.iter().filter(|edit| edit.document == doc.name)))
+                })
+                .collect()
+        };
+        for (at, text) in replaced {
+            self.docs[at].text = text;
+        }
+    }
+
     fn open(&mut self, doc: usize, keep: bool) {
         let at = self.tabs.open(0, Shown::Doc(doc), |shown| matches!(shown, Shown::Doc(d) if *d == doc), None);
         if keep {

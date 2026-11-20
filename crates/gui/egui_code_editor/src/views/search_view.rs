@@ -2,22 +2,29 @@
 //! matching lines under their document, in the language's colors with each match tinted.
 //!
 //! ```text
-//! [$eventID[moveStart]$          ] [.*]
+//! ˅ [$eventID[moveStart]$        ] [.*]
+//!   [$eventID[moveStop]$         ] [⇄*]  <- with `˃`: the replacement, and "replace all"
 //! 3 results in 2 objects
 //! ────────────────────────────────────────────  <- a line and a tinted band start each document
 //! ▼ #0106  hkbModifierList  GetUpModList      2   <- the host's label; a click folds it
-//!     <hkparam name="id">$eventID[moveStart]$</hkparam>   <- a click opens that line
+//!     <hkparam name="id">$eventID[moveStart]$</hkparam>  ⇄  <- a click opens that line; ⇄ replaces in it
 //! ```
 //! - Text ignoring ASCII case, or with `.*` on a regex ignoring case (e.g. `#0\d{3}`). A regex not
 //!   finished yet finds nothing.
 //! - It searches again only when the query or the documents' `version` changed, and keeps at most
 //!   [`SearchView::MAX_HITS`] lines: a short query matches nearly every line.
+//! - Replacing: the host is asked ([`SearchAsk::Replace`]) and gets the edits from
+//!   [`SearchView::replace_edits`], of every match (not only the hits kept). A regex's replacement may
+//!   name its groups (`$1`).
 //!
 //! ```text
 //! let mut search = SearchView::default();                      // kept by the host
 //! search.refresh(version, docs.iter().map(|d| (d.id, d.text)));
-//! let open = search.show(ui, &labels, &Xml, |job, id, visuals| { /* append the label of `id` */ });
-//! if let Some((id, line)) = open { /* open document `id` at `line` */ }
+//! match search.show(ui, &labels, &Xml, |job, id, visuals| { /* append the label of `id` */ }) {
+//!     Some(SearchAsk::Open(id, line)) => { /* open document `id` at `line` */ }
+//!     Some(SearchAsk::Replace(only)) => { /* apply search.replace_edits(docs, only) */ }
+//!     None => {}
+//! }
 //! ```
 
 use std::{
@@ -26,8 +33,9 @@ use std::{
 };
 
 use egui::{Color32, text::LayoutJob};
+use egui_widgets::shadcn::{Button, Icon};
 
-use crate::Language;
+use crate::{DocumentEdit, Language};
 
 /// One matching line. Kept across frames, so it owns its text.
 #[derive(Debug, PartialEq, Eq)]
@@ -51,6 +59,20 @@ pub struct SearchLabels<'a> {
     pub results_in: &'a str,
     /// `3 results in 2 files`: `files`.
     pub documents: &'a str,
+    pub replace_hint: &'a str,
+    pub replace_all_hover: &'a str,
+    pub replace_line_hover: &'a str,
+    pub toggle_replace_hover: &'a str,
+}
+
+/// What the results were asked for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SearchAsk {
+    /// A line was clicked: open `(document, line)`.
+    Open(Box<str>, usize),
+    /// Replace the matches in the line of hit `Some(index)`, or in every line (`None`): see
+    /// [`SearchView::replace_edits`].
+    Replace(Option<usize>),
 }
 
 /// See the module docs.
@@ -59,6 +81,9 @@ pub struct SearchView {
     pub query: String,
     /// `.*`: `query` is a regex.
     pub regex: bool,
+    /// The replace field is shown (`˃`).
+    pub replacing: bool,
+    pub replacement: String,
     pub hits: Vec<SearchHit>,
     /// The documents whose hits are folded away.
     folded: std::collections::BTreeSet<Box<str>>,
@@ -116,6 +141,53 @@ impl SearchView {
         self.searched = Some((self.query.clone(), self.regex, version));
     }
 
+    /// The edits that replace the matches in `documents` (`(id, text)`, those the host lets change)
+    /// with [`Self::replacement`]: in the line of hit `only`, or in every line. Every match, not only
+    /// the hits kept.
+    pub fn replace_edits<'a>(
+        &self,
+        documents: impl Iterator<Item = (&'a str, &'a str)>,
+        only: Option<usize>,
+    ) -> Vec<DocumentEdit<'a>> {
+        let query = self.query.trim();
+        let regex = if self.regex {
+            match regex::RegexBuilder::new(query).case_insensitive(true).build() {
+                Ok(regex) => Some(regex),
+                Err(_) => return Vec::new(),
+            }
+        } else {
+            None
+        };
+        let only = only.and_then(|at| self.hits.get(at)).map(|hit| (&*hit.document, hit.line));
+
+        let mut edits = Vec::new();
+        for (document, text) in documents.filter(|(document, _)| only.is_none_or(|(of, _)| of == *document)) {
+            let lines = text.lines().enumerate().filter(|(line, _)| only.is_none_or(|(_, of)| of == *line));
+            for (line, line_text) in lines {
+                let found: Vec<(Range<usize>, String)> = match &regex {
+                    Some(regex) => regex
+                        .captures_iter(line_text)
+                        .filter_map(|captures| {
+                            let found = captures.get(0).filter(|found| !found.is_empty())?;
+                            let mut new_text = String::new();
+                            captures.expand(&self.replacement, &mut new_text);
+                            Some((found.range(), new_text))
+                        })
+                        .collect(),
+                    None => stdx::text::find_ignore_case(line_text, query)
+                        .map(|range| (range, self.replacement.clone()))
+                        .collect(),
+                };
+                edits.extend(found.into_iter().map(|(range, new_text)| {
+                    let start = line_text[..range.start].chars().count();
+                    let columns = start..start + line_text[range].chars().count();
+                    DocumentEdit { document: document.into(), line, columns, new_text }
+                }));
+            }
+        }
+        edits
+    }
+
     /// How many documents have hits.
     #[must_use]
     pub fn document_count(&self) -> usize {
@@ -154,10 +226,13 @@ impl SearchView {
         labels: &SearchLabels<'_>,
         language: &dyn Language,
         label: impl Fn(&mut LayoutJob, &str, &egui::Visuals),
-    ) -> Option<(Box<str>, usize)> {
-        self.field(ui, labels);
+    ) -> Option<SearchAsk> {
+        let replace_all = self.field(ui, labels);
         if self.query.trim().is_empty() {
             return None;
+        }
+        if replace_all && !self.hits.is_empty() {
+            return Some(SearchAsk::Replace(None));
         }
 
         // `3 results in 2 files`, as VS Code's line above the results.
@@ -170,10 +245,11 @@ impl SearchView {
             labels.documents
         ));
 
-        let (open, fold) = {
+        let (open, fold, replace) = {
             let rows = self.rows();
             let height = ui.text_style_height(&egui::TextStyle::Monospace) + 6.0;
-            let (mut open, mut fold) = (None, None);
+            let (mut open, mut fold, mut replace) = (None, None, None);
+            let replace_hover = self.replacing.then_some(labels.replace_line_hover);
             let scroll = egui::ScrollArea::both().id_salt("code_editor_search_view").auto_shrink(false);
             scroll.show_rows(ui, height, rows.len(), |ui, range| {
                 for row in &rows[range] {
@@ -185,15 +261,15 @@ impl SearchView {
                                 fold = Some(first);
                             }
                         }
-                        Row::Hit(at) => {
-                            if hit_row(ui, &self.hits[at], height, language) {
-                                open = Some(at);
-                            }
-                        }
+                        Row::Hit(at) => match hit_row(ui, &self.hits[at], height, (language, replace_hover)) {
+                            Some(HitClick::Open) => open = Some(at),
+                            Some(HitClick::Replace) => replace = Some(at),
+                            None => {}
+                        },
                     }
                 }
             });
-            (open, fold)
+            (open, fold, replace)
         };
 
         if let Some(first) = fold {
@@ -201,13 +277,22 @@ impl SearchView {
             self.toggle(&document);
         }
 
-        open.map(|at| (self.hits[at].document.clone(), self.hits[at].line))
+        if let Some(at) = replace {
+            return Some(SearchAsk::Replace(Some(at)));
+        }
+        open.map(|at| SearchAsk::Open(self.hits[at].document.clone(), self.hits[at].line))
     }
 
-    /// `[query] [.*]` in one row, right to left: `.*` takes its width first, the field the rest.
-    /// (Without the row, the layout takes all the height left, with the field in its middle.)
-    fn field(&mut self, ui: &mut egui::Ui, labels: &SearchLabels<'_>) {
+    /// `˃ [query] [.*]`, and under it `[replacement] [⇄*]` while replacing. Each row right to left:
+    /// the button takes its width first, the field the rest. (Without the row, the layout takes all
+    /// the height left, with the field in its middle.) Returns whether "replace all" was clicked.
+    fn field(&mut self, ui: &mut egui::Ui, labels: &SearchLabels<'_>) -> bool {
         let field = ui.horizontal(|ui| {
+            let chevron = if self.replacing { Icon::ChevronDown } else { Icon::ChevronRight };
+            let toggle = Button::new("").icon(chevron).small();
+            if ui.add(toggle).on_hover_text(labels.toggle_replace_hover).clicked() {
+                self.replacing = !self.replacing;
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let regex = egui_widgets::shadcn::Button::selectable(self.regex, ".*").small();
                 if ui.add(regex).on_hover_text(labels.regex_hover).clicked() {
@@ -223,6 +308,26 @@ impl SearchView {
         if std::mem::take(&mut self.focus) {
             field.inner.request_focus();
         }
+        if !self.replacing {
+            return false;
+        }
+
+        // Under the query: past the toggle.
+        let indent = field.inner.rect.left() - ui.min_rect().left();
+        ui.horizontal(|ui| {
+            ui.add_space((indent - ui.spacing().item_spacing.x).max(0.0));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let all = Button::new("").icon(Icon::ReplaceAll).small();
+                let all = ui.add(all).on_hover_text(labels.replace_all_hover).clicked();
+                let field = egui_widgets::shadcn::TextEdit::singleline(&mut self.replacement)
+                    .hint_text(labels.replace_hint)
+                    .desired_width(ui.available_width());
+                ui.add(field);
+                all
+            })
+            .inner
+        })
+        .inner
     }
 }
 
@@ -287,11 +392,25 @@ fn document_row(
     response.clicked()
 }
 
-/// A matching line in the language's colors with its matches tinted. Returns whether it was clicked
-/// (to open it).
-fn hit_row(ui: &mut egui::Ui, hit: &SearchHit, height: f32, language: &dyn Language) -> bool {
+/// What a click on a hit asked for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HitClick {
+    Open,
+    Replace,
+}
+
+/// A matching line in the language's colors with its matches tinted, and, while replacing
+/// (`replace_hover`), its `⇄` on hover. Returns what a click on it asked for.
+fn hit_row(
+    ui: &mut egui::Ui,
+    hit: &SearchHit,
+    height: f32,
+    (language, replace_hover): (&dyn Language, Option<&str>),
+) -> Option<HitClick> {
     let (rect, response) = ui.allocate_exact_size(egui::vec2(ui.available_width(), height), egui::Sense::click());
-    if response.hovered() {
+    // The pointer on the row, its `⇄` too.
+    let hovered = ui.rect_contains_pointer(rect);
+    if hovered {
         ui.painter().rect_filled(rect, 0.0, ui.visuals().widgets.hovered.weak_bg_fill);
     }
 
@@ -299,7 +418,15 @@ fn hit_row(ui: &mut egui::Ui, hit: &SearchHit, height: f32, language: &dyn Langu
     let text_at = egui::pos2(rect.left() + HIT_INDENT, rect.center().y - galley.size().y / 2.0);
     ui.painter().with_clip_rect(rect).galley(text_at, galley, ui.visuals().text_color());
 
-    response.on_hover_text(format!("{}:{}", hit.document, hit.line + 1)).clicked()
+    // `⇄` at the right end, over the text, as VS Code's.
+    if let Some(hover) = replace_hover.filter(|_| hovered) {
+        let at = egui::Rect::from_min_size(egui::pos2(rect.right() - height, rect.top()), egui::vec2(height, height));
+        let button = Button::new("").icon(Icon::Replace).small();
+        if ui.put(at, button).on_hover_text(hover).clicked() {
+            return Some(HitClick::Replace);
+        }
+    }
+    response.on_hover_text(format!("{}:{}", hit.document, hit.line + 1)).clicked().then_some(HitClick::Open)
 }
 
 /// `text` as `language` colors it, with the byte ranges `matches` on VS Code's tint of a match.
@@ -386,6 +513,31 @@ mod tests {
         assert_eq!(search.document_count(), 2);
         search.toggle("#1");
         assert_eq!(search.rows(), [document(0, 2), document(2, 1), Row::Hit(2)]);
+    }
+
+    /// Every match, in every line or in a hit's line only; the columns of the untrimmed line; a
+    /// regex's groups.
+    #[test]
+    fn matches_are_replaced_where_asked() {
+        let documents = || [("#1", "\tA a\nb a"), ("#2", "a")].into_iter();
+        let mut search = SearchView { query: "a".to_owned(), replacement: "x".to_owned(), ..SearchView::default() };
+        search.refresh(1, documents());
+
+        let all = search.replace_edits(documents(), None);
+        let places: Vec<(&str, usize, Range<usize>)> =
+            all.iter().map(|edit| (edit.document.as_ref(), edit.line, edit.columns.clone())).collect();
+        assert_eq!(places, [("#1", 0, 1..2), ("#1", 0, 3..4), ("#1", 1, 2..3), ("#2", 0, 0..1)]);
+        let of_1 = all.iter().filter(|edit| edit.document == "#1");
+        assert_eq!(DocumentEdit::apply("\tA a\nb a", of_1), "\tx x\nb x");
+
+        let one = search.replace_edits(documents(), Some(1)); // `#1`'s line 1
+        assert_eq!(one.iter().map(|edit| edit.line).collect::<Vec<_>>(), [1]);
+
+        search.regex = true;
+        search.query = r"(b) (a)".to_owned();
+        search.replacement = "$2$1".to_owned();
+        let swapped = search.replace_edits(documents(), None);
+        assert_eq!(swapped.iter().map(|edit| edit.new_text.as_str()).collect::<Vec<_>>(), ["ab"]);
     }
 
     #[test]

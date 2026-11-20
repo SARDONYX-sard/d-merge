@@ -68,7 +68,7 @@ pub use self::{
         problems,
         problems::{ProblemGroup, ProblemsCursor, ProblemsKey, ProblemsPanel},
         references::{PeekAsk, PeekInput, ReferenceList},
-        search_view::{SearchHit, SearchLabels, SearchView},
+        search_view::{SearchAsk, SearchHit, SearchLabels, SearchView},
         status::{StatusBar, StatusBarOutput, status_line},
     },
 };

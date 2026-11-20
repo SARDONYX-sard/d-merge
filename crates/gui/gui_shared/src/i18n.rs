@@ -1592,11 +1592,23 @@ pub enum I18nKey {
     /// Use a regular expression (ignoring case)
     SearchRegexHover,
 
+    /// Replace every match in every object ($1: a group of the regex)
+    SearchReplaceAllHover,
+
+    /// Replace
+    SearchReplaceHint,
+
+    /// Replace in this line
+    SearchReplaceLineHover,
+
     /// results in
     SearchResultsIn,
 
     /// Text of every object, e.g. $eventID[moveStart]$ (Ctrl+Shift+F)
     SearchTextHint,
+
+    /// Toggle Replace
+    SearchToggleReplaceHover,
 
     /// Select All
     SelectAll,
