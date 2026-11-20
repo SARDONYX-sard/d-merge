@@ -213,10 +213,10 @@ impl ReferenceList {
         self.current_place()
     }
 
-    /// The editor's line it opens under, and how tall it is. `cursor_line`: where the editor's cursor
-    /// is, read the first time.
-    pub(crate) fn gap(&mut self, cursor_line: impl FnOnce() -> usize) -> (usize, f32) {
-        (*self.anchor.get_or_insert_with(cursor_line), self.height)
+    /// The editor's line it opens under. `cursor_line`: where the editor's cursor is, read the first
+    /// time.
+    pub(crate) fn anchor(&mut self, cursor_line: impl FnOnce() -> usize) -> usize {
+        *self.anchor.get_or_insert_with(cursor_line)
     }
 
     /// The `(document, line)` of the reference selected.
@@ -281,27 +281,35 @@ impl ReferenceList {
         }
     }
 
-    /// Draws the peek in the editor's gap at `top`, as wide as the editor's view. Returns what was
-    /// asked; `list` is `None` once it has closed.
+    /// Draws the peek over the editor's text from `top`, from the view's left to `right` (the
+    /// minimap's left), with a hole in the editor's shapes from index `first_shape` on (see
+    /// [`crate::editor::hole`]). Returns what was asked; `list` is `None` once it has closed.
     pub(crate) fn show_inline(
         ui: &mut egui::Ui,
         list: &mut Option<Self>,
         input: &PeekInput<'_>,
-        top: f32,
+        (top, right, first_shape): (f32, f32, usize),
     ) -> Option<PeekAsk> {
         let references = list.as_mut()?;
         references.read_snippets(input.texts);
         references.load_preview(input.texts);
 
         let view = ui.clip_rect();
-        let rect = egui::Rect::from_x_y_ranges(view.x_range(), top..=top + references.height);
-        if references.take_keyboard {
-            ui.scroll_to_rect(rect, None); // just opened: shown whole
-        }
+        // Under its line; near the view's end, as far up as it must to be seen whole.
+        let top = top.min(view.bottom() - references.height).max(view.top());
+        let rect = egui::Rect::from_x_y_ranges(view.left()..=right, top..=top + references.height);
+        // Floating over the lines below, as VS Code's, the text staying where it is; see-through, with
+        // what the editor drew under it taken out (`hole`): the page shows, not the text. Nothing it
+        // covers takes a click.
+        crate::editor::hole::punch(ui.ctx(), ui.layer_id(), first_shape, rect.intersect(view));
+        let _covered = ui.interact(rect, ui.scope_id().with("references_peek_cover"), egui::Sense::click_and_drag());
         let builder = egui::UiBuilder::new().max_rect(rect).layout(egui::Layout::top_down(egui::Align::Min));
         let asked = ui
             .scope_builder(builder, |ui| {
                 ui.set_clip_rect(rect.intersect(view));
+                // Every scroll in it at once: its preview going to a reference, its list following
+                // the cursor (an animation through the text in between is slow, as Vim `gg`'s).
+                ui.style_mut().scroll_animation = egui::style::ScrollAnimation::none();
                 references.peek_ui(ui, input.language)
             })
             .inner;
@@ -454,7 +462,9 @@ impl ReferenceList {
                         Item::Row(row) => reference_line(ui, &self.rows[row], on_cursor),
                     };
                     if on_cursor && self.moved {
-                        response.scroll_to_me(None);
+                        // At once (`scroll_to_me` takes the app's style, not this one's).
+                        let instant = egui::style::ScrollAnimation::none();
+                        ui.scroll_to_rect_animation(response.rect, None, instant);
                     }
                     if response.clicked() {
                         clicked = Some(item);

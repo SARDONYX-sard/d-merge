@@ -490,9 +490,9 @@ third",
     assert_eq!(frames.selection(), 8..8, "at `second` of line 2");
 }
 
-/// The peek's gap: the rows below the line move down by its height; its top is that line's bottom.
+/// The peek floats under its line: from the line's bottom, the lines below staying where they are.
 #[test]
-fn a_gap_pushes_the_lines_below_down() {
+fn the_peek_opens_under_its_line() {
     let ctx = egui::Context::default();
     let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
         let font = egui::FontId::monospace(14.0);
@@ -504,12 +504,8 @@ c"
             font,
             egui::Color32::WHITE,
         );
-        let gapped = text::with_gap(&galley, 1, 300.0);
-        let tops: Vec<f32> = gapped.rows.iter().map(|row| row.pos.y).collect();
-        assert_eq!(tops[..2], [galley.rows[0].pos.y, galley.rows[1].pos.y], "above: as they were");
-        assert_eq!(tops[2], galley.rows[2].pos.y + 300.0);
-        assert_eq!(gapped.rect.height(), galley.rect.height() + 300.0);
-        assert_eq!(text::gap_top(&gapped, 1), galley.rows[1].rect().bottom());
+        assert_eq!(text::line_bottom(&galley, 1), galley.rows[1].rect().bottom());
+        assert_eq!(text::line_bottom(&galley, 9), galley.rows[2].rect().bottom(), "past the end: the last");
     });
     output.textures_delta.clear();
 }

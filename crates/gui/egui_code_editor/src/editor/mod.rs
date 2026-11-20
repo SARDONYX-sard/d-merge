@@ -4,6 +4,7 @@ pub(crate) mod comment;
 pub(crate) mod cursor;
 mod decorations;
 pub(crate) mod edit_ops;
+pub(crate) mod hole;
 mod input;
 pub(crate) mod layout;
 mod menu;
@@ -22,7 +23,7 @@ use self::{
     menu::{context_menu, resolve_navigation, run_menu_action},
     popups::{accept_completion, run_quick_fix, show_hover, show_signature, show_which_key, update_completion_popup},
     state::CodeEditorState,
-    text::{gap_top, show_text, sorted_chars},
+    text::{line_bottom, show_text, sorted_chars},
 };
 use crate::{
     Diagnostic, EditorAction, EditorLabels, EditorRequest, InlineDiff, Keymap, Language, Location, PeekAsk, PeekInput,
@@ -311,9 +312,9 @@ impl<'a> CodeEditor<'a> {
             // In a buffer that stays: this is every frame.
             text.clone_into(&mut state.read_only_text);
         }
-        // The references' peek opens under the cursor's line, in a gap of its height.
-        let gap = references.as_mut().and_then(|(list, _)| list.as_mut()).map(|list| {
-            list.gap(|| {
+        // The references' peek floats under the cursor's line, over the lines below it.
+        let peek_line = references.as_mut().and_then(|(list, _)| list.as_mut()).map(|list| {
+            list.anchor(|| {
                 let state = egui::TextEdit::load_state(ui.ctx(), id);
                 let at = state.and_then(|state| state.cursor.char_range()).map_or(0, |range| range.primary.index.0);
                 LinePos::from_char_index(text, at).line
@@ -329,7 +330,6 @@ impl<'a> CodeEditor<'a> {
             requests,
             request_keys,
             background,
-            gap,
         };
 
         state.indent = language.indent();
@@ -358,6 +358,8 @@ impl<'a> CodeEditor<'a> {
         let notes_width = overlays::annotations_width(ui, annotations);
         let gutter = (line_numbers || notes_width > 0.0)
             .then(|| notes_width + if line_numbers { overlays::gutter_width(ui, text) } else { 0.0 });
+        // What the editor draws from here on: the references' peek punches a hole in it.
+        let first_shape = ui.ctx().graphics_mut(|graphics| graphics.entry(ui.layer_id()).next_idx().0);
         let (gutter_left, output) = show_text(frame, ui, state, text, desired_rows, gutter);
         let response = &output.response.response;
         let placed = (&*output.galley, output.galley_pos);
@@ -393,10 +395,6 @@ impl<'a> CodeEditor<'a> {
         if let Some(width) = minimap {
             minimap::show(ui, (id, &mut state.minimap), placed, (ui.clip_rect().intersect(response.rect), width));
         }
-        let peek = references.and_then(|(list, input)| {
-            let top = placed.1.y + gap_top(placed.0, gap?.0);
-            ReferenceList::show_inline(ui, list, input, top)
-        });
         if let Some(cursor) = anchor {
             scroll_to_cursor(ui, id, cursor, placed.0, input.keys.scroll);
         }
@@ -411,6 +409,14 @@ impl<'a> CodeEditor<'a> {
         if features.inlay_hints {
             overlays::inlay_hints(ui, placed.0, placed.1, language, text);
         }
+        // The references' peek last, as VS Code's: over all the editor draws (the minimap, the hints,
+        // the cursor); its popups are above it, in layers of their own.
+        let peek = references.and_then(|(list, input)| {
+            let top = placed.1.y + line_bottom(placed.0, peek_line?);
+            // Left of the minimap, which stays in view beside it.
+            let right = ui.clip_rect().right() - minimap.unwrap_or(0.0);
+            ReferenceList::show_inline(ui, list, input, (top, right, first_shape))
+        });
         let open_hover = cursor_index.filter(|_| input.keys.show_hover || input.triggers.hover); // e.g., Vim `K`
         show_hover(frame, ui, state, text, response, placed, open_hover);
         if inserting && !state.completion.is_open() && response.has_focus() {
@@ -478,8 +484,6 @@ struct EditorFrame<'a> {
     request_keys: Option<&'a [(EditorRequest, String)]>,
     /// See [`CodeEditor::background`].
     background: egui::Color32,
-    /// The references' peek: `(the line it opens under, its height)`.
-    gap: Option<(usize, f32)>,
 }
 
 #[cfg(test)]

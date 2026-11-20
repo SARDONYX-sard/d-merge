@@ -25,7 +25,7 @@ pub(crate) fn show_text(
         background: frame.background,
     };
     let mut layouter = |ui: &egui::Ui, buf: &dyn egui::TextBuffer, _wrap_width: f32| {
-        let galley = layout::cached(
+        layout::cached(
             &mut state.layout,
             ui,
             buf.as_str(),
@@ -33,11 +33,7 @@ pub(crate) fn show_text(
             frame.underlines,
             search.as_ref(),
             frame.inline_diff,
-        );
-        match frame.gap {
-            Some((line, height)) => std::sync::Arc::new(with_gap(&galley, line, height)),
-            None => galley,
-        }
+        )
     };
     let before = ui
         .input(|input| input.pointer.secondary_pressed())
@@ -142,28 +138,13 @@ pub(crate) fn show_text_edit(
     .inner
 }
 
-/// `galley` with the rows below line `line` moved `height` down, for what opens between the lines
-/// (the references' peek). The cursor, the selection and the clicks follow the rows where they are.
-///
-/// e.g., line 1 of `a\nb\nc`, `height` 300: `c` is 300 points lower, the galley 300 taller.
-pub(crate) fn with_gap(galley: &egui::Galley, line: usize, height: f32) -> egui::Galley {
-    let mut galley = galley.clone();
-    let below = gap_row(&galley, line) + 1;
-    for row in galley.rows.iter_mut().skip(below) {
-        row.pos.y += height;
-    }
-    galley.rect.max.y += height;
-    galley.mesh_bounds.max.y += height;
-    galley
-}
-
-/// Where the gap under line `line` starts, from the top of `galley`.
-pub(crate) fn gap_top(galley: &egui::Galley, line: usize) -> f32 {
-    galley.rows.get(gap_row(galley, line)).map_or(0.0, |row| row.rect().bottom())
+/// The bottom of line `line` in `galley`, from its top: where the references' peek opens.
+pub(crate) fn line_bottom(galley: &egui::Galley, line: usize) -> f32 {
+    galley.rows.get(last_row_of(galley, line)).map_or(0.0, |row| row.rect().bottom())
 }
 
 /// The last row of line `line`: the one it ends with, or the last of all.
-fn gap_row(galley: &egui::Galley, line: usize) -> usize {
+fn last_row_of(galley: &egui::Galley, line: usize) -> usize {
     let mut ended = 0;
     for (index, row) in galley.rows.iter().enumerate() {
         if row.ends_with_newline {
