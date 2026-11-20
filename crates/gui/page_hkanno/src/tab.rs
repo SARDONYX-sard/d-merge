@@ -38,6 +38,8 @@ pub(crate) struct HkannoTab {
     /// The saved cursor still has to be applied to the editor (once, on first show).
     pub(crate) restore_cursor: bool,
     pub(crate) preview: Preview,
+    /// The editor group it is in: see `crate::ui::groups`.
+    pub(crate) group: u64,
 }
 
 impl HkannoTab {
@@ -68,9 +70,32 @@ impl HkannoTab {
             editor: CodeEditorState::default(),
             restore_cursor: true,
             preview: Preview::default(),
+            group: 0,
         };
         tab.text_changed();
         Ok(tab)
+    }
+
+    /// A tab of no file read, named `input_path`: for the tests of what holds tabs.
+    #[cfg(test)]
+    pub(crate) fn blank(input_path: &str) -> Self {
+        Self {
+            settings: HkannoTabSettings {
+                input_path: input_path.to_owned(),
+                output_path: input_path.to_owned(),
+                ..Default::default()
+            },
+            text: String::new(),
+            original: Hkanno { ptr: "".into(), num_original_frames: 0, duration: 0.0, annotation_tracks: Vec::new() },
+            bytes: Arc::default(),
+            dirty: false,
+            diagnostics: Vec::new(),
+            editor_diagnostics: Vec::new(),
+            editor: CodeEditorState::default(),
+            restore_cursor: false,
+            preview: Preview::default(),
+            group: 0,
+        }
     }
 
     /// Re-opens a tab saved in `settings.json`, keeping its output path, format and cursor.

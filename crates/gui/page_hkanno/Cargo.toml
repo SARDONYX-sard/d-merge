@@ -19,6 +19,7 @@ parking_lot = { workspace = true }
 tracing     = { workspace = true }
 
 # workspace members
+egui_dock_area   = { workspace = true }
 egui_code_editor  = { workspace = true }
 egui_widgets      = { workspace = true }
 keybinding        = { workspace = true }

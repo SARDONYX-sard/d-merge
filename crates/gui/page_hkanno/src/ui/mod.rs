@@ -1,13 +1,14 @@
 //! Drawing of the hkanno page: tabs, editor, problems. The logic is in the modules next to this
-//! directory.
+//! directory. The tabs are in editor groups, docked as VS Code's: see [`groups`].
 
+pub(crate) mod groups;
 mod preview;
 mod toolbar;
 
 use egui_code_editor::{
     CodeEditor, CodeEditorOutput, EditorCommand, EditorFeatures, Keymap, ProblemGroup, ProblemsPanel, text_pos::LinePos,
 };
-use egui_widgets::{TabAction, shadcn::Button};
+use egui_widgets::shadcn::Button;
 use gui_shared::{
     i18n::{I18nKey, I18nMap},
     settings::ui::editor::EditorMode,
@@ -69,7 +70,8 @@ impl HkannoPage {
 
         // ── Fixed bars (registered before the central area) ────────────────────
         let frame = ctx.panel_frame;
-        egui::Panel::top("hkanno_tabs").frame(frame).show(ui, |ui| self.tab_bar(ui, &mut ctx));
+        // The page's bars are of the active group's tab: see `groups`.
+        self.tidy_groups();
         if !self.tabs.is_empty() {
             egui::Panel::top("hkanno_file_bar").frame(frame).show(ui, |ui| self.file_bar(ui, &ctx));
             egui::Panel::top("hkanno_toolbar").frame(frame).show(ui, |ui| self.toolbar(ui, &mut ctx));
@@ -80,82 +82,10 @@ impl HkannoPage {
         }
 
         // ── Editor ─────────────────────────────────────────────────────────────
-        egui::CentralPanel::default().frame(frame).show(ui, |ui| {
-            if self.tabs.is_empty() {
-                ui.centered_and_justified(|ui| ui.weak(ctx.i18n.t(I18nKey::HkannoEmptyMessage)));
-            } else {
-                self.editor(ui, &mut ctx);
-            }
-        });
+        egui::CentralPanel::default().frame(frame).show(ui, |ui| self.groups_ui(ui, &mut ctx));
 
         self.dialogs(ui.ctx(), &ctx);
         drop_overlay(ui.ctx(), ctx.i18n);
-    }
-
-    /// `│ attack.hkx ✖ │ idle.hkx ● │ ...  [Open]`: VS Code's tabs ([`egui_widgets::EditorTab`]).
-    /// `●`: unsaved edits; red / yellow: the file has errors / warnings.
-    fn tab_bar(&mut self, ui: &mut egui::Ui, ctx: &mut HkannoPageCtx<'_>) {
-        let menu = egui_widgets::TabMenu::from_texts(gui_shared::i18n::tab_menu_texts(ctx.i18n));
-        let mut picked = None;
-        let mut open = None;
-        ui.horizontal(|ui| {
-            egui::ScrollArea::horizontal().id_salt("hkanno_tab_scroll").show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    ui.spacing_mut().item_spacing.x = 0.0; // the tabs touch, with a line between them
-                    for (i, tab) in self.tabs.iter().enumerate() {
-                        let worst = egui_code_editor::problems::worst(&tab.editor_diagnostics);
-                        let tone = worst.map(|severity| severity.color(ui.visuals()));
-                        let focused = ui.memory(|m| m.has_focus(tab.editor_id()));
-                        let shown = egui_widgets::EditorTab::new(tab.title(), i == self.active)
-                            .focused(focused)
-                            .modified(tab.dirty)
-                            .tone(tone)
-                            .hover(tab.settings.input_path.as_str())
-                            .show(ui);
-                        let more = |ui: &mut egui::Ui| {
-                            tab_menu(ui, tab, ctx.i18n);
-                            None
-                        };
-                        if let Some(action) = shown.action(&menu, |action| (i, action), more) {
-                            picked = Some(action);
-                        }
-                    }
-                });
-            });
-
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui
-                    .add(Button::new(ctx.i18n.t(I18nKey::OpenButton)))
-                    .on_hover_text(ctx.i18n.t(I18nKey::HkannoOpenHover))
-                    .clicked()
-                {
-                    open =
-                        gui_shared::rfd::FileDialog::new().add_filter("Havok Animation", &["hkx", "xml"]).pick_files();
-                }
-            });
-        });
-
-        if let Some(files) = open {
-            self.open(files.into_iter().map(|p| p.display().to_string()), ctx);
-        }
-        let unsaved = match picked {
-            Some((at, TabAction::Show)) => {
-                self.active = at;
-                false
-            }
-            Some((at, TabAction::Close)) => {
-                self.close(at);
-                false
-            }
-            Some((at, TabAction::CloseOthers)) => self.close_where(|index| index != at),
-            Some((at, TabAction::CloseToTheRight)) => self.close_where(|index| index > at),
-            Some((_, TabAction::CloseAll)) => self.close_where(|_| true),
-            // No preview tabs here: every file opened stays.
-            Some((_, TabAction::KeepOpen)) | None => false,
-        };
-        if unsaved {
-            ctx.notify.error(ctx.i18n.t(I18nKey::HkannoTabUnsaved).to_owned());
-        }
     }
 
     /// The text editor of the active tab, with its status bar below (e.g. `-- INSERT --`).

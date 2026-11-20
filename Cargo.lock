@@ -4020,6 +4020,7 @@ version = "0.0.0"
 dependencies = [
  "egui",
  "egui_code_editor",
+ "egui_dock_area",
  "egui_widgets",
  "fast_hash",
  "gui_shared",
