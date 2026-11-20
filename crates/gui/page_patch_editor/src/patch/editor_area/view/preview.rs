@@ -47,7 +47,12 @@ pub(super) fn lines_ui(
     #[expect(clippy::cast_precision_loss, reason = "row counts are small")]
     let row_top = |row: usize| row as f32 * (row_height + ui.spacing().item_spacing.y);
     // Within what can be scrolled: past the end, the scroll area would go beyond and spring back.
-    let view_height = ui.available_height();
+    // The view is what the scroll area measured last frame: the room left less the horizontal bar
+    // (shown with a long line). Before that, the room left less the bar's.
+    let view_key = ui.make_persistent_id("patch_preview_view_height");
+    let room = ui.available_height();
+    let view_height =
+        ui.data(|data| data.get_temp(view_key)).unwrap_or_else(|| room - ui.spacing().scroll.allocated_width());
     let max_offset = (row_top(preview.lines().len()) - ui.spacing().item_spacing.y - view_height).max(0.0);
     let offset = |top: f32| top.clamp(0.0, max_offset);
     let mut scroll = egui::ScrollArea::both().auto_shrink(false);
@@ -62,7 +67,7 @@ pub(super) fn lines_ui(
 
     let current = preview.current;
     let mut event = None;
-    scroll.show_rows(ui, row_height, preview.lines().len(), |ui, range| {
+    let shown = scroll.show_rows(ui, row_height, preview.lines().len(), |ui, range| {
         let first_row = range.start;
         for (i, (kind, text)) in preview.lines()[range].iter().enumerate() {
             let size = egui::vec2(ui.available_width().max(content_width), row_height);
@@ -97,6 +102,7 @@ pub(super) fn lines_ui(
             }
         }
     });
+    ui.data_mut(|data| data.insert_temp(view_key, shown.inner_rect.height()));
     event
 }
 
