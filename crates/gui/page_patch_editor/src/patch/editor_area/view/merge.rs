@@ -54,11 +54,9 @@ impl EditorPane {
         let Some(values) = self.merge_values.take() else { return };
 
         let (picked, close) = {
-            let panel_id = if work.user_patch { "user_patch_merge" } else { "nemesis_merge" };
-            let panel = egui::Panel::right(panel_id).default_size(620.0).resizable(true);
             let template = &work.workspace.behaviors[active];
-            // Kept to the panel's width: see `egui_widgets::contained`.
-            panel.show(ui, |ui| egui_widgets::contained(ui, |ui| panel_ui(ui, i18n, (id, template), &values))).inner
+            // Kept to the tab's width: see `egui_widgets::contained`.
+            egui_widgets::contained(ui, |ui| panel_ui(ui, i18n, (id, template), &values))
         };
 
         if let Some(pick) = picked {

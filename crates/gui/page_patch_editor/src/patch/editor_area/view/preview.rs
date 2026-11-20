@@ -23,7 +23,7 @@ pub(super) fn nav_ui(preview: &mut Preview, ui: &mut egui::Ui, hover: &str) {
 
 /// What a click in the preview asked for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum PreviewEvent {
+pub(in crate::patch::editor_area) enum PreviewEvent {
     /// `↶`: put this changed block back to the template.
     Revert(usize),
     /// A double click: show this preview row in the editor.

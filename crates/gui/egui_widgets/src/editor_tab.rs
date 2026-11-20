@@ -250,7 +250,8 @@ impl EditorTab {
         let lock = if self.read_only { Self::CLOSE_SIZE + 2.0 } else { 0.0 };
         let letter = if self.decoration.is_some() { Self::CLOSE_SIZE } else { 0.0 };
         let width = self.padding + galley.size().x + 6.0 + lock + letter + Self::CLOSE_SIZE + self.padding;
-        let (rect, response) = ui.allocate_exact_size(egui::vec2(width, self.height), egui::Sense::click());
+        // Dragged too: a host may move it (e.g. to another group of tabs).
+        let (rect, response) = ui.allocate_exact_size(egui::vec2(width, self.height), egui::Sense::click_and_drag());
         // A hand over it, as over a link: it is clicked, not typed in.
         let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
         let response = match self.hover {

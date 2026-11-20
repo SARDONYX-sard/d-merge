@@ -92,16 +92,26 @@ impl EditorArea {
                 focused: editor_focused,
                 can_split: !behavior.added.contains_key(id) && !behavior.is_ref(id) && id != PANDORA_DOC,
                 can_graph: super::graph::can_show(behavior, &names.graph, id),
+                strip: &mut self.strip,
             };
             let toolbar = super::toolbar::show(ui, i18n, input);
             (result.walk_history, result.tab_event) = (toolbar.walk_history, toolbar.tab_event);
+
+            // The side tab is the one shown in this group: its content in the editor's place.
+            if self.groups.side_shown(self.drawing) {
+                self.side_ui(ui, i18n, work, sel);
+                return;
+            }
 
             if behavior.is_ref(id) {
                 ui.weak(i18n.t(I18nKey::RefReadOnly));
             }
 
-            toggle_problems = self.pane.status_bar(ui, i18n, keymap, work.user_patch);
-            clicked = problems.panel_ui(ui, i18n, &work.workspace.behaviors, &problem_keys);
+            // One status bar and Problems panel: the active group's.
+            if self.drawing == self.groups.active {
+                toggle_problems = self.pane.status_bar(ui, i18n, keymap, work.user_patch);
+                clicked = problems.panel_ui(ui, i18n, &work.workspace.behaviors, &problem_keys);
+            }
             let input = EditorInput {
                 behavior: (sel.active, behavior),
                 id,

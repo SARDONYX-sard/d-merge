@@ -5,6 +5,7 @@ use std::{path::Path, rc::Rc, time::Instant};
 use egui_code_editor::{EditorCommand, InlineDiff};
 use egui_widgets::TabAction;
 
+pub(super) mod groups;
 mod pane;
 mod revision_view;
 mod tab_bar;
@@ -44,6 +45,17 @@ pub(in crate::patch) struct EditorArea {
     tabs: EditorTabs,
     /// The diffs and blames of the history open as tabs. See [`Views`].
     views: Views,
+    /// The editor groups: the active one is this area's own state, the others parked there. See
+    /// [`groups`].
+    groups: groups::Groups,
+    /// The group being drawn (the active one, or another swapped in for it).
+    drawing: groups::GroupId,
+    /// The active group's state while another is swapped in to be drawn.
+    away: Option<groups::Parked>,
+    /// What the tab bar of the group being drawn tells the dock. See [`groups::TabStrip`].
+    strip: groups::TabStrip,
+    /// What the side tab asked (revert a block, go to a line), for the active group's object.
+    side_event: Option<view::preview::PreviewEvent>,
     /// The editor went to a place on its own (a problem, a definition, a reference, back / forward):
     /// the tree shows it, though the editor had the keyboard already (getting it shows it too).
     moved: bool,
@@ -281,11 +293,20 @@ impl EditorArea {
         event: Option<TabEvent>,
         current: &str,
     ) -> Option<(FileAction, String)> {
+        let event = event?;
+        // Another tab of the group clicked (or closed, its neighbor shown): no longer the side tab.
+        if matches!(event, TabEvent::Object(..) | TabEvent::View(..)) && self.groups.side_shown(self.drawing) {
+            self.groups.side = Some((self.drawing, false));
+        }
         let tabs = (&mut self.tabs, &mut self.views);
-        let outcome = match event? {
+        let outcome = match event {
             TabEvent::Object(action, id) => tab_events::object_action(tabs, sel.active, (action, id), current),
             TabEvent::View(action, at) => tab_events::view_action(tabs, sel.active, (action, at)),
             TabEvent::File(action, id) => return Some((action, id)),
+            TabEvent::Side(action) => {
+                self.side_action(action);
+                return None;
+            }
         };
         // The object shown was closed: `Ctrl+O` / `Alt+←` comes back to it, as in VS Code.
         if outcome.close_editor && sel.selected.as_deref() == Some(current) {
@@ -293,6 +314,20 @@ impl EditorArea {
         }
         self.apply_tab_outcome(sel, outcome);
         None
+    }
+
+    /// The side tab was clicked (shown in its group) or closed (the preview goes off).
+    const fn side_action(&mut self, action: TabAction) {
+        match action {
+            TabAction::Show => self.groups.side = Some((self.drawing, true)),
+            TabAction::Close => {
+                self.pane.show_preview = false;
+                if let Some(away) = &mut self.away {
+                    away.pane.show_preview = false;
+                }
+            }
+            _ => {}
+        }
     }
 
     /// What follows a tab event: another selection, the editor's state gone.

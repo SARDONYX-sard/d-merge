@@ -46,6 +46,17 @@ impl Keys {
         keybinding::host::take(&mut self.commands, command)
     }
 
+    /// This frame's commands, set aside: e.g. while a group of tabs that has not the keyboard is
+    /// drawn. See [`Self::restore`].
+    pub(in crate::patch) fn set_aside(&mut self) -> Vec<&'static str> {
+        std::mem::take(&mut self.commands)
+    }
+
+    /// The commands set aside, back. See [`Self::set_aside`].
+    pub(in crate::patch) fn restore(&mut self, commands: Vec<&'static str>) {
+        self.commands = commands;
+    }
+
     /// Takes every command `map` knows, in the order they came, as what `map` makes them.
     pub(in crate::patch) fn take_mapped<T>(&mut self, map: impl Fn(&str) -> Option<T>) -> Vec<T> {
         keybinding::host::take_mapped(&mut self.commands, map)

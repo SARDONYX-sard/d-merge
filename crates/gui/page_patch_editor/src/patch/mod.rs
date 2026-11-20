@@ -159,6 +159,8 @@ enum TabEvent {
     View(egui_widgets::TabAction, usize),
     /// The object's file: its path to the clipboard, or shown in the file manager.
     File(tool::file::FileAction, String),
+    /// The side tab: the patch preview, or a conflict's values. See `editor_area::groups`.
+    Side(egui_widgets::TabAction),
 }
 
 impl PatchTool {

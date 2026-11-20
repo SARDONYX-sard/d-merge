@@ -139,7 +139,7 @@ impl Views {
         i18n: &I18nMap,
         at: usize,
         (tabs, graph, active): (&crate::patch::editor::tabs::EditorTabs, &crate::patch::tree::Graph, usize),
-        keymap: Keymap,
+        (keymap, strip): (Keymap, &mut super::groups::TabStrip),
     ) -> ShownOutput {
         let mut output = ShownOutput::default();
         egui::CentralPanel::default().show(ui, |ui| {
@@ -151,7 +151,7 @@ impl Views {
                     ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                         let marks = super::tab_bar::TabMarks { focused: true, problems: None, changes: ("", &[]) };
                         output.tab_event =
-                            super::tab_bar::tab_bar(ui, i18n, tabs, (active, ""), graph, marks, &view_tabs);
+                            super::tab_bar::tab_bar(ui, i18n, tabs, (active, ""), graph, (marks, strip), &view_tabs);
                     });
                 });
             });
@@ -241,7 +241,7 @@ impl EditorArea {
 
         let keymap = Keymap::from_vim(self.pane.mode.is_vim());
         let names = work.names(active);
-        let output = self.views.show_at(ui, i18n, at, (&self.tabs, &names.graph, active), keymap);
+        let output = self.views.show_at(ui, i18n, at, (&self.tabs, &names.graph, active), (keymap, &mut self.strip));
         // What the key bindings see (`editorFocus`): this editor, as the object's is seen.
         self.pane.had_focus = output.has_focus;
 

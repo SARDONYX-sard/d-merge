@@ -656,6 +656,9 @@ pub enum I18nKey {
     /// Go to Line
     EditorGoToLine,
 
+    /// Close this group
+    EditorGroupCloseHover,
+
     /// Next tab (Alt+L, Ctrl+PageDown; Vim: gt, :tabn)
     EditorNextTab,
 
