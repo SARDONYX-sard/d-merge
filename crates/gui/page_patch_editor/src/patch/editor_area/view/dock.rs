@@ -24,7 +24,7 @@ use crate::patch::{
     },
     problems::Problems,
     tool::{keys::Keys, selection::Selection, work_state::Work},
-    workspace::{PANDORA_DOC, history::ObjectChange},
+    workspace::history::ObjectChange,
 };
 
 /// Draws each group, with what they need.
@@ -292,7 +292,7 @@ impl EditorArea {
             return;
         }
         let behavior = &work.workspace.behaviors[sel.active];
-        if behavior.added.contains_key(&*id) || behavior.is_ref(&id) || *id == *PANDORA_DOC {
+        if !behavior.has_preview(&id) {
             ui.weak(i18n.t(I18nKey::NoChange));
             return;
         }

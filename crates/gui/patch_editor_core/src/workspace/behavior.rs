@@ -318,6 +318,41 @@ impl Behavior {
             .or_else(|| self.refs.get(id).map(|object| object.class.as_str()))
     }
 
+    /// Has `id` a patch preview? Not a new object (written as is), an object of a referenced mod, nor
+    /// the Pandora document.
+    pub fn has_preview(&self, id: &str) -> bool {
+        !self.added.contains_key(id) && !self.is_ref(id) && id != PANDORA_DOC
+    }
+
+    /// A file `id` of the animation data, read from a mod: a patch (with `MOD_CODE` blocks, e.g.
+    /// `$header$/$header$.txt`) is the template's object (its original side) and its edit (the mod's
+    /// side), as an XML object is: the editor has the text as the mod makes it, the markers are the
+    /// preview's. A file without blocks is a new one, written as is.
+    pub(crate) fn add_anim_file(&mut self, id: String, text: String) {
+        if !text.contains("<!-- MOD_CODE") {
+            self.added.insert(id, text);
+            return;
+        }
+        self.read_anim_patch(id, &text);
+    }
+
+    /// An animation data patch `text` of `id` (with `MOD_CODE` blocks) as its edit: of the template's
+    /// object if it has one (a set of the anim set data), else of one made of the patch's original
+    /// side. See [`Self::add_anim_file`].
+    pub(crate) fn read_anim_patch(&mut self, id: String, text: &str) {
+        let edited = resolve(text, View::Mod).into_owned();
+        if self.template_object(&id).is_some() {
+            self.set_text(&id, &edited);
+            return;
+        }
+        let original = resolve(text, View::Original).into_owned();
+        #[expect(clippy::cast_possible_truncation, reason = "far fewer than 4 billion objects")]
+        self.object_index.insert(id.clone(), self.objects.len() as u32);
+        let object = TemplateObject { id: id.clone(), class: String::new(), name: String::new(), text: original };
+        self.objects.push(object);
+        self.set_text(&id, &edited);
+    }
+
     /// Is `id` an object of a referenced mod, which can be looked at but not changed?
     pub fn is_ref(&self, id: &str) -> bool {
         self.refs.contains_key(id) && !self.added.contains_key(id)
@@ -529,5 +564,28 @@ impl Behavior {
         };
         self.added.insert(id.clone(), text);
         id
+    }
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use std::path::Path;
+
+    use super::Behavior;
+    /// A file of the animation data with `MOD_CODE` blocks (a header the mod adds to) is the
+    /// template's and its edit: the editor has no marker, the preview has them again, of the work's
+    /// code. One without blocks is written as is.
+    #[test]
+    fn an_anim_patch_is_a_template_and_its_edit() {
+        let mut adsf = Behavior::open(Path::new("meshes/animationdatasinglefile.bin")).unwrap();
+        let header = "$header$/$header$.txt";
+        let blocks = "A.txt\n<!-- MOD_CODE ~m~ OPEN -->\nNew.txt\n<!-- CLOSE -->\n";
+        adsf.add_anim_file(header.to_owned(), blocks.to_owned());
+        adsf.add_anim_file("D~1/Slide~slide$0.txt".to_owned(), "Slide\n".to_owned());
+
+        assert_eq!(adsf.text(header), Some("A.txt\nNew.txt\n"), "the editor's: no marker");
+        assert_eq!(adsf.patch("m", header).as_deref(), Some(blocks), "the preview's: the blocks again");
+        assert!(adsf.has_preview(header));
+        assert!(!adsf.has_preview("D~1/Slide~slide$0.txt"), "new, written as is");
     }
 }

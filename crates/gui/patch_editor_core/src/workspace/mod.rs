@@ -138,6 +138,9 @@ fn read_cached_behavior(entry: &Path, done: &AtomicUsize) -> Result<Option<Behav
         if id == PANDORA_DOC {
             behavior.pandora_doc_ids = pandora_patch::doc::doc_object_ids(&text);
             behavior.pandora_doc = Some(text);
+        } else if behavior.is_anim_data() && text.contains("<!-- MOD_CODE") {
+            // Kept as its patch (see `files_to_save`): split again, as it was read from the mod.
+            behavior.read_anim_patch(id, &text);
         } else if behavior.template_object(&id).is_some() {
             behavior.edits.insert(id, text);
         } else {
@@ -432,13 +435,17 @@ impl Workspace {
         workspace.resolutions = sonic_rs::from_str(&resolutions).unwrap_or_default();
         // Counted too: they are most of what is read, after the patches of the work.
         workspace.reload_refs_counted(done);
-        let hashes = workspace.files_to_save()?.iter().map(|(path, text)| (path.clone(), text_hash(text))).collect();
+        let hashes =
+            workspace.files_to_save(code)?.iter().map(|(path, text)| (path.clone(), text_hash(text))).collect();
         workspace.saved = Some(SavedFiles { dir, hashes });
         Ok(workspace)
     }
 
     /// What the cache dir holds: file (relative to it) -> contents. See [`Self::save`].
-    fn files_to_save(&self) -> Result<BTreeMap<PathBuf, Cow<'_, str>>, String> {
+    ///
+    /// An edit of the animation data is kept as its patch (of `code`), as the mod has it: its template
+    /// side is not in the template (see [`Behavior::add_anim_file`]), and is read back from it.
+    fn files_to_save(&self, code: &str) -> Result<BTreeMap<PathBuf, Cow<'_, str>>, String> {
         let mut files = BTreeMap::new();
         files.insert(PathBuf::from("info.ini"), Cow::Owned(info_ini(&self.info)));
         let file = WorkspaceFile {
@@ -462,7 +469,15 @@ impl Workspace {
             let behavior_dir = PathBuf::from(behavior.cache_name());
             let template = behavior.template_path.display().to_string();
             files.insert(behavior_dir.join("template.path"), Cow::Owned(template));
-            for (id, text) in behavior.edits.iter().chain(&behavior.added) {
+            for (id, text) in &behavior.edits {
+                let kept = if behavior.is_anim_data() {
+                    behavior.patch(code, id).unwrap_or(Cow::Borrowed(text.as_str()))
+                } else {
+                    Cow::Borrowed(text.as_str())
+                };
+                files.insert(behavior_dir.join(cache_file(id)), kept);
+            }
+            for (id, text) in &behavior.added {
                 files.insert(behavior_dir.join(cache_file(id)), Cow::Borrowed(text.as_str()));
             }
             if let Some(name) = &behavior.pandora_file {
@@ -489,7 +504,7 @@ impl Workspace {
         let dir = Self::cache_dir(root, code);
         // Not known until this has succeeded: a failure leaves the disk in between.
         let known = self.saved.take().filter(|saved| saved.dir == dir && dir.is_dir());
-        let files = self.files_to_save()?;
+        let files = self.files_to_save(code)?;
         let hashes: BTreeMap<PathBuf, u64> = files.iter().map(|(path, text)| (path.clone(), text_hash(text))).collect();
 
         if known.is_none() && dir.is_dir() {
@@ -919,6 +934,32 @@ mod tests {
         std::fs::remove_dir_all(Workspace::cache_dir(&dir.join("other"), "mine")).unwrap();
         loaded.save(&dir.join("other"), "mine").unwrap();
         assert_eq!(read(&elsewhere.join("D~1%2Fa.txt.xml")), "a\n");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// An animation data patch (a header the mod adds to) comes back from the cache as it was read
+    /// from the mod: the edit of a template made of its original side, its patch with the blocks
+    /// again; and nothing to save again (no change seen each time it is opened).
+    #[test]
+    fn an_anim_patch_comes_back_from_the_cache() {
+        let dir = std::env::temp_dir().join(format!("d_merge_anim_cache_{}", std::process::id()));
+        let root = dir.join("caches");
+        let mut workspace = Workspace::default();
+        workspace.behaviors.push(Behavior::open(&dir.join("meshes").join(format!("{ADSF}.bin"))).unwrap());
+        let header = "$header$/$header$.txt";
+        let blocks = "A.txt\n<!-- MOD_CODE ~mine~ OPEN -->\nNew.txt\n<!-- CLOSE -->\n";
+        workspace.behaviors[0].add_anim_file(header.to_owned(), blocks.to_owned());
+        workspace.save(&root, "mine").unwrap();
+
+        let mut loaded = Workspace::load(&root, "mine").unwrap();
+        let behavior = &loaded.behaviors[0];
+        let edited = behavior.edits.get(header).map(String::as_str);
+        let patch = behavior.patch("mine", header).map(std::borrow::Cow::into_owned);
+        assert_eq!(edited, Some("A.txt\nNew.txt\n"), "an edit, no marker");
+        assert_eq!(patch.as_deref(), Some(blocks), "its preview: the blocks");
+        let unchanged = loaded.saved.as_ref().map(|saved| saved.hashes.clone());
+        loaded.save(&root, "mine").unwrap();
+        assert_eq!(loaded.saved.as_ref().map(|saved| saved.hashes.clone()), unchanged, "nothing changed");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

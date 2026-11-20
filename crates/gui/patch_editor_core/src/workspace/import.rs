@@ -31,7 +31,7 @@ pub(crate) fn import_adsf(mod_dir: &Path, template_root: &Path) -> Result<Option
         let project_name = file_name_of(&project);
         for file in read_dir(&project)?.filter(|p| p.is_file()) {
             let file_name = file_name_of(&file);
-            behavior.added.insert(format!("{project_name}/{file_name}"), read_text(&file)?);
+            behavior.add_anim_file(format!("{project_name}/{file_name}"), read_text(&file)?);
         }
     }
     Ok(Some(behavior))
@@ -75,9 +75,7 @@ pub(super) fn import_asdsf(
                         apply_to_template(&patch, behavior.template_object(&id).map_or("", |object| &object.text));
                     behavior.set_text(&id, &text);
                 }
-                None => {
-                    behavior.added.insert(wanted, read_text(&file)?);
-                }
+                None => behavior.add_anim_file(wanted, read_text(&file)?),
             }
         }
     }

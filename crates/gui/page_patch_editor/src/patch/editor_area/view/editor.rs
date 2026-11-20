@@ -90,7 +90,7 @@ impl EditorArea {
                 id,
                 graph: &names.graph,
                 focused: editor_focused,
-                can_split: !behavior.added.contains_key(id) && !behavior.is_ref(id) && id != PANDORA_DOC,
+                can_split: behavior.has_preview(id),
                 can_graph: super::graph::can_show(behavior, &names.graph, id),
                 strip: &mut self.strip,
             };
