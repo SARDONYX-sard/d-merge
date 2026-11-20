@@ -29,7 +29,9 @@ impl EditorPane {
             let language: &dyn egui_code_editor::Language =
                 if self.preview_roles.is_empty() { &egui_code_editor::languages::Xml } else { &anim };
             let view = self.preview_view.as_mut()?;
-            super::preview::lines_ui(view, ui, (i18n.t(I18nKey::PatchPreviewRevertHunkHover), language))
+            let object = self.opened.as_ref().map(|(behavior, id)| (*behavior, id.as_str()));
+            let texts = (i18n.t(I18nKey::PatchPreviewRevertHunkHover), language);
+            super::preview::lines_ui(view, ui, object, texts)
         })
     }
 

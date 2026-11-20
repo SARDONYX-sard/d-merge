@@ -30,10 +30,12 @@ pub(in crate::patch::editor_area) enum PreviewEvent {
 }
 
 /// The lines (only the visible ones are laid out).
+/// `object`: `(behavior, id)` of the object it is of: each keeps where it was scrolled to.
 /// `language`: of the patch's lines (XML, or the animation data's).
 pub(super) fn lines_ui(
     preview: &mut Preview,
     ui: &mut egui::Ui,
+    object: Option<(usize, &str)>,
     (revert_hover, language): (&str, &dyn egui_code_editor::Language),
 ) -> Option<PreviewEvent> {
     let row_height = ui.text_style_height(&egui::TextStyle::Monospace) + 2.0;
@@ -55,7 +57,14 @@ pub(super) fn lines_ui(
         ui.data(|data| data.get_temp(view_key)).unwrap_or_else(|| room - ui.spacing().scroll.allocated_width());
     let max_offset = (row_top(preview.lines().len()) - ui.spacing().item_spacing.y - view_height).max(0.0);
     let offset = |top: f32| top.clamp(0.0, max_offset);
-    let mut scroll = egui::ScrollArea::both().auto_shrink(false);
+    // Per object, as the editor's: one object's place, past another's end, would spring back slowly.
+    let id_salt = ("patch_preview_scroll", object);
+    let mut scroll = egui::ScrollArea::both().id_salt(id_salt).auto_shrink(false);
+    // Shorter since it was scrolled (e.g., an edit took lines away): at its end at once.
+    let scrolled = egui::scroll_area::State::load(ui.ctx(), ui.make_persistent_id(id_salt));
+    if scrolled.is_some_and(|state| state.unclamped_offset().y > max_offset) {
+        scroll = scroll.vertical_scroll_offset(max_offset);
+    }
     if let Some(row) = preview.take_followed_scroll() {
         scroll = scroll.vertical_scroll_offset(offset(row_top(row) - view_height / 2.0));
     }
